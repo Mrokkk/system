@@ -1,0 +1,4 @@
+bool 'Floppy driver' CONFIG_FLOPPY
+bool 'TTY driver' CONFIG_TTY y
+bool 'TTY printk' CONFIG_TTY_PRINTK y
+bool 'Serial driver' CONFIG_SERIAL y

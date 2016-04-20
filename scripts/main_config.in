@@ -1,0 +1,15 @@
+comment "Configure architecture"
+. arch/config.in
+
+comment "Configure arch-dependent features"
+. arch/$arch/config.in
+
+comment "Configure in-kernel features"
+. kernel/config.in
+
+comment "Configure file systems"
+. fs/config.in
+
+comment "Configure drivers"
+. drivers/config.in
+
