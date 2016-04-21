@@ -33,37 +33,13 @@ int kernel_symbols_size;
  *===========================================================================*/
 __noreturn void kmain() {
 
-    char arch_info[128], modules_list[128], irqs_list[128],
-            char_devices_list[128], block_devices_list[128];
-
     ASSERT_EQ(Check_Status, kernel_status, 0);
-
-    (void)arch_info; (void)modules_list; (void)irqs_list;
-    (void)char_devices_list; (void)block_devices_list;
 
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
 
     processes_init();
 
     kprocess_create(&init, "init");
-
-#ifdef CONFIG_PRINT_ARCH
-    arch_info_get(arch_info);
-    printk("%s", arch_info);
-#endif
-#ifdef CONFIG_PRINT_IRQS
-    irqs_list_get(irqs_list);
-    printk("%s", irqs_list);
-#endif
-#ifdef CONFIG_PRINT_MODULES
-    modules_list_get(modules_list);
-    printk("%s", modules_list);
-#endif
-#ifdef CONFIG_PRINT_DEVICES
-    char_devices_list_get(char_devices_list);
-    block_devices_list_get(block_devices_list);
-    printk("%s%s", char_devices_list, block_devices_list);
-#endif
 
     kernel_status = 1;
 
@@ -73,14 +49,15 @@ __noreturn void kmain() {
 
 }
 
-static void idle() {
+/*===========================================================================*
+ *                                   idle                                    *
+ *===========================================================================*/
+__noreturn static void idle() {
 
     process_stop(process_current);
-    resched();
     while (1);
 
 }
-
 
 /*===========================================================================*
  *                                  welcome                                  *
@@ -112,8 +89,31 @@ int init() {
      */
 
     int child_pid, status;
+    char arch_info[128], modules_list[128], irqs_list[128],
+            char_devices_list[128], block_devices_list[128];
+
+    (void)arch_info; (void)modules_list; (void)irqs_list;
+    (void)char_devices_list; (void)block_devices_list;
 
     modules_init();
+
+#ifdef CONFIG_PRINT_ARCH
+    arch_info_get(arch_info);
+    printk("%s", arch_info);
+#endif
+#ifdef CONFIG_PRINT_IRQS
+    irqs_list_get(irqs_list);
+    printk("%s", irqs_list);
+#endif
+#ifdef CONFIG_PRINT_MODULES
+    modules_list_get(modules_list);
+    printk("%s", modules_list);
+#endif
+#ifdef CONFIG_PRINT_DEVICES
+    char_devices_list_get(char_devices_list);
+    block_devices_list_get(block_devices_list);
+    printk("%s%s", char_devices_list, block_devices_list);
+#endif
 
     printf("This shouldn't be seen\n");
 

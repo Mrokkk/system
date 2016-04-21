@@ -2,33 +2,28 @@
 #define __MODULE_H_
 
 #include <kernel/compiler.h>
+#include <kernel/list.h>
 
 struct kernel_module {
     int (*init)();
     int (*deinit)();
     char *name;
     unsigned int this_module;
-    struct kernel_module *next;
+    struct list_head modules;
 };
 
-#define KERNEL_MODULE_MAGIC 0x254E0401
-
 #define KERNEL_MODULE(name) \
-    static int kmodule_init();              \
-    static int kmodule_deinit();            \
-    static unsigned int this_module;        \
-    __attribute__ ((section(".modules_data"))) \
-    unsigned int km_##name[] = {            \
-            KERNEL_MODULE_MAGIC,            \
-            (unsigned int)kmodule_init,     \
-            (unsigned int)kmodule_deinit,   \
-            (unsigned int)#name,            \
-            (unsigned int)&this_module      \
+    static int kmodule_init();                  \
+    static int kmodule_deinit();                \
+    static unsigned int this_module;            \
+    __attribute__ ((section(".modules_data")))  \
+    struct kernel_module km_##name = {          \
+            kmodule_init,                       \
+            kmodule_deinit,                     \
+            #name,                              \
+            (unsigned int)&this_module,         \
+            LIST_INIT(km_##name.modules)        \
     }
-
-#ifndef __alias
-#define __alias(x)
-#endif
 
 #define module_init(init) \
     static int kmodule_init() __alias(init)
@@ -36,10 +31,28 @@ struct kernel_module {
 #define module_exit(exit) \
     static int kmodule_deinit() __alias(exit)
 
+extern struct list_head modules;
+
+/*===========================================================================*
+ *                                module_add                                 *
+ *===========================================================================*/
+static inline void module_add(struct kernel_module *new) {
+
+    list_add_back(&new->modules, &modules);
+
+}
+
+/*===========================================================================*
+ *                               module_remove                               *
+ *===========================================================================*/
+static inline void module_remove(struct kernel_module *module) {
+
+    list_del(&module->modules);
+
+}
+
 int modules_init();
 int modules_list_get();
-int module_add(struct kernel_module *module);
-int module_remove(struct kernel_module *module);
 void modules_shutdown();
 struct kernel_module *module_find(unsigned int this_module);
 

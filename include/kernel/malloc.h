@@ -5,12 +5,14 @@
 
 #ifndef __ASSEMBLER__
 
+#include <kernel/list.h>
+
 struct memory_block {
     union {
         struct {
             unsigned int size;
             char free;
-            struct memory_block *next;
+            struct list_head blocks;
         };
         struct {
             unsigned char dummy[MEMORY_BLOCK_SIZE];

@@ -6,7 +6,7 @@ static struct memory_block *kmalloc_create_block(int size);
 
 extern unsigned int ram;
 static char *heap = _end;
-struct memory_block *memory_blocks = 0;
+DECLARE_LIST(memory_blocks);
 
 /*===========================================================================*
  *                                   ksbrk                                   *
@@ -39,7 +39,7 @@ static struct memory_block *kmalloc_create_block(int size) {
         return new; /* We're out of memory */
     new->size = size;
     new->free = 0;
-    new->next = 0;
+    list_init(&new->blocks);
 
     return new;
 
@@ -50,21 +50,14 @@ static struct memory_block *kmalloc_create_block(int size) {
  *===========================================================================*/
 void *kmalloc(size_t size) {
     
-    struct memory_block *temp = memory_blocks;
+    struct memory_block *temp;
     struct memory_block *new;
 
     /* Align size to multiplication of MEMORY_BLOCK_SIZE */
     if (size % MEMORY_BLOCK_SIZE)
         size = (size / MEMORY_BLOCK_SIZE) * MEMORY_BLOCK_SIZE + MEMORY_BLOCK_SIZE;
 
-    /* If list doesn't exist, create it */
-    if (unlikely(temp == NULL)) {
-        if (!(new = kmalloc_create_block(size))) return 0;
-        memory_blocks = new;
-        return (void *)new->block_ptr;
-    }
-
-    for (; temp->next != NULL; temp = temp->next) {
+    list_for_each_entry(temp, &memory_blocks, blocks) {
 
         /* If we found block with bigger size */
         if (temp->free && temp->size >= size) {
@@ -77,20 +70,21 @@ void *kmalloc(size_t size) {
             } else {
                 temp->free = 0;
                 temp->size = size;
-                new = (struct memory_block *)((unsigned int)temp->block_ptr + size);
-                new->free = 1;
-                new->next = temp->next;
+                new = (struct memory_block *)
+                    ((unsigned int)temp->block_ptr + size);
                 new->size = old_size - MEMORY_BLOCK_SIZE - temp->size;
-                temp->next = new;
+                new->free = 1;
+                list_add_front(&new->blocks, &temp->blocks);
+                ASSERT(temp->blocks.next == &new->blocks);
             }
 
             return (void *)temp->block_ptr;
         }
     }
 
-    /* Add nex block to the end of the list */
+    /* Add next block to the end of the list */
     if (!(new = kmalloc_create_block(size))) return 0;
-    temp->next = new;
+    list_add_back(&new->blocks, &memory_blocks);
 
     return (void *)new->block_ptr;
 
@@ -101,9 +95,9 @@ void *kmalloc(size_t size) {
  *===========================================================================*/
 int kfree(void *address) {
 
-    struct memory_block *temp = memory_blocks;
+    struct memory_block *temp;
 
-    do {
+    list_for_each_entry(temp, &memory_blocks, blocks) {
 
         /* If given address matches block data pointer, set free flag... */
         if ((unsigned int)temp->block_ptr == (unsigned int)address) {
@@ -111,19 +105,20 @@ int kfree(void *address) {
             return 0; /* ...and return */
         }
 
-        if (temp->next) {
+        if (temp->blocks.next != &memory_blocks) {
+
+            struct memory_block *next =
+                list_entry(temp->blocks.next, struct memory_block, blocks);
 
             /* Merge two neighboring blocks if they're free */
-            if (temp->next->free && temp->free) {
-                temp->size = temp->size + temp->next->size + MEMORY_BLOCK_SIZE;
-                temp->next = temp->next->next;
+            if (next->free && temp->free) {
+                temp->size = temp->size + next->size + MEMORY_BLOCK_SIZE;
+                list_del(&next->blocks);
             }
 
         }
 
-        temp = temp->next;
-
-    } while (temp != NULL);
+    }
 
     printk("cannot free 0x%x\n", (unsigned int)address);
     
