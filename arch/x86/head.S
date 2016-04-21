@@ -43,7 +43,8 @@ ENTRY(_start)
 
     /* Set up stack register */
     setup_stack:
-        movl $stack_top, %esp
+        movl $init_stack, %esp
+        addl $1024, %esp
         push %eax
         push %ebx
 
@@ -95,12 +96,4 @@ ENDPROC(_start)
 ENTRY(bad_magic_msg)
     .asciz "check_mb_magic: Not Multiboot v1 compilant bootloader!\n"
 END(bad_magic_msg)
-
-SECTION(.data)
-
-SECTION(.stack), "aw", @nobits
-ENTRY(kstack)
-    .skip 0x10000 /* 4 kB */
-ENTRY(stack_top)
-END(kstack)
 

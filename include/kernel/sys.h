@@ -1,6 +1,11 @@
 #ifndef INCLUDE_KERNEL_SYS_H_
 #define INCLUDE_KERNEL_SYS_H_
 
+#undef __syscall0
+#undef __syscall1
+#undef __syscall2
+#undef __syscall3
+#undef __syscall4
 #define __syscall0(call) int sys_##call();
 #define __syscall1(call, ...) int sys_##call();
 #define __syscall2(call, ...) int sys_##call();

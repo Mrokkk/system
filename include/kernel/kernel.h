@@ -71,15 +71,15 @@ struct kernel_init {
 #define INIT_PRIORITY_LO    2
 
 struct kernel_symbol *symbol_find(const char *name);
+struct kernel_symbol *symbol_find_address(unsigned int address);
 int symbols_read(char *symbols, unsigned int size);
 
+extern unsigned long init_kernel_stack[];
 extern struct cpu_info cpu_info;
 extern volatile unsigned int jiffies;
 extern char *symbols;
 extern unsigned int symbols_size;
 extern unsigned int ram;
-
-#define USER(x) __attribute__((section(".user_text"))) x
 
 #ifdef __cplusplus
 }

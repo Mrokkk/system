@@ -13,7 +13,10 @@ void scheduler() {
 
     struct process *last = process_current;
 
-    if (list_empty(&running)) return;
+    if (list_empty(&running)) {
+        process_current = &init_process;
+        goto end;
+    }
 
     if (process_current->stat != PROCESS_RUNNING) {
         process_current = list_entry(running.next, struct process, queue);
@@ -23,6 +26,8 @@ void scheduler() {
         if (temp == &running) temp = temp->next;
         process_current = list_entry(temp, struct process, queue);
     }
+
+end:
 
     if (last == process_current) return;
 

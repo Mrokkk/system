@@ -184,6 +184,14 @@ extern inline unsigned int dr3_get() {
         rv;                                         \
     })
 
+#define ss_get() \
+    ({                                              \
+        unsigned int rv;                            \
+        asm volatile("mov %%ss, %0" : "=r" (rv));   \
+        rv;                                         \
+    })
+
+
 #define esp_get() \
     ({                                              \
         unsigned int rv;                            \

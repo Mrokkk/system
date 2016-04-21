@@ -1,5 +1,5 @@
-#ifndef __SYSTEM_H_
-#define __SYSTEM_H_
+#ifndef __X86_SYSTEM_H_
+#define __X86_SYSTEM_H_
 
 #include <kernel/compiler.h>
 #include <kernel/process.h>
@@ -107,4 +107,4 @@ extern void get_from_user(void *, void *);
 extern void put_to_user(void *, void *);
 unsigned int ram_get();
 
-#endif /* __SYSTEM_H_ */
+#endif /* __X86_SYSTEM_H_ */

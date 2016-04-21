@@ -8,8 +8,10 @@
 #include <kernel/fs.h>
 #include <kernel/time.h>
 #include <kernel/test.h>
+#include <arch/register.h>
 
 void kmain();
+static void idle();
 static void welcome();
 int init();
 
@@ -27,38 +29,6 @@ int kernel_symbols_size;
 /* FIXME: Add better support for boot modules */
 
 /*===========================================================================*
- *                                kernel_init                                *
- *===========================================================================*/
-void kernel_init() {
-
-    /*
-     * FIXME: Improve this
-     */
-
-    struct kernel_init *init;
-    struct kernel_init *table[10];
-    int i, max = 0;
-
-    memset(table, 0, 40);
-
-    for (init = (struct kernel_init *)_skinit;
-         init < (struct kernel_init *)_ekinit;
-         init++) {
-        table[init->priority] = init;
-        if (max > init->priority) max = init->priority;
-        printk("Priority %d\n", init->priority);
-    }
-
-    for (i=0; i<10; i++) {
-        if (table[i]) {
-            printk("Running %s\n", table[i]->name);
-            table[i]->init();
-        }
-    }
-
-}
-
-/*===========================================================================*
  *                                   kmain                                   *
  *===========================================================================*/
 __noreturn void kmain() {
@@ -73,7 +43,9 @@ __noreturn void kmain() {
 
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
 
-    kernel_init();
+    processes_init();
+
+    kprocess_create(&init, "init");
 
 #ifdef CONFIG_PRINT_ARCH
     arch_info_get(arch_info);
@@ -95,19 +67,25 @@ __noreturn void kmain() {
 
     kernel_status = 1;
 
-    switch_to_user();
+    idle();
 
-    exit(init());
-
-    /* Not reachable */
     while (1);
 
 }
 
+static void idle() {
+
+    process_stop(process_current);
+    resched();
+    while (1);
+
+}
+
+
 /*===========================================================================*
  *                                  welcome                                  *
  *===========================================================================*/
-static void USER(welcome()) {
+static void welcome() {
 
     printf("myOS v%d.%d for %s\n",
     VERSION_MAJ, VERSION_MIN, stringify(ARCH));
@@ -122,12 +100,12 @@ static void USER(welcome()) {
 
 }
 
-int USER(temp_shell());
+int temp_shell();
 
 /*===========================================================================*
  *                                   init                                    *
  *===========================================================================*/
-int USER(init()) {
+int init() {
 
     /*
      * Whole is temporary while there's no real fs and binary loading...
@@ -135,10 +113,12 @@ int USER(init()) {
 
     int child_pid, status;
 
+    modules_init();
+
     printf("This shouldn't be seen\n");
 
     /* Open standard streams */
-    if (open("/dev/tty0", 0) || dup(0) || dup(0)) while (1);
+    if (open("/dev/tty0", 0) || dup(0) || dup(0)) exit(-1);
 
     /* Say hello */
     welcome();
@@ -152,12 +132,14 @@ int USER(init()) {
     /* Do fork */
     if ((child_pid = fork()) < 0) {
         printf("Fork error in init!\n");
-        return -1;
+        exit(-1);
     } else if (!child_pid) {
-        return temp_shell();
+        exit(temp_shell());
     }
 
-    while (1) waitpid(child_pid, &status, 0); /* Idle */
+    waitpid(child_pid, &status, 0);
+
+    exit(0);
 
     return 0;
 
@@ -166,7 +148,7 @@ int USER(init()) {
 /*===========================================================================*
  *                                 read_line                                 *
  *===========================================================================*/
-static inline void USER(read_line(char *line)) {
+static inline void read_line(char *line) {
 
     int size = read(0, line, 32);
     line[size-1] = 0;
@@ -176,7 +158,7 @@ static inline void USER(read_line(char *line)) {
 /*===========================================================================*
  *                                  c_zombie                                 *
  *===========================================================================*/
-static int USER(c_zombie()) {
+static int c_zombie() {
 
     int pid = fork();
 
@@ -187,7 +169,7 @@ static int USER(c_zombie()) {
 /*===========================================================================*
  *                                   c_bug                                   *
  *===========================================================================*/
-static int USER(c_bug()) {
+static int c_bug() {
 
     exec();
     printf("Bug!!!\n");
@@ -295,6 +277,20 @@ struct kernel_symbol *symbol_find(const char *name) {
 
     for (i = 0; i < kernel_symbols_size; i++) {
         if (!strncmp(kernel_symbols[i]->name, name, 32))
+            return kernel_symbols[i];
+    }
+
+    return 0;
+
+}
+
+struct kernel_symbol *symbol_find_address(unsigned int address) {
+
+    int i;
+
+    for (i = 0; i < kernel_symbols_size; i++) {
+        if ((address < kernel_symbols[i]->address + kernel_symbols[i]->size)
+                && (address > kernel_symbols[i]->address))
             return kernel_symbols[i];
     }
 

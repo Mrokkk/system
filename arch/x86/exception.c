@@ -30,6 +30,8 @@ void do_exception(
 ) {
 
     struct opcode_decoded_struct decoded;
+    struct kernel_symbol *symbol;
+    char *function;
     char string[80];
     unsigned int cr0 = cr0_get(),
                  cr2 = cr2_get(),
@@ -37,6 +39,8 @@ void do_exception(
                  cr4 = cr4_get();
 
     opcode_decode((unsigned char *)regs->eip, &decoded);
+    symbol = symbol_find_address(regs->eip);
+    function = symbol ? symbol->name : "<unknown>";
 
     if (nr == __NR_debug) { /* TODO: Debug */
 
@@ -48,11 +52,12 @@ void do_exception(
 
     /* If we are in user space, kill process and resched */
     if (regs->cs == USER_CS) {
-        printk("%s in process %d (%s) at 0x%x :: %s\n",
+        printk("%s in process %d (%s) at 0x%x (%s) :: %s\n",
                 exception_messages[nr],
                 process_current->pid,
                 process_current->name,
                 (unsigned int)regs->eip,
+                function,
                 decoded.string);
 
         process_exit(process_current);
@@ -65,6 +70,7 @@ void do_exception(
     eflags_bits_string_get(regs->eflags, string);
     printk("%s\n", string);
     printk("Instruction: %s\n", decoded.string);
+    printk("Procedure: %s\n", function);
 
     printk("CR0=0x%x\n", (unsigned int)cr0);
     cr0_bits_string_get(cr0, string);

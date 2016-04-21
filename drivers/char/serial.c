@@ -1,4 +1,5 @@
 #include <arch/io.h>
+#include <arch/register.h>
 #include <kernel/module.h>
 #include <kernel/device.h>
 #include <kernel/string.h>
@@ -182,7 +183,8 @@ static int c_running() {
     struct process *proc;
 
     list_for_each_entry(proc, &running, queue) {
-        serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name, proc->stat);
+        serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name,
+                proc->stat);
     }
     sys_exit(0);
     return 0;
@@ -196,8 +198,9 @@ static int c_ps() {
 
     struct process *proc;
 
-    list_for_each_entry(proc, &process_list, processes) {
-        serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name, proc->stat);
+    list_for_each_entry(proc, &init_process.processes, processes) {
+        serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name,
+                proc->stat);
     }
 
     sys_exit(0);
@@ -236,7 +239,7 @@ int kexit(int e) {
  *===========================================================================*/
 static int c_zombie() {
 
-    int pid = kthread_create(&kexit, "zombie");
+    int pid = kprocess_create(&kexit, "zombie");
 
     sys_exit(pid);
 
@@ -267,6 +270,8 @@ static struct command {
         {0, 0}
 };
 
+#include <arch/register.h>
+
 /*===========================================================================*
  *                                 seriald                                   *
  *===========================================================================*/
@@ -286,7 +291,7 @@ int seriald() {
         if (line[0] == 0) continue;
         for (i=0; com[i].name; i++) {
             if (!strcmp(com[i].name, line)) {
-                pid = kthread_create(com[i].function, com[i].name);
+                pid = kprocess_create(com[i].function, com[i].name);
                 if (pid > 0) sys_waitpid(pid, &status, 0);
                 break;
             }
@@ -335,7 +340,7 @@ int serial_init() {
 
     buffer_init(&serial_buffer, 32);
 
-    kthread_create(&seriald, "seriald");
+    kprocess_create(&seriald, "seriald");
 
     return 0;
 

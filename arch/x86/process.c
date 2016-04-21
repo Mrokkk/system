@@ -4,6 +4,7 @@
 #include <arch/segment.h>
 #include <arch/register.h>
 #include <arch/process.h>
+#include <kernel/process.h>
 
 #define PROCESS_KERNEL_STACK_SIZE 4096
 
@@ -31,39 +32,42 @@ static void *stack_copy(unsigned int *dest, unsigned int *src, unsigned int size
 /*===========================================================================*
  *                               process_copy                                *
  *===========================================================================*/
-int process_copy(struct process *dest, struct process *src,
-                 unsigned int *new_stack, struct pt_regs *old_regs) {
+int arch_process_copy(struct process *dest, struct process *src,
+        struct pt_regs *old_regs) {
 
     unsigned int *old_stack = (unsigned int *)src->mm.end;
-    unsigned int *stack;
+    unsigned int *stack, *old_stack_end = 0;
+    unsigned int *new_stack;
+    unsigned int cs, ss;
 
-    ASSERT(old_regs->cs == KERNEL_CS || old_regs->cs == USER_CS);
-    ASSERT(old_regs->ds == KERNEL_DS || old_regs->ds == USER_DS);
-    ASSERT(old_regs->ss == KERNEL_DS || old_regs->ss == USER_DS);
-    ASSERT(old_regs->gs == USER_DS);
+    /* Set correct values of CS and SS depending on the type
+     * of process
+     */
+    cs = dest->kernel ? KERNEL_CS : USER_CS;
+    ss = dest->kernel ? KERNEL_DS : USER_DS;
 
-    if (old_regs->cs == KERNEL_CS)
-        dest->kernel = 1;
+    /* If we're not changing privilege level, ESP value in pt_regs
+     * would be wrong and would point to return instruction. But that's
+     * not a problem, because its address is exactly ESP address we want.
+     */
+    if (old_regs->ss != KERNEL_DS && old_regs->ss != USER_DS) {
+        old_stack_end = (unsigned int *)&old_regs->esp;
+    } else old_stack_end = (unsigned int *)old_regs->esp;
 
-    memset(&dest->context, 0, sizeof(struct context));
-
-    /* Copy stack */
+    /* Copy stack if we're copying to user process */
     if (!dest->kernel)
-        new_stack = stack_copy(new_stack, old_stack,
-                (unsigned int)old_stack - old_regs->esp);
+        new_stack = stack_copy((unsigned int *)dest->context.esp, old_stack,
+                (unsigned int)old_stack - (unsigned int)old_stack_end);
+    else new_stack = (unsigned int *)dest->context.esp;
 
-    dest->context.iomap_offset = 104;
-    dest->context.ss0 = KERNEL_DS;
-    dest->context.esp0 = (unsigned int)kmalloc(PROCESS_KERNEL_STACK_SIZE) +
-            PROCESS_KERNEL_STACK_SIZE;
-
-    stack = (unsigned int *)dest->context.esp0;
+    stack = dest->kernel ? (unsigned int *)dest->context.esp
+            : (unsigned int *)dest->context.esp0;
 
     /* Setup kernel stack which should be loaded at context switch */
-    push(old_regs->ss, stack);                          /* ss */
+    push(ss, stack);                                    /* ss */
     push(new_stack, stack);                             /* esp */
     push(old_regs->eflags | 0x200, stack);              /* eflags */
-    push(old_regs->cs, stack);                          /* cs */
+    push(cs, stack);                                    /* cs */
     push(old_regs->eip, stack);                         /* eip */
     push(old_regs->gs, stack);                          /* gs */
     push(old_regs->fs, stack);                          /* fs */
@@ -78,11 +82,33 @@ int process_copy(struct process *dest, struct process *src,
     push(old_regs->ecx, stack);                         /* ecx */
     push(old_regs->ebx, stack);                         /* ebx */
 
+    /* Finally, set created stack to context struct */
     dest->context.esp = (unsigned int)stack;
     dest->context.eip = (unsigned int)&ret_from_syscall;
 
     /* Copy ports permissions */
     memcpy(dest->context.io_bitmap, src->context.io_bitmap, 128);
+
+    return 0;
+
+}
+
+int arch_exec(struct pt_regs *regs) {
+
+    (void)regs;
+
+    return 0;
+
+}
+
+int arch_process_init(struct process *proc) {
+
+    /* memset(&proc->context, 0, sizeof(struct context)); */
+    proc->context.iomap_offset = 104;
+    proc->context.ss0 = KERNEL_DS;
+    proc->context.esp0 = (unsigned int)kmalloc(PROCESS_KERNEL_STACK_SIZE) +
+            PROCESS_KERNEL_STACK_SIZE;
+    proc->context.esp = (unsigned int)proc->mm.end;
 
     return 0;
 
@@ -102,7 +128,7 @@ void arch_process_free(struct process *proc) {
 /*===========================================================================*
  *                          arch_kthread_regs_init                           *
  *===========================================================================*/
-int arch_kthread_regs_init(struct pt_regs *regs, unsigned int ip) {
+int arch_kprocess_regs_init(struct pt_regs *regs, unsigned int ip) {
 
     ASSERT(regs != 0);
     ASSERT(ip != 0);

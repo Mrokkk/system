@@ -25,9 +25,6 @@ SECTIONS
 		_smodules_data = .;
 		KEEP(*(.modules_data))
 		_emodules_data = .;
-		_skinit = .;
-		KEEP(*(.kernel_init))
-		_ekinit = .;
 		_edata = .;
 	}	
 

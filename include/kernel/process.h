@@ -5,6 +5,7 @@
 #include <kernel/wait.h>
 #include <kernel/fs.h>
 #include <kernel/signal.h>
+#include <arch/process.h>
 
 #ifndef INIT_PROCESS_CONTEXT
 #define INIT_PROCESS_CONTEXT
@@ -18,7 +19,7 @@
 #define INIT_PROCESS_STACK
 #endif
 
-#define INIT_PROCESS_PID 1
+#define INIT_PROCESS_PID 0
 
 #define PROCESS_SPACE 8192
 #define PROCESS_FILES 128
@@ -28,6 +29,13 @@
 #define PROCESS_WAITING     1
 #define PROCESS_STOPPED     2
 #define PROCESS_RUNNING     3
+
+#define USER_PROCESS        0
+#define KERNEL_PROCESS      1
+
+#define CLONE_STACK         2
+#define CLONE_FILES         4
+#define CLONE_OTHER         8
 
 struct mm {
     void *start, *end;
@@ -75,7 +83,7 @@ struct process {
 
 };
 
-#define INIT_PROCESS \
+#define PROCESS_INIT(proc) \
     {                                               \
         context: {INIT_PROCESS_CONTEXT},            \
         mm: {                                       \
@@ -85,12 +93,13 @@ struct process {
         },                                          \
         pid: INIT_PROCESS_PID,                      \
         priority: 1,                                \
-        name: "init",                               \
+        name: #proc,                                \
         stat: PROCESS_RUNNING,                      \
         processes:                                  \
-            LIST_INIT(init_process.processes),      \
+            LIST_INIT(proc.processes),              \
         queue:                                      \
-            LIST_INIT(init_process.queue),          \
+            LIST_INIT(proc.queue),                  \
+        kernel: 1,                                  \
     }
 
 extern struct process init_process;
@@ -104,13 +113,16 @@ extern struct list_head stopped;
 extern unsigned int total_forks;
 extern unsigned int context_switches;
 
+int processes_init();
+struct process *process_create(int type);
+void process_copy(struct process *dest, struct process *src, int clone, struct pt_regs *regs);
 struct process *process_find(int pid);
 int process_stop(struct process *proc);
 int process_wake(struct process *proc);
 int process_exit(struct process *proc);
 pid_t find_free_pid();
 void resched();
-int kthread_create(int (*start)(), const char *name);
+int kprocess_create(int (*start)(), const char *name);
 
 #endif /* __PROCESS_H_ */
 

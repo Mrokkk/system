@@ -2,9 +2,6 @@
 
 int sys_exec(struct pt_regs regs) {
 
-    (void)regs;
-    resched();
-
-    return 0;
+    return arch_exec(&regs);
 
 }

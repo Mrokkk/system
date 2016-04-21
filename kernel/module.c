@@ -11,7 +11,7 @@ struct kernel_module *modules_list = 0;
 /*===========================================================================*
  *                               modules_init                                *
  *===========================================================================*/
-KERNEL_INIT(modules_init, INIT_PRIORITY_MED)() {
+int modules_init() {
 
     struct kernel_module *module = 0;
     unsigned int *temp, i;

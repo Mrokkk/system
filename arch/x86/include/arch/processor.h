@@ -53,7 +53,6 @@ struct pt_regs {
     unsigned short ss, __ss;
 } __attribute__ ((packed));
 
-extern unsigned int stack_top;
 extern void ret_from_process();
 extern int init();
 void regs_print(struct pt_regs *regs);
@@ -79,14 +78,11 @@ void regs_print(struct pt_regs *regs);
 
 #define INIT_PROCESS_STACK_SIZE 256
 
-#define INIT_PROCESS_STACK \
-        [253] = (unsigned long)ret_from_process, \
-        [254] = 0,                               \
-        [255] = 0xdeadc0de
+#define INIT_PROCESS_STACK
 
 #define INIT_PROCESS_CONTEXT \
         .iomap_offset = 104,               \
-        .esp0 = (unsigned long)&stack_top, \
+        .esp0 = (unsigned long)&init_kernel_stack[INIT_PROCESS_STACK_SIZE], \
         .ss0 = 0x10,
 
 #endif /* __X86_PROCESSOR_H_ */
