@@ -141,7 +141,7 @@ int arch_kprocess_regs_init(struct pt_regs *regs, unsigned int ip) {
     regs->eip = ip;
     regs->ss = KERNEL_DS;
     regs->es = KERNEL_DS;
-    regs->gs = USER_DS;
+    regs->gs = KERNEL_DS;
     regs->fs = KERNEL_DS;
 
     return 0;

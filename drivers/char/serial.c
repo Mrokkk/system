@@ -292,7 +292,7 @@ int seriald() {
         for (i=0; com[i].name; i++) {
             if (!strcmp(com[i].name, line)) {
                 pid = kprocess_create(com[i].function, com[i].name);
-                if (pid > 0) sys_waitpid(pid, &status, 0);
+                if (pid > 0) waitpid(pid, &status, 0);
                 break;
             }
         }

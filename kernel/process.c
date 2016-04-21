@@ -100,21 +100,35 @@ static int process_state_change(struct process *proc, int stat) {
 }
 
 /*===========================================================================*
+ *                            process_wake_waiting                           *
+ *===========================================================================*/
+void process_wake_waiting(struct process *proc) {
+
+    struct process *temp;
+
+    list_for_each_entry(temp, &proc->wait_queue, wait_queue)
+        process_wake(temp);
+
+}
+
+/*===========================================================================*
  *                              process_exit                                 *
  *===========================================================================*/
 int process_exit(struct process *proc) {
 
-    int stat;
+    int errno;
 
     if (proc->pid == INIT_PROCESS_PID) { /* TODO: Shutdown system */
         printk("Init returned %d: shutdown now...\n", proc->errno);
         while (1);
     }
 
-    if ((stat = process_state_change(proc, NO_PROCESS))) {
-        printk("cannot change state of process %d :: %d\n", proc->pid, stat);
-        return 1;
-    }
+    if ((errno = process_state_change(proc, NO_PROCESS)))
+        return errno;
+
+    process_wake_waiting(proc);
+
+    if (proc == process_current) resched();
 
     while (1);
 
@@ -126,14 +140,45 @@ int process_exit(struct process *proc) {
  *                               process_stop                                *
  *===========================================================================*/
 int process_stop(struct process *proc) {
-    return process_state_change(proc, PROCESS_STOPPED);
+
+    int errno;
+
+    if ((errno = process_state_change(proc, PROCESS_STOPPED))) return errno;
+
+    if (proc == process_current) resched();
+
+    return 0;
+
 }
 
 /*===========================================================================*
  *                                process_wake                               *
  *===========================================================================*/
 int process_wake(struct process *proc) {
-    return process_state_change(proc, PROCESS_RUNNING);
+
+    int errno;
+
+    if ((errno = process_state_change(proc, PROCESS_RUNNING))) return errno;
+
+    if (proc == process_current) resched();
+
+    return 0;
+
+}
+
+/*===========================================================================*
+ *                                process_wait                               *
+ *===========================================================================*/
+int process_wait(struct process *proc) {
+
+    int errno;
+
+    if ((errno = process_state_change(proc, PROCESS_WAITING))) return errno;
+
+    if (proc == process_current) resched();
+
+    return 0;
+
 }
 
 /*===========================================================================*
@@ -161,11 +206,11 @@ struct process *process_create(int type) {
     new_process->mm.end = end;
     new_process->errno = 0;
     new_process->signals = 0;
-    new_process->wait_queue = 0;
     new_process->forks = 0;
     new_process->context_switches = 0;
     new_process->stat = NO_PROCESS;
     new_process->name = (char *)kmalloc(16);
+    list_init(&new_process->wait_queue);
 
     strcpy(new_process->name, "new");
 

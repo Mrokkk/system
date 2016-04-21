@@ -70,7 +70,7 @@ struct process {
     struct signals *signals;
 
     /* For sys_wait */
-    struct wait_queue *wait_queue;
+    struct list_head wait_queue;
 
     /* Pointers to other processes        *
      * 'y' means younger, 'o' means older */
@@ -99,6 +99,8 @@ struct process {
             LIST_INIT(proc.processes),              \
         queue:                                      \
             LIST_INIT(proc.queue),                  \
+        wait_queue:                                 \
+            LIST_INIT(proc.wait_queue),             \
         kernel: 1,                                  \
     }
 
@@ -119,6 +121,7 @@ void process_copy(struct process *dest, struct process *src, int clone, struct p
 struct process *process_find(int pid);
 int process_stop(struct process *proc);
 int process_wake(struct process *proc);
+int process_wait(struct process *proc);
 int process_exit(struct process *proc);
 pid_t find_free_pid();
 void resched();
