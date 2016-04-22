@@ -5,7 +5,6 @@
 #include <kernel/wait.h>
 #include <kernel/fs.h>
 #include <kernel/signal.h>
-#include <arch/process.h>
 
 #ifndef INIT_PROCESS_CONTEXT
 #define INIT_PROCESS_CONTEXT
@@ -125,7 +124,15 @@ int process_wait(struct process *proc);
 int process_exit(struct process *proc);
 pid_t find_free_pid();
 void resched();
-int kprocess_create(int (*start)(), const char *name);
+int kernel_process(int (*start)(), const char *name);
+
+/* Arch-dependent functions */
+int arch_process_copy(struct process *dest, struct process *src, struct pt_regs *old_regs);
+void arch_process_free(struct process *proc);
+int arch_kernel_process_regs(struct pt_regs *regs, unsigned int ip);
+int arch_exec(struct pt_regs *regs);
+int arch_process_init(struct process *proc);
+void regs_print(struct pt_regs *regs);
 
 #endif /* __PROCESS_H_ */
 

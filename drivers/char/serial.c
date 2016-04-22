@@ -239,7 +239,7 @@ int kexit(int e) {
  *===========================================================================*/
 static int c_zombie() {
 
-    int pid = kprocess_create(&kexit, "zombie");
+    int pid = kernel_process(&kexit, "zombie");
 
     sys_exit(pid);
 
@@ -291,7 +291,7 @@ int seriald() {
         if (line[0] == 0) continue;
         for (i=0; com[i].name; i++) {
             if (!strcmp(com[i].name, line)) {
-                pid = kprocess_create(com[i].function, com[i].name);
+                pid = kernel_process(com[i].function, com[i].name);
                 if (pid > 0) waitpid(pid, &status, 0);
                 break;
             }
@@ -340,7 +340,7 @@ int serial_init() {
 
     buffer_init(&serial_buffer, 32);
 
-    kprocess_create(&seriald, "seriald");
+    kernel_process(&seriald, "seriald");
 
     return 0;
 

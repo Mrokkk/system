@@ -39,7 +39,7 @@ __noreturn void kmain() {
 
     processes_init();
 
-    kprocess_create(&init, "init");
+    kernel_process(&init, "init");
 
     kernel_status = 1;
 

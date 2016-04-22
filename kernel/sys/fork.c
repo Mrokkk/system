@@ -1,5 +1,4 @@
 #include <kernel/process.h>
-#include <arch/process.h>
 #include <kernel/test.h>
 
 unsigned int total_forks;

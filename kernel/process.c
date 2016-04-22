@@ -1,6 +1,5 @@
 #include <kernel/process.h>
 #include <kernel/sys.h>
-#include <arch/process.h>
 
 static int process_state_change(struct process *proc, int stat);
 
@@ -256,12 +255,12 @@ void process_copy(struct process *dest, struct process *src, int clone_flags,
 /*===========================================================================*
  *                              kthread_create                               *
  *===========================================================================*/
-int kprocess_create(int (*start)(), const char *name) {
+int kernel_process(int (*start)(), const char *name) {
 
      struct pt_regs regs;
      struct process *new;
 
-     arch_kprocess_regs_init(&regs, (unsigned int)start);
+     arch_kernel_process_regs(&regs, (unsigned int)start);
 
      new = process_create(KERNEL_PROCESS);
      process_copy(new, process_current, CLONE_FILES, &regs);

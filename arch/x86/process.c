@@ -3,7 +3,6 @@
 #include <arch/string.h>
 #include <arch/segment.h>
 #include <arch/register.h>
-#include <arch/process.h>
 #include <kernel/process.h>
 
 #define PROCESS_KERNEL_STACK_SIZE 4096
@@ -128,7 +127,7 @@ void arch_process_free(struct process *proc) {
 /*===========================================================================*
  *                          arch_kthread_regs_init                           *
  *===========================================================================*/
-int arch_kprocess_regs_init(struct pt_regs *regs, unsigned int ip) {
+int arch_kernel_process_regs(struct pt_regs *regs, unsigned int ip) {
 
     ASSERT(regs != 0);
     ASSERT(ip != 0);

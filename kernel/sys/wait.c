@@ -1,5 +1,4 @@
 #include <kernel/process.h>
-#include <arch/process.h>
 #include <arch/io.h>
 
 /*===========================================================================*
