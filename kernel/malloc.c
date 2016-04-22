@@ -74,8 +74,7 @@ void *kmalloc(size_t size) {
                     ((unsigned int)temp->block_ptr + size);
                 new->size = old_size - MEMORY_BLOCK_SIZE - temp->size;
                 new->free = 1;
-                list_add_front(&new->blocks, &temp->blocks);
-                ASSERT(temp->blocks.next == &new->blocks);
+                list_add(&new->blocks, &temp->blocks);
             }
 
             return (void *)temp->block_ptr;
@@ -84,7 +83,7 @@ void *kmalloc(size_t size) {
 
     /* Add next block to the end of the list */
     if (!(new = kmalloc_create_block(size))) return 0;
-    list_add_back(&new->blocks, &memory_blocks);
+    list_add_tail(&new->blocks, &memory_blocks);
 
     return (void *)new->block_ptr;
 

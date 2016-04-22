@@ -29,7 +29,7 @@ int sys_waitpid(int pid, int *status, int opt) {
     last_stat = proc->stat;
 
     if (!process_check_stat(pid, last_stat)) return 0;
-    list_add_back(&process_current->wait_queue, &proc->wait_queue);
+    list_add_tail(&process_current->wait_queue, &proc->wait_queue);
     process_wait(process_current);
 
     put_to_user(status, &(proc->errno));

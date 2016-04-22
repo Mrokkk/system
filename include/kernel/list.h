@@ -28,11 +28,11 @@ static inline void __list_del(struct list_head *prev, struct list_head *next) {
     prev->next = next;
 }
 
-static inline void list_add_front(struct list_head *new, struct list_head *head) {
+static inline void list_add(struct list_head *new, struct list_head *head) {
     __list_add(new, head, head->next);
 }
 
-static inline void list_add_back(struct list_head *new, struct list_head *head) {
+static inline void list_add_tail(struct list_head *new, struct list_head *head) {
     __list_add(new, head->prev, head);
 }
 
@@ -48,7 +48,7 @@ static inline void list_del(struct list_head *entry) {
 
 static inline void list_move(struct list_head *list, struct list_head *head) {
         __list_del(list->prev, list->next);
-        list_add_back(list, head);
+        list_add_tail(list, head);
 }
 
 #define list_entry(ptr, type, member) \

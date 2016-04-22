@@ -25,7 +25,7 @@ int processes_init() {
     /*
      * Just add init_process to running queue
      */
-    list_add_back(&init_process.queue, &running);
+    list_add_tail(&init_process.queue, &running);
 
     return 0;
 
@@ -78,13 +78,13 @@ static int process_state_change(struct process *proc, int stat) {
     /* ...and add it to the relevant one */
     switch (stat) {
         case PROCESS_RUNNING:
-            list_add_back(&proc->queue, &running);
+            list_add_tail(&proc->queue, &running);
             break;
         case PROCESS_WAITING:
-            list_add_back(&proc->queue, &waiting);
+            list_add_tail(&proc->queue, &waiting);
             break;
         case PROCESS_STOPPED:
-            list_add_back(&proc->queue, &stopped);
+            list_add_tail(&proc->queue, &stopped);
             break;
         case NO_PROCESS:
             /* Nothing */
@@ -216,7 +216,7 @@ struct process *process_create(int type) {
 
     arch_process_init(new_process);
 
-    list_add_back(&new_process->processes, &init_process.processes);
+    list_add_tail(&new_process->processes, &init_process.processes);
 
     process_current->y_child = new_process;
     process_current->forks++;

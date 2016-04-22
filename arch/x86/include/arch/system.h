@@ -45,6 +45,8 @@ extern inline void wrmsr(unsigned int nr, unsigned int msr) {
 #define process_switch(prev, next) \
     do {                                \
         asm volatile(                   \
+            "pushl %%ebx;"              \
+            "pushl %%ecx;"              \
             "pushl %%esi;"              \
             "pushl %%edi;"              \
             "pushl %%ebp;"              \
@@ -57,6 +59,8 @@ extern inline void wrmsr(unsigned int nr, unsigned int msr) {
             "popl %%ebp;"               \
             "popl %%edi;"               \
             "popl %%esi;"               \
+            "popl %%ecx;"               \
+            "popl %%ebx;"               \
             : "=m" (prev->context.esp), \
               "=m" (prev->context.eip)  \
             : "m" (next->context.esp),  \

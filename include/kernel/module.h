@@ -38,7 +38,7 @@ extern struct list_head modules;
  *===========================================================================*/
 static inline void module_add(struct kernel_module *new) {
 
-    list_add_back(&new->modules, &modules);
+    list_add_tail(&new->modules, &modules);
 
 }
 
