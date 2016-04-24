@@ -2,25 +2,30 @@
 #define __BUFFER_H
 
 /*
- * Circular buffer implementation
+ * Implementation of circular buffer of chars
  */
 
-struct buffer_struct {
-    char in, out;
-    char buffer_size;
+struct buffer {
+    unsigned short in, out;
+    unsigned short buffer_size;
     char *data;
 };
 
-#define create_buffer_struct(name) \
-    struct name {            \
-        char in, out;        \
-        char buffer_size;    \
-        char *data;          \
+#define DECLARE_BUFFER(name, size) \
+    char __buffer_##name[size]; \
+    struct buffer name = {      \
+            0, 0, size,         \
+            __buffer_##name     \
     }
 
-int buffer_init(void *buf, int size);
-int buffer_put(void *buf, char c);
-int buffer_get(void *buf, char *c);
-int buffer_empty(void *buf);
+/*===========================================================================*
+ *                               buffer_empty                                *
+ *===========================================================================*/
+static inline int buffer_empty(struct buffer *buffer) {
+    return (buffer->in == buffer->out);
+}
+
+void buffer_put(struct buffer *buffer, char c);
+int buffer_get(struct buffer *buffer, char *c);
 
 #endif

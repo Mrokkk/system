@@ -21,7 +21,7 @@ int serial_write();
 int serial_read();
 void serial_irs();
 
-create_buffer_struct(serial_buffer) serial_buffer;
+DECLARE_BUFFER(serial_buffer, 32);
 
 char serial_status[4];
 
@@ -337,8 +337,6 @@ int serial_init() {
 
     irq_register(0x4, &serial_irs, "com1");
     irq_register(0x3, &serial_irs, "com2");
-
-    buffer_init(&serial_buffer, 32);
 
     kernel_process(&seriald, "seriald");
 

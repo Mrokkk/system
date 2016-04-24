@@ -42,8 +42,8 @@ static inline int list_empty(struct list_head *entry) {
 
 static inline void list_del(struct list_head *entry) {
     __list_del(entry->prev, entry->next);
-    entry->next = (void *) 0;
-    entry->prev = (void *) 0;
+    entry->next = (void *) entry;
+    entry->prev = (void *) entry;
 }
 
 static inline void list_move(struct list_head *list, struct list_head *head) {

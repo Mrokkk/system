@@ -4,6 +4,7 @@
 #include <kernel/module.h>
 #include <kernel/device.h>
 #include <kernel/buffer.h>
+#include <kernel/wait.h>
 
 int keyboard_init();
 
@@ -11,10 +12,8 @@ int keyboard_init();
 #define DATA_PORT 0x60
 #define STATUS_PORT 0x64
 
-create_buffer_struct(keyboard_buffer) keyboard_buffer;
-
-#define keyboard_disable()      do { keyboard_send_command(0xad); keyboard_wait(); } while (0)
-#define keyboard_enable()       keyboard_send_command(0xae)
+#define keyboard_disable()  do { keyboard_send_command(0xad); keyboard_wait(); } while (0)
+#define keyboard_enable()   keyboard_send_command(0xae)
 
 #define L_CTRL  0x1d
 #define L_ALT   0x38
@@ -82,6 +81,9 @@ char *scancodes[] = {
         "\0\0", "  ", "\0\0"
 };
 
+DECLARE_BUFFER(keyboard_buffer, 32);
+DECLARE_WAIT_QUEUE_HEAD(keyboard_wq);
+
 /*===========================================================================*
  *                               keyboard_wait                               *
  *===========================================================================*/
@@ -125,11 +127,15 @@ int keyboard_read(struct inode *inode, struct file *file, char *buffer,
         unsigned int size) {
 
     unsigned int i;
+    DECLARE_WAIT_QUEUE(kb, process_current);
 
-    (void)inode; (void)buffer; (void)size; (void)file;
+    (void)inode; (void)buffer; (void)size; (void)file; (void)kb;
 
     for (i=0; i<size; i++) {
-        while (buffer_get(&keyboard_buffer, &buffer[i]));
+        while (buffer_get(&keyboard_buffer, &buffer[i])) {
+            queue_push(&keyboard_wq, &kb);
+            process_wait(process_current);
+        }
         if (buffer[i] == '\n') return i+1;
         if (buffer[i] == '\b' && i > 0) {
             buffer[i--] = 0;
@@ -151,7 +157,7 @@ void keyboard_irs() {
 
     keyboard_disable();
 
-    /* Check if we have defined action
+    /* Check if we have a defined action
      * for this scancode */
     if (special_scancodes[scan_code]) {
         special_scancodes[scan_code]();
@@ -165,12 +171,16 @@ void keyboard_irs() {
         printk("^%c\n", character);
     } else {
         /* Insert character to circular buffer */
-        if (!buffer_put(&keyboard_buffer, character)) {
-            printk("%c", character); /* and print it */
+        buffer_put(&keyboard_buffer, character);
+        printk("%c", character); /* and print it */
+        if (!queue_empty(&keyboard_wq)) {
+            struct process *proc = queue_pop(&keyboard_wq);
+            process_wake(proc);
         } /* TODO: printing shouldn't be here */
     }
 
-    end: keyboard_enable();
+end:
+    keyboard_enable();
 
 }
 
@@ -224,7 +234,6 @@ int keyboard_init(void) {
 
     keyboard_enable();
 
-    buffer_init(&keyboard_buffer, 32);
     irq_register(0x01, keyboard_irs, "keyboard");
     
     return 0;
