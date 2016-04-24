@@ -1,10 +1,7 @@
 #ifndef __BIOS_H_
 #define __BIOS_H_
 
-#include <kernel/compiler.h>
-#include <arch/processor.h>
 #include <arch/real_mode.h>
-#include <arch/register.h>
 
 struct bios_data_area {
     unsigned short com_ports[4];

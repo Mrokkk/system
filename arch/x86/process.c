@@ -45,15 +45,15 @@ int arch_process_copy(struct process *dest, struct process *src,
     cs = dest->kernel ? KERNEL_CS : USER_CS;
     ss = dest->kernel ? KERNEL_DS : USER_DS;
 
-    /* If we're not changing privilege level, ESP value in pt_regs
-     * would be wrong and would point to return instruction. But that's
-     * not a problem, because its address is exactly ESP address we want.
+    /* If we're not changing privilege level, the ESP value in the pt_regs
+     * would be wrong and would point to the return instruction. But that's
+     * not a problem, because its address is exactly the ESP address we want.
      */
     if (old_regs->ss != KERNEL_DS && old_regs->ss != USER_DS) {
         old_stack_end = (unsigned int *)&old_regs->esp;
     } else old_stack_end = (unsigned int *)old_regs->esp;
 
-    /* Copy stack if we're copying to user process */
+    /* Copy stack if we're copying to the user process */
     if (!dest->kernel)
         new_stack = stack_copy((unsigned int *)dest->context.esp, old_stack,
                 (unsigned int)old_stack - (unsigned int)old_stack_end);
@@ -81,7 +81,7 @@ int arch_process_copy(struct process *dest, struct process *src,
     push(old_regs->ecx, stack);                         /* ecx */
     push(old_regs->ebx, stack);                         /* ebx */
 
-    /* Finally, set created stack to context struct */
+    /* Finally, set created stack to the context struct */
     dest->context.esp = (unsigned int)stack;
     dest->context.eip = (unsigned int)&ret_from_syscall;
 
@@ -92,6 +92,9 @@ int arch_process_copy(struct process *dest, struct process *src,
 
 }
 
+/*===========================================================================*
+ *                                arch_exec                                  *
+ *===========================================================================*/
 int arch_exec(struct pt_regs *regs) {
 
     (void)regs;
@@ -100,9 +103,11 @@ int arch_exec(struct pt_regs *regs) {
 
 }
 
+/*===========================================================================*
+ *                             arch_process_init                             *
+ *===========================================================================*/
 int arch_process_init(struct process *proc) {
 
-    /* memset(&proc->context, 0, sizeof(struct context)); */
     proc->context.iomap_offset = 104;
     proc->context.ss0 = KERNEL_DS;
     proc->context.esp0 = (unsigned int)kmalloc(PROCESS_KERNEL_STACK_SIZE) +
@@ -114,7 +119,7 @@ int arch_process_init(struct process *proc) {
 }
 
 /*===========================================================================*
- *                            arch_process_free                              *
+ *                             arch_process_free                             *
  *===========================================================================*/
 void arch_process_free(struct process *proc) {
 

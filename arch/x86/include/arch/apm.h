@@ -34,7 +34,7 @@
 #define APM_POWER_MANAGEMENT_DISABLE    (__APM_POWER_MANAGEMENT_DISABLE)
 #define APM_POWER_STATE_SET(dev, stat)  (__APM_POWER_STATE_SET | APM_ARG0(stat) | APM_ARG1(dev))
 
-/* apm_function ma poni¿sz¹ budowê  *
+/* apm_function layout:             *
  * 28    20     12      4      0    *
  * | ARG2 | ARG1 | ARG0 | F_NR |    */
 

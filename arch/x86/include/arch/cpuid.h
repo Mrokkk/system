@@ -1,8 +1,6 @@
 #ifndef __CPUID_H_
 #define __CPUID_H_
 
-#include <kernel/compiler.h>
-
 struct cpuid_regs {
     unsigned int eax;
     unsigned int ebx;
@@ -92,37 +90,6 @@ struct cpuid {
 #define INTEL_TM_STRING     "Thermal Monitor supported"
 #define INTEL_IA64_STRING   "IA64 processor emulating x86"
 #define INTEL_PBE_STRING    "Pending Break Enable"
-
-/*printd("CPU extensions:\n");
-cpuid_print_ext(ext, INTEL_FPU);
-cpuid_print_ext(ext, INTEL_VME);
-cpuid_print_ext(ext, INTEL_DE);
-cpuid_print_ext(ext, INTEL_PSE);
-cpuid_print_ext(ext, INTEL_TSC);
-cpuid_print_ext(ext, INTEL_MSR);
-cpuid_print_ext(ext, INTEL_PAE);
-cpuid_print_ext(ext, INTEL_MCE);
-cpuid_print_ext(ext, INTEL_CX8);
-cpuid_print_ext(ext, INTEL_APIC);
-cpuid_print_ext(ext, INTEL_SEP);
-cpuid_print_ext(ext, INTEL_MTRR);
-cpuid_print_ext(ext, INTEL_PGE);
-cpuid_print_ext(ext, INTEL_MCA);
-cpuid_print_ext(ext, INTEL_CMOV);
-cpuid_print_ext(ext, INTEL_PAT);
-cpuid_print_ext(ext, INTEL_PSE_36);
-cpuid_print_ext(ext, INTEL_PSN);
-cpuid_print_ext(ext, INTEL_CLFSH);
-cpuid_print_ext(ext, INTEL_DS);
-cpuid_print_ext(ext, INTEL_ACPI);
-cpuid_print_ext(ext, INTEL_MMX);
-cpuid_print_ext(ext, INTEL_FXSR);
-cpuid_print_ext(ext, INTEL_SSE);
-cpuid_print_ext(ext, INTEL_SSE2);
-cpuid_print_ext(ext, INTEL_SS);
-cpuid_print_ext(ext, INTEL_HTT);
-cpuid_print_ext(ext, INTEL_TM);
-cpuid_print_ext(ext, INTEL_IA64);*/
 
 #define cpuid_ext_avl(flags, ext) \
     ((flags) & (ext)) && 1

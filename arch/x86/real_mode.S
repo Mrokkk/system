@@ -3,30 +3,30 @@
 #include <arch/descriptor.h>
 
 #define HEAD_ADDRESS    0x500
-#define HEAD_SIZE        0x80
+#define HEAD_SIZE       0x80
 
-#define RETURN_ADDRESS    0x580
-#define RETURN_SIZE        0x80
+#define RETURN_ADDRESS  0x580
+#define RETURN_SIZE     0x80
 
-#define PROC_ADDRESS     0x600
-#define PROC_SIZE        0x100
+#define PROC_ADDRESS    0x600
+#define PROC_SIZE       0x100
 
-#define GP_ADDRESS        0x700
-#define GP_SIZE            0x6
+#define GP_ADDRESS      0x700
+#define GP_SIZE         0x6
 
-#define GDT_ADDRESS        0x706
+#define GDT_ADDRESS     0x706
 #define GDT_SIZE        24
 
-#define IDT_ADDRESS        0x71e
+#define IDT_ADDRESS     0x71e
 #define IDT_SIZE        0x6
 
 #define GP32_ADDRESS    0x724
 
-#define GDT32_ADDRESS    0x72a
+#define GDT32_ADDRESS   0x72a
 
-#define PARAMS_ADDRESS    0x800
+#define PARAMS_ADDRESS  0x800
 
-#define STACK_TOP        0x1000
+#define STACK_TOP       0x1000
 
 SECTION(.data)
 

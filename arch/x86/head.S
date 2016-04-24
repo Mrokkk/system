@@ -75,7 +75,6 @@ ENTRY(_start)
     /* Knows CPUID */
     _arch_setup:
         call_function(multiboot_read)
-        call_function(arch_setup)
 
     /* Check if bootloader was Multiboot compliant */
     check_mb_magic:

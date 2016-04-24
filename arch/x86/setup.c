@@ -22,14 +22,11 @@ int cpu_info_get();
 static void cpu_intel();
 void prepare_to_shutdown();
 void pit_configure();
-void delay_calibrate(void);
 void pic_disable();
 void irqs_configure();
-void irq_disable(int irq);
 
 /* In assembly */
 extern void sse_enable();
-extern void do_delay(unsigned int loops);
 
 /* Exceptions */
 #define __exception_noerrno(x) void exc_##x##_handler();
@@ -50,7 +47,6 @@ char *bootloader_name;
 char cmdline_saved[64];
 
 volatile char sse_enabled = 0;
-volatile char mmx_enabled = 0;
 
 struct bios_data_area *bda = (struct bios_data_area *)BDA_BASE_ADDRESS;
 
@@ -130,23 +126,18 @@ void arch_setup() {
     /* Read CPU info */
     cpu_info_get();
 
-    /* Store descriptors set by bootloader */
+    /* Store descriptors set by the bootloader */
     gdt_store(&old_gdt);
     old_gdt_entries = (struct gdt_entry *)old_gdt.base;
-
-    if (cpu_info.features & INTEL_MMX)
-        mmx_enabled = 1;
 
     if (cpu_info.features & INTEL_SSE)
         sse_enable();
 
     gdt_load(&gdt);
-    irqs_configure();
     idt_configure();
     tss_init();
-
+    irqs_configure();
     nmi_enable();
-
     apm_enable();
 
     irq_register(2, &empty_isr, "cascade");
@@ -155,7 +146,6 @@ void arch_setup() {
     pit_configure();
 
     sti(); /* Enable interrupts */
-    delay_calibrate();
 
 }
 
@@ -191,63 +181,6 @@ void pit_configure() {
 
 }
 
-unsigned long loops_per_sec = (1<<12);
-
-/* This is the number of bits of precision for the loops_per_second.  Each
-   bit takes on average 1.5/HZ seconds.  This (like the original) is a little
-   better than 1% */
-#define LPS_PREC 8
-
-/*===========================================================================*
- *                              delay_calibrate                              *
- *===========================================================================*/
-void delay_calibrate(void) {
-
-    unsigned int ticks;
-    int loopbit;
-    int lps_precision = LPS_PREC;
-    int i;
-
-    loops_per_sec = (1<<12);
-
-    for (i=0; i<320000; i++) asm volatile("nop");
-
-    printk("Calibrating delay loop.. ");
-    while (loops_per_sec <<= 1) {
-        /* wait for "start of" clock tick */
-        ticks = jiffies;
-        while (ticks == jiffies)
-            /* nothing */;
-        /* Go .. */
-        ticks = jiffies;
-        do_delay(loops_per_sec);
-        ticks = jiffies - ticks;
-        if (ticks)
-            break;
-    }
-
-    /* Do a binary approximation to get loops_per_second set to equal one clock
-     (up to lps_precision bits) */
-    loops_per_sec >>= 1;
-    loopbit = loops_per_sec;
-    while (lps_precision-- && (loopbit >>= 1) ) {
-        loops_per_sec |= loopbit;
-        ticks = jiffies;
-        while (ticks == jiffies);
-        ticks = jiffies;
-        do_delay(loops_per_sec);
-        if (jiffies != ticks)    /* longer than 1 tick */
-            loops_per_sec &= ~loopbit;
-    }
-
-/* finally, adjust loops per second in terms of seconds instead of clocks */
-    loops_per_sec *= HZ;
-/* Round the value and print it */
-    printk("ok - %lu.%02lu BogoMIPS\n",
-        (loops_per_sec+2500)/500000,
-        ((loops_per_sec+2500)/5000) % 100);
-
-}
 
 /*===========================================================================*
  *                                   delay                                   *

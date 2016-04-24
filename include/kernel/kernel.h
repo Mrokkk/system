@@ -1,10 +1,6 @@
 #ifndef __KERNEL_H_
 #define __KERNEL_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <kernel/version.h>
 #include <kernel/compile.h>
 #include <kernel/config.h>
@@ -52,27 +48,10 @@ struct kernel_symbol {
     char type;
 };
 
-struct kernel_init {
-    char *name;
-    int (*init)();
-    int priority;
-};
-
-#define KERNEL_INIT(name, prio) \
-        int name();                                 \
-        __attribute__((section(".kernel_init")))    \
-        struct kernel_init __##name = {             \
-                #name, name, prio                   \
-        };                                          \
-        int name
-
-#define INIT_PRIORITY_HI    0
-#define INIT_PRIORITY_MED   1
-#define INIT_PRIORITY_LO    2
-
 struct kernel_symbol *symbol_find(const char *name);
 struct kernel_symbol *symbol_find_address(unsigned int address);
 int symbols_read(char *symbols, unsigned int size);
+void arch_setup();
 
 extern unsigned long init_kernel_stack[];
 extern struct cpu_info cpu_info;
@@ -80,9 +59,5 @@ extern volatile unsigned int jiffies;
 extern char *symbols;
 extern unsigned int symbols_size;
 extern unsigned int ram;
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

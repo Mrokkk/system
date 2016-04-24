@@ -28,12 +28,71 @@ int kernel_symbols_size;
 /* FIXME: Specify interface for reading RAM */
 /* FIXME: Add better support for boot modules */
 
+unsigned long loops_per_sec = (1<<12);
+
+/* This is the number of bits of precision for the loops_per_second.  Each
+   bit takes on average 1.5/HZ seconds.  This (like the original) is a little
+   better than 1% */
+#define LPS_PREC 8
+
+/*===========================================================================*
+ *                              delay_calibrate                              *
+ *===========================================================================*/
+void delay_calibrate(void) {
+
+    unsigned int ticks;
+    int loopbit;
+    int lps_precision = LPS_PREC;
+    int i;
+
+    loops_per_sec = (1<<12);
+
+    for (i=0; i<320000; i++) asm volatile("nop");
+
+    printk("Calibrating delay loop.. ");
+    while (loops_per_sec <<= 1) {
+        /* wait for "start of" clock tick */
+        ticks = jiffies;
+        while (ticks == jiffies)
+            /* nothing */;
+        /* Go .. */
+        ticks = jiffies;
+        do_delay(loops_per_sec);
+        ticks = jiffies - ticks;
+        if (ticks)
+            break;
+    }
+
+    /* Do a binary approximation to get loops_per_second set to equal one clock
+     (up to lps_precision bits) */
+    loops_per_sec >>= 1;
+    loopbit = loops_per_sec;
+    while (lps_precision-- && (loopbit >>= 1) ) {
+        loops_per_sec |= loopbit;
+        ticks = jiffies;
+        while (ticks == jiffies);
+        ticks = jiffies;
+        do_delay(loops_per_sec);
+        if (jiffies != ticks)    /* longer than 1 tick */
+            loops_per_sec &= ~loopbit;
+    }
+
+/* finally, adjust loops per second in terms of seconds instead of clocks */
+    loops_per_sec *= HZ;
+/* Round the value and print it */
+    printk("ok - %lu.%02lu BogoMIPS\n",
+        (loops_per_sec+2500)/500000,
+        ((loops_per_sec+2500)/5000) % 100);
+
+}
+
 /*===========================================================================*
  *                                   kmain                                   *
  *===========================================================================*/
 __noreturn void kmain() {
 
-    ASSERT_EQ(Check_Status, kernel_status, 0);
+    arch_setup();
+    delay_calibrate();
 
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
 

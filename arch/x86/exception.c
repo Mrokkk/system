@@ -9,7 +9,6 @@
 #include <arch/system.h>
 #include <arch/descriptor.h>
 #include <arch/cpuid.h>
-#include <arch/opcode.h>
 #include <arch/register.h>
 #include <arch/segment.h>
 
@@ -29,7 +28,6 @@ void do_exception(
     struct pt_regs *regs    /* Registers */
 ) {
 
-    struct opcode_decoded_struct decoded;
     struct kernel_symbol *symbol;
     char *function;
     char string[80];
@@ -38,13 +36,12 @@ void do_exception(
                  cr3 = cr3_get(),
                  cr4 = cr4_get();
 
-    opcode_decode((unsigned char *)regs->eip, &decoded);
     symbol = symbol_find_address(regs->eip);
     function = symbol ? symbol->name : "<unknown>";
 
     if (nr == __NR_debug) { /* TODO: Debug */
 
-        printk("Instruction: 0x%08x : %s\n", regs->eip, decoded.string);
+        printk("Instruction: 0x%08x : <>", regs->eip);
 
         return;
 
@@ -52,13 +49,12 @@ void do_exception(
 
     /* If we are in user space, kill process and resched */
     if (regs->cs == USER_CS) {
-        printk("%s in process %d (%s) at 0x%x (%s) :: %s\n",
+        printk("%s in process %d (%s) at 0x%x (%s)\n",
                 exception_messages[nr],
                 process_current->pid,
                 process_current->name,
                 (unsigned int)regs->eip,
-                function,
-                decoded.string);
+                function);
 
         process_exit(process_current);
         while (1);
@@ -69,7 +65,6 @@ void do_exception(
     printk("IOPL=%d; ", ((unsigned int)regs->eflags >> 12) & 0x3);
     eflags_bits_string_get(regs->eflags, string);
     printk("%s\n", string);
-    printk("Instruction: %s\n", decoded.string);
     printk("Procedure: %s\n", function);
 
     printk("CR0=0x%x\n", (unsigned int)cr0);

@@ -3,12 +3,10 @@
 
 #include <kernel/compiler.h>
 
-/* Makra pozwalaj¹ce na odczyt pamiêci pod poszczególnymi adresami */
 #define readb(address) (*(unsigned char *)(address))
 #define readw(address) (*(unsigned short *)(address))
 #define readl(address) (*(unsigned long *)(address))
 
-/* Makra pozwalaj¹ce na zapis pamiêci pod poszczególnymi adresami */
 #define writeb(data, address) ((*(unsigned char *)(address)) = (data))
 #define writew(data, address) ((*(unsigned short *)(address)) = (data))
 #define writel(data, address) ((*(unsigned long *)(address)) = (data))

@@ -68,39 +68,8 @@ extern inline void wrmsr(unsigned int nr, unsigned int msr) {
               "a" (prev), "d" (next));  \
     } while (0)
 
-#define switch_to_user() \
-    do {                                        \
-        asm volatile(                           \
-            "pushl %0;"                         \
-            "mov $init_stack, %%eax;"           \
-            "add %2, %%eax;"                    \
-            "pushl %%eax;"                      \
-            "pushl $0x200;"                     \
-            "pushl %1;"                         \
-            "push $1f;"                         \
-            "iret;"                             \
-            "1:"                                \
-            "mov %0, %%eax;"                    \
-            "mov %%ax, %%ds;"                   \
-            "mov %%ax, %%es;"                   \
-            "mov %%ax, %%fs;"                   \
-            "mov %%ax, %%gs;"                   \
-            :: "i" (USER_DS), "i" (USER_CS),    \
-               "i" (4*INIT_PROCESS_STACK_SIZE)  \
-        );                                      \
-    } while (0)
-
 extern unsigned long loops_per_sec;
 extern void do_delay();
-
-extern inline void udelay(unsigned long usecs) {
-
-    usecs *= loops_per_sec/1000000;
-
-    do_delay(usecs);
-
-}
-
 extern void irq_enable(unsigned int);
 extern void delay(unsigned int);
 extern void reboot();
@@ -110,5 +79,13 @@ extern void copy_to_user(void *dest, void *src, unsigned int size);
 extern void get_from_user(void *, void *);
 extern void put_to_user(void *, void *);
 unsigned int ram_get();
+
+extern inline void udelay(unsigned long usecs) {
+
+    usecs *= loops_per_sec/1000000;
+
+    do_delay(usecs);
+
+}
 
 #endif /* __X86_SYSTEM_H_ */
