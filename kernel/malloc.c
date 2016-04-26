@@ -6,7 +6,7 @@ static struct memory_block *kmalloc_create_block(int size);
 
 extern unsigned int ram;
 static char *heap = _end;
-DECLARE_LIST(memory_blocks);
+LIST_DECLARE(memory_blocks);
 
 /*===========================================================================*
  *                                   ksbrk                                   *
@@ -59,7 +59,7 @@ void *kmalloc(size_t size) {
 
     list_for_each_entry(temp, &memory_blocks, blocks) {
 
-        /* If we found block with bigger size */
+        /* If we have found block with bigger size */
         if (temp->free && temp->size >= size) {
 
             unsigned int old_size = temp->size;
@@ -98,7 +98,7 @@ int kfree(void *address) {
 
     list_for_each_entry(temp, &memory_blocks, blocks) {
 
-        /* If given address matches block data pointer, set free flag... */
+        /* If given address matches the block data pointer, set free flag... */
         if ((unsigned int)temp->block_ptr == (unsigned int)address) {
             temp->free = 1;
             return 0; /* ...and return */

@@ -8,12 +8,12 @@
 #include <kernel/fs.h>
 #include <kernel/time.h>
 #include <kernel/test.h>
-#include <arch/register.h>
 
 void kmain();
 static void idle();
 static void welcome();
 int init();
+void delay_calibrate(void);
 
 struct cpu_info cpu_info;
 

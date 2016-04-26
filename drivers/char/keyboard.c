@@ -5,6 +5,8 @@
 #include <kernel/device.h>
 #include <kernel/buffer.h>
 #include <kernel/wait.h>
+#include <kernel/spinlock.h>
+#include <kernel/semaphore.h>
 
 int keyboard_init();
 
@@ -81,8 +83,8 @@ char *scancodes[] = {
         "\0\0", "  ", "\0\0"
 };
 
-DECLARE_BUFFER(keyboard_buffer, 32);
-DECLARE_WAIT_QUEUE_HEAD(keyboard_wq);
+BUFFER_DECLARE(keyboard_buffer, 32);
+WAIT_QUEUE_HEAD_DECLARE(keyboard_wq);
 
 /*===========================================================================*
  *                               keyboard_wait                               *
@@ -127,13 +129,13 @@ int keyboard_read(struct inode *inode, struct file *file, char *buffer,
         unsigned int size) {
 
     unsigned int i;
-    DECLARE_WAIT_QUEUE(kb, process_current);
+    WAIT_QUEUE_DECLARE(kb, process_current);
 
     (void)inode; (void)buffer; (void)size; (void)file; (void)kb;
 
     for (i=0; i<size; i++) {
         while (buffer_get(&keyboard_buffer, &buffer[i])) {
-            queue_push(&keyboard_wq, &kb);
+            wait_queue_push(&kb, &keyboard_wq);
             process_wait(process_current);
         }
         if (buffer[i] == '\n') return i+1;
@@ -173,8 +175,9 @@ void keyboard_irs() {
         /* Insert character to circular buffer */
         buffer_put(&keyboard_buffer, character);
         printk("%c", character); /* and print it */
-        if (!queue_empty(&keyboard_wq)) {
-            struct process *proc = queue_pop(&keyboard_wq);
+
+        if (!wait_queue_empty(&keyboard_wq)) {
+            struct process *proc = wait_queue_pop(&keyboard_wq);
             process_wake(proc);
         } /* TODO: printing shouldn't be here */
     }

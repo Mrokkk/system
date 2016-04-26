@@ -103,6 +103,9 @@ struct process {
         kernel: 1,                                  \
     }
 
+#define PROCESS_DECLARE(name) \
+    struct process name = PROCESS_INIT(name)
+
 extern struct process init_process;
 extern struct process *process_current;
 

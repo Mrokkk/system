@@ -8,11 +8,11 @@ unsigned long init_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, };
 unsigned long init_kernel_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, };
 
 /* Init process itself */
-struct process init_process = PROCESS_INIT(init_process);
+PROCESS_DECLARE(init_process);
 
-DECLARE_LIST(running);
-DECLARE_LIST(waiting);
-DECLARE_LIST(stopped);
+LIST_DECLARE(running);
+LIST_DECLARE(waiting);
+LIST_DECLARE(stopped);
 
 static pid_t last_pid = INIT_PROCESS_PID;
 
@@ -158,8 +158,6 @@ int process_wake(struct process *proc) {
     int errno;
 
     if ((errno = process_state_change(proc, PROCESS_RUNNING))) return errno;
-
-    if (proc == process_current) resched();
 
     return 0;
 

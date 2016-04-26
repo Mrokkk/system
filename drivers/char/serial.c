@@ -9,6 +9,7 @@
 #include <kernel/stdarg.h>
 #include <kernel/stddef.h>
 #include <kernel/sys.h>
+#include <kernel/semaphore.h>
 
 #define COM1 0x3f8
 #define COM2 0x2f8
@@ -21,7 +22,7 @@ int serial_write();
 int serial_read();
 void serial_irs();
 
-DECLARE_BUFFER(serial_buffer, 32);
+BUFFER_DECLARE(serial_buffer, 32);
 
 char serial_status[4];
 
@@ -34,6 +35,8 @@ static struct file_operations fops = {
 KERNEL_MODULE(serial);
 module_init(serial_init);
 module_exit(serial_deinit);
+
+SEMAPHORE_DECLARE(serial_sem, 1);
 
 /*===========================================================================*
  *                                 serial_open                               *
@@ -118,11 +121,13 @@ void serial_irs() {
 int serial_write(struct inode *inode, struct file *file, const char *buffer,
         unsigned int size) {
 
+    unsigned int old = size;
+
     (void)inode; (void)file;
 
     while (size--) serial_send(*buffer++, COM1);
 
-    return size;
+    return old;
 
 }
 
@@ -217,10 +222,14 @@ static int c_kstat() {
 
     int uptime = jiffies/HZ;
 
+    semaphore_down(&serial_sem);
+
     print_data(jiffies);
     print_data(uptime);
     print_data(context_switches);
     print_data(total_forks);
+
+    semaphore_up(&serial_sem);
 
     sys_exit(0);
     return 0;

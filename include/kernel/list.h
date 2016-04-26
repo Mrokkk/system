@@ -6,7 +6,7 @@ struct list_head {
 };
 
 #define LIST_INIT(list) { &(list), &(list) }
-#define DECLARE_LIST(name) struct list_head name = LIST_INIT(name)
+#define LIST_DECLARE(name) struct list_head name = LIST_INIT(name)
 
 static inline void list_init(struct list_head *list) {
     list->next = list->prev = list;
@@ -53,6 +53,9 @@ static inline void list_move(struct list_head *list, struct list_head *head) {
 
 #define list_entry(ptr, type, member) \
         ((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
+
+#define list_next_entry(ptr, type, member) \
+        ((type *)((char *)((ptr)->next)-(unsigned long)(&((type *)0)->member)))
 
 #define list_for_each(pos, head) \
     for (pos = (head)->next; pos != (head); pos = pos->next)

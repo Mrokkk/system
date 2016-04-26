@@ -6,7 +6,7 @@
  * Whole modules implementation is temporary
  */
 
-DECLARE_LIST(modules);
+LIST_DECLARE(modules);
 
 /*===========================================================================*
  *                               modules_init                                *

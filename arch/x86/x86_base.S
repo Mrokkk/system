@@ -7,6 +7,40 @@
 #include <kernel/unistd.h>
 
 /*===========================================================================*
+ *                            __semaphore_wake                               *
+ *===========================================================================*/
+ENTRY(__semaphore_wake)
+    push %eax
+    push %edx
+    push %ecx
+    call __up
+    pop %eax
+    pop %edx
+    pop %ecx
+    ret
+ENDPROC(__semaphore_wake)
+
+/*===========================================================================*
+ *                            __semaphore_sleep                              *
+ *===========================================================================*/
+ENTRY(__semaphore_sleep)
+    push %eax
+    push %edx
+    push %ecx
+    call __down_failed
+    pop %eax
+    pop %edx
+    pop %ecx
+    ret
+ENDPROC(__semaphore_sleep)
+
+/*
+ * Procedures copying from/to user have to
+ * be here, because GCC (at least 4.8.2) can't
+ * override segments.
+ */
+
+/*===========================================================================*
  *                               get_from_user                               *
  *===========================================================================*/
 ENTRY(get_from_user)
@@ -95,9 +129,9 @@ ENTRY(do_delay)
         mov 4(%esp), %eax
         jmp 1f
     .align 16
-    1:    jmp 2f
+    1:  jmp 2f
     .align 16
-    2:    decl %eax
+    2:  decl %eax
         jns 2b
         ret
 ENDPROC(do_delay)
@@ -121,10 +155,10 @@ ENTRY(syscall_handler) /* INT 0x80 handler */
         mov %eax, REGS_EAX(%esp) /* Put value returned by *
                                   * syscall in pt_regs    */
 
-    .global ret_from_syscall
-    ret_from_syscall:
+    ENTRY(ret_from_syscall)
         RESTORE_ALL
         iret
+    ENDPROC(ret_from_syscall)
 
 ENDPROC(syscall_handler)
 

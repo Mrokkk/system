@@ -11,19 +11,15 @@ struct buffer {
     char *data;
 };
 
-#define DECLARE_BUFFER(name, size) \
+#define BUFFER_DECLARE(name, size) \
     char __buffer_##name[size]; \
     struct buffer name = {      \
             0, 0, size,         \
             __buffer_##name     \
     }
 
-/*===========================================================================*
- *                               buffer_empty                                *
- *===========================================================================*/
-static inline int buffer_empty(struct buffer *buffer) {
-    return (buffer->in == buffer->out);
-}
+#define buffer_empty(buffer) \
+    (buffer->in == buffer->out)
 
 void buffer_put(struct buffer *buffer, char c);
 int buffer_get(struct buffer *buffer, char *c);
