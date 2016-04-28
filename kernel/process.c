@@ -56,6 +56,8 @@ void process_wake_waiting(struct process *proc) {
 
     struct process *temp;
 
+    if (list_empty(&proc->wait_queue)) return;
+
     list_for_each_entry(temp, &proc->wait_queue, wait_queue)
         process_wake(temp);
 
@@ -127,6 +129,7 @@ static void process_struct_init(struct process *proc) {
     proc->context_switches = 0;
     proc->stat = PROCESS_ZOMBIE;
     *proc->name = 0;
+    list_init(&proc->wait_queue);
 
 }
 
@@ -146,8 +149,6 @@ static struct process *process_create(int type) {
     process_space_setup(new_process);
     process_struct_init(new_process);
     new_process->kernel = type;
-
-    list_init(&new_process->wait_queue);
 
     return new_process;
 
@@ -187,16 +188,24 @@ static void process_parent_child_link(struct process *parent,
 /*===========================================================================*
  *                               process_clone                               *
  *===========================================================================*/
-int process_clone(struct process *parent, struct pt_regs *regs, int clone_flags) {
+int process_clone(struct process *parent, struct pt_regs *regs,
+        int clone_flags) {
 
     struct process *child;
+    int flags;
 
     child = process_create(process_type(parent));
     process_parent_child_link(parent, child);
     process_copy(child, parent, regs, clone_flags);
     list_add_tail(&child->processes, &init_process.processes);
     process_forked(parent);
+
+    save_flags(flags);
+    cli();
+
     process_wake(child);
+
+    restore_flags(flags);
 
     return child->pid;
 

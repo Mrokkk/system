@@ -7,9 +7,10 @@
 #include <kernel/unistd.h>
 #include <kernel/fs.h>
 #include <kernel/time.h>
+#include <kernel/test.h>
 
 void kmain();
-static void idle();
+void idle();
 static void welcome();
 int init();
 void delay_calibrate(void);
@@ -102,6 +103,8 @@ __noreturn void kmain() {
 
     kernel_process(init, "init");
 
+    TESTS_RUN();
+
     idle();
 
     while (1);
@@ -111,7 +114,7 @@ __noreturn void kmain() {
 /*===========================================================================*
  *                                   idle                                    *
  *===========================================================================*/
-__noreturn static void idle() {
+__noreturn void idle() {
 
     process_stop(process_current);
     while (1);
@@ -177,7 +180,8 @@ int init() {
     printf("This shouldn't be seen\n");
 
     /* Open standard streams */
-    if (open("/dev/tty0", 0) || dup(0) || dup(0)) exit(-1);
+    if (open("/dev/tty0", 0) || dup(0) || dup(0))
+        exit(-1);
 
     /* Say hello */
     welcome();

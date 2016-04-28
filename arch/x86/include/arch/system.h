@@ -2,7 +2,6 @@
 #define __X86_SYSTEM_H_
 
 #include <kernel/compiler.h>
-#include <kernel/process.h>
 #include <arch/segment.h>
 
 #define mb() \
@@ -25,6 +24,8 @@
 
 #define halt() \
     asm volatile("hlt")
+
+#include <kernel/process.h>
 
 /* Context switching */
 #define process_switch(prev, next) \

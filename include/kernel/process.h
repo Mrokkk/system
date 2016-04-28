@@ -138,8 +138,15 @@ static inline void process_exit(struct process *proc) {
     list_del(&proc->running);
     proc->stat = PROCESS_ZOMBIE;
     process_wake_waiting(proc);
-    if (proc == process_current) scheduler();
-    while (1);
+
+    if (proc == process_current) {
+        scheduler();
+        while (1);
+    }
+    /* There was a serious bug! Function
+     * was entering a infinite loop
+     * regardless of the fact process
+     * is the not current process */
 
 }
 

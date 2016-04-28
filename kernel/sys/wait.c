@@ -19,20 +19,25 @@ __noinline int process_check_stat(int pid, char stat) {
 int sys_waitpid(int pid, int *status, int opt) {
 
     struct process *proc = process_find(pid);
-    char last_stat;
     unsigned int flags;
 
     (void)opt;
 
     if (!proc) return -ESRCH;
-    last_stat = proc->stat;
+    if (proc->stat != PROCESS_RUNNING) goto delete_process;
 
-    if (!process_check_stat(pid, last_stat)) return 0;
+    /*
+     * There was a bug!
+     * Callee process was waiting for process
+     * even if that process wasn't running
+     */
+
     list_add_tail(&process_current->wait_queue, &proc->wait_queue);
     process_wait(process_current);
 
     put_to_user(status, &(proc->errno));
 
+delete_process:
     save_flags(flags);
     cli();
 

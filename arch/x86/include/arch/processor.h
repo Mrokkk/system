@@ -82,7 +82,6 @@ void regs_print(struct pt_regs *regs);
 
 #define INIT_PROCESS_CONTEXT(name) \
         .iomap_offset = 104, \
-        .esp0 = (unsigned long)&name##_stack[INIT_PROCESS_STACK_SIZE], \
         .esp = (unsigned long)&name##_stack[INIT_PROCESS_STACK_SIZE], \
         .ss0 = 0x10,
 
