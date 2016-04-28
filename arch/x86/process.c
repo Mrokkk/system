@@ -3,6 +3,7 @@
 #include <arch/string.h>
 #include <arch/segment.h>
 #include <arch/register.h>
+#include <arch/io.h>
 #include <kernel/process.h>
 
 #define PROCESS_KERNEL_STACK_SIZE 4096
@@ -15,7 +16,8 @@ extern void ret_from_syscall();
 /*===========================================================================*
  *                                stack_copy                                 *
  *===========================================================================*/
-static void *stack_copy(unsigned int *dest, unsigned int *src, unsigned int size) {
+static void *stack_copy(unsigned int *dest, unsigned int *src,
+        unsigned int size) {
 
     /*
      * New, quite safe copying stacks. Last one was buggy...
@@ -29,90 +31,134 @@ static void *stack_copy(unsigned int *dest, unsigned int *src, unsigned int size
 }
 
 /*===========================================================================*
- *                               process_copy                                *
+ *                              stack_create                                 *
  *===========================================================================*/
-int arch_process_copy(struct process *dest, struct process *src,
-        struct pt_regs *old_regs) {
+static inline void *stack_create(unsigned int size) {
 
-    unsigned int *old_stack = (unsigned int *)src->mm.end;
-    unsigned int *stack, *old_stack_end = 0;
-    unsigned int *new_stack;
-    unsigned int cs, ss;
+    return (void *)((unsigned int)kmalloc(size) + size);
 
-    /* Set correct values of CS and SS depending on the type
-     * of process
+}
+
+/* I'm sure *_process_setup_stack functions can look better,
+ * but I leave it as it is.
+ */
+
+/*===========================================================================*
+ *                        kernel_process_setup_stack                         *
+ *===========================================================================*/
+unsigned int kernel_process_setup_stack(struct process *dest,
+        struct process *src,
+        struct pt_regs *src_regs) {
+
+    unsigned int *dest_stack = (unsigned int *)dest->mm.end,
+                 *process_stack;
+
+    /*
+     * We're not creating kernel stack for kernel process,
+     * because it would never be used (except for one case)
      */
-    cs = dest->kernel ? KERNEL_CS : USER_CS;
-    ss = dest->kernel ? KERNEL_DS : USER_DS;
 
-    /* If we're not changing privilege level, the ESP value in the pt_regs
-     * would be wrong and would point to the return instruction. But that's
-     * not a problem, because its address is exactly the ESP address we want.
+    (void)src;
+
+    /*
+     * If we'are not changing privilege level, which we don't do in that case
+     * (privilege levels in the process and in the handler are the same), we
+     * don't have the EIP value in the pt_regs (exactly we have but it points
+     * to some random value). But we can figure out its address. If CPU doesn't
+     * change privileges in the exception entry, it doesn't change stacks, so
+     * it simply pushes appropriate values (EFLAGS, CS and EIP) on the
+     * currently using stack. So, the ESP value that has been used in the
+     * process before exception is the address 4 bytes after EFLAGS, which
+     * is the address of the ESP field in the pt_regs.
      */
-    if (old_regs->ss != KERNEL_DS && old_regs->ss != USER_DS) {
-        old_stack_end = (unsigned int *)&old_regs->esp;
-    } else old_stack_end = (unsigned int *)old_regs->esp;
 
-    /* Copy stack if we're copying to the user process */
-    if (!dest->kernel)
-        new_stack = stack_copy((unsigned int *)dest->context.esp, old_stack,
-                (unsigned int)old_stack - (unsigned int)old_stack_end);
-    else new_stack = (unsigned int *)dest->context.esp;
+    dest_stack = stack_copy(
+            (unsigned int *)dest_stack,
+            (unsigned int *)src->mm.end,
+            (unsigned int)src->mm.end - (unsigned int)&src_regs->esp);
 
-    stack = dest->kernel ? (unsigned int *)dest->context.esp
-            : (unsigned int *)dest->context.esp0;
+    process_stack = dest_stack;
+    dest->context.esp0 = 0;
+
+    push(src_regs->eflags | 0x200, dest_stack);             /* eflags */
+    push(KERNEL_CS, dest_stack);                            /* cs */
+    push(src_regs->eip, dest_stack);                        /* eip */
+    push(src_regs->gs, dest_stack);                         /* gs */
+    push(src_regs->fs, dest_stack);                         /* fs */
+    push(src_regs->es, dest_stack);                         /* es */
+    push(src_regs->ds, dest_stack);                         /* ds */
+    push(0, dest_stack);                                    /* eax */
+    push((unsigned int)process_stack + src_regs->ebp
+            - (unsigned int)src->context.esp, dest_stack);  /* ebp */
+    push(src_regs->edi, dest_stack);                        /* edi */
+    push(src_regs->esi, dest_stack);                        /* esi */
+    push(src_regs->edx, dest_stack);                        /* edx */
+    push(src_regs->ecx, dest_stack);                        /* ecx */
+    push(src_regs->ebx, dest_stack);                        /* ebx */
+
+    return (unsigned int)dest_stack;
+
+}
+
+/*===========================================================================*
+ *                         user_process_setup_stack                          *
+ *===========================================================================*/
+unsigned int user_process_setup_stack(struct process *dest,
+        struct process *src,
+        struct pt_regs *src_regs) {
+
+    unsigned int *kernel_stack;
+    unsigned int *user_stack;
+    unsigned int *dest_stack_start = (unsigned int *)dest->mm.end;
+    unsigned int *src_stack_start = (unsigned int *)src->mm.end;
+    unsigned int *src_stack_end = (unsigned int *)src_regs->esp;
+
+    dest->context.esp0 = (unsigned int)(kernel_stack =
+            stack_create(PROCESS_KERNEL_STACK_SIZE));
+
+    user_stack = stack_copy((unsigned int *)dest_stack_start, src_stack_start,
+            (unsigned int)src_stack_start - (unsigned int)src_stack_end);
 
     /* Setup kernel stack which should be loaded at context switch */
-    push(ss, stack);                                    /* ss */
-    push(new_stack, stack);                             /* esp */
-    push(old_regs->eflags | 0x200, stack);              /* eflags */
-    push(cs, stack);                                    /* cs */
-    push(old_regs->eip, stack);                         /* eip */
-    push(old_regs->gs, stack);                          /* gs */
-    push(old_regs->fs, stack);                          /* fs */
-    push(old_regs->es, stack);                          /* es */
-    push(old_regs->ds, stack);                          /* ds */
-    push(0, stack);                                     /* eax */
-    push((unsigned int)new_stack + old_regs->ebp
-            - (unsigned int)src->context.esp, stack);   /* ebp */
-    push(old_regs->edi, stack);                         /* edi */
-    push(old_regs->esi, stack);                         /* esi */
-    push(old_regs->edx, stack);                         /* edx */
-    push(old_regs->ecx, stack);                         /* ecx */
-    push(old_regs->ebx, stack);                         /* ebx */
+    push(USER_DS, kernel_stack);                                /* ss */
+    push(user_stack, kernel_stack);                             /* esp */
+    push(src_regs->eflags | 0x200, kernel_stack);               /* eflags */
+    push(USER_CS, kernel_stack);                                /* cs */
+    push(src_regs->eip, kernel_stack);                          /* eip */
+    push(src_regs->gs, kernel_stack);                           /* gs */
+    push(src_regs->fs, kernel_stack);                           /* fs */
+    push(src_regs->es, kernel_stack);                           /* es */
+    push(src_regs->ds, kernel_stack);                           /* ds */
+    push(0, kernel_stack);                                      /* eax */
+    push((unsigned int)user_stack + src_regs->ebp
+            - (unsigned int)src->context.esp, kernel_stack);    /* ebp */
+    push(src_regs->edi, kernel_stack);                          /* edi */
+    push(src_regs->esi, kernel_stack);                          /* esi */
+    push(src_regs->edx, kernel_stack);                          /* edx */
+    push(src_regs->ecx, kernel_stack);                          /* ecx */
+    push(src_regs->ebx, kernel_stack);                          /* ebx */
 
-    /* Finally, set created stack to the context struct */
-    dest->context.esp = (unsigned int)stack;
+    return (unsigned int)kernel_stack;
+
+}
+
+/*===========================================================================*
+ *                             arch_process_copy                             *
+ *===========================================================================*/
+int arch_process_copy(struct process *dest, struct process *src,
+        struct pt_regs *src_regs) {
+
+    if (process_is_kernel(dest))
+        dest->context.esp = kernel_process_setup_stack(dest, src, src_regs);
+    else
+        dest->context.esp = user_process_setup_stack(dest, src, src_regs);
+
     dest->context.eip = (unsigned int)&ret_from_syscall;
+    dest->context.iomap_offset = 104;
+    dest->context.ss0 = KERNEL_DS;
 
     /* Copy ports permissions */
     memcpy(dest->context.io_bitmap, src->context.io_bitmap, 128);
-
-    return 0;
-
-}
-
-/*===========================================================================*
- *                                arch_exec                                  *
- *===========================================================================*/
-int arch_exec(struct pt_regs *regs) {
-
-    (void)regs;
-
-    return 0;
-
-}
-
-/*===========================================================================*
- *                             arch_process_init                             *
- *===========================================================================*/
-int arch_process_init(struct process *proc) {
-
-    proc->context.iomap_offset = 104;
-    proc->context.ss0 = KERNEL_DS;
-    proc->context.esp0 = (unsigned int)kmalloc(PROCESS_KERNEL_STACK_SIZE) +
-            PROCESS_KERNEL_STACK_SIZE;
-    proc->context.esp = (unsigned int)proc->mm.end;
 
     return 0;
 
@@ -123,32 +169,10 @@ int arch_process_init(struct process *proc) {
  *===========================================================================*/
 void arch_process_free(struct process *proc) {
 
-    /* Free kernel stack */
-    kfree((void *)((unsigned int)proc->context.esp0 -
+    /* Free kernel stack (if exists) */
+    if (proc->context.esp0)
+        kfree((void *)((unsigned int)proc->context.esp0 -
             PROCESS_KERNEL_STACK_SIZE));
-
-}
-
-/*===========================================================================*
- *                          arch_kthread_regs_init                           *
- *===========================================================================*/
-int arch_kernel_process_regs(struct pt_regs *regs, unsigned int ip) {
-
-    ASSERT(regs != 0);
-    ASSERT(ip != 0);
-
-    memset(regs, 0, sizeof(struct pt_regs));
-
-    regs->cs = KERNEL_CS;
-    regs->ds = KERNEL_DS;
-    regs->ebp = process_current->context.esp;
-    regs->eip = ip;
-    regs->ss = KERNEL_DS;
-    regs->es = KERNEL_DS;
-    regs->gs = KERNEL_DS;
-    regs->fs = KERNEL_DS;
-
-    return 0;
 
 }
 
@@ -161,8 +185,10 @@ void FASTCALL(__process_switch(struct process *prev, struct process *next)) {
 
     unsigned int base = (unsigned int)&next->context;
 
-    ASSERT(prev != 0);
-    ASSERT(next != 0);
+    /*
+     * Simply reload TSS with the address of process's context
+     * structure
+     */
 
     (void)prev; (void)next;
 
@@ -188,5 +214,60 @@ void regs_print(struct pt_regs *regs) {
     printk("DS=0x%04x; ES=0x%04x; FS=0x%04x; GS=0x%04x\n",
             regs->ds, regs->es, regs->fs, regs->gs);
     printk("EFLAGS=0x%08x\n", regs->eflags);
+
+}
+
+#define set_context(stack, ip) \
+    do {                        \
+        asm volatile(           \
+            "movl %0, %%esp;"   \
+            "jmp *%1;"          \
+            :: "r" (stack),     \
+               "r" (ip));       \
+    } while (0)
+
+/*===========================================================================*
+ *                                  sys_exec                                 *
+ *===========================================================================*/
+__noreturn int sys_exec(struct pt_regs regs) {
+
+    unsigned int *kernel_stack,
+                 *user_stack;
+    unsigned int flags, eip = 0;
+
+    save_flags(flags);
+    cli();
+
+    eip = regs.ebx;
+
+    if (process_is_kernel(process_current)) {
+        /* We change kernel process to the user process. To do so,
+         * we must create the kernel stack for it.
+         */
+        kernel_stack = stack_create(PROCESS_KERNEL_STACK_SIZE);
+        process_current->context.esp0 = (unsigned int)kernel_stack;
+    } else kernel_stack = (unsigned int *)process_current->context.esp0;
+
+    process_current->kernel = 0;
+
+    user_stack = process_current->mm.end;
+
+    push(USER_DS, kernel_stack);                    /* ss */
+    push(user_stack, kernel_stack);                 /* esp */
+    push(0x200, kernel_stack);                      /* eflags */
+    push(USER_CS, kernel_stack);                    /* cs */
+    push(eip, kernel_stack);                        /* eip */
+    push(USER_DS, kernel_stack);                    /* gs */
+    push(USER_DS, kernel_stack);                    /* fs */
+    push(USER_DS, kernel_stack);                    /* es */
+    push(USER_DS, kernel_stack);                    /* ds */
+    push(0, kernel_stack);                          /* eax */
+    kernel_stack -= 6;
+
+    restore_flags(flags);
+
+    set_context(kernel_stack, &ret_from_syscall);
+
+    while (1);
 
 }

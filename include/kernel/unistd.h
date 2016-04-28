@@ -114,5 +114,5 @@ __syscall2(open, TYPE_STRING, TYPE_UL_DEC)
 __syscall1(dup, TYPE_SL_DEC)
 __syscall1(close, int)
 __syscall3(waitpid, int, int *, int)
-__syscall1(exec, struct pt_regs)
+__syscall1(exec, int)
 

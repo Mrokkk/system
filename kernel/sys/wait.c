@@ -36,11 +36,10 @@ int sys_waitpid(int pid, int *status, int opt) {
     save_flags(flags);
     cli();
 
-    if (proc->stat == NO_PROCESS) {
+    if (proc->stat == PROCESS_ZOMBIE) {
         list_del(&proc->processes);
         arch_process_free(proc);
         kfree(proc->mm.start);
-        kfree(proc->name);
         if (proc->signals)
             kfree(proc->signals);
         kfree(proc);

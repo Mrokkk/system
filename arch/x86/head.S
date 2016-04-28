@@ -43,7 +43,7 @@ ENTRY(_start)
 
     /* Set up stack register */
     setup_stack:
-        movl $init_stack, %esp
+        movl $init_process_stack, %esp
         addl $1024, %esp
         push %eax
         push %ebx

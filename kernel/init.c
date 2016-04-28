@@ -7,7 +7,6 @@
 #include <kernel/unistd.h>
 #include <kernel/fs.h>
 #include <kernel/time.h>
-#include <kernel/test.h>
 
 void kmain();
 static void idle();
@@ -19,7 +18,6 @@ struct cpu_info cpu_info;
 
 volatile unsigned int jiffies;
 
-char kernel_status = 0;
 struct mmap mmap[10];
 unsigned int ram;
 struct kernel_symbol *kernel_symbols[370];
@@ -91,6 +89,10 @@ void delay_calibrate(void) {
  *===========================================================================*/
 __noreturn void kmain() {
 
+    /*
+     * This is init process with PID 0
+     */
+
     arch_setup();
     delay_calibrate();
 
@@ -98,9 +100,7 @@ __noreturn void kmain() {
 
     processes_init();
 
-    kernel_process(&init, "init");
-
-    kernel_status = 1;
+    kernel_process(init, "init");
 
     idle();
 
@@ -193,7 +193,7 @@ int init() {
         printf("Fork error in init!\n");
         exit(-1);
     } else if (!child_pid) {
-        exit(temp_shell());
+        exec(&temp_shell);
     }
 
     waitpid(child_pid, &status, 0);
@@ -221,8 +221,8 @@ static int c_zombie() {
 
     int pid = fork();
 
-    return pid;
-
+    exit(pid);
+    return 0;
 }
 
 /*===========================================================================*
@@ -230,7 +230,6 @@ static int c_zombie() {
  *===========================================================================*/
 static int c_bug() {
 
-    exec();
     printf("Bug!!!\n");
     printk("It's a bug!");
 
@@ -265,15 +264,15 @@ int temp_shell() {
         if ((pid=fork()) == 0) {
             for (i=0; com[i].name; i++) {
                 if (!strcmp(com[i].name, line))
-                    return com[i].function();
+                    exec(com[i].function);
             }
             if (!com[i].name) printf("No such command: %s\n", line);
-            return -EBADC;
+            exit(-EBADC);
         } else if (pid < 0) printf("%s: fork error!\n", line);
         waitpid(pid, &status, 0);
     }
 
-    return 0;
+    exit(0);
 
 }
 

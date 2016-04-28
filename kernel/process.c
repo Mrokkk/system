@@ -1,20 +1,12 @@
 #include <kernel/process.h>
 #include <kernel/sys.h>
 
-static int process_state_change(struct process *proc, int stat);
-
-/* Stacks for init process */
-unsigned long init_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, };
-unsigned long init_kernel_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, };
-
-/* Init process itself */
 PROCESS_DECLARE(init_process);
-
 LIST_DECLARE(running);
-LIST_DECLARE(waiting);
-LIST_DECLARE(stopped);
 
-static pid_t last_pid = INIT_PROCESS_PID;
+static pid_t last_pid;
+
+unsigned int total_forks;
 
 /*===========================================================================*
  *                               processes_init                              *
@@ -22,9 +14,9 @@ static pid_t last_pid = INIT_PROCESS_PID;
 int processes_init() {
 
     /*
-     * Just add init_process to running queue
+     * Just add init_process to the running queue
      */
-    list_add_tail(&init_process.queue, &running);
+    list_add_tail(&init_process.running, &running);
 
     return 0;
 
@@ -58,47 +50,6 @@ pid_t find_free_pid() {
 }
 
 /*===========================================================================*
- *                           process_state_change                            *
- *===========================================================================*/
-static int process_state_change(struct process *proc, int stat) {
-
-    unsigned int flags;
-
-    if (!proc) return -ESRCH;
-    if (proc->stat == stat) printk("cannot change\n");
-
-    save_flags(flags);
-    cli();
-
-    /* Remove process form its current queue... */
-    if (proc->stat != NO_PROCESS)
-        list_del(&proc->queue);
-
-    /* ...and add it to the relevant one */
-    switch (stat) {
-        case PROCESS_RUNNING:
-            list_add_tail(&proc->queue, &running);
-            break;
-        case PROCESS_WAITING:
-            list_add_tail(&proc->queue, &waiting);
-            break;
-        case PROCESS_STOPPED:
-            list_add_tail(&proc->queue, &stopped);
-            break;
-        case NO_PROCESS:
-            /* Nothing */
-            break;
-    }
-
-    proc->stat = stat;
-
-    restore_flags(flags);
-
-    return 0;
-
-}
-
-/*===========================================================================*
  *                            process_wake_waiting                           *
  *===========================================================================*/
 void process_wake_waiting(struct process *proc) {
@@ -111,117 +62,95 @@ void process_wake_waiting(struct process *proc) {
 }
 
 /*===========================================================================*
- *                              process_exit                                 *
+ *                              process_forked                               *
  *===========================================================================*/
-int process_exit(struct process *proc) {
+static inline void process_forked(struct process *proc) {
+    proc->forks++;
+    total_forks++;
+}
 
-    int errno;
+/*===========================================================================*
+ *                            process_space_free                             *
+ *===========================================================================*/
+static inline void process_space_free(struct process *proc) {
+    kfree(proc->mm.start);
+}
 
-    if (proc->pid == INIT_PROCESS_PID) { /* TODO: Shutdown system */
-        printk("Init returned %d: shutdown now...\n", proc->errno);
-        while (1);
-    }
+/*===========================================================================*
+ *                           process_signals_free                            *
+ *===========================================================================*/
+static inline void process_signals_free(struct process *proc) {
+    if (proc->signals)
+        kfree(proc->signals);
+}
 
-    if ((errno = process_state_change(proc, NO_PROCESS)))
-        return errno;
+/*===========================================================================*
+ *                            process_space_setup                            *
+ *===========================================================================*/
+static inline int process_space_setup(struct process *proc) {
 
-    process_wake_waiting(proc);
+    char *start, *end;
 
-    if (proc == process_current) resched();
+    /* Set up process space */
+    if (!(end = start = (char *)kmalloc(PROCESS_SPACE)))
+        return -ENOMEM;
 
-    while (1);
+    end += PROCESS_SPACE;
+    proc->mm.start = start;
+    proc->mm.end = end;
 
     return 0;
 
 }
 
 /*===========================================================================*
- *                               process_stop                                *
+ *                              process_delete                               *
  *===========================================================================*/
-int process_stop(struct process *proc) {
+void process_delete(struct process *proc) {
 
-    int errno;
-
-    if ((errno = process_state_change(proc, PROCESS_STOPPED))) return errno;
-
-    if (proc == process_current) resched();
-
-    return 0;
+    process_space_free(proc);
+    arch_process_free(proc);
+    process_signals_free(proc);
+    kfree(proc);
 
 }
 
 /*===========================================================================*
- *                                process_wake                               *
+ *                            process_struct_init                            *
  *===========================================================================*/
-int process_wake(struct process *proc) {
+static void process_struct_init(struct process *proc) {
 
-    int errno;
-
-    if ((errno = process_state_change(proc, PROCESS_RUNNING))) return errno;
-
-    return 0;
-
-}
-
-/*===========================================================================*
- *                                process_wait                               *
- *===========================================================================*/
-int process_wait(struct process *proc) {
-
-    int errno;
-
-    if ((errno = process_state_change(proc, PROCESS_WAITING))) return errno;
-
-    if (proc == process_current) resched();
-
-    return 0;
+    proc->pid = find_free_pid();
+    proc->errno = 0;
+    proc->signals = 0;
+    proc->forks = 0;
+    proc->context_switches = 0;
+    proc->stat = PROCESS_ZOMBIE;
+    *proc->name = 0;
 
 }
 
 /*===========================================================================*
  *                               process_create                              *
  *===========================================================================*/
-struct process *process_create(int type) {
+static struct process *process_create(int type) {
 
     struct process *new_process;
-    char *start, *end;
+
+    (void)type;
 
     /* Allocate space for process structure */
     if (!(new_process = (struct process *)kmalloc(sizeof(struct process))))
         goto cannot_create_process;
 
-    /* Set up process space */
-    if (!(end = start = (char *)kmalloc(PROCESS_SPACE)))
-        goto cannot_create_space;
-    end += PROCESS_SPACE;
+    process_space_setup(new_process);
+    process_struct_init(new_process);
+    new_process->kernel = type;
 
-    new_process->kernel = (type == KERNEL_PROCESS);
-    new_process->pid = find_free_pid();
-    new_process->parent = process_current;
-    new_process->ppid = process_current->pid;
-    new_process->mm.start = start;
-    new_process->mm.end = end;
-    new_process->errno = 0;
-    new_process->signals = 0;
-    new_process->forks = 0;
-    new_process->context_switches = 0;
-    new_process->stat = NO_PROCESS;
-    new_process->name = (char *)kmalloc(16);
     list_init(&new_process->wait_queue);
-
-    strcpy(new_process->name, "new");
-
-    arch_process_init(new_process);
-
-    list_add_tail(&new_process->processes, &init_process.processes);
-
-    process_current->y_child = new_process;
-    process_current->forks++;
 
     return new_process;
 
-cannot_create_space:
-    kfree(new_process);
 cannot_create_process:
     return 0;
 
@@ -230,13 +159,8 @@ cannot_create_process:
 /*===========================================================================*
  *                                process_copy                               *
  *===========================================================================*/
-void process_copy(struct process *dest, struct process *src, int clone_flags,
-        struct pt_regs *regs) {
-
-    unsigned int flags;
-
-    save_flags(flags);
-    cli();
+static void process_copy(struct process *dest, struct process *src,
+        struct pt_regs *regs, int clone_flags) {
 
     strcpy(dest->name, src->name);
     if (clone_flags & CLONE_FILES)
@@ -246,28 +170,35 @@ void process_copy(struct process *dest, struct process *src, int clone_flags,
 
     arch_process_copy(dest, src, regs);
 
-    restore_flags(flags);
+}
+
+/*===========================================================================*
+ *                          process_parent_child_link                        *
+ *===========================================================================*/
+static void process_parent_child_link(struct process *parent,
+        struct process *child) {
+
+    child->parent = parent;
+    child->ppid = parent->pid;
+    parent->y_child = child;
 
 }
 
 /*===========================================================================*
- *                              kthread_create                               *
+ *                               process_clone                               *
  *===========================================================================*/
-int kernel_process(int (*start)(), const char *name) {
+int process_clone(struct process *parent, struct pt_regs *regs, int clone_flags) {
 
-     struct pt_regs regs;
-     struct process *new;
+    struct process *child;
 
-     arch_kernel_process_regs(&regs, (unsigned int)start);
+    child = process_create(process_type(parent));
+    process_parent_child_link(parent, child);
+    process_copy(child, parent, regs, clone_flags);
+    list_add_tail(&child->processes, &init_process.processes);
+    process_forked(parent);
+    process_wake(child);
 
-     new = process_create(KERNEL_PROCESS);
-     process_copy(new, process_current, CLONE_FILES, &regs);
-
-     strcpy(new->name, name);
-
-     process_wake(new);
-
-     return new->pid;
+    return child->pid;
 
 }
 

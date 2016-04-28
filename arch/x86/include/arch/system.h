@@ -26,25 +26,11 @@
 #define halt() \
     asm volatile("hlt")
 
-extern inline unsigned long long rdmsr(unsigned int nr) {
-
-    unsigned long long rv;
-
-    asm volatile("rdmsr" : "=A" (rv) : "c" (nr));
-    return rv;
-
-}
-
-extern inline void wrmsr(unsigned int nr, unsigned int msr) {
-
-    asm volatile("wrmsr" : : "A" (msr), "c"(nr));
-
-}
-
 /* Context switching */
 #define process_switch(prev, next) \
     do {                                \
         asm volatile(                   \
+            "push %%gs;"                \
             "pushl %%ebx;"              \
             "pushl %%ecx;"              \
             "pushl %%esi;"              \
@@ -61,6 +47,7 @@ extern inline void wrmsr(unsigned int nr, unsigned int msr) {
             "popl %%esi;"               \
             "popl %%ecx;"               \
             "popl %%ebx;"               \
+            "pop %%gs;"                 \
             : "=m" (prev->context.esp), \
               "=m" (prev->context.eip)  \
             : "m" (next->context.esp),  \

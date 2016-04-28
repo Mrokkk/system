@@ -18,13 +18,11 @@
 #define INIT_PROCESS_STACK
 #endif
 
-#define INIT_PROCESS_PID 0
-
 #define PROCESS_SPACE 8192
 #define PROCESS_FILES 128
 
 /* Process states */
-#define NO_PROCESS          0
+#define PROCESS_ZOMBIE      0
 #define PROCESS_WAITING     1
 #define PROCESS_STOPPED     2
 #define PROCESS_RUNNING     3
@@ -64,7 +62,7 @@ struct process {
     int forks;
     /* Memory management structure */
     struct mm mm;
-    char *name; /* TODO: Replace with args */
+    char name[32]; /* TODO: Replace with args */
     struct file *files[PROCESS_FILES];
     struct signals *signals;
 
@@ -78,32 +76,35 @@ struct process {
     
     /* Lists */
     struct list_head processes;
-    struct list_head queue;
+    struct list_head running;
 
 };
 
+#define PROCESS_SPACE_INIT(name) \
+    unsigned long name##_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, };
+
 #define PROCESS_INIT(proc) \
     {                                               \
-        context: {INIT_PROCESS_CONTEXT},            \
+        context: {INIT_PROCESS_CONTEXT(proc)},      \
         mm: {                                       \
-            &init_stack[0],                         \
-            &init_stack[INIT_PROCESS_STACK_SIZE],   \
+            &proc##_stack[0],                       \
+            &proc##_stack[INIT_PROCESS_STACK_SIZE], \
             0, 0, 0, 0                              \
         },                                          \
-        pid: INIT_PROCESS_PID,                      \
         priority: 1,                                \
         name: #proc,                                \
         stat: PROCESS_RUNNING,                      \
         processes:                                  \
             LIST_INIT(proc.processes),              \
-        queue:                                      \
-            LIST_INIT(proc.queue),                  \
+        running:                                    \
+            LIST_INIT(proc.running),                \
         wait_queue:                                 \
             LIST_INIT(proc.wait_queue),             \
         kernel: 1,                                  \
     }
 
 #define PROCESS_DECLARE(name) \
+    PROCESS_SPACE_INIT(name); \
     struct process name = PROCESS_INIT(name)
 
 extern struct process init_process;
@@ -111,31 +112,101 @@ extern struct process *process_current;
 
 extern struct list_head process_list;
 extern struct list_head running;
-extern struct list_head waiting;
-extern struct list_head stopped;
 
 extern unsigned int total_forks;
 extern unsigned int context_switches;
 
 int processes_init();
-struct process *process_create(int type);
-void process_copy(struct process *dest, struct process *src, int clone, struct pt_regs *regs);
+int process_clone(struct process *proc, struct pt_regs *regs, int clone_flags);
 struct process *process_find(int pid);
-int process_stop(struct process *proc);
-int process_wake(struct process *proc);
-int process_wait(struct process *proc);
-int process_exit(struct process *proc);
+void process_wake_waiting(struct process *proc);
 pid_t find_free_pid();
-void resched();
-int kernel_process(int (*start)(), const char *name);
+void scheduler();
+void exit(int);
+pid_t fork(void);
 
 /* Arch-dependent functions */
 int arch_process_copy(struct process *dest, struct process *src, struct pt_regs *old_regs);
 void arch_process_free(struct process *proc);
-int arch_kernel_process_regs(struct pt_regs *regs, unsigned int ip);
-int arch_exec(struct pt_regs *regs);
-int arch_process_init(struct process *proc);
 void regs_print(struct pt_regs *regs);
+
+/*===========================================================================*
+ *                              process_exit                                 *
+ *===========================================================================*/
+static inline void process_exit(struct process *proc) {
+
+    list_del(&proc->running);
+    proc->stat = PROCESS_ZOMBIE;
+    process_wake_waiting(proc);
+    if (proc == process_current) scheduler();
+    while (1);
+
+}
+
+/*===========================================================================*
+ *                               process_stop                                *
+ *===========================================================================*/
+static inline void process_stop(struct process *proc) {
+
+    list_del(&proc->running);
+    proc->stat = PROCESS_STOPPED;
+    if (proc == process_current) scheduler();
+
+}
+
+/*===========================================================================*
+ *                                process_wake                               *
+ *===========================================================================*/
+static inline void process_wake(struct process *proc) {
+
+    list_add_tail(&proc->running, &running);
+    proc->stat = PROCESS_RUNNING;
+
+}
+
+/*===========================================================================*
+ *                                process_wait                               *
+ *===========================================================================*/
+static inline void process_wait(struct process *proc) {
+
+    list_del(&proc->running);
+    proc->stat = PROCESS_WAITING;
+    if (proc == process_current) scheduler();
+
+}
+
+/*===========================================================================*
+ *                               kernel_process                              *
+ *===========================================================================*/
+static inline int kernel_process(int (*start)(), char *name) {
+
+    int pid;
+
+    if ((pid = fork()) == 0)
+        exit(start());
+    else if (pid < 0) return pid;
+
+    strcpy(process_find(pid)->name, name);
+
+    return pid;
+
+}
+
+#define process_type(proc) \
+    ((proc)->kernel)
+
+#define process_is_kernel(proc) \
+    ((proc)->kernel)
+
+#define process_is_user(proc) \
+    (!(proc)->kernel)
+
+#define process_memory_start(proc) \
+    (proc)->mm.start
+
+#define process_memory_end(proc, type) \
+    (type)((proc)->mm.end)
+
 
 #endif /* __PROCESS_H_ */
 

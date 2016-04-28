@@ -187,7 +187,7 @@ static int c_running() {
 
     struct process *proc;
 
-    list_for_each_entry(proc, &running, queue) {
+    list_for_each_entry(proc, &running, running) {
         serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name,
                 proc->stat);
     }
@@ -238,6 +238,7 @@ static int c_kstat() {
 
 int kexit(int e) {
 
+    e = 0;
     sys_exit(e);
     return 0;
 

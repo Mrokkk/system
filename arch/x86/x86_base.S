@@ -168,14 +168,6 @@ ENDPROC(syscall_handler)
 ENTRY(timer_handler) /* IRQ 0 handler */
 
         incl jiffies
-        cmpb $0, kernel_status
-        jne 1f
-        push %eax
-        PIC_EOI(0)
-        pop %eax
-        iret
-
-    1:
         SAVE_ALL
         PIC_EOI(0)
         call SYMBOL_NAME(scheduler)

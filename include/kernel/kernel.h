@@ -53,7 +53,6 @@ struct kernel_symbol *symbol_find_address(unsigned int address);
 int symbols_read(char *symbols, unsigned int size);
 void arch_setup();
 
-extern unsigned long init_kernel_stack[];
 extern struct cpu_info cpu_info;
 extern volatile unsigned int jiffies;
 extern char *symbols;

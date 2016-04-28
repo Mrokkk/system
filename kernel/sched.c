@@ -19,12 +19,12 @@ void scheduler() {
     }
 
     if (process_current->stat != PROCESS_RUNNING) {
-        process_current = list_entry(running.next, struct process, queue);
+        process_current = list_entry(running.next, struct process, running);
     } else {
-        struct list_head *temp = process_current->queue.next;
+        struct list_head *temp = process_current->running.next;
         /* I don't like it, but it works... */
         if (temp == &running) temp = temp->next;
-        process_current = list_entry(temp, struct process, queue);
+        process_current = list_entry(temp, struct process, running);
     }
 
 end:
@@ -41,11 +41,3 @@ end:
 
 }
 
-/*===========================================================================*
- *                                 resched                                   *
- *===========================================================================*/
-void resched() {
-
-    scheduler();
-
-}
