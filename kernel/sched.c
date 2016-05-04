@@ -14,6 +14,9 @@ void scheduler() {
     struct process *last = process_current;
 
     if (list_empty(&running)) {
+        /* If there are no processes on the running queue,
+         * run init process, which is the idle process
+         */
         process_current = &init_process;
         goto end;
     }

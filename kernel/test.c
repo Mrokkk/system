@@ -8,7 +8,7 @@ TEST_PLAN(processes)
     TEST_SUITE(kernel_process) {
         struct process *proc = 0;
         int child_pid, status;
-        ASSERT_EQ(isKernelProcess, init_process.kernel, KERNEL_PROCESS);
+        ASSERT_EQ(isKernelProcess, init_process.type, KERNEL_PROCESS);
         if ((child_pid = fork()) == 0) {
             while (1);
         }

@@ -9,6 +9,40 @@ static pid_t last_pid;
 unsigned int total_forks;
 
 /*===========================================================================*
+ *                              process_forked                               *
+ *===========================================================================*/
+static inline void process_forked(struct process *proc) {
+    proc->forks++;
+    total_forks++;
+}
+
+/*===========================================================================*
+ *                            process_space_free                             *
+ *===========================================================================*/
+static inline void process_space_free(struct process *proc) {
+    kfree(proc->mm.start);
+}
+
+/*===========================================================================*
+ *                           process_signals_free                            *
+ *===========================================================================*/
+static inline void process_signals_free(struct process *proc) {
+    if (proc->signals)
+        kfree(proc->signals);
+}
+
+/*===========================================================================*
+ *                               find_free_pid                               *
+ *===========================================================================*/
+pid_t find_free_pid() {
+    /*
+     * Just incrementing PID. Maybe it should be more
+     * complicated (some hash table maybe?)
+     */
+    return ++last_pid;
+}
+
+/*===========================================================================*
  *                               processes_init                              *
  *===========================================================================*/
 int processes_init() {
@@ -39,17 +73,6 @@ struct process *process_find(int pid) {
 }
 
 /*===========================================================================*
- *                               find_free_pid                               *
- *===========================================================================*/
-pid_t find_free_pid() {
-    /*
-     * Just incrementing PID. Maybe it should be more
-     * complicated (some hash table maybe?)
-     */
-    return ++last_pid;
-}
-
-/*===========================================================================*
  *                            process_wake_waiting                           *
  *===========================================================================*/
 void process_wake_waiting(struct process *proc) {
@@ -64,32 +87,9 @@ void process_wake_waiting(struct process *proc) {
 }
 
 /*===========================================================================*
- *                              process_forked                               *
- *===========================================================================*/
-static inline void process_forked(struct process *proc) {
-    proc->forks++;
-    total_forks++;
-}
-
-/*===========================================================================*
- *                            process_space_free                             *
- *===========================================================================*/
-static inline void process_space_free(struct process *proc) {
-    kfree(proc->mm.start);
-}
-
-/*===========================================================================*
- *                           process_signals_free                            *
- *===========================================================================*/
-static inline void process_signals_free(struct process *proc) {
-    if (proc->signals)
-        kfree(proc->signals);
-}
-
-/*===========================================================================*
  *                            process_space_setup                            *
  *===========================================================================*/
-static inline int process_space_setup(struct process *proc) {
+static int process_space_setup(struct process *proc) {
 
     char *start, *end;
 
@@ -110,6 +110,9 @@ static inline int process_space_setup(struct process *proc) {
  *===========================================================================*/
 void process_delete(struct process *proc) {
 
+    list_del(&proc->siblings);
+    list_del(&proc->children);
+    list_del(&proc->processes);
     process_space_free(proc);
     arch_process_free(proc);
     process_signals_free(proc);
@@ -123,13 +126,15 @@ void process_delete(struct process *proc) {
 static void process_struct_init(struct process *proc) {
 
     proc->pid = find_free_pid();
-    proc->errno = 0;
+    proc->exit_code = 0;
     proc->signals = 0;
     proc->forks = 0;
     proc->context_switches = 0;
     proc->stat = PROCESS_ZOMBIE;
     *proc->name = 0;
     list_init(&proc->wait_queue);
+    list_init(&proc->children);
+    list_init(&proc->siblings);
 
 }
 
@@ -146,12 +151,16 @@ static struct process *process_create(int type) {
     if (!(new_process = (struct process *)kmalloc(sizeof(struct process))))
         goto cannot_create_process;
 
-    process_space_setup(new_process);
+    if (process_space_setup(new_process))
+        goto cannot_allocate;
+
     process_struct_init(new_process);
-    new_process->kernel = type;
+    new_process->type = type;
 
     return new_process;
 
+cannot_allocate:
+    process_delete(new_process);
 cannot_create_process:
     return 0;
 
@@ -181,7 +190,7 @@ static void process_parent_child_link(struct process *parent,
 
     child->parent = parent;
     child->ppid = parent->pid;
-    parent->y_child = child;
+    list_add(&child->siblings, &parent->children);
 
 }
 
@@ -208,6 +217,23 @@ int process_clone(struct process *parent, struct pt_regs *regs,
     restore_flags(flags);
 
     return child->pid;
+
+}
+
+/*===========================================================================*
+ *                               kernel_process                              *
+ *===========================================================================*/
+int kernel_process(int (*start)(), char *name) {
+
+    int pid;
+
+    if ((pid = fork()) == 0)
+        exit(start());
+    else if (pid < 0) return pid;
+
+    strcpy(process_find(pid)->name, name);
+
+    return pid;
 
 }
 

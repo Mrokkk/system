@@ -35,20 +35,14 @@ int sys_waitpid(int pid, int *status, int opt) {
     list_add_tail(&process_current->wait_queue, &proc->wait_queue);
     process_wait(process_current);
 
-    put_to_user(status, &(proc->errno));
+    put_to_user(status, &(proc->exit_code));
 
 delete_process:
     save_flags(flags);
     cli();
 
-    if (proc->stat == PROCESS_ZOMBIE) {
-        list_del(&proc->processes);
-        arch_process_free(proc);
-        kfree(proc->mm.start);
-        if (proc->signals)
-            kfree(proc->signals);
-        kfree(proc);
-    }
+    if (proc->stat == PROCESS_ZOMBIE)
+        process_delete(proc);
 
     restore_flags(flags);
 

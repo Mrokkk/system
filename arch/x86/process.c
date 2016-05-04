@@ -248,7 +248,7 @@ __noreturn int sys_exec(struct pt_regs regs) {
         process_current->context.esp0 = (unsigned int)kernel_stack;
     } else kernel_stack = (unsigned int *)process_current->context.esp0;
 
-    process_current->kernel = 0;
+    process_current->type = 0;
 
     user_stack = process_current->mm.end;
 

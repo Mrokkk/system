@@ -204,8 +204,8 @@ static int c_ps() {
     struct process *proc;
 
     list_for_each_entry(proc, &init_process.processes, processes) {
-        serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name,
-                proc->stat);
+        serial_printf("pid=%d name=%s stat=%c\n", proc->pid, proc->name,
+                process_state_char(proc->stat));
     }
 
     sys_exit(0);

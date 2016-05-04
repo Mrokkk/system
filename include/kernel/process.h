@@ -7,25 +7,26 @@
 #include <kernel/signal.h>
 
 #ifndef INIT_PROCESS_CONTEXT
-#define INIT_PROCESS_CONTEXT
+#define INIT_PROCESS_CONTEXT(proc)
 #endif
 
 #ifndef INIT_PROCESS_STACK_SIZE
 #define INIT_PROCESS_STACK_SIZE 512
 #endif
 
-#ifndef INIT_PROCESS_STACK
-#define INIT_PROCESS_STACK
-#endif
-
 #define PROCESS_SPACE 8192
 #define PROCESS_FILES 128
 
 /* Process states */
-#define PROCESS_ZOMBIE      0
+#define PROCESS_RUNNING     0
 #define PROCESS_WAITING     1
 #define PROCESS_STOPPED     2
-#define PROCESS_RUNNING     3
+#define PROCESS_ZOMBIE      3
+
+#define PROCESS_STATE_STRING "rwsz"
+
+#define process_state_char(x) \
+    PROCESS_STATE_STRING[(int)(x)]
 
 #define USER_PROCESS        0
 #define KERNEL_PROCESS      1
@@ -51,30 +52,25 @@ struct signals {
 /*=======================*/
 struct process {
 
+    stat_t stat;
     pid_t pid, ppid;
     int pgrp;
-    stat_t stat;
-    int kernel;
     unsigned int priority;
-    int errno;
+    int exit_code;
+    int exit_state;
+    char type;
     struct context context;
     int context_switches;
     int forks;
-    /* Memory management structure */
     struct mm mm;
-    char name[32]; /* TODO: Replace with args */
+    char name[32];
     struct file *files[PROCESS_FILES];
     struct signals *signals;
-
-    /* For sys_wait */
+    struct process *parent;
     struct list_head wait_queue;
-
-    /* Pointers to other processes        *
-     * 'y' means younger, 'o' means older */
-    struct process *parent, *y_child, *o_child,
-                   *y_sibling, *o_sibling;
-    
-    /* Lists */
+    struct list_head children;
+    /* It's not safe to use this list directly, yet */
+    struct list_head siblings;
     struct list_head processes;
     struct list_head running;
 
@@ -100,7 +96,11 @@ struct process {
             LIST_INIT(proc.running),                \
         wait_queue:                                 \
             LIST_INIT(proc.wait_queue),             \
-        kernel: 1,                                  \
+        children:                                   \
+            LIST_INIT(proc.children),               \
+        siblings:                                   \
+            LIST_INIT(proc.siblings),               \
+        type: 1,                                    \
     }
 
 #define PROCESS_DECLARE(name) \
@@ -118,6 +118,8 @@ extern unsigned int context_switches;
 
 int processes_init();
 int process_clone(struct process *proc, struct pt_regs *regs, int clone_flags);
+void process_delete(struct process *proc);
+int kernel_process(int (*start)(), char *name);
 struct process *process_find(int pid);
 void process_wake_waiting(struct process *proc);
 pid_t find_free_pid();
@@ -146,7 +148,7 @@ static inline void process_exit(struct process *proc) {
     /* There was a serious bug! Function
      * was entering a infinite loop
      * regardless of the fact process
-     * is the not current process */
+     * was not the current process */
 
 }
 
@@ -182,31 +184,22 @@ static inline void process_wait(struct process *proc) {
 
 }
 
-/*===========================================================================*
- *                               kernel_process                              *
- *===========================================================================*/
-static inline int kernel_process(int (*start)(), char *name) {
-
-    int pid;
-
-    if ((pid = fork()) == 0)
-        exit(start());
-    else if (pid < 0) return pid;
-
-    strcpy(process_find(pid)->name, name);
-
-    return pid;
-
-}
+#define processes_list_print(list, member) \
+    do { \
+        struct process *__proc; \
+        list_for_each_entry(__proc, list, member) \
+            printk("pid:%d; name:%s; stat:%d\n", __proc->pid, __proc->name, \
+                __proc->stat); \
+    } while (0)
 
 #define process_type(proc) \
-    ((proc)->kernel)
+    ((proc)->type)
 
 #define process_is_kernel(proc) \
-    ((proc)->kernel)
+    process_type(proc)
 
 #define process_is_user(proc) \
-    (!(proc)->kernel)
+    (!(proc)->type)
 
 #define process_memory_start(proc) \
     (proc)->mm.start

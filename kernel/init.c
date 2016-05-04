@@ -96,9 +96,6 @@ __noreturn void kmain() {
 
     arch_setup();
     delay_calibrate();
-
-    printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
-
     processes_init();
 
     kernel_process(init, "init");
@@ -115,6 +112,10 @@ __noreturn void kmain() {
  *                                   idle                                    *
  *===========================================================================*/
 __noreturn void idle() {
+
+    /*
+     * Remove itself from the running queue
+     */
 
     process_stop(process_current);
     while (1);
@@ -176,7 +177,7 @@ int init() {
     block_devices_list_get(block_devices_list);
     printk("%s%s", char_devices_list, block_devices_list);
 #endif
-
+    printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
     printf("This shouldn't be seen\n");
 
     /* Open standard streams */
