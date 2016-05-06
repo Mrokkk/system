@@ -71,6 +71,7 @@ int close(int);
 int dup(int);
 int waitpid(int, int *, int);
 int exec();
+int mount(const char *, const char *);
 
 #endif /* __ASSEMBLER__ */
 
@@ -115,4 +116,5 @@ __syscall1(dup, TYPE_SL_DEC)
 __syscall1(close, int)
 __syscall3(waitpid, int, int *, int)
 __syscall1(exec, int)
+__syscall2(mount, char *, char *)
 

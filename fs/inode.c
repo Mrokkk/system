@@ -1,11 +1,17 @@
 #include <kernel/fs.h>
 #include <kernel/kernel.h>
 
-struct inode *inodes[256][MAX_INODES];
+struct inode *inodes[MAX_INODES];
+LIST_DECLARE(mounted_inodes);
+struct inode *root;
 
-int inode_put(struct inode *inode) {
+struct inode *inode_create() {
 
-    (void)inode;
+    struct inode *inode;
+
+    if ((inode = kmalloc(sizeof(struct inode))) == 0) return 0;
+
+    inodes[inode->ino] = inode;
 
     return 0;
 

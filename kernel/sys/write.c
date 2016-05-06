@@ -14,9 +14,9 @@ int sys_write(int fd, const char *buffer, size_t size) {
     file = process_current->files[fd];
 
     if (!file) return -EBADF;
-    if (!file->f_ops) return -ENODEV;
-    if (!file->f_ops->write) return -ENODEV;
+    if (!file->ops) return -ENODEV;
+    if (!file->ops->write) return -ENODEV;
 
-    return file->f_ops->write(0, file, kbuf, size);
+    return file->ops->write(0, file, kbuf, size);
 
 }

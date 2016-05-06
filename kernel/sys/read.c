@@ -14,11 +14,11 @@ int sys_read(int fd, char *buffer, size_t n) {
     file = process_current->files[fd];
 
     if (!file) return -EBADF;
-    if (!file->f_ops) return -ENODEV;
-    if (!file->f_ops->read) return -ENODEV;
+    if (!file->ops) return -ENODEV;
+    if (!file->ops->read) return -ENODEV;
 
     /* Call file-dependent function */
-    res = file->f_ops->read(0, file, kbuf, n);
+    res = file->ops->read(0, file, kbuf, n);
 
     copy_to_user(buffer, kbuf, n);
 

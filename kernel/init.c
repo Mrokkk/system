@@ -160,6 +160,9 @@ int init() {
 
     modules_init();
 
+    if (mount("rootfs", "/"))
+        printk("Cannot mount root\n");
+
 #ifdef CONFIG_PRINT_ARCH
     arch_info_get(arch_info);
     printk("%s", arch_info);

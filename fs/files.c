@@ -1,44 +1,16 @@
 #include <kernel/kernel.h>
 #include <kernel/fs.h>
 
-struct file *files;
-int file_nr;
+LIST_DECLARE(files);
 
-/*===========================================================================*
- *                                  file_put                                 *
- *===========================================================================*/
-int file_put(struct file *file) {
+struct file *file_create() {
 
-    struct file *temp;
+    struct file *fil;
 
-    if (!files) {
-        files = file;
-        file->f_next = 0;
-        file->f_prev = 0;
-        return 0;
-    }
+    if ((fil = kmalloc(sizeof(struct file))) == 0) return 0;
 
-    for (temp=files; temp->f_next; temp=temp->f_next);
+    list_add_tail(&fil->files, &files);
 
-    temp->f_next = file;
-    file->f_prev = temp;
-
-    return 0;
+    return fil;
 
 }
-
-/*===========================================================================*
- *                                file_close                                 *
- *===========================================================================*/
-int file_free(struct file *file) {
-
-    if (file->f_prev)
-        file->f_prev->f_next = file->f_next;
-    else
-        files = file->f_next;
-    kfree(file);
-
-    return 0;
-
-}
-
