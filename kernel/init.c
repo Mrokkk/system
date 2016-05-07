@@ -160,7 +160,7 @@ int init() {
 
     modules_init();
 
-    if (mount("rootfs", "/"))
+    if (mount("none", "/", "rootfs", 0, 0))
         printk("Cannot mount root\n");
 
 #ifdef CONFIG_PRINT_ARCH

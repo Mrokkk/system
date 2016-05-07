@@ -33,19 +33,19 @@
 #define __NR_utime 30
 #define __NR_stty 31
 #define __NR_gtty 32
-#define __NR_nosys3 33
+//#define __NR_nosys3 33
 #define __NR_nice 34
 #define __NR_sleep 35
 #define __NR_sync 36
 #define __NR_kill 37
 #define __NR_switch 38
-#define __NR_xxxx
-#define __NR_xxxxx
+//#define __NR_xxxx
+//#define __NR_xxxxx
 #define __NR_dup 41
 #define __NR_pipe 42
 #define __NR_times 43
 #define __NR_prof 44
-#define __NR_xxxxxx
+//#define __NR_xxxxxx
 #define __NR_setgid 46
 #define __NR_getgid 47
 #define __NR_signal 48
@@ -71,7 +71,7 @@ int close(int);
 int dup(int);
 int waitpid(int, int *, int);
 int exec();
-int mount(const char *, const char *);
+int mount(const char *, const char *, const char *, int, void *);
 
 #endif /* __ASSEMBLER__ */
 
@@ -97,6 +97,10 @@ int mount(const char *, const char *);
 #define __syscall4(call, type1, type2, type3, type4)
 #endif
 
+#ifndef __syscall5
+#define __syscall5(call, type1, type2, type3, type4, type5)
+#endif
+
 #define TYPE_UL_HEX        1
 #define TYPE_UL_DEC        2
 #define TYPE_SL_DEC        3
@@ -116,5 +120,5 @@ __syscall1(dup, TYPE_SL_DEC)
 __syscall1(close, int)
 __syscall3(waitpid, int, int *, int)
 __syscall1(exec, int)
-__syscall2(mount, char *, char *)
+__syscall5(mount, const char *, const char *, const char *, 0, 0)
 

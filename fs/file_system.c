@@ -16,8 +16,17 @@ void fullpath_get(const char *path, char *full_path) {
 int file_system_register(struct file_system *fs) {
 
     if (!fs->read_super || !fs->name) return -ENXIO;
+    if (fs->file_systems.next) return -EBUSY;
 
     list_add_tail(&fs->file_systems, &file_systems);
+
+    return 0;
+
+}
+
+int file_system_unregister(struct file_system *fs) {
+
+    list_del(&fs->file_systems);
 
     return 0;
 
@@ -45,6 +54,10 @@ int do_mount(struct file_system *fs, const char *mount_point) {
     if (!(temp_inode = kmalloc(sizeof(struct inode))))
         return -ENOMEM;
 
+    if (!strcmp(mount_point, "/") && !root) {
+        /* TODO: mounting root */
+    }
+
     fullpath_get(mount_point, fullpath);
 
     if (strcmp(fullpath, "/")) return -ENODEV;
@@ -58,21 +71,24 @@ int do_mount(struct file_system *fs, const char *mount_point) {
 
 }
 
-int sys_mount(const char *name, const char *mount_point) {
+int sys_mount(const char *source, const char *target,
+        const char *filesystemtype, unsigned long mountflags) {
 
     char kname[255];
     char kmount[255];
     int i;
     struct file_system *fs;
 
+    (void)source; (void)mountflags;
+
     for (i = 0; i < 64; i++) {
-        get_from_user(&kname[i], (void *)&name[i]);
+        get_from_user(&kname[i], (void *)&filesystemtype[i]);
         if (kname[i] == 0)
             break;
     }
 
     for (i = 0; i < 64; i++) {
-        get_from_user(&kmount[i], (void *)&mount_point[i]);
+        get_from_user(&kmount[i], (void *)&target[i]);
         if (kmount[i] == 0)
             break;
     }

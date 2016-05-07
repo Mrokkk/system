@@ -23,17 +23,17 @@ struct inode *lookup(const char *filename) {
 
     if (!root) return 0;
 
-    if (*path == '/') path = path_next(path)+1;
+    if (*path == '/') path = path_next(path) + 1;
     temp = root;
 
-    do {
+    while (1) {
         base_name(path, name);
         temp->ops->lookup(temp, name, 0, &temp2);
         temp = temp2;
         path = path_next(path);
         if (!path) break;
         path++;
-    } while (1);
+    }
 
     return temp2;
 

@@ -205,10 +205,10 @@
         push %ebx; \
         push %esi; \
         mov $__NR_##name, %eax; \
-        mov 4(%esp), %ebx; \
-        mov 8(%esp), %ecx; \
-        mov 12(%esp), %edx; \
-        mov 16(%esp), %esi; \
+        mov 12(%esp), %ebx; \
+        mov 16(%esp), %ecx; \
+        mov 20(%esp), %edx; \
+        mov 24(%esp), %esi; \
         int $0x80; \
         pop %esi; \
         pop %ebx; \
@@ -221,11 +221,11 @@
         push %esi; \
         push %edi; \
         mov $__NR_##name, %eax; \
-        mov 4(%esp), %ebx; \
-        mov 8(%esp), %ecx; \
-        mov 12(%esp), %edx; \
-        mov 16(%esp), %esi; \
-        mov 20(%esp), %edi; \
+        mov 16(%esp), %ebx; \
+        mov 20(%esp), %ecx; \
+        mov 24(%esp), %edx; \
+        mov 28(%esp), %esi; \
+        mov 32(%esp), %edi; \
         int $0x80; \
         pop %edi; \
         pop %esi; \

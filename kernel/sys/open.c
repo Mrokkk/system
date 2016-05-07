@@ -39,6 +39,7 @@ int sys_open(const char *filename, int mode) {
         return errno;
 
     process_current->files[fd] = file;
+    file->count = 1;
 
     return 0;
 
@@ -58,6 +59,7 @@ int sys_dup(int fd) {
     if (!process_current->files[fd]) return -EBADF;
 
     process_current->files[new_fd] = process_current->files[fd];
+    process_current->files[new_fd]->count++;
 
     return 0;
 
@@ -74,9 +76,10 @@ int sys_close(int fd) {
     file = process_current->files[fd];
     if (!file) return -EBADF;
 
-    file_free(file);
-
     process_current->files[fd] = 0;
+
+    if (!--file->count)
+        file_free(file);
 
     return 0;
 

@@ -18,10 +18,7 @@ typedef unsigned int off_t;
 #define READ 0
 #define WRITE 1
 
-struct inode_operations;
 struct super_block;
-struct file_operations;
-struct super_operations;
 
 struct inode {
     dev_t dev;
@@ -34,7 +31,6 @@ struct inode {
     unsigned int atime;
     unsigned int mtime;
     unsigned int ctime;
-    struct inode_operations *ops;
     struct super_block *sb;
     struct inode *next, *prev;
     struct inode *hash_next, *hash_prev;
@@ -49,6 +45,23 @@ struct inode {
     unsigned char seek;
     unsigned char update;
     void *data;
+    struct inode_operations {
+        struct file_operations *default_file_ops;
+        int (*create)(struct inode *, const char *, int, int, struct inode **);
+        int (*lookup)(struct inode *, const char *, int, struct inode **);
+        int (*link)(struct inode *, struct inode *, const char *,int);
+        int (*unlink)(struct inode *, const char *, int);
+        int (*symlink)(struct inode *, const char *, int, const char *);
+        int (*mkdir)(struct inode *, const char *, int, int);
+        int (*rmdir)(struct inode *, const char *, int);
+        int (*mknod)(struct inode *, const char *, int, int, int);
+        int (*rename)(struct inode *, const char *, int, struct inode *, const char *, int);
+        int (*readlink)(struct inode *, char *, int);
+        int (*follow_link)(struct inode *, struct inode *, int, int, struct inode **);
+        int (*bmap)(struct inode *, int);
+        void (*truncate)(struct inode *);
+        int (*permission)(struct inode *, int);
+    } *ops;
 };
 
 struct file {
@@ -59,8 +72,19 @@ struct file {
     unsigned short count;
     unsigned short reada;
     struct inode *inode;
-    struct file_operations *ops;
     struct list_head files;
+    struct file_operations {
+        int (*lseek)(struct inode *, struct file *, off_t, int);
+        int (*read)(struct inode *, struct file *, char *, int);
+        int (*write)(struct inode *, struct file *, char *, int);
+        int (*readdir)(struct inode *, struct file *, struct dirent *, int);
+        //int (*select)(struct inode *, struct file *, int, select_table *);
+        int (*ioctl)(struct inode *, struct file *, unsigned int, unsigned long);
+        int (*mmap)(struct inode *, struct file *, unsigned long, size_t, int, unsigned long);
+        int (*open)(struct inode *, struct file *);
+        void (*release)(struct inode *, struct file *);
+        int (*fsync)(struct inode *, struct file *);
+    } *ops;
 };
 
 struct super_block {
@@ -70,7 +94,6 @@ struct super_block {
     unsigned char lock;
     unsigned char rd_only;
     unsigned char dirt;
-    struct super_operations *ops;
     unsigned long flags;
     unsigned long magic;
     unsigned long time;
@@ -78,48 +101,16 @@ struct super_block {
     struct inode *mounted;
     struct wait_queue *wait;
     void *data;
-};
-
-struct file_operations {
-    int (*lseek)(struct inode *, struct file *, off_t, int);
-    int (*read)(struct inode *, struct file *, char *, int);
-    int (*write)(struct inode *, struct file *, char *, int);
-    int (*readdir)(struct inode *, struct file *, struct dirent *, int);
-    //int (*select)(struct inode *, struct file *, int, select_table *);
-    int (*ioctl)(struct inode *, struct file *, unsigned int, unsigned long);
-    int (*mmap)(struct inode *, struct file *, unsigned long, size_t, int, unsigned long);
-    int (*open)(struct inode *, struct file *);
-    void (*release)(struct inode *, struct file *);
-    int (*fsync)(struct inode *, struct file *);
-};
-
-struct inode_operations {
-    struct file_operations *default_file_ops;
-    int (*create)(struct inode *, const char *, int, int, struct inode **);
-    int (*lookup)(struct inode *, const char *, int, struct inode **);
-    int (*link)(struct inode *, struct inode *, const char *,int);
-    int (*unlink)(struct inode *, const char *, int);
-    int (*symlink)(struct inode *, const char *, int, const char *);
-    int (*mkdir)(struct inode *, const char *, int, int);
-    int (*rmdir)(struct inode *, const char *, int);
-    int (*mknod)(struct inode *, const char *, int, int, int);
-    int (*rename)(struct inode *, const char *, int, struct inode *, const char *, int);
-    int (*readlink)(struct inode *, char *, int);
-    int (*follow_link)(struct inode *, struct inode *, int, int, struct inode **);
-    int (*bmap)(struct inode *, int);
-    void (*truncate)(struct inode *);
-    int (*permission)(struct inode *, int);
-};
-
-struct super_operations {
-    void (*read_inode)(struct inode *);
-    int (*notify_change)(int flags, struct inode *);
-    void (*write_inode)(struct inode *);
-    void (*put_inode)(struct inode *);
-    void (*put_super)(struct super_block *);
-    void (*write_super)(struct super_block *);
-    //void (*statfs)(struct super_block *, struct statfs *);
-    int (*remount_fs)(struct super_block *, int *, char *);
+    struct super_operations {
+        void (*read_inode)(struct inode *);
+        int (*notify_change)(int flags, struct inode *);
+        void (*write_inode)(struct inode *);
+        void (*put_inode)(struct inode *);
+        void (*put_super)(struct super_block *);
+        void (*write_super)(struct super_block *);
+        //void (*statfs)(struct super_block *, struct statfs *);
+        int (*remount_fs)(struct super_block *, int *, char *);
+    } *ops;
 };
 
 struct file_system {
