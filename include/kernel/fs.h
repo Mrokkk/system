@@ -140,14 +140,4 @@ int do_mount(struct file_system *fs, const char *mount_point);
 int do_open(struct file **new_file, const char *filename, int mode);
 struct file *file_create();
 
-/*===========================================================================*
- *                                file_close                                 *
- *===========================================================================*/
-static inline void file_free(struct file *file) {
-
-    list_del(&file->files);
-    kfree(file);
-
-}
-
 #endif /* INCLUDE_KERNEL_FS_H_ */

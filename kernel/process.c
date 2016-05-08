@@ -28,7 +28,7 @@ static inline void process_space_free(struct process *proc) {
  *===========================================================================*/
 static inline void process_signals_free(struct process *proc) {
     if (proc->signals)
-        kfree(proc->signals);
+        DESTRUCT(proc->signals);
 }
 
 /*===========================================================================*
@@ -116,7 +116,7 @@ void process_delete(struct process *proc) {
     process_space_free(proc);
     arch_process_free(proc);
     process_signals_free(proc);
-    kfree(proc);
+    DESTRUCT(proc);
 
 }
 
@@ -148,7 +148,7 @@ static struct process *process_create(int type) {
     (void)type;
 
     /* Allocate space for process structure */
-    if (!(new_process = (struct process *)kmalloc(sizeof(struct process))))
+    if (CONSTRUCT(new_process))
         goto cannot_create_process;
 
     if (process_space_setup(new_process))

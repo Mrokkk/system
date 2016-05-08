@@ -57,7 +57,7 @@ int rootfs_lookup(struct inode *dir, const char *name, int len, struct inode **r
 
     (void)dir; (void)name; (void)len; (void)result;
 
-    *result = kmalloc(sizeof(struct inode));
+    CONSTRUCT(*result);
 
     if ((dev = char_device_find(name)) != 0) {
         dev_ops.default_file_ops = dev->fops;

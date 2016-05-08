@@ -76,7 +76,7 @@ int sys_close(int fd) {
     process_current->files[fd] = 0;
 
     if (!--file->count)
-        file_free(file);
+       DESTRUCT(file, list_del(&file->files));
 
     return 0;
 

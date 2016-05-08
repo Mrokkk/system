@@ -6,6 +6,7 @@
 #ifndef __ASSEMBLER__
 
 #include <kernel/list.h>
+#include <kernel/macro.h>
 
 struct memory_block {
     union {
@@ -23,6 +24,30 @@ struct memory_block {
 
 void *kmalloc(unsigned int);
 int kfree(void *);
+
+/* Generic constructor */
+#define __CONSTRUCT(object, initializer) \
+    ({ object = (typeof(object))kmalloc(sizeof(typeof(*object))); \
+    if (object) (void)initializer; !object; })
+
+/* Generic destructor */
+#define __DESTRUCT(object, deinitializer) \
+    do { \
+        (void)deinitializer; \
+        kfree(object); \
+    } while (0)
+
+#define CONSTRUCT_1(object)              __CONSTRUCT(object, 0)
+#define CONSTRUCT_2(object, initializer) __CONSTRUCT(object, initializer)
+
+#define DESTRUCT_1(object)                __DESTRUCT(object, 0)
+#define DESTRUCT_2(object, deinitializer) __DESTRUCT(object, deinitializer)
+
+#define CONSTRUCT(...) \
+    REAL_VAR_MACRO_2(CONSTRUCT_1, CONSTRUCT_2, __VA_ARGS__)
+
+#define DESTRUCT(...) \
+    REAL_VAR_MACRO_2(DESTRUCT_1, DESTRUCT_2, __VA_ARGS__)
 
 #endif
 

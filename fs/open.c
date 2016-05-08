@@ -45,7 +45,9 @@ int do_open(struct file **new_file, const char *filename, int mode) {
 
     inode = lookup(filename);
 
-    *new_file = file_create();
+    if (CONSTRUCT(*new_file, list_add_tail(&(*new_file)->files, &files)))
+        return -ENOMEM;
+
     (*new_file)->inode = inode;
     (*new_file)->ops = inode->ops->default_file_ops;
     (*new_file)->mode = mode;

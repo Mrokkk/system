@@ -42,38 +42,11 @@ struct file_system *file_system_get(const char *name) {
 
     struct file_system *fs;
 
-    list_for_each_entry(fs, &file_systems, file_systems) {
+    list_for_each_entry(fs, &file_systems, file_systems)
         if (!strcmp(name, fs->name))
             return fs;
-    }
 
     return 0;
-
-}
-
-static struct super_block *super_block_create() {
-
-    struct super_block *new_sb;
-
-    if (!(new_sb = kmalloc(sizeof(struct super_block))))
-        return new_sb;
-
-    memset(new_sb, 0, sizeof(struct super_block));
-
-    return new_sb;
-
-}
-
-static struct mounted_system *mounted_system_create() {
-
-    struct mounted_system *new_ms;
-
-    if (!(new_ms = kmalloc(sizeof(struct mounted_system))))
-        return new_ms;
-
-    memset(new_ms, 0, sizeof(struct mounted_system));
-
-    return new_ms;
 
 }
 
@@ -84,12 +57,16 @@ int do_mount(struct file_system *fs, const char *mount_point) {
     struct inode *temp_inode;
     char fullpath[255];
 
-    if (!(temp_inode = kmalloc(sizeof(struct inode))))
+    if (CONSTRUCT(temp_inode))
         return -ENOMEM;
 
     fullpath_get(mount_point, fullpath);
-    sb = super_block_create();
-    ms = mounted_system_create();
+
+    if (CONSTRUCT(sb, memset(sb, 0, sizeof(struct super_block))))
+        return -ENOMEM;
+
+    if (CONSTRUCT(ms, memset(ms, 0, sizeof(struct mounted_system))))
+        return -ENOMEM;
 
     fs->read_super(sb, 0, 0);
     ms->dir = kmalloc(255);

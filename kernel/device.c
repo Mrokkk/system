@@ -15,8 +15,7 @@ int __char_device_register(unsigned int major, const char *name,
     struct device *new, *temp = char_devices[major];
     struct kernel_module *mod;
 
-    new = kmalloc(sizeof(struct device));
-    if (unlikely(!new)) return -ENOMEM; /* Can't allocate memory... */
+    if (CONSTRUCT(new)) return -ENOMEM;
 
     new->fops = fops;
     new->next = 0;
@@ -109,8 +108,7 @@ int __block_device_register(unsigned int major, const char *name,
 
     kernel_trace("adding block device %u %s", major, name);
 
-    new = kmalloc(sizeof(struct device));
-    if (unlikely(!new)) return -ENOMEM;
+    if (CONSTRUCT(new)) return -ENOMEM;
 
     new->fops = fops;
     new->next = 0;
