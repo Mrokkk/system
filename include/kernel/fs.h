@@ -111,6 +111,7 @@ struct super_block {
         //void (*statfs)(struct super_block *, struct statfs *);
         int (*remount_fs)(struct super_block *, int *, char *);
     } *ops;
+    struct list_head super_blocks;
 };
 
 struct file_system {
@@ -118,6 +119,14 @@ struct file_system {
     char *name;
     int requires_dev;
     struct list_head file_systems;
+    struct list_head super_blocks;
+};
+
+struct mounted_system {
+    dev_t dev;
+    char *dir;
+    struct super_block *sb;
+    struct list_head mounted_systems;
 };
 
 extern struct list_head files;
@@ -126,6 +135,7 @@ extern struct inode *root;
 
 int vfs_init();
 int file_system_register(struct file_system *fs);
+struct inode *lookup(const char *filename);
 int do_mount(struct file_system *fs, const char *mount_point);
 int do_open(struct file **new_file, const char *filename, int mode);
 struct file *file_create();

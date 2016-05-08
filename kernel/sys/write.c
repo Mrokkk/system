@@ -17,6 +17,6 @@ int sys_write(int fd, const char *buffer, size_t size) {
     if (!file->ops) return -ENODEV;
     if (!file->ops->write) return -ENODEV;
 
-    return file->ops->write(0, file, kbuf, size);
+    return file->ops->write(file->inode, file, kbuf, size);
 
 }
