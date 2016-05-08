@@ -3,7 +3,7 @@
 
 LIST_DECLARE(file_systems);
 
-int fs_init() {
+int vfs_init() {
     return 0;
 }
 

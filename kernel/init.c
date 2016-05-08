@@ -21,7 +21,7 @@ volatile unsigned int jiffies;
 
 struct mmap mmap[10];
 unsigned int ram;
-struct kernel_symbol *kernel_symbols[370];
+struct kernel_symbol *kernel_symbols;
 int kernel_symbols_size;
 
 /* FIXME: Specify interface for reading RAM */
@@ -43,10 +43,14 @@ void delay_calibrate(void) {
     int loopbit;
     int lps_precision = LPS_PREC;
     int i;
+    int flags;
 
     loops_per_sec = (1<<12);
 
     for (i=0; i<320000; i++) asm volatile("nop");
+
+    save_flags(flags);
+    sti();
 
     printk("Calibrating delay loop.. ");
     while (loops_per_sec <<= 1) {
@@ -83,6 +87,8 @@ void delay_calibrate(void) {
         (loops_per_sec+2500)/500000,
         ((loops_per_sec+2500)/5000) % 100);
 
+    restore_flags(flags);
+
 }
 
 /*===========================================================================*
@@ -90,18 +96,22 @@ void delay_calibrate(void) {
  *===========================================================================*/
 __noreturn void kmain() {
 
-    /*
-     * This is init process with PID 0
-     */
-
     arch_setup();
     delay_calibrate();
     processes_init();
+    vfs_init();
 
-    kernel_process(init, "init");
+    sti();
+    /* Now we're officially in the first process with
+     * PID 0 (init_process).
+     */
 
     TESTS_RUN();
 
+    /* Create another process called 'init' (ugh...)
+     * and change itself into the idle process.
+     */
+    kernel_process(init, "init");
     idle();
 
     while (1);
@@ -342,8 +352,8 @@ struct kernel_symbol *symbol_find(const char *name) {
     int i;
 
     for (i = 0; i < kernel_symbols_size; i++) {
-        if (!strncmp(kernel_symbols[i]->name, name, 32))
-            return kernel_symbols[i];
+        if (!strncmp(kernel_symbols[i].name, name, 32))
+            return &kernel_symbols[i];
     }
 
     return 0;
@@ -355,32 +365,39 @@ struct kernel_symbol *symbol_find_address(unsigned int address) {
     int i;
 
     for (i = 0; i < kernel_symbols_size; i++) {
-        if ((address < kernel_symbols[i]->address + kernel_symbols[i]->size)
-                && (address > kernel_symbols[i]->address))
-            return kernel_symbols[i];
+        if ((address < kernel_symbols[i].address + kernel_symbols[i].size)
+                && (address > kernel_symbols[i].address))
+            return &kernel_symbols[i];
     }
 
     return 0;
 
 }
 
-int symbols_read(char *symbols, unsigned int size) {
+int symbols_get_number(char *symbols, unsigned int size) {
 
     char *temp = symbols;
     int nr = 0;
 
-    while ((unsigned int)temp < (unsigned int)symbols + size) {
-        kernel_symbols[nr] = kmalloc(sizeof(struct kernel_symbol));
-        if (!kernel_symbols[nr]) {
-            printk("Out of memory!\n");
-            break;
-        }
-        temp = symbol_read(temp, kernel_symbols[nr]);
-        nr++;
-    }
+    while ((unsigned int)temp < (unsigned int)symbols + size)
+        if (*temp++ == '\n') nr++;
+
+    return nr;
+
+}
+
+int symbols_read(char *symbols, unsigned int size) {
+
+    int nr = 0, i = 0;
+
+    nr = symbols_get_number(symbols, size);
+    kernel_symbols = kmalloc(nr * sizeof(struct kernel_symbol));
+    kernel_symbols_size = nr;
+
+    for (i = 0; i<nr; i++)
+        symbols = symbol_read(symbols, &kernel_symbols[i]);
 
     printk("Read %d symbols\n", nr);
-    kernel_symbols_size = nr;
 
     return 0;
 

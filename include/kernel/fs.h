@@ -124,6 +124,7 @@ extern struct list_head files;
 extern struct list_head mounted_inodes;
 extern struct inode *root;
 
+int vfs_init();
 int file_system_register(struct file_system *fs);
 int do_mount(struct file_system *fs, const char *mount_point);
 int do_open(struct file **new_file, const char *filename, int mode);
