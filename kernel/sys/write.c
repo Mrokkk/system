@@ -9,7 +9,7 @@ int sys_write(int fd, const char *buffer, size_t size) {
     struct file *file;
     char kbuf[size+1];
 
-    copy_from_user(kbuf, (void *)buffer, size);
+    memcpy_from_user(kbuf, buffer, size);
 
     file = process_current->files[fd];
 

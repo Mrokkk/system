@@ -1,5 +1,6 @@
 #include <kernel/fs.h>
 #include <kernel/kernel.h>
+#include <arch/segment.h>
 
 LIST_DECLARE(file_systems);
 
@@ -76,22 +77,12 @@ int sys_mount(const char *source, const char *target,
 
     char kname[255];
     char kmount[255];
-    int i;
     struct file_system *fs;
 
     (void)source; (void)mountflags;
 
-    for (i = 0; i < 64; i++) {
-        get_from_user(&kname[i], (void *)&filesystemtype[i]);
-        if (kname[i] == 0)
-            break;
-    }
-
-    for (i = 0; i < 64; i++) {
-        get_from_user(&kmount[i], (void *)&target[i]);
-        if (kmount[i] == 0)
-            break;
-    }
+    strcpy_from_user(kname, filesystemtype);
+    strcpy_from_user(kmount, target);
 
     if (!(fs = file_system_get(kname))) return -ENODEV;
 

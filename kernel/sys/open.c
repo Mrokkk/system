@@ -2,6 +2,8 @@
 #include <kernel/device.h>
 #include <kernel/fs.h>
 
+#include <arch/segment.h>
+
 int process_find_free_fd(struct process *proc) {
 
     int fd;
@@ -22,15 +24,10 @@ int process_find_free_fd(struct process *proc) {
 int sys_open(const char *filename, int mode) {
 
     char kbuf[64];
-    int i = 0;
     int fd, errno;
     struct file *file;
 
-    for (i = 0; i < 64; i++) {
-        get_from_user(&kbuf[i], (void *)&filename[i]);
-        if (kbuf[i] == 0)
-            break;
-    }
+    strcpy_from_user(kbuf, filename);
 
     if ((fd = process_find_free_fd(process_current)) < 0)
         return fd;

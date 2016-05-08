@@ -20,7 +20,7 @@ int sys_read(int fd, char *buffer, size_t n) {
     /* Call file-dependent function */
     res = file->ops->read(0, file, kbuf, n);
 
-    copy_to_user(buffer, kbuf, n);
+    memcpy_to_user(buffer, kbuf, n);
 
     return res;
 
