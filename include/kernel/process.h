@@ -6,14 +6,6 @@
 #include <kernel/fs.h>
 #include <kernel/signal.h>
 
-#ifndef INIT_PROCESS_CONTEXT
-#define INIT_PROCESS_CONTEXT(proc)
-#endif
-
-#ifndef INIT_PROCESS_STACK_SIZE
-#define INIT_PROCESS_STACK_SIZE 512
-#endif
-
 #define PROCESS_SPACE 8192
 #define PROCESS_FILES 128
 
@@ -120,9 +112,10 @@ int processes_init();
 int process_clone(struct process *proc, struct pt_regs *regs, int clone_flags);
 void process_delete(struct process *proc);
 int kernel_process(int (*start)(), char *name);
-struct process *process_find(int pid);
+int process_find(int pid, struct process **p);
 void process_wake_waiting(struct process *proc);
 pid_t find_free_pid();
+int process_find_free_fd(struct process *proc, int *fd);
 void scheduler();
 void exit(int);
 pid_t fork(void);
@@ -132,56 +125,52 @@ int arch_process_copy(struct process *dest, struct process *src, struct pt_regs 
 void arch_process_free(struct process *proc);
 void regs_print(struct pt_regs *regs);
 
-/*===========================================================================*
- *                              process_exit                                 *
- *===========================================================================*/
-static inline void process_exit(struct process *proc) {
+static inline int process_is_running(struct process *p) {
+    return p->stat == PROCESS_RUNNING;
+}
 
+static inline int process_is_zombie(struct process *p) {
+    return p->stat == PROCESS_ZOMBIE;
+}
+
+static inline void process_exit(struct process *proc) {
     list_del(&proc->running);
     proc->stat = PROCESS_ZOMBIE;
     process_wake_waiting(proc);
-
     if (proc == process_current) {
         scheduler();
         while (1);
     }
-    /* There was a serious bug! Function
-     * was entering a infinite loop
-     * regardless of the fact process
-     * was not the current process */
-
 }
 
-/*===========================================================================*
- *                               process_stop                                *
- *===========================================================================*/
 static inline void process_stop(struct process *proc) {
-
     list_del(&proc->running);
     proc->stat = PROCESS_STOPPED;
     if (proc == process_current) scheduler();
-
 }
 
-/*===========================================================================*
- *                                process_wake                               *
- *===========================================================================*/
 static inline void process_wake(struct process *proc) {
-
     list_add_tail(&proc->running, &running);
     proc->stat = PROCESS_RUNNING;
-
 }
 
-/*===========================================================================*
- *                                process_wait                               *
- *===========================================================================*/
 static inline void process_wait(struct process *proc) {
-
     list_del(&proc->running);
     proc->stat = PROCESS_WAITING;
     if (proc == process_current) scheduler();
+}
 
+static inline void process_fd_set(struct process *proc, int fd, struct file *file) {
+    proc->files[fd] = file;
+}
+
+static inline int process_fd_get(struct process *proc, int fd, struct file **file) {
+    if (!(*file = proc->files[fd])) return 1;
+    return 0;
+}
+
+static inline int fd_check_bounds(int fd) {
+    return (fd >= PROCESS_FILES) || (fd < 0);
 }
 
 #define processes_list_print(list, member) \
@@ -199,14 +188,10 @@ static inline void process_wait(struct process *proc) {
     process_type(proc)
 
 #define process_is_user(proc) \
-    (!(proc)->type)
+    (!process_type(proc))
 
 #define process_memory_start(proc) \
     (proc)->mm.start
-
-#define process_memory_end(proc, type) \
-    (type)((proc)->mm.end)
-
 
 #endif /* __PROCESS_H_ */
 

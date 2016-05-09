@@ -7,17 +7,14 @@
 int sys_read(int fd, char *buffer, size_t n) {
 
     struct file *file;
-    char kbuf[n];
+    char kbuf[n+1];
     int res;
 
-    /* Get file corresponding to descriptor */
-    file = process_current->files[fd];
+    process_fd_get(process_current, fd, &file);
 
     if (!file) return -EBADF;
     if (!file->ops) return -ENODEV;
     if (!file->ops->read) return -ENODEV;
-
-    /* Call file-dependent function */
     res = file->ops->read(file->inode, file, kbuf, n);
 
     memcpy_to_user(buffer, kbuf, n);

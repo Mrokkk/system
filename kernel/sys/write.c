@@ -11,7 +11,7 @@ int sys_write(int fd, const char *buffer, size_t size) {
 
     memcpy_from_user(kbuf, buffer, size);
 
-    file = process_current->files[fd];
+    process_fd_get(process_current, fd, &file);
 
     if (!file) return -EBADF;
     if (!file->ops) return -ENODEV;

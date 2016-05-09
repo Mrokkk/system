@@ -38,15 +38,18 @@ int file_system_unregister(struct file_system *fs) {
 
 }
 
-struct file_system *file_system_get(const char *name) {
+int file_system_get(const char *name, struct file_system **fs) {
 
-    struct file_system *fs;
+    struct file_system *temp;
 
-    list_for_each_entry(fs, &file_systems, file_systems)
-        if (!strcmp(name, fs->name))
-            return fs;
+    list_for_each_entry(temp, &file_systems, file_systems)
+        if (!strcmp(name, temp->name)) {
+            *fs = temp;
+            return 0;
+        }
 
-    return 0;
+    *fs = 0;
+    return 1;
 
 }
 
@@ -92,18 +95,19 @@ int do_mount(struct file_system *fs, const char *mount_point) {
 int sys_mount(const char *source, const char *target,
         const char *filesystemtype, unsigned long mountflags) {
 
-    char kname[255];
-    char kmount[255];
+    char k_fs_name[255];
+    char k_target[255];
     struct file_system *fs;
 
     (void)source; (void)mountflags;
 
-    strcpy_from_user(kname, filesystemtype);
-    strcpy_from_user(kmount, target);
+    strcpy_from_user(k_fs_name, filesystemtype);
+    strcpy_from_user(k_target, target);
 
-    if (!(fs = file_system_get(kname))) return -ENODEV;
+    if (file_system_get(k_fs_name, &fs))
+        return -ENODEV;
 
-    return do_mount(fs, kmount);
+    return do_mount(fs, k_target);
 
 }
 

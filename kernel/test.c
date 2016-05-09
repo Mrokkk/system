@@ -13,7 +13,7 @@ TEST_PLAN(processes)
             while (1);
         }
         ASSERT_GT(isntPidNull, child_pid, 0);
-        proc = process_find(child_pid);
+        process_find(child_pid, &proc);
         ASSERT_NEQ(ifProcessStructExists, proc, 0);
         process_exit(proc);
         ASSERT_NEQ(isntProcessZombie, proc->stat, 0);

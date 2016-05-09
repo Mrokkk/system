@@ -9,8 +9,6 @@
 
 typedef unsigned int off_t;
 
-#define MAX_INODES 512
-
 #define MAY_EXEC 1
 #define MAY_WRITE 2
 #define MAY_READ 4
