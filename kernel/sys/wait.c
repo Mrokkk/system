@@ -17,7 +17,7 @@ int sys_waitpid(int pid, int *status, int opt) {
     list_add_tail(&process_current->wait_queue, &proc->wait_queue);
     process_wait(process_current);
 
-    put_user_long(status, &(proc->exit_code));
+    put_user_long(proc->exit_code, status);
 
 delete_process:
     save_flags(flags);

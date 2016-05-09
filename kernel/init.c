@@ -42,12 +42,9 @@ void delay_calibrate(void) {
     unsigned int ticks;
     int loopbit;
     int lps_precision = LPS_PREC;
-    int i;
     int flags;
 
     loops_per_sec = (1<<12);
-
-    for (i=0; i<320000; i++) asm volatile("nop");
 
     save_flags(flags);
     sti();
@@ -195,7 +192,7 @@ int init() {
 
     /* Open standard streams */
     if (open("/dev/tty0", 0) || dup(0) || dup(0))
-        exit(-1);
+        return -1;
 
     /* Say hello */
     welcome();
@@ -209,14 +206,12 @@ int init() {
     /* Do fork */
     if ((child_pid = fork()) < 0) {
         printf("Fork error in init!\n");
-        exit(-1);
+        return -1;
     } else if (!child_pid) {
         exec(&temp_shell);
     }
 
     waitpid(child_pid, &status, 0);
-
-    exit(0);
 
     return 0;
 

@@ -27,15 +27,15 @@ extern inline unsigned long __get_user_long(unsigned long *user) {
 }
 
 extern inline void __put_user_byte(unsigned char val, unsigned char *user) {
-    asm volatile("movb %1, %%gs:(%0);" :: "r" (val), "r" (user));
+    asm volatile("movb %0, %%gs:(%1);" :: "r" (val), "r" (user));
 }
 
 extern inline void __put_user_word(unsigned short val, unsigned short *user) {
-    asm volatile("movw %1, %%gs:(%0);" :: "r" (val), "r" (user));
+    asm volatile("movw %0, %%gs:(%1);" :: "r" (val), "r" (user));
 }
 
-extern inline void __put_user_long(unsigned long val, unsigned long *user) {
-    asm volatile("movl %1, %%gs:(%0);" :: "r" (val), "r" (user));
+static inline void __put_user_long(unsigned long val, unsigned long *user) {
+    asm volatile("movl %0, %%gs:(%1);" :: "r" (val), "r" (user));
 }
 
 #define get_user_byte(address) \
