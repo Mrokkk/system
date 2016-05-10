@@ -74,7 +74,7 @@ void pit_configure() {
             PIT_PORT_COMMAND);
     outb(LATCH & 0xff, PIT_PORT_CHANNEL0);
     outb(LATCH >> 8, PIT_PORT_CHANNEL0);
-    irq_register(0, &empty_isr, "timer");
+
     irq_enable(0);
 
 }
@@ -107,6 +107,7 @@ void irqs_configure() {
 
     pit_configure();
 
+    irq_register(0, &empty_isr, "timer");
     irq_register(2, &empty_isr, "cascade");
     irq_register(13, &empty_isr, "fpu");
 
