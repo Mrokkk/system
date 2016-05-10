@@ -5,7 +5,7 @@
 
 typedef struct semaphore {
     volatile int count;
-    int waiting;
+    volatile int waiting;
     struct wait_queue_head queue;
 } semaphore_t;
 

@@ -1,6 +1,5 @@
 #include <kernel/semaphore.h>
-
-/* These functions may not be correct */
+#include <arch/system.h>
 
 void __down_failed(semaphore_t *sem) {
 
@@ -17,9 +16,9 @@ void __up(semaphore_t *sem) {
 
     struct process *proc;
 
-    if (sem->waiting) {
-        proc = wait_queue_pop(&sem->queue);
-        process_wake(proc);
-    }
+    proc = wait_queue_pop(&sem->queue);
+    if (!proc) return;
+    sem->waiting--;
+    process_wake(proc);
 
 }

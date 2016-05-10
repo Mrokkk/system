@@ -120,6 +120,8 @@ void serial_irs() {
 
 }
 
+SEMAPHORE_DECLARE(serial_lock, 1);
+
 /*===========================================================================*
  *                               serial_write                                *
  *===========================================================================*/
@@ -130,7 +132,11 @@ int serial_write(struct inode *inode, struct file *file, const char *buffer,
 
     (void)inode; (void)file;
 
+    semaphore_down(&serial_lock);
+
     while (size--) serial_send(*buffer++, COM1);
+
+    semaphore_up(&serial_lock);
 
     return old;
 

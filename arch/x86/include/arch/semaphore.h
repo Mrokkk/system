@@ -3,8 +3,6 @@
 
 #include <kernel/process.h>
 
-/* I hope these are correct ... */
-
 static inline void semaphore_up(semaphore_t *sem) {
 
     asm volatile(
@@ -24,7 +22,7 @@ static inline void semaphore_down(semaphore_t *sem) {
         "js 2f;"
         "jmp 3f;"
         "2:"
-        "call __down_failed;"
+        "call __semaphore_sleep;"
         "3: "
         : "=m" (sem->count)
         : "c" (sem)

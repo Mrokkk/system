@@ -14,9 +14,9 @@ ENTRY(__semaphore_wake)
     push %edx
     push %ecx
     call __up
-    pop %eax
-    pop %edx
     pop %ecx
+    pop %edx
+    pop %eax
     ret
 ENDPROC(__semaphore_wake)
 
@@ -28,9 +28,9 @@ ENTRY(__semaphore_sleep)
     push %edx
     push %ecx
     call __down_failed
-    pop %eax
-    pop %edx
     pop %ecx
+    pop %edx
+    pop %eax
     ret
 ENDPROC(__semaphore_sleep)
 
