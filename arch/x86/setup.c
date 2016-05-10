@@ -3,16 +3,12 @@
 #include <kernel/irq.h>
 #include <kernel/time.h>
 #include <kernel/module.h>
-#include <kernel/malloc.h>
 
 #include <arch/io.h>
 #include <arch/descriptor.h>
-#include <arch/bios.h>
-#include <arch/real_mode.h>
 #include <arch/cpuid.h>
 #include <arch/segment.h>
 #include <arch/multiboot.h>
-#include <arch/pit.h>
 
 static void tss_init();
 static void idt_configure();
@@ -20,12 +16,6 @@ static void idt_set_gate(unsigned char num, unsigned long base, unsigned short s
 int cpu_info_get();
 static void cpu_intel();
 void prepare_to_shutdown();
-void pit_configure();
-void pic_disable();
-void irqs_configure();
-
-/* In assembly */
-extern void sse_enable();
 
 /* Exceptions */
 #define __exception_noerrno(x) void exc_##x##_handler();
@@ -36,20 +26,14 @@ extern void sse_enable();
 /* Interrupts */
 #define __isr(x) void isr_##x();
 #define __pic_isr(x) void isr_##x();
-#define __timer_isr(x) void isr_##x();
+#define __timer_isr(x) void timer_handler();
+#define __syscall_handler(x) void syscall_handler();
 #include <arch/isr.h>
-void timer_handler();     /* 0x20 */
-void syscall_handler();    /* 0x80 */
-void empty_isr() {};
 
 char *bootloader_name;
 char cmdline_saved[64];
 
-volatile char sse_enabled = 0;
-
-struct bios_data_area *bda = (struct bios_data_area *)BDA_BASE_ADDRESS;
-
-struct gdt_entry gdt_entries[8192] = {
+struct gdt_entry gdt_entries[] = {
 
     /* Null segment */
     descriptor_entry(0, 0, 0),
@@ -129,19 +113,10 @@ void arch_setup() {
     gdt_store(&old_gdt);
     old_gdt_entries = (struct gdt_entry *)old_gdt.base;
 
-    if (cpu_info.features & INTEL_SSE)
-        sse_enable();
-
     gdt_load(&gdt);
     idt_configure();
     tss_init();
-    irqs_configure();
     nmi_enable();
-
-    irq_register(2, &empty_isr, "cascade");
-    irq_register(13, &empty_isr, "fpu");
-
-    pit_configure();
 
 }
 
@@ -159,24 +134,6 @@ void gdt_print(struct gdt_entry *entries, int size) {
     }
 
 }
-
-#define CLOCK_TICK_RATE 1193182
-#define LATCH  ((CLOCK_TICK_RATE) / HZ) /* TODO: Why is it so inaccurate? */
-
-/*===========================================================================*
- *                               pit_configure                               *
- *===========================================================================*/
-void pit_configure() {
-
-    outb(PIT_CHANNEL0 | PIT_MODE_2 | PIT_ACCES_LOHI | PIT_16BIN,
-            PIT_PORT_COMMAND);
-    outb(LATCH & 0xff, PIT_PORT_CHANNEL0);
-    outb(LATCH >> 8, PIT_PORT_CHANNEL0);
-    irq_register(0, &empty_isr, "timer");
-    irq_enable(0);
-
-}
-
 
 /*===========================================================================*
  *                                   delay                                   *
@@ -231,6 +188,8 @@ unsigned int ram_get() {
     return (mmap[index].base + mmap[index].size);
 
 }
+
+static void empty_isr() {};
 
 /*===========================================================================*
  *                              idt_configure                                *
@@ -341,7 +300,6 @@ __noreturn void shutdown_by_bios() {
  *===========================================================================*/
 void prepare_to_shutdown() {
 
-    pic_disable();
     cli();
     modules_shutdown();
 

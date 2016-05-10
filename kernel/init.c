@@ -14,6 +14,7 @@ void idle();
 static void welcome();
 int init();
 void delay_calibrate(void);
+void irqs_configure();
 
 struct cpu_info cpu_info;
 

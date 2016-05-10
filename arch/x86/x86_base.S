@@ -45,7 +45,6 @@ ENTRY(sse_enable)
         mov %cr4, %eax
         or $(3 << 9), %ax
         mov %eax, %cr4
-        mov $sse_enabled, %eax
         movb $1, (%eax)
         ret
 ENDPROC(sse_enable)

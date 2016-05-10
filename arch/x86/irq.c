@@ -1,6 +1,8 @@
 #include <kernel/kernel.h>
 #include <kernel/irq.h>
+#include <kernel/time.h>
 #include <arch/io.h>
+#include <arch/pit.h>
 
 static struct irq irq_list[16];
 
@@ -8,6 +10,9 @@ static unsigned short mask = 0xffff;
 
 #define PIC1 0x20
 #define PIC2 0xA0
+
+void pic_disable();
+static void empty_isr() {};
 
 /*===========================================================================*
  *                               irq_register                                *
@@ -57,6 +62,23 @@ int irqs_list_get(char *buffer) {
 
 }
 
+#define CLOCK_TICK_RATE 1193182
+#define LATCH  ((CLOCK_TICK_RATE) / HZ) /* TODO: Why is it so inaccurate? */
+
+/*===========================================================================*
+ *                               pit_configure                               *
+ *===========================================================================*/
+void pit_configure() {
+
+    outb(PIT_CHANNEL0 | PIT_MODE_2 | PIT_ACCES_LOHI | PIT_16BIN,
+            PIT_PORT_COMMAND);
+    outb(LATCH & 0xff, PIT_PORT_CHANNEL0);
+    outb(LATCH >> 8, PIT_PORT_CHANNEL0);
+    irq_register(0, &empty_isr, "timer");
+    irq_enable(0);
+
+}
+
 /*===========================================================================*
  *                               irqs_configure                              *
  *===========================================================================*/
@@ -81,9 +103,12 @@ void irqs_configure() {
     outb(1, PIC1 + 1);
     outb(1, PIC2 + 1);
 
-    /* Disable PIC */
-    outb(0xFF, PIC1 + 1);
-    outb(0xFF, PIC2 + 1);
+    pic_disable();
+
+    pit_configure();
+
+    irq_register(2, &empty_isr, "cascade");
+    irq_register(13, &empty_isr, "fpu");
 
 }
 
