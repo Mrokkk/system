@@ -9,7 +9,7 @@
 #include <kernel/stdarg.h>
 #include <kernel/stddef.h>
 #include <kernel/sys.h>
-#include <kernel/semaphore.h>
+#include <kernel/mutex.h>
 
 #define COM1 0x3f8
 #define COM2 0x2f8
@@ -120,7 +120,7 @@ void serial_irs() {
 
 }
 
-SEMAPHORE_DECLARE(serial_lock, 1);
+MUTEX_DECLARE(serial_lock);
 
 /*===========================================================================*
  *                               serial_write                                *
@@ -132,11 +132,11 @@ int serial_write(struct inode *inode, struct file *file, const char *buffer,
 
     (void)inode; (void)file;
 
-    semaphore_down(&serial_lock);
+    mutex_lock(&serial_lock);
 
     while (size--) serial_send(*buffer++, COM1);
 
-    semaphore_up(&serial_lock);
+    mutex_unlock(&serial_lock);
 
     return old;
 
