@@ -11,7 +11,6 @@
 #include <arch/real_mode.h>
 #include <arch/cpuid.h>
 #include <arch/segment.h>
-#include <arch/apm.h>
 #include <arch/multiboot.h>
 #include <arch/pit.h>
 
@@ -138,7 +137,6 @@ void arch_setup() {
     tss_init();
     irqs_configure();
     nmi_enable();
-    apm_enable();
 
     irq_register(2, &empty_isr, "cascade");
     irq_register(13, &empty_isr, "fpu");
@@ -333,24 +331,7 @@ __noreturn void reboot_by_crash() {
  *                             shutdown_by_bios                              *
  *===========================================================================*/
 __noreturn void shutdown_by_bios() {
-
-    struct regs_struct regs;
-
-    (void)regs;
-
-    if (apm_check(&regs)->eflags & 1) goto error;
-    if (apm_disconnect(&regs)->eflags & 1) goto error;
-    if (apm_connect(&regs, APM_INTERFACE_REAL_MODE)->eflags & 1) goto error;
-    if (apm_power_management_enable(&regs)->eflags & 1) goto error;
-    if (apm_power_state_set(&regs, APM_DEVICE_ALL,
-            APM_POWER_STATE_OFF)->eflags & 1)
-        goto error;
-
     while (1);
-
-error:
-    while (1);
-
 }
 
 /*===========================================================================*
@@ -369,11 +350,7 @@ void prepare_to_shutdown() {
  *===========================================================================*/
 __noreturn void shutdown() {
 
-    struct regs_struct regs;
-
     prepare_to_shutdown();
-
-    apm_power_state_set(&regs, APM_DEVICE_ALL, APM_POWER_STATE_OFF);
 
     printk("Bye, bye!!!");
 
@@ -535,8 +512,6 @@ void multiboot_read(struct multiboot_info *mb) {
         strcpy(cmdline_saved, (char *)mb->cmdline);
     if (mb->flags & MULTIBOOT_FLAGS_BL_NAME_BIT)
         bootloader_name = (char *)mb->bootloader_name;
-    if (mb->flags & MULTIBOOT_FLAGS_APM_TABLE_BIT)
-        apm_table = (struct multiboot_apm_table_struct *)mb->apm_table;
     if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT) {
         multiboot_modules_read(mb);
     }

@@ -264,7 +264,7 @@ qemu qemu-kernel:
 
 help:
 	@echo "Configuring:"
-	@echo "  config"
+	@echo "  configure - configure build - it must be run first"
 	@echo "Build targets:"
 	@echo "  all - build whole kernel"
 	@echo "  dir - build only 'dir' directory"
@@ -277,8 +277,7 @@ help:
 	@echo "  iso - create bootable ISO image"
 	@echo "  qemu, qemu-kernel - run QEMU directly loading kernel"
 	@echo "  qemu-iso - create ISO and run QEMU"
-	@echo "    To pass additional options to QEMU, set QEMU-FLAGS"
-	@echo "    to them"
+	@echo "    To pass additional options to QEMU, set QEMU-FLAGS to them"
 	@echo "Architectures supported:"
 	@echo "  x86 [i386 i486 i586 i686]"
 	@echo "Cross-compiling:"
