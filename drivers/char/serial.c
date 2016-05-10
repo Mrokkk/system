@@ -41,9 +41,14 @@ SEMAPHORE_DECLARE(serial_sem, 1);
 /*===========================================================================*
  *                                 serial_open                               *
  *===========================================================================*/
-int serial_open(int minor) {
+int serial_open(struct inode *inode, struct file *file) {
 
     unsigned short PORT;
+    int minor;
+
+    (void)inode; (void)file;
+
+    minor = MINOR(inode->dev);
 
     switch (minor) {
         case 0: PORT = COM1; break;
@@ -191,7 +196,6 @@ static int c_running() {
         serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name,
                 proc->stat);
     }
-    sys_exit(0);
     return 0;
 
 }
@@ -208,7 +212,6 @@ static int c_ps() {
                 process_state_char(proc->stat));
     }
 
-    sys_exit(0);
     return 0;
 }
 
@@ -231,15 +234,12 @@ static int c_kstat() {
 
     semaphore_up(&serial_sem);
 
-    sys_exit(0);
     return 0;
 
 }
 
-int kexit(int e) {
+int kexit() {
 
-    e = 0;
-    sys_exit(e);
     return 0;
 
 }
@@ -249,9 +249,7 @@ int kexit(int e) {
  *===========================================================================*/
 static int c_zombie() {
 
-    int pid = kernel_process(&kexit, "zombie");
-
-    sys_exit(pid);
+    kernel_process(&kexit, "zombie");
 
     return 0;
 
@@ -340,10 +338,7 @@ int seriald() {
  *===========================================================================*/
 int serial_init() {
 
-    char_device_register(MAJOR_CHR_SERIAL, "ttyS0", &fops);
-    char_device_register(MAJOR_CHR_SERIAL, "ttyS1", &fops);
-    char_device_register(MAJOR_CHR_SERIAL, "ttyS2", &fops);
-    char_device_register(MAJOR_CHR_SERIAL, "ttyS3", &fops);
+    char_device_register(MAJOR_CHR_SERIAL, "ttyS", &fops);
 
     irq_register(0x4, &serial_irs, "com1");
     irq_register(0x3, &serial_irs, "com2");

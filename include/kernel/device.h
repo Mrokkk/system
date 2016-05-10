@@ -13,29 +13,25 @@
 
 struct device {
     char name[32];
-    unsigned char minor_max;
     struct kernel_module *owner;
     struct file_operations *fops;
-    struct device *next;
-    struct list_head *devices;
 };
 
 int __char_device_register(unsigned int major, const char *name, struct file_operations *fops, unsigned int this_module);
-struct device *char_device_get(unsigned int major);
-struct file_operations *char_fops_get(unsigned int major);
 int char_devices_list_get(char *buffer);
+int char_device_find(const char *name, struct device **dev);
 
-int __block_device_register(unsigned int major, const char *name, struct file_operations *fops, unsigned int this_module);
-struct device *block_device_get(unsigned int major);
-struct file_operations *block_fops_get(unsigned int major);
-int block_devices_list_get(char *buffer);
+extern struct device *char_devices[16];
+
+static inline struct device *char_device_get(unsigned int major) {
+    return char_devices[major];
+}
+
+static inline struct file_operations *char_fops_get(unsigned int major) {
+    return char_devices[major]->fops;
+}
 
 #define char_device_register(major, name, fops) \
     __char_device_register(major, name, fops, (unsigned int)&this_module)
-
-#define block_device_register(major, name, fops) \
-    __block_device_register(major, name, fops, (unsigned int)&this_module)
-
-struct device *char_device_find(const char *name);
 
 #endif /* __DEVICE_H_ */

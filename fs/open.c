@@ -26,6 +26,8 @@ struct inode *lookup(const char *filename) {
     if (*path == '/') path = path_next(path) + 1;
     temp = root;
 
+    CONSTRUCT(temp2); /* FIXME: Not freeing */
+
     while (1) {
         base_name(path, name);
         temp->ops->lookup(temp, name, 0, &temp2);

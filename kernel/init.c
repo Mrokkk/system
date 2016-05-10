@@ -160,10 +160,10 @@ int init() {
 
     int child_pid, status;
     char arch_info[128], modules_list[128], irqs_list[128],
-            char_devices_list[128], block_devices_list[128];
+            char_devices_list[128];
 
     (void)arch_info; (void)modules_list; (void)irqs_list;
-    (void)char_devices_list; (void)block_devices_list;
+    (void)char_devices_list;
 
     modules_init();
 
@@ -184,8 +184,7 @@ int init() {
 #endif
 #ifdef CONFIG_PRINT_DEVICES
     char_devices_list_get(char_devices_list);
-    block_devices_list_get(block_devices_list);
-    printk("%s%s", char_devices_list, block_devices_list);
+    printk("%s", char_devices_list);
 #endif
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
     printf("This shouldn't be seen\n");

@@ -30,7 +30,7 @@ int tty_init() {
 
     video_init();
 
-    char_device_register(MAJOR_CHR_TTY, "tty0", &fops);
+    char_device_register(MAJOR_CHR_TTY, "tty", &fops);
 
     console_register(&display_print);
 

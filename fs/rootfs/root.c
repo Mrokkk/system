@@ -1,6 +1,8 @@
+#include <kernel/kernel.h>
 #include <kernel/fs.h>
 #include <kernel/device.h>
 #include <kernel/module.h>
+#include <kernel/ctype.h>
 
 KERNEL_MODULE(rootfs);
 module_init(rootfs_init);
@@ -51,17 +53,37 @@ void rootfs_read_inode(struct inode *inode) {
 
 }
 
+int get_minor(const char *src) {
+
+    char *temp;
+    while (!isdigit(*src) && *src)
+        src++;
+    return strtol(src, &temp, 10);
+
+}
+
+void skip_minor(const char *src, char *target) {
+
+    while (isalpha(*src) && (*target++ = *src++));
+    *target = 0;
+
+}
+
 int rootfs_lookup(struct inode *dir, const char *name, int len, struct inode **result) {
 
     struct device *dev;
+    char dev_name[32];
+    int minor, major;
 
-    (void)dir; (void)name; (void)len; (void)result;
+    (void)dir; (void)name; (void)len; (void)result; (void)minor;
 
-    CONSTRUCT(*result);
-
-    if ((dev = char_device_find(name)) != 0) {
+    skip_minor(name, dev_name);
+    major = char_device_find(dev_name, &dev);
+    if ((dev) != 0) {
+        minor = get_minor(name);
         dev_ops.default_file_ops = dev->fops;
         (*result)->ops = &dev_ops;
+        (*result)->dev = MKDEV(major, minor);
     } else
         (*result)->ops = &rootfs_inode_ops;
 
@@ -73,8 +95,6 @@ int rootfs_read(struct inode *inode, struct file *file, char *buffer, int size) 
 
     (void)inode; (void)file; (void)buffer; (void)size;
 
-    printk("Bad read\n");
-
     return 0;
 
 }
@@ -82,8 +102,6 @@ int rootfs_read(struct inode *inode, struct file *file, char *buffer, int size) 
 int rootfs_write(struct inode *inode, struct file *file, char *buffer, int size) {
 
     (void)inode; (void)file; (void)buffer; (void)size;
-
-    printk("Bad write\n");
 
     return 0;
 
