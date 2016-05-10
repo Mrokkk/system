@@ -16,10 +16,10 @@ unexport OWN-DIRS-LIST
 
 RELATIVE-TO-BASE :=  $(shell pwd | sed 's:^$(TOPDIR)/::')
 
-# Absolute path to current o-files directory
+# Absolute path to the current o-files directory
 OBJDIR := $(TOPDIR)/obj/$(RELATIVE-TO-BASE)
 
-ifneq ($(OWN-DIRS-LIST), y)
+ifeq ($(OWN-DIRS-LIST), )
 
 # Subdirectories
 DIRS := $(filter-out $(addsuffix /, $(EXCLUDE-DIRS)), $(shell ls -d */ 2>/dev/null))
@@ -27,11 +27,11 @@ DIRS := $(DIRS:%/=%)
 
 endif
 
-ifneq ($(OWN-SRC-LIST), y)
+ifeq ($(OWN-SRC-LIST), )
 
 # Sources listed in directory
 C-SRC := $(filter-out $(EXCLUDE-FILES), $(shell ls *.c 2>/dev/null | tr '\n' ' '))
-ASM-SRC := $(shell ls *.S 2>/dev/null | tr '\n' ' ')
+ASM-SRC := $(filter-out $(EXCLUDE-FILES), $(shell ls *.S 2>/dev/null | tr '\n' ' '))
 
 endif
 
