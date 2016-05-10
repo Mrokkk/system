@@ -10,6 +10,10 @@
 #define __timer_isr(x)
 #endif
 
+#ifndef __syscall_handler
+#define __syscall_handler(x)
+#endif
+
 __isr(0)
 __isr(1)
 __isr(2)
@@ -138,7 +142,7 @@ __isr(124)
 __isr(125)
 __isr(126)
 __isr(127)
-__isr(128)
+__syscall_handler(128)
 __isr(129)
 __isr(130)
 __isr(131)

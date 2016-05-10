@@ -143,7 +143,7 @@ struct multiboot_apm_table_struct {
 #define MULTIBOOT_FLAGS_APM_TABLE_BIT       (1 << 10)
 #define MULTIBOOT_FLAGS_VBE_BIT             (1 << 11)
 
-void multiboot_read(struct multiboot_info *mb);
+int multiboot_read(struct multiboot_info *mb, unsigned int magic);
 
 #endif /* __ASSEMBLER__ */
 

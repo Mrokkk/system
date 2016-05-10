@@ -96,15 +96,14 @@ void irq_enable(unsigned int irq) {
 
     mask &= ~(1 << irq);
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     if (irq < 8)
         outb(mask & 0xff, PIC1 + 1);
     else
         outb(mask >> 8, PIC2 + 1);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
 }
 
@@ -117,15 +116,14 @@ void irq_disable(int irq) {
 
     mask |= (1 << irq);
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     if (irq < 8)
         outb(mask & 0xFF, PIC1 + 1);
     else
         outb(mask >> 8, PIC2 + 1);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
 }
 
@@ -136,13 +134,12 @@ void pic_disable() {
 
     unsigned int flags;
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     outb(0xff, PIC1 + 1);
     outb(0xff, PIC2 + 1);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
 }
 
@@ -153,13 +150,12 @@ void pic_enable() {
 
     unsigned int flags;
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     outb(mask & 0xff, PIC1 + 1);
     outb((mask >> 8) & 0xff, PIC2 + 1);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
 }
 

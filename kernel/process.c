@@ -175,10 +175,9 @@ int process_clone(struct process *parent, struct pt_regs *regs,
     list_add_tail(&child->processes, &init_process.processes);
     process_forked(parent);
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
     process_wake(child);
-    restore_flags(flags);
+    irq_restore(flags);
     return child->pid;
 
 cannot_allocate:

@@ -20,13 +20,13 @@ int sys_waitpid(int pid, int *status, int opt) {
     put_user_long(proc->exit_code, status);
 
 delete_process:
-    save_flags(flags);
-    cli();
+
+    irq_save(flags);
 
     if (process_is_zombie(proc))
         process_delete(proc);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
     return 0;
 

@@ -9,6 +9,7 @@ SECTIONS
 	{
 		_stext = .;
 		KEEP(*(.multiboot))
+		KEEP(*(.text.boot))
 		*(.text)
 		_etext = .;
 	}

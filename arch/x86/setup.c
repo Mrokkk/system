@@ -240,13 +240,20 @@ static void idt_configure() {
     #undef __isr
     #undef __pic_isr
     #undef __timer_isr
+    #undef __syscall_handler
     #define __isr(x) \
         idt_set_gate((x), (unsigned long)empty_isr, KERNEL_CS, \
                      GDT_FLAGS_TYPE_32TRAP_GATE);
     #define __pic_isr(x) \
         idt_set_gate((x), (unsigned long)isr_##x, KERNEL_CS, \
                      GDT_FLAGS_TYPE_32TRAP_GATE);
-    #define __timer_isr __pic_isr
+    #define __syscall_handler(x) \
+        idt_set_gate((x), (unsigned long)syscall_handler, \
+                 KERNEL_CS, GDT_FLAGS_TYPE_32TRAP_GATE | GDT_FLAGS_RING3);
+    #define __timer_isr(x) \
+        idt_set_gate((x), (unsigned long)timer_handler, \
+                     KERNEL_CS, GDT_FLAGS_TYPE_32INT_GATE);
+
     #include <arch/isr.h>
 
     #undef __exception_noerrno
@@ -258,11 +265,6 @@ static void idt_configure() {
     #define __exception_errno __exception_noerrno
     #define __exception_debug __exception_noerrno
     #include <arch/exception.h>
-
-    idt_set_gate(0x20, (unsigned long)timer_handler,
-                 KERNEL_CS, GDT_FLAGS_TYPE_32INT_GATE);
-    idt_set_gate(0x80, (unsigned long)syscall_handler,
-                 KERNEL_CS, GDT_FLAGS_TYPE_32TRAP_GATE | GDT_FLAGS_RING3);
 
     idt_load(&idt);
 
@@ -502,7 +504,12 @@ static inline void multiboot_modules_read(struct multiboot_info *mb) {
 /*===========================================================================*
  *                              multiboot_read                               *
  *===========================================================================*/
-void multiboot_read(struct multiboot_info *mb) {
+int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
+
+    if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
+        printk("ERROR: Not Multiboot v1 compilant bootloader!\n");
+        return 0;
+    }
 
     if (mb->flags & MULTIBOOT_FLAGS_MMAP_BIT)
         multiboot_mmap_read(mb);
@@ -515,6 +522,8 @@ void multiboot_read(struct multiboot_info *mb) {
     if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT) {
         multiboot_modules_read(mb);
     }
+
+    return mb->cmdline;
 
 }
 

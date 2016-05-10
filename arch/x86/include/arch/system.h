@@ -7,10 +7,10 @@
 #define mb() \
     asm volatile("" : : : "memory")
 
-#define save_flags(x) \
+#define flags_save(x) \
     asm volatile("pushfl; popl %0" : "=r" (x) : /*  */ : "memory")
 
-#define restore_flags(x) \
+#define flags_restore(x) \
     asm volatile("pushl %0; popfl" : /*  */ : "r" (x) : "memory")
 
 #define sti() \
@@ -18,6 +18,15 @@
 
 #define cli() \
     asm volatile("cli" : : : "memory")
+
+/* As long I don't support SMP I don't
+ * need a spinlock on irq_save and irq_restore
+ */
+#define irq_save(x) \
+    { flags_save(x); cli(); }
+
+#define irq_restore(x) \
+    { flags_restore(x); }
 
 #define nop() \
     asm volatile("nop")
@@ -62,10 +71,6 @@ extern void irq_enable(unsigned int);
 extern void delay(unsigned int);
 extern void reboot();
 extern void shutdown();
-extern void copy_from_user(void *dest, void *src, unsigned int size);
-extern void copy_to_user(void *dest, void *src, unsigned int size);
-extern void get_from_user(void *, void *);
-extern void put_to_user(void *, void *);
 unsigned int ram_get();
 
 extern inline void udelay(unsigned long usecs) {

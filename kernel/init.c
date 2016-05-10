@@ -46,7 +46,7 @@ void delay_calibrate(void) {
 
     loops_per_sec = (1<<12);
 
-    save_flags(flags);
+    irq_save(flags);
     sti();
 
     printk("Calibrating delay loop.. ");
@@ -84,19 +84,24 @@ void delay_calibrate(void) {
         (loops_per_sec+2500)/500000,
         ((loops_per_sec+2500)/5000) % 100);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
 }
 
 /*===========================================================================*
  *                                   kmain                                   *
  *===========================================================================*/
-__noreturn void kmain() {
+__noreturn void kmain(char *boot_params) {
+
+    (void)boot_params;
+
+    printk("Boot params: %s\n", boot_params);
 
     arch_setup();
-    delay_calibrate();
+    irqs_configure();
     processes_init();
     vfs_init();
+    delay_calibrate();
 
     sti();
     /* Now we're officially in the first process with
@@ -189,18 +194,18 @@ int init() {
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
     printf("This shouldn't be seen\n");
 
+    /* Just playing with serial */
+    if (open("/dev/ttyS0", 0)) printf("Cannot open serial\n");
+    fprintf(0, "Hello World!\n");
+    if (close(0)) printf("Can't close ttyS0\n");
+    fprintf(0, "Hello World!\n");
+
     /* Open standard streams */
     if (open("/dev/tty0", 0) || dup(0) || dup(0))
         return -1;
 
     /* Say hello */
     welcome();
-
-    /* Just playing with serial */
-    if (open("/dev/ttyS0", 0)) printf("Cannot open serial\n");
-    fprintf(3, "Hello World!\n");
-    if (close(3)) printf("Can't close ttyS0\n");
-    fprintf(3, "Hello World!\n");
 
     /* Do fork */
     if ((child_pid = fork()) < 0) {

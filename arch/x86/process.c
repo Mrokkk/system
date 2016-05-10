@@ -235,8 +235,7 @@ __noreturn int sys_exec(struct pt_regs regs) {
                  *user_stack;
     unsigned int flags, eip = 0;
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     eip = regs.ebx;
 
@@ -264,7 +263,7 @@ __noreturn int sys_exec(struct pt_regs regs) {
     push(0, kernel_stack);                          /* eax */
     kernel_stack -= 6;
 
-    restore_flags(flags);
+    irq_restore(flags);
 
     set_context(kernel_stack, &ret_from_syscall);
 

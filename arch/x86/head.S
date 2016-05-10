@@ -15,17 +15,9 @@ ENTRY(multiboot_header)
     .long MAGIC
     .long FLAGS
     .long CHECKSUM
-    .long 0
-    .long 0
-    .long 0
-    .long 0
-    .long MULTIBOOT_VIDEO_MODE_LIN
-    .long MULTIBOOT_VIDEO_MODE_WIDTH
-    .long MULTIBOOT_VIDEO_MODE_HEIGHT
-    .long 0
 END(multiboot_header)
 
-SECTION(.text)
+SECTION(.text.boot)
 
 /*===========================================================================*
  *                                 _start                                    *
@@ -36,63 +28,45 @@ ENTRY(_start)
      * a magic number in EAX and pointer to          *
      * multiboot_info structure in EBX               */
 
-    /* Zero EFLAGS register */
-    setup_eflags:
+        /* Zero EFLAGS register */
         pushl $0
         popfl
 
-    /* Set up stack register */
-    setup_stack:
+        /* Set up stack register */
         movl $init_process_stack, %esp
         addl $1024, %esp
         push %eax
         push %ebx
 
-    /* Clear BSS */
-    clear_bss:
+        /* Clear BSS */
         movl $_sbss, %edi
         movl $_ebss, %ecx
         subl %edi, %ecx
         cld
         rep
 
-    /* Check if our processor knows CPUID instruction */
-    check_cpuid:
+        /* Check if our processor knows CPUID instruction */
         pushf               /* Place EFLAGS on the stack */
         pop %eax            /* Pop value from the stack to EAX */
         mov %eax, %ebx
-        xorl $register_bit_mask(eflags_id), %ebx /* Set 23th bit in EFLAGS (ID) */
+        /* Set 23th bit in EFLAGS (ID) */
+        xorl $register_bit_mask(eflags_id), %ebx
         push %ebx
         popf
         pushf
         pop %eax
         cmp %eax, %ecx
-        jne _arch_setup
-
-    is_486:
-        hlt    /* TODO */
+        jne 1f
+        hlt    /* TODO: 486 processors */
 
     /* Knows CPUID */
-    _arch_setup:
+    1:
         call_function(multiboot_read)
-
-    /* Check if bootloader was Multiboot compliant */
-    check_mb_magic:
-        pop %ebx
-        pop %eax
-        cmp $0x2BADB002, %eax
-        je jump_to_main
-        call_function1(printk, $bad_magic_msg)
-
-    jump_to_main:
+        push %eax
         call_function(kmain)
 
-    inf_loop:
-        jmp inf_loop
+    2:
+        jmp 2b
 
 ENDPROC(_start)
-
-ENTRY(bad_magic_msg)
-    .asciz "check_mb_magic: Not Multiboot v1 compilant bootloader!\n"
-END(bad_magic_msg)
 

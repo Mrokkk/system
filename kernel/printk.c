@@ -16,8 +16,7 @@ int printk(const char *fmt, ...) {
     int printed;
     unsigned int flags;
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     va_start(args, fmt);
     printed = vsprintf(printf_buf, fmt, args);
@@ -32,7 +31,7 @@ int printk(const char *fmt, ...) {
     else
         printk_index += sprintf(printk_buffer+printk_index, "%s", printf_buf);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
     return printed;
 
@@ -45,13 +44,12 @@ void console_register(void (*func)(const char *string)) {
 
     unsigned int flags;
 
-    save_flags(flags);
-    cli();
+    irq_save(flags);
 
     console_print = func;
     (*console_print)(printk_buffer);
 
-    restore_flags(flags);
+    irq_restore(flags);
 
 }
 
