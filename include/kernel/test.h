@@ -60,9 +60,17 @@
         }                                           \
     } while (0)
 
+#ifdef CONFIG_TESTS
+
 #define TESTS_RUN() \
     void tests_run(); \
     tests_run();
+
+#else
+
+#define TESTS_RUN()
+
+#endif
 
 #define TEST_SUITE(name) \
     auto void SUITE_##name(int *);\

@@ -63,6 +63,9 @@ KERNEL-BIN := $(BINDIR)/kernel
 
 # Subdirectories to be build
 DIRS := arch fs kernel lib drivers
+ifeq ($(CONFIG_TESTS), y)
+DIRS += tests
+endif
 
 LINKER-SCRIPT := $(TOPDIR)/arch/$(ARCH)/linker.ld
 
