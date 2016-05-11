@@ -1,6 +1,7 @@
 #include <kernel/string.h>
 #include <kernel/module.h>
 #include <kernel/device.h>
+#include <kernel/mutex.h>
 
 #include <arch/bios.h>
 #include <arch/io.h>
@@ -32,136 +33,148 @@
 #define RESX 80
 #define RESY 25
 
-void cls();
-int video_init();
-void display_print(const char *text);
-
-unsigned short *pointer[4] = {
+static unsigned short *pointer[4] = {
         (unsigned short *)0xb8000,
-        (unsigned short *)(0xb8000+4096),
-        (unsigned short *)(0xb8000+2*4096),
-        (unsigned short *)(0xb8000+3*4096)
+        (unsigned short *)(0xb8000 + 1 * 4096),
+        (unsigned short *)(0xb8000 + 2 * 4096),
+        (unsigned short *)(0xb8000 + 3 * 4096)
 };
 
-unsigned char attrib = forecolor(COLOR_GRAY) | backcolor(COLOR_BLACK);
-unsigned char csr_x[4] = {0, 0, 0, 0};
-unsigned char csr_y[4] = {0, 0, 0, 0};
+static unsigned char default_attribute = forecolor(COLOR_GRAY) | backcolor(COLOR_BLACK);
+static unsigned char csr_x[4] = {0, 0, 0, 0};
+static unsigned char csr_y[4] = {0, 0, 0, 0};
 
-unsigned char current_page = 0;
+static unsigned char current_page = 0;
+
+static inline void video_mem_write(unsigned short data, unsigned short offset) {
+    pointer[current_page][offset] = data;
+}
+
+static inline void cursor_x_set(int x) {
+    csr_x[current_page] = x;
+}
+
+static inline void cursor_y_set(int y) {
+    csr_y[current_page] = y;
+}
+
+static inline void cursor_x_inc() {
+    csr_x[current_page]++;
+}
+
+static inline void cursor_y_inc() {
+    csr_y[current_page]++;
+}
+
+static inline void cursor_x_dec() {
+    csr_x[current_page]--;
+}
+
+static inline void cursor_y_dec() {
+    csr_y[current_page]--;
+}
+
+static inline int cursor_x_get() {
+    return csr_x[current_page];
+}
+
+static inline int cursor_y_get() {
+    return csr_y[current_page];
+}
+
+static inline unsigned short make_video_char(char c, char a) {
+    return ((a << 8) | c);
+}
+
+static inline unsigned short current_offset_get() {
+    return cursor_y_get() * RESX + cursor_x_get();
+}
+
+MUTEX_DECLARE(video_lock);
 
 void scroll(void) {
 
     unsigned short blank;
     unsigned short temp;
 
-    /* Spacja na czarnym tle */
-    blank = 0x20 | (attrib << 8);
+    blank = 0x20 | (default_attribute << 8);
 
-    if(csr_y[current_page] >= RESY) {
-        /* Move the current text chunk that makes up the screen
-         * back in the buffer by a line */
-        temp = csr_y[current_page] - RESY + 1;
+    if(cursor_y_get() >= RESY) {
+        temp = cursor_y_get() - RESY + 1;
         memcpy(pointer[current_page], pointer[current_page] + temp * RESX, (RESY - temp) * RESX * 2);
-
-        /* Finally, we set the chunk of memory that occupies
-         * the last line of text to our 'blank' character */
         memsetw(pointer[current_page] + (RESY - temp) * RESX, blank, RESX);
-        csr_y[current_page] = RESY - 1;
+        cursor_y_set(RESY - 1);
     }
 
 }
 
 void move_csr(void) {
 
-    unsigned short offset;
-
-    offset = csr_y[current_page] * RESX + csr_x[current_page];
+    unsigned short off = current_offset_get();
 
     outb(14, 0x3D4);
-    outb(offset >> 8, 0x3D5);
+    outb(off >> 8, 0x3D5);
     outb(15, 0x3D4);
-    outb(offset, 0x3D5);
+    outb(off, 0x3D5);
 
 }
 
 void cls() {
 
-    unsigned short blank = 0x20 | (attrib << 8);
+    unsigned short blank = 0x20 | (default_attribute << 8);
 
-    memsetw((unsigned short*) pointer[current_page], blank, RESX * RESY);
-    csr_x[current_page] = 0;
-    csr_y[current_page] = 0;
+    memsetw((unsigned short*)pointer[current_page], blank, RESX * RESY);
+    cursor_x_set(0);
+    cursor_y_set(0);
     move_csr();
 
 }
 
-
 void putch(unsigned char c) {
 
-    unsigned short *where;
-    unsigned short att = attrib << 8;
-
-    /* Backspace */
-    if (c == 0x08) {
-        if(csr_x[current_page] != 0) {
-            csr_x[current_page]--;
+    if (c == '\b') {
+        if(cursor_x_get() != 0) {
+            cursor_x_dec();
             putch(' ');
-            csr_x[current_page]--;
+            cursor_x_dec();
         }
-    }
-    /* Tabulator */
-    else if (c == 0x09) {
-        csr_x[current_page] = (csr_x[current_page] + 8) & ~(8 - 1);
-    }
-    /* CR */
-    else if (c == '\r') {
-        csr_x[current_page] = 0;
-    }
-    /* Znak nowej linii - LF */
+    } else if (c == '\t')
+        cursor_x_set((cursor_x_get() + 8) & ~(8 - 1));
+    else if (c == '\r')
+        cursor_x_set(0);
     else if (c == '\n') {
-        csr_x[current_page] = 0;
-        csr_y[current_page]++;
-    }
-    /* Any character greater than and including a space, is a
-    *  printable character. The equation for finding the index
-    *  in a linear chunk of memory can be represented by:
-    *  Index = [(y * width) + x] */
-    else if (c >= ' ') {
-        where = pointer[current_page] + (csr_y[current_page] * RESX + csr_x[current_page]);
-        *where = c | att;    /* Character AND attributes: color */
-        csr_x[current_page]++;
+        cursor_x_set(0);
+        cursor_y_inc();
+    } else if (c >= ' ') {
+        video_mem_write(make_video_char(c, default_attribute), current_offset_get());
+        cursor_x_inc();
     }
 
-    /* If the cursor has reached the edge of the screen's width, we
-    *  insert a new line in there */
     if (csr_x[current_page] >= RESX) {
-        csr_x[current_page] = 0;
-        csr_y[current_page]++;
+        cursor_x_set(0);
+        cursor_y_inc();
     }
 
-    /* Scroll the screen if needed, and finally move the cursor */
     scroll();
     move_csr();
 
 }
 
-
 void display_print(const char *text) {
 
-    unsigned int i = 0;
+    while (*text)
+        putch(*text++);
 
-    for (i = 0; text[i]!=0; i++) {
-        putch(text[i]);
-        /*write_serial(text[i]);*/
-    }
 }
 
 int display_write(struct inode *inode, struct file *file, const char *buffer, unsigned int size) {
 
     (void)inode; (void)file;
 
+    mutex_lock(&video_lock);
     while (size--)
         putch(*buffer++);
+    mutex_unlock(&video_lock);
 
     return size;
 
@@ -169,6 +182,7 @@ int display_write(struct inode *inode, struct file *file, const char *buffer, un
 
 int video_init() {
 
+#if 0
     struct regs_struct param;
 
     param.ax = 3;
@@ -179,8 +193,9 @@ int video_init() {
     param.ax = 0x1001;
     param.bx = 100 << 8;
     execute_in_real_mode((unsigned int)bios_int10h, &param);
+#endif
+
     pointer[0] = (unsigned short*)VIDEO_SEGMENT;
-    pointer[1] = (unsigned short*)(VIDEO_SEGMENT+4096);
 
     cls();
 
@@ -188,133 +203,3 @@ int video_init() {
 
 }
 
-void disp_set_page(unsigned char page) {
-
-    struct regs_struct param;
-
-    param.ax = 0;
-    param.bx = 0;
-    param.cx = 0;
-    param.dx = 0;
-
-    current_page = page;
-    param.ax = 0x0500 | page;
-    execute_in_real_mode((unsigned int)bios_int10h, &param);
-
-}
-
-void disp_switch_page(int page) {
-
-    struct regs_struct param;
-
-    param.ax = 0;
-    param.bx = 0;
-    param.cx = 0;
-    param.dx = 0;
-
-    current_page = page;
-    param.ax = 0x0500 | page;
-    execute_in_real_mode((unsigned int)bios_int10h, &param);
-    move_csr();
-
-}
-
-void disp_putch(unsigned char c, unsigned char attr) {
-
-    unsigned short *where;
-    unsigned short att = attr << 8;
-
-    /* Backspace */
-    if(c == 0x08) {
-        if(csr_x[current_page] != 0) {
-            csr_x[current_page]--;
-            disp_putch(' ', att);
-            csr_x[current_page]--;
-        }
-    }
-    /* Tabulator */
-    else if(c == 0x09) {
-        csr_x[current_page] = (csr_x[current_page] + 8) & ~(8 - 1);
-    }
-    /* CR */
-    else if(c == '\r') {
-        csr_x[current_page] = 0;
-    }
-
-    /* LF */
-    else if(c == '\n') {
-        csr_x[current_page] = 0;
-        csr_y[current_page]++;
-    }
-    /* Any character greater than and including a space, is a
-    *  printable character. The equation for finding the index
-    *  in a linear chunk of memory can be represented by:
-    *  Index = [(y * width) + x] */
-    else if(c >= ' ') {
-        where = pointer[current_page] + (csr_y[current_page] * RESX + csr_x[current_page]);
-        *where = c | att;    /* Character AND attributes: color */
-        csr_x[current_page]++;
-    }
-
-    /* If the cursor has reached the edge of the screen's width, we
-    *  insert a new line in there */
-    if(csr_x[current_page] >= RESX) {
-        csr_x[current_page] = 0;
-        csr_y[current_page]++;
-    }
-
-    /* Scroll the screen if needed, and finally move the cursor */
-    scroll();
-    move_csr();
-
-}
-
-/* Uses the above routine to output a string... */
-void disp_puts(char *text, unsigned char attr) {
-
-    unsigned int i;
-
-    for (i = 0; text[i]!=0; i++) {
-        disp_putch((unsigned char)text[i], attr);
-        /*write_serial(text[i]);*/
-    }
-}
-
-unsigned char get_csr_x() {
-    return csr_x[current_page];
-}
-
-unsigned char get_csr_y() {
-    return csr_y[current_page];
-}
-
-unsigned char get_current_page() {
-    return current_page;
-}
-
-unsigned char disp_goto(unsigned char x, unsigned char y) {
-    csr_x[current_page] = x;
-    csr_y[current_page] = y;
-    return 0;
-}
-
-void disp_change_color(unsigned char color) {
-
-    unsigned short *where;
-    where = pointer[current_page] + (csr_y[current_page] * RESX + csr_x[current_page]);
-    *where = (*where & 0xff) | (color << 8);
-    csr_x[current_page]++;
-    move_csr();
-
-}
-
-void clear_screen(unsigned char c, unsigned char att) {
-
-    unsigned short blank = c | (att << 8);
-    memsetw((unsigned short*) pointer[current_page], blank, RESX * RESY);
-
-    csr_x[current_page] = 0;
-    csr_y[current_page] = 0;
-    move_csr();
-
-}
