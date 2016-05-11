@@ -217,6 +217,19 @@ void regs_print(struct pt_regs *regs) {
 
 }
 
+/*===========================================================================*
+ *                                 sys_clone                                 *
+ *===========================================================================*/
+int sys_clone(struct pt_regs regs) {
+
+    unsigned int sp = regs.ecx;
+
+    if (!sp) sp = regs.esp;
+
+    return process_clone(process_current, &regs, regs.ebx);
+
+}
+
 #define set_context(stack, ip) \
     do {                        \
         asm volatile(           \

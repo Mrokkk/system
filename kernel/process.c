@@ -196,8 +196,8 @@ int kernel_process(int (*start)(), void *args, unsigned int flags) {
 
     (void)args; (void)flags;
 
-    if ((pid = fork()) == 0)
-        exit(start());
+    if ((pid = clone(flags, 0)) == 0)
+        exit(start(args));
 
     return pid;
 

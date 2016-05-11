@@ -50,6 +50,7 @@
 #define __NR_getgid 47
 #define __NR_signal 48
 #define __NR_readdir 49
+#define __NR_clone 120
 
 #ifndef __ASSEMBLER__
 
@@ -72,6 +73,7 @@ int dup(int);
 int waitpid(int, int *, int);
 int exec();
 int mount(const char *, const char *, const char *, int, void *);
+int clone(unsigned int flags, void *stack);
 
 #endif /* __ASSEMBLER__ */
 
@@ -121,4 +123,4 @@ __syscall1(close, int)
 __syscall3(waitpid, int, int *, int)
 __syscall1(exec, int)
 __syscall5(mount, const char *, const char *, const char *, 0, 0)
-
+__syscall2(clone, unsigned int, void *)
