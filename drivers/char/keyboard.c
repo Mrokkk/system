@@ -14,8 +14,19 @@ int keyboard_init();
 #define DATA_PORT 0x60
 #define STATUS_PORT 0x64
 
-#define keyboard_disable()  do { keyboard_send_command(0xad); keyboard_wait(); } while (0)
-#define keyboard_enable()   keyboard_send_command(0xae)
+#define CMD_ENABLE_FIRST                0xae
+#define CMD_DISABLE_FIRST               0xad
+#define CMD_DISABLE_SECOND              0xa7
+#define CMD_TEST_CONTROLLER             0xaa
+#define CMD_TEST_FIRST_PS2_PORT         0xab
+#define CMD_READ_CONFIGURATION_BYTE     0x20
+#define CMD_WRITE_CONFIGURATION_BYTE    0x60
+
+#define keyboard_disable() \
+    do { keyboard_send_command(CMD_DISABLE_FIRST); keyboard_wait(); } while (0)
+
+#define keyboard_enable() \
+    keyboard_send_command(CMD_ENABLE_FIRST)
 
 #define L_CTRL  0x1d
 #define L_ALT   0x38
@@ -195,42 +206,34 @@ int keyboard_init(void) {
     unsigned char byte;
 
     keyboard_disable();
-    keyboard_send_command(0xa7);
+    keyboard_send_command(CMD_DISABLE_SECOND);
     
-    io_wait();
-    inb(DATA_PORT);
+    while (inb(STATUS_PORT) & 1)
+        inb(DATA_PORT);
     io_wait();
     
-    keyboard_send_command(0xaa);
+    keyboard_send_command(CMD_TEST_CONTROLLER);
     byte = keyboard_receive();
-    if (byte != 0x55) {
-        kernel_trace("keyboard self-test failed!\n");
-    }
+    if (byte != 0x55) return -1;
 
-    keyboard_send_command(0x20);
+    keyboard_send_command(CMD_READ_CONFIGURATION_BYTE);
     byte = keyboard_receive();
 
     /* If translation is disabled, try to enable it */
     if (!(byte & (1 << 6))) {
-        kernel_trace("translation is not enabled, "
-                     "attempting to enable it ...\n", 0);
         byte |= (1 << 6);
-        keyboard_send_command(0x60);
+        keyboard_send_command(CMD_WRITE_CONFIGURATION_BYTE);
         outb(byte, DATA_PORT);
         keyboard_wait();
-        keyboard_send_command(0x20);
-        if (!(keyboard_receive() & (1 << 6))) {
-            kernel_trace("failed!\n", 0);
+        keyboard_send_command(CMD_READ_CONFIGURATION_BYTE);
+        if (!(keyboard_receive() & (1 << 6)))
             return -1;
-        }
-        kernel_trace("OK!\n", 0);
     }
     
     /* Enable interrupt */
     if (!(byte & 0x1)) {
-        kernel_trace("enabling IRQ1\n", 0);
         byte |= 0x1;
-        keyboard_send_command(0x60);
+        keyboard_send_command(CMD_WRITE_CONFIGURATION_BYTE);
         outb(byte, DATA_PORT);
         keyboard_wait();
     }
