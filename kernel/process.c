@@ -190,20 +190,14 @@ cannot_create_process:
 /*===========================================================================*
  *                               kernel_process                              *
  *===========================================================================*/
-int kernel_process(int (*start)(), char *name) {
+int kernel_process(int (*start)(), void *args, unsigned int flags) {
 
     int pid;
-    struct process *p;
+
+    (void)args; (void)flags;
 
     if ((pid = fork()) == 0)
         exit(start());
-    else if (pid < 0) return pid;
-
-    if (process_find(pid, &p)) {
-        printk("Cannot find created process with pid=%d\n", pid);
-        return -EERR;
-    }
-    strcpy(p->name, name);
 
     return pid;
 

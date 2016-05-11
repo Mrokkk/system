@@ -114,7 +114,7 @@ __noreturn void kmain(char *boot_params) {
     /* Create another process called 'init' (ugh...)
      * and change itself into the idle process.
      */
-    kernel_process(init, "init");
+    kernel_process(init, 0, 0);
     idle();
 
     while (1);
@@ -171,6 +171,8 @@ int init() {
     (void)arch_info; (void)modules_list; (void)irqs_list;
     (void)char_devices_list;
 
+    strcpy(process_current->name, "init");
+
     modules_init();
 
     if (mount("none", "/", "rootfs", 0, 0))
@@ -213,6 +215,7 @@ int init() {
         printf("Fork error in init!\n");
         return -1;
     } else if (!child_pid) {
+        strcpy(process_current->name, "shell");
         exec(&temp_shell);
     }
 

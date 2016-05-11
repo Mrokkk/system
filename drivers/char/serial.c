@@ -255,7 +255,7 @@ int kexit() {
  *===========================================================================*/
 static int c_zombie() {
 
-    kernel_process(&kexit, "zombie");
+    kernel_process(&kexit, 0, 0);
 
     return 0;
 
@@ -298,6 +298,7 @@ int seriald() {
     (void)i; (void)com; (void)line;
 
     serial_printf("Seriald\n");
+    strcpy(process_current->name, "seriald");
 
     while(1) {
         serial_printf("$$ ");
@@ -305,7 +306,7 @@ int seriald() {
         if (line[0] == 0) continue;
         for (i=0; com[i].name; i++) {
             if (!strcmp(com[i].name, line)) {
-                pid = kernel_process(com[i].function, com[i].name);
+                pid = kernel_process(com[i].function, 0, 0);
                 if (pid > 0) waitpid(pid, &status, 0);
                 break;
             }
@@ -349,7 +350,7 @@ int serial_init() {
     irq_register(0x4, &serial_irs, "com1");
     irq_register(0x3, &serial_irs, "com2");
 
-    kernel_process(&seriald, "seriald");
+    kernel_process(&seriald, 0, 0);
 
     return 0;
 

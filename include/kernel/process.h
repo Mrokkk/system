@@ -111,7 +111,7 @@ extern unsigned int context_switches;
 int processes_init();
 int process_clone(struct process *proc, struct pt_regs *regs, int clone_flags);
 void process_delete(struct process *proc);
-int kernel_process(int (*start)(), char *name);
+int kernel_process(int (*start)(), void *args, unsigned int flags);
 int process_find(int pid, struct process **p);
 void process_wake_waiting(struct process *proc);
 pid_t find_free_pid();
