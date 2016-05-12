@@ -28,14 +28,6 @@ static inline void process_forked(struct process *proc) {
 }
 
 /*===========================================================================*
- *                           process_signals_free                            *
- *===========================================================================*/
-static inline void process_signals_free(struct process *proc) {
-    if (proc->signals)
-        DESTRUCT(proc->signals);
-}
-
-/*===========================================================================*
  *                            process_space_free                             *
  *===========================================================================*/
 static inline void process_space_free(struct process *proc) {
@@ -104,52 +96,58 @@ static inline void process_name_copy(struct process *dest,
 /*===========================================================================*
  *                              process_fs_copy                              *
  *===========================================================================*/
-static inline void process_fs_copy(struct process *dest,
+static inline int process_fs_copy(struct process *dest,
         struct process *src, int clone_flags) {
 
     if (clone_flags & CLONE_FS) {
         dest->fs = src->fs;
         dest->fs->count++;
     } else {
-        CONSTRUCT(dest->fs);
+        if (CONSTRUCT(dest->fs)) return 1;
         memcpy(dest->fs, src->fs, sizeof(struct fs));
         dest->fs->count = 1;
     }
+
+    return 0;
 
 }
 
 /*===========================================================================*
  *                            process_files_copy                             *
  *===========================================================================*/
-static inline void process_files_copy(struct process *dest,
+static inline int process_files_copy(struct process *dest,
         struct process *src, int clone_flags) {
 
     if (clone_flags & CLONE_FILES) {
         dest->files = src->files;
         dest->files->count++;
     } else {
-        CONSTRUCT(dest->files);
+        if (CONSTRUCT(dest->files)) return 1;
         dest->files->count = 1;
         memcpy(dest->files->files, src->files->files,
                 sizeof(struct file *) * PROCESS_FILES);
     }
+
+    return 0;
 
 }
 
 /*===========================================================================*
  *                           process_signals_copy                            *
  *===========================================================================*/
-static inline void process_signals_copy(struct process *dest,
+static inline int process_signals_copy(struct process *dest,
         struct process *src, int clone_flags) {
 
     if (clone_flags & CLONE_SIGHAND) {
         dest->signals = src->signals;
         dest->signals->count++;
     } else {
-        CONSTRUCT(dest->signals);
+        if (CONSTRUCT(dest->signals)) return 1;
         memcpy(dest->signals, src->signals, sizeof(struct signals));
         dest->signals->count = 1;
     }
+
+    return 0;
 
 }
 
@@ -195,7 +193,9 @@ void process_delete(struct process *proc) {
     list_del(&proc->processes);
     process_space_free(proc);
     arch_process_free(proc);
-    process_signals_free(proc);
+    process_fs_exit(proc);
+    process_files_exit(proc);
+    process_signals_exit(proc);
     DESTRUCT(proc);
 
 }
@@ -214,14 +214,18 @@ int process_clone(struct process *parent, struct pt_regs *regs,
     if (process_space_setup(child))
         goto cannot_allocate;
     process_struct_init(child);
-    process_parent_child_link(parent, child);
     child->type = parent->type;
     process_name_copy(child, parent);
-    process_fs_copy(child, parent, clone_flags);
-    process_files_copy(child, parent, clone_flags);
-    process_signals_copy(child, parent, clone_flags);
-    arch_process_copy(child, parent, regs);
+    if (process_fs_copy(child, parent, clone_flags))
+        goto fs_error;
+    if (process_files_copy(child, parent, clone_flags))
+        goto files_error;
+    if (process_signals_copy(child, parent, clone_flags))
+        goto signals_error;
+    if (arch_process_copy(child, parent, regs))
+        goto arch_error;
     list_add_tail(&child->processes, &init_process.processes);
+    process_parent_child_link(parent, child);
     process_forked(parent);
 
     irq_save(flags);
@@ -229,6 +233,13 @@ int process_clone(struct process *parent, struct pt_regs *regs,
     irq_restore(flags);
     return child->pid;
 
+arch_error:
+    process_signals_exit(child);
+signals_error:
+    process_files_exit(child);
+files_error:
+    process_fs_exit(child);
+fs_error:
 cannot_allocate:
     DESTRUCT(child);
 cannot_create_process:

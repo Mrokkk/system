@@ -17,9 +17,6 @@
 
 #define PROCESS_STATE_STRING "rwsz"
 
-#define process_state_char(x) \
-    PROCESS_STATE_STRING[(int)(x)]
-
 #define USER_PROCESS        0
 #define KERNEL_PROCESS      1
 
@@ -140,10 +137,10 @@ extern unsigned int total_forks;
 extern unsigned int context_switches;
 
 int processes_init();
-int process_clone(struct process *proc, struct pt_regs *regs, int clone_flags);
+int process_clone(struct process *parent, struct pt_regs *regs, int clone_flags);
 void process_delete(struct process *proc);
 int kernel_process(int (*start)(), void *args, unsigned int flags);
-int process_find(int pid, struct process **p);
+int process_find(int pid, struct process **proc);
 void process_wake_waiting(struct process *proc);
 int process_find_free_fd(struct process *proc, int *fd);
 void scheduler();
@@ -154,6 +151,10 @@ int fork(void);
 int arch_process_copy(struct process *dest, struct process *src, struct pt_regs *old_regs);
 void arch_process_free(struct process *proc);
 void regs_print(struct pt_regs *regs);
+
+static inline char process_state_char(int s) {
+    return PROCESS_STATE_STRING[s];
+}
 
 static inline int process_is_running(struct process *p) {
     return p->stat == PROCESS_RUNNING;
@@ -190,11 +191,13 @@ static inline void process_wait(struct process *proc) {
     if (proc == process_current) scheduler();
 }
 
-static inline void process_fd_set(struct process *proc, int fd, struct file *file) {
+static inline void process_fd_set(struct process *proc, int fd,
+        struct file *file) {
     proc->files->files[fd] = file;
 }
 
-static inline int process_fd_get(struct process *proc, int fd, struct file **file) {
+static inline int process_fd_get(struct process *proc, int fd,
+        struct file **file) {
     if (!(*file = proc->files->files[fd])) return 1;
     return 0;
 }
@@ -215,6 +218,25 @@ static inline int process_is_user(struct process *p) {
     return p->type == USER_PROCESS;
 }
 
+static inline void process_signals_exit(struct process *p) {
+    if (!--p->signals->count)
+        DESTRUCT(p->signals);
+}
+
+static inline void process_files_exit(struct process *p) {
+    if (!--p->files->count)
+        DESTRUCT(p->files);
+}
+
+static inline void process_fs_exit(struct process *p) {
+    if (!--p->fs->count)
+        DESTRUCT(p->fs);
+}
+
+static inline void *process_memory_start(struct process *p) {
+    return p->mm.start;
+}
+
 #define processes_list_print(list, member) \
     do { \
         struct process *__proc; \
@@ -222,9 +244,6 @@ static inline int process_is_user(struct process *p) {
             printk("pid:%d; name:%s; stat:%d\n", __proc->pid, __proc->name, \
                 __proc->stat); \
     } while (0)
-
-#define process_memory_start(proc) \
-    (proc)->mm.start
 
 #endif /* __PROCESS_H_ */
 
