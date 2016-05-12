@@ -274,6 +274,77 @@ int process_find_free_fd(struct process *proc, int *fd) {
 }
 
 /*===========================================================================*
+ *                                  sys_fork                                 *
+ *===========================================================================*/
+int sys_fork(struct pt_regs regs) {
+
+    /*
+     * Not quite compatible with POSIX, but does its work
+     */
+
+    return process_clone(process_current, &regs, 0);
+
+}
+
+/*===========================================================================*
+ *                                  sys_exit                                 *
+ *===========================================================================*/
+int sys_exit(int return_value) {
+
+    process_current->exit_code = return_value;
+    strcpy(process_current->name, "<defunct>");
+    process_exit(process_current);
+
+    return 0;
+
+}
+
+/*===========================================================================*
+ *                                 sys_getpid                                *
+ *===========================================================================*/
+int sys_getpid() {
+    return process_current->pid;
+}
+
+/*===========================================================================*
+ *                                sys_getppid                                *
+ *===========================================================================*/
+int sys_getppid() {
+    return process_current->ppid;
+}
+
+/*===========================================================================*
+ *                               sys_waitpid                                 *
+ *===========================================================================*/
+int sys_waitpid(int pid, int *status, int opt) {
+
+    struct process *proc;
+    unsigned int flags;
+
+    (void)opt;
+
+    if (process_find(pid, &proc)) return -ESRCH;
+    if (proc->stat != PROCESS_RUNNING) goto delete_process;
+
+    list_add_tail(&process_current->wait_queue, &proc->wait_queue);
+    process_wait(process_current);
+
+    put_user_long(proc->exit_code, status);
+
+delete_process:
+
+    irq_save(flags);
+
+    if (process_is_zombie(proc))
+        process_delete(proc);
+
+    irq_restore(flags);
+
+    return 0;
+
+}
+
+/*===========================================================================*
  *                               processes_init                              *
  *===========================================================================*/
 int processes_init() {
