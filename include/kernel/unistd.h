@@ -61,7 +61,7 @@ struct syscall_trace {
     char params[4];
 };
 
-pid_t fork(void);
+int fork(void);
 pid_t getpid();
 pid_t getppid(pid_t);
 void exit(int);

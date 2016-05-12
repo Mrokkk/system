@@ -23,20 +23,39 @@
 #define USER_PROCESS        0
 #define KERNEL_PROCESS      1
 
-#define CLONE_STACK         2
-#define CLONE_FILES         4
-#define CLONE_OTHER         8
+#define CLONE_FS            (1 << 0)
+#define CLONE_FILES         (1 << 1)
+#define CLONE_SIGHAND       (1 << 2)
 
 struct mm {
     void *start, *end;
     void *args_start, *args_end;
     void *env_start, *env_end;
+#define MM_INIT(start, end) \
+    { (void *)start, (void *)end, 0, }
 };
 
 struct signals {
+    int count;
     unsigned short trapped;
     struct sigaction sigaction[16];
     struct context context;
+#define SIGNALS_INIT \
+    { 1, 0, { { 0, }, }, {0, } }
+};
+
+struct fs {
+    int count;
+    struct inode *root, *pwd;
+#define FS_INIT \
+    { 1, 0, 0 }
+};
+
+struct files {
+    int count;
+    struct file *files[PROCESS_FILES];
+#define FILES_INIT \
+    { 1, { 0, } }
 };
 
 /*=======================*/
@@ -56,7 +75,8 @@ struct process {
     int forks;
     struct mm mm;
     char name[32];
-    struct file *files[PROCESS_FILES];
+    struct fs *fs;
+    struct files *files;
     struct signals *signals;
     struct process *parent;
     struct list_head wait_queue;
@@ -68,20 +88,28 @@ struct process {
 
 };
 
-#define PROCESS_SPACE_INIT(name) \
-    unsigned long name##_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, };
+#define PROCESS_SPACE_DECLARE(name) \
+    unsigned long name##_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, }
+
+#define PROCESS_FS_DECLARE(name) \
+    struct fs name##_fs = FS_INIT
+
+#define PROCESS_FILES_DECLARE(name) \
+    struct files name##_files = FILES_INIT
+
+#define PROCESS_SIGNALS_DECLARE(name) \
+    struct signals name##_signals = SIGNALS_INIT
 
 #define PROCESS_INIT(proc) \
     {                                               \
-        context: {INIT_PROCESS_CONTEXT(proc)},      \
-        mm: {                                       \
-            &proc##_stack[0],                       \
-            &proc##_stack[INIT_PROCESS_STACK_SIZE], \
-            0, 0, 0, 0                              \
-        },                                          \
-        priority: 1,                                \
-        name: #proc,                                \
         stat: PROCESS_RUNNING,                      \
+        context: INIT_PROCESS_CONTEXT(proc),        \
+        mm: MM_INIT(&proc##_stack[0],               \
+            &proc##_stack[INIT_PROCESS_STACK_SIZE]),\
+        name: #proc,                                \
+        fs: &proc##_fs,                             \
+        files: &proc##_files,                       \
+        signals: &proc##_signals,                   \
         processes:                                  \
             LIST_INIT(proc.processes),              \
         running:                                    \
@@ -96,7 +124,10 @@ struct process {
     }
 
 #define PROCESS_DECLARE(name) \
-    PROCESS_SPACE_INIT(name); \
+    PROCESS_SPACE_DECLARE(name); \
+    PROCESS_FS_DECLARE(name); \
+    PROCESS_FILES_DECLARE(name); \
+    PROCESS_SIGNALS_DECLARE(name); \
     struct process name = PROCESS_INIT(name)
 
 extern struct process init_process;
@@ -114,11 +145,10 @@ void process_delete(struct process *proc);
 int kernel_process(int (*start)(), void *args, unsigned int flags);
 int process_find(int pid, struct process **p);
 void process_wake_waiting(struct process *proc);
-pid_t find_free_pid();
 int process_find_free_fd(struct process *proc, int *fd);
 void scheduler();
 void exit(int);
-pid_t fork(void);
+int fork(void);
 
 /* Arch-dependent functions */
 int arch_process_copy(struct process *dest, struct process *src, struct pt_regs *old_regs);
@@ -161,16 +191,28 @@ static inline void process_wait(struct process *proc) {
 }
 
 static inline void process_fd_set(struct process *proc, int fd, struct file *file) {
-    proc->files[fd] = file;
+    proc->files->files[fd] = file;
 }
 
 static inline int process_fd_get(struct process *proc, int fd, struct file **file) {
-    if (!(*file = proc->files[fd])) return 1;
+    if (!(*file = proc->files->files[fd])) return 1;
     return 0;
 }
 
 static inline int fd_check_bounds(int fd) {
     return (fd >= PROCESS_FILES) || (fd < 0);
+}
+
+static inline int process_type(struct process *p) {
+    return p->type;
+}
+
+static inline int process_is_kernel(struct process *p) {
+    return p->type == KERNEL_PROCESS;
+}
+
+static inline int process_is_user(struct process *p) {
+    return p->type == USER_PROCESS;
 }
 
 #define processes_list_print(list, member) \
@@ -180,15 +222,6 @@ static inline int fd_check_bounds(int fd) {
             printk("pid:%d; name:%s; stat:%d\n", __proc->pid, __proc->name, \
                 __proc->stat); \
     } while (0)
-
-#define process_type(proc) \
-    ((proc)->type)
-
-#define process_is_kernel(proc) \
-    process_type(proc)
-
-#define process_is_user(proc) \
-    (!process_type(proc))
 
 #define process_memory_start(proc) \
     (proc)->mm.start

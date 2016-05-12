@@ -9,6 +9,17 @@ static pid_t last_pid;
 unsigned int total_forks;
 
 /*===========================================================================*
+ *                               find_free_pid                               *
+ *===========================================================================*/
+static inline pid_t find_free_pid() {
+    /*
+     * Just incrementing PID. Maybe it should be more
+     * complicated (some hash table maybe?)
+     */
+    return ++last_pid;
+}
+
+/*===========================================================================*
  *                              process_forked                               *
  *===========================================================================*/
 static inline void process_forked(struct process *proc) {
@@ -34,7 +45,7 @@ static inline void process_space_free(struct process *proc) {
 /*===========================================================================*
  *                            process_space_setup                            *
  *===========================================================================*/
-static int process_space_setup(struct process *proc) {
+static inline int process_space_setup(struct process *proc) {
 
     char *start, *end;
 
@@ -53,11 +64,11 @@ static int process_space_setup(struct process *proc) {
 /*===========================================================================*
  *                            process_struct_init                            *
  *===========================================================================*/
-static void process_struct_init(struct process *proc) {
+static inline void process_struct_init(struct process *proc) {
 
     proc->pid = find_free_pid();
     proc->exit_code = 0;
-    proc->signals = 0;
+    proc->exit_state = 0;
     proc->forks = 0;
     proc->context_switches = 0;
     proc->stat = PROCESS_ZOMBIE;
@@ -71,7 +82,7 @@ static void process_struct_init(struct process *proc) {
 /*===========================================================================*
  *                          process_parent_child_link                        *
  *===========================================================================*/
-static void process_parent_child_link(struct process *parent,
+static inline void process_parent_child_link(struct process *parent,
         struct process *child) {
 
     child->parent = parent;
@@ -81,32 +92,65 @@ static void process_parent_child_link(struct process *parent,
 }
 
 /*===========================================================================*
- *                                process_copy                               *
+ *                             process_name_copy                             *
  *===========================================================================*/
-static void process_copy(struct process *dest, struct process *src,
-        struct pt_regs *regs, int clone_flags) {
-
-    dest->type = src->type;
+static inline void process_name_copy(struct process *dest,
+        struct process *src) {
 
     strcpy(dest->name, src->name);
-    if (clone_flags & CLONE_FILES)
-        memcpy(dest->files, src->files, sizeof(struct file *) * PROCESS_FILES);
-    else
-        memset(dest->files, 0, sizeof(struct file *) * PROCESS_FILES);
-
-    arch_process_copy(dest, src, regs);
 
 }
 
 /*===========================================================================*
- *                               find_free_pid                               *
+ *                              process_fs_copy                              *
  *===========================================================================*/
-pid_t find_free_pid() {
-    /*
-     * Just incrementing PID. Maybe it should be more
-     * complicated (some hash table maybe?)
-     */
-    return ++last_pid;
+static inline void process_fs_copy(struct process *dest,
+        struct process *src, int clone_flags) {
+
+    if (clone_flags & CLONE_FS) {
+        dest->fs = src->fs;
+        dest->fs->count++;
+    } else {
+        CONSTRUCT(dest->fs);
+        memcpy(dest->fs, src->fs, sizeof(struct fs));
+        dest->fs->count = 1;
+    }
+
+}
+
+/*===========================================================================*
+ *                            process_files_copy                             *
+ *===========================================================================*/
+static inline void process_files_copy(struct process *dest,
+        struct process *src, int clone_flags) {
+
+    if (clone_flags & CLONE_FILES) {
+        dest->files = src->files;
+        dest->files->count++;
+    } else {
+        CONSTRUCT(dest->files);
+        dest->files->count = 1;
+        memcpy(dest->files->files, src->files->files,
+                sizeof(struct file *) * PROCESS_FILES);
+    }
+
+}
+
+/*===========================================================================*
+ *                           process_signals_copy                            *
+ *===========================================================================*/
+static inline void process_signals_copy(struct process *dest,
+        struct process *src, int clone_flags) {
+
+    if (clone_flags & CLONE_SIGHAND) {
+        dest->signals = src->signals;
+        dest->signals->count++;
+    } else {
+        CONSTRUCT(dest->signals);
+        memcpy(dest->signals, src->signals, sizeof(struct signals));
+        dest->signals->count = 1;
+    }
+
 }
 
 /*===========================================================================*
@@ -171,7 +215,12 @@ int process_clone(struct process *parent, struct pt_regs *regs,
         goto cannot_allocate;
     process_struct_init(child);
     process_parent_child_link(parent, child);
-    process_copy(child, parent, regs, clone_flags);
+    child->type = parent->type;
+    process_name_copy(child, parent);
+    process_fs_copy(child, parent, clone_flags);
+    process_files_copy(child, parent, clone_flags);
+    process_signals_copy(child, parent, clone_flags);
+    arch_process_copy(child, parent, regs);
     list_add_tail(&child->processes, &init_process.processes);
     process_forked(parent);
 
@@ -194,8 +243,6 @@ int kernel_process(int (*start)(), void *args, unsigned int flags) {
 
     int pid;
 
-    (void)args; (void)flags;
-
     if ((pid = clone(flags, 0)) == 0)
         exit(start(args));
 
@@ -209,12 +256,13 @@ int kernel_process(int (*start)(), void *args, unsigned int flags) {
 int process_find_free_fd(struct process *proc, int *fd) {
 
     int i;
+    struct file *dummy;
 
     /* Find first free file descriptor */
     for (i=0; i<PROCESS_FILES; i++)
-        if (!proc->files[i]) break;
+        if (process_fd_get(proc, i, &dummy)) break;
 
-    if (i == PROCESS_FILES - 1) {
+    if (dummy) {
         *fd = 0;
         return 1;
     }
