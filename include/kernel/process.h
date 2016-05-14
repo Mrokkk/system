@@ -237,6 +237,10 @@ static inline void *process_memory_start(struct process *p) {
     return p->mm.start;
 }
 
+static inline int current_can_kill(struct process *p) {
+    return p->pid != 0;
+}
+
 #define processes_list_print(list, member) \
     do { \
         struct process *__proc; \
