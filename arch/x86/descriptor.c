@@ -138,7 +138,7 @@ static void idt_configure() {
                  KERNEL_CS, GDT_FLAGS_TYPE_32TRAP_GATE | GDT_FLAGS_RING3);
     #define __timer_isr(x) \
         idt_set_gate((x), (unsigned long)timer_handler, \
-                     KERNEL_CS, GDT_FLAGS_TYPE_32INT_GATE);
+                     KERNEL_CS, GDT_FLAGS_TYPE_32TRAP_GATE);
 
     #include <arch/isr.h>
 

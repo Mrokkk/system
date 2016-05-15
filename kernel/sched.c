@@ -37,9 +37,6 @@ end:
     context_switches++;
     process_current->context_switches++;
 
-    /* There was sti(), which was causing bug (why?) I
-     * couldn't fix for hours. But what is interesting,
-     * it was present only on qemu 2.5.1. */
     process_switch(last, process_current);
 
 }
