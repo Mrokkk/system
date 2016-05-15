@@ -35,10 +35,10 @@ struct mm {
 struct signals {
     int count;
     unsigned short trapped;
-    struct sigaction sigaction[16];
+    sighandler_t sighandler[NSIGNALS];
     struct context context;
 #define SIGNALS_INIT \
-    { 1, 0, { { 0, }, }, { 0, } }
+    { 1, 0, { 0, }, { 0, } }
 };
 
 struct fs {

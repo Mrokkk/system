@@ -14,7 +14,7 @@ int sys_signal(int signum, sighandler_t handler) {
         process_current->signals->trapped &= !(1 << signum);
     else
         process_current->signals->trapped |= (1 << signum);
-    process_current->signals->sigaction[signum].sighandler = handler;
+    process_current->signals->sighandler[signum] = handler;
 
     return 0;
 
@@ -35,6 +35,7 @@ static void default_sighandler(struct process *p, int signum) {
             break;
         case SIGCONT:
             process_wake(p);
+            break;
         case SIGSTOP:
         case SIGTTIN:
         case SIGTTOU:
@@ -62,9 +63,8 @@ int sys_kill(int pid, int signum) {
     if (!current_can_kill(p)) return -EPERM;
 
     if (p->signals->trapped & (1 << signum)) {
-          /* Run handler in process */
         process_wake(p);
-        arch_process_execute(p, (unsigned int)p->signals->sigaction[signum].sighandler);
+        arch_process_execute(p, (unsigned int)p->signals->sighandler[signum]);
     } else
         default_sighandler(p, signum);
 

@@ -253,9 +253,7 @@ static int c_bug() {
 
     printf("Bug!!!\n");
     kill(3, SIGINT);
-    /*printk("It's a bug!");*/
-    while (1);
-
+    exit(0);
     return 0;
 
 }

@@ -284,6 +284,25 @@ __noreturn int sys_exec(struct pt_regs regs) {
 
 }
 
+/*===========================================================================*
+ *                         signal_restore_code_put                           *
+ *===========================================================================*/
+static inline void signal_restore_code_put(unsigned char *user_code) {
+
+    /* mov $__NR_sigreturn, %eax */
+    put_user_byte(0xb8, user_code);
+    user_code++;
+    put_user_long(__NR_sigreturn, user_code);
+    user_code += 4;
+
+    /* int $0x80 */
+    put_user_byte(0xcd, user_code);
+    user_code++;
+    put_user_byte(0x80, user_code);
+    user_code++;
+
+}
+
 #define SIGHAN_STACK_SIZE 512
 
 /*===========================================================================*
@@ -313,17 +332,7 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
 
     exec_kernel_stack_frame(&kernel_stack, (unsigned int)user_stack, eip);
 
-    /* mov $__NR_sigreturn, %eax */
-    put_user_byte(0xb8, user_code);
-    user_code++;
-    put_user_long(__NR_sigreturn, user_code);
-    user_code += 4;
-
-    /* int $0x80 */
-    put_user_byte(0xcd, user_code);
-    user_code++;
-    put_user_byte(0x80, user_code);
-    user_code++;
+    signal_restore_code_put(user_code);
 
     proc->context.eip = (unsigned int)ret_from_syscall;
     proc->context.esp = (unsigned int)kernel_stack;

@@ -42,12 +42,6 @@
 
 typedef int (*sighandler_t)();
 
-struct sigaction {
-    sighandler_t sighandler;
-    unsigned int sigmask;
-    unsigned int sigflags;
-};
-
 int signal(int signum, sighandler_t handler);
 int kill(int pid, int signum);
 
