@@ -46,7 +46,6 @@ struct sigaction {
     sighandler_t sighandler;
     unsigned int sigmask;
     unsigned int sigflags;
-    void (*sigrestorer)(void);
 };
 
 int signal(int signum, sighandler_t handler);

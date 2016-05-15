@@ -38,7 +38,7 @@ struct signals {
     struct sigaction sigaction[16];
     struct context context;
 #define SIGNALS_INIT \
-    { 1, 0, { { 0, }, }, {0, } }
+    { 1, 0, { { 0, }, }, { 0, } }
 };
 
 struct fs {
@@ -150,6 +150,7 @@ int fork(void);
 /* Arch-dependent functions */
 int arch_process_copy(struct process *dest, struct process *src, struct pt_regs *old_regs);
 void arch_process_free(struct process *proc);
+int arch_process_execute(struct process *proc, unsigned int ip);
 void regs_print(struct pt_regs *regs);
 
 static inline char process_state_char(int s) {
@@ -181,7 +182,8 @@ static inline void process_stop(struct process *proc) {
 }
 
 static inline void process_wake(struct process *proc) {
-    list_add_tail(&proc->running, &running);
+    if (proc->stat != PROCESS_RUNNING)
+        list_add_tail(&proc->running, &running);
     proc->stat = PROCESS_RUNNING;
 }
 

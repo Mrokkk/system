@@ -252,7 +252,9 @@ static int c_zombie() {
 static int c_bug() {
 
     printf("Bug!!!\n");
-    printk("It's a bug!");
+    kill(3, SIGINT);
+    /*printk("It's a bug!");*/
+    while (1);
 
     return 0;
 
@@ -269,6 +271,11 @@ static struct command {
         {0, 0}
 };
 
+int sighan(int pid) {
+    printf("Got signal from %d\n", pid);
+    return 0;
+}
+
 /*===========================================================================*
  *                                temp_shell                                 *
  *===========================================================================*/
@@ -277,6 +284,8 @@ int temp_shell() {
     char line[32];
     struct command *com = commands;
     int i, pid, status = 0;
+
+    signal(SIGINT, sighan);
 
     while (1) {
         status ? printf("* ") : printf("# ");

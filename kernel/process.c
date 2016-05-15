@@ -1,5 +1,6 @@
 #include <kernel/process.h>
 #include <kernel/sys.h>
+#include <arch/register.h>
 
 PROCESS_DECLARE(init_process);
 LIST_DECLARE(running);

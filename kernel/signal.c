@@ -1,3 +1,4 @@
+#include <kernel/kernel.h>
 #include <kernel/process.h>
 #include <kernel/signal.h>
 
@@ -62,6 +63,8 @@ int sys_kill(int pid, int signum) {
 
     if (p->signals->trapped & (1 << signum)) {
           /* Run handler in process */
+        process_wake(p);
+        arch_process_execute(p, (unsigned int)p->signals->sigaction[signum].sighandler);
     } else
         default_sighandler(p, signum);
 

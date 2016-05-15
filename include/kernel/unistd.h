@@ -50,6 +50,7 @@
 #define __NR_getgid 47
 #define __NR_signal 48
 #define __NR_readdir 49
+#define __NR_sigreturn 119
 #define __NR_clone 120
 
 #ifndef __ASSEMBLER__
@@ -126,3 +127,5 @@ __syscall5(mount, const char *, const char *, const char *, 0, 0)
 __syscall2(clone, unsigned int, void *)
 __syscall2(kill, int, int)
 __syscall2(signal, int, int (*)(int))
+__syscall1(sigreturn, int)
+
