@@ -287,12 +287,19 @@ __noreturn int sys_exec(struct pt_regs regs) {
 /*===========================================================================*
  *                         signal_restore_code_put                           *
  *===========================================================================*/
-static inline void signal_restore_code_put(unsigned char *user_code) {
+static inline void signal_restore_code_put(unsigned char *user_code,
+        unsigned int *sighan_stack) {
 
     /* mov $__NR_sigreturn, %eax */
     put_user_byte(0xb8, user_code);
     user_code++;
     put_user_long(__NR_sigreturn, user_code);
+    user_code += 4;
+
+    /* mov $sighan_stack, %ebx */
+    put_user_byte(0xbb, user_code);
+    user_code++;
+    put_user_long(sighan_stack, user_code);
     user_code += 4;
 
     /* int $0x80 */
@@ -310,11 +317,9 @@ static inline void signal_restore_code_put(unsigned char *user_code) {
  *===========================================================================*/
 int arch_process_execute(struct process *proc, unsigned int eip) {
 
-    unsigned int *kernel_stack, *user_stack,
+    unsigned int *kernel_stack, *sighan_stack,
                  flags;
     unsigned char *user_code;
-
-    (void)proc; (void)eip; (void)user_stack; (void)kernel_stack;
 
     irq_save(flags);
 
@@ -325,14 +330,14 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
     proc->signals->context.esp0 = proc->context.esp0;
     proc->signals->context.eip = proc->context.eip;
 
-    user_stack = stack_create(SIGHAN_STACK_SIZE);
+    sighan_stack = stack_create(SIGHAN_STACK_SIZE);
 
-    push(process_current->pid, user_stack);
-    push(user_code, user_stack);
+    push(process_current->pid, sighan_stack);
+    push(user_code, sighan_stack);
 
-    exec_kernel_stack_frame(&kernel_stack, (unsigned int)user_stack, eip);
+    exec_kernel_stack_frame(&kernel_stack, (unsigned int)sighan_stack, eip);
 
-    signal_restore_code_put(user_code);
+    signal_restore_code_put(user_code, sighan_stack + 2);
 
     proc->context.eip = (unsigned int)ret_from_syscall;
     proc->context.esp = (unsigned int)kernel_stack;
@@ -347,8 +352,9 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
 /*===========================================================================*
  *                               sys_sigreturn                               *
  *===========================================================================*/
-__noreturn int sys_sigreturn() {
+__noreturn int sys_sigreturn(unsigned char *stack) {
 
+    kfree(stack - SIGHAN_STACK_SIZE);
     process_current->context.esp0 = process_current->signals->context.esp0;
     set_context(process_current->signals->context.esp,
             process_current->signals->context.eip);
