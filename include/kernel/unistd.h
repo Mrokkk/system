@@ -50,6 +50,7 @@
 #define __NR_getgid 47
 #define __NR_signal 48
 #define __NR_readdir 49
+#define __NR_getppid 64
 #define __NR_sigreturn 119
 #define __NR_clone 120
 
@@ -64,7 +65,7 @@ struct syscall_trace {
 
 int fork(void);
 pid_t getpid();
-pid_t getppid(pid_t);
+pid_t getppid();
 void exit(int);
 int write(int, const char *, size_t);
 int read(int, void *, size_t);
@@ -128,4 +129,6 @@ __syscall2(clone, unsigned int, void *)
 __syscall2(kill, int, int)
 __syscall2(signal, int, int (*)(int))
 __syscall1(sigreturn, int)
+__syscall0(getpid)
+__syscall0(getppid)
 

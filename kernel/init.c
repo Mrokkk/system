@@ -252,7 +252,7 @@ static int c_zombie() {
 static int c_bug() {
 
     printf("Bug!!!\n");
-    kill(3, SIGINT);
+    kill(getppid(), SIGINT);
     exit(0);
     return 0;
 
