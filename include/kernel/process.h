@@ -29,7 +29,7 @@ struct mm {
     void *args_start, *args_end;
     void *env_start, *env_end;
 #define MM_INIT(start, end) \
-    { (void *)start, (void *)end, 0, }
+    { (void *)start, (void *)end, 0, 0, 0, 0 }
 };
 
 struct signals {
@@ -117,7 +117,7 @@ struct process {
             LIST_INIT(proc.children),               \
         siblings:                                   \
             LIST_INIT(proc.siblings),               \
-        type: 1,                                    \
+        type: KERNEL_PROCESS,                       \
     }
 
 #define PROCESS_DECLARE(name) \

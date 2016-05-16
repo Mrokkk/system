@@ -126,7 +126,6 @@
 #define __exception_noerrno(x) \
     ENTRY(exc_##x##_handler) \
         SAVE_ALL; \
-        push %esp; \
         push $0; \
         push $__NR_##x; \
         call do_exception; \
@@ -137,10 +136,10 @@
 
 #define __exception_errno(x) \
     ENTRY(exc_##x##_handler) \
+        mov (%esp), %eax; \
         add $4, %esp; \
         SAVE_ALL; \
-        push %esp; \
-        push $0; \
+        push %eax; \
         push $__NR_##x; \
         call do_exception; \
         add $12, %esp; \
@@ -151,7 +150,6 @@
 #define __exception_debug(x) \
     ENTRY(exc_##x##_handler) \
         SAVE_ALL; \
-        push %esp; \
         push $0; \
         push $__NR_##x; \
         call do_exception; \

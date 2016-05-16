@@ -15,6 +15,7 @@ static void welcome();
 int init();
 void delay_calibrate(void);
 void irqs_configure();
+int paging_init();
 
 struct cpu_info cpu_info;
 
@@ -100,9 +101,10 @@ __noreturn void kmain(char *boot_params) {
 
     arch_setup();
     irqs_configure();
+    delay_calibrate();
     processes_init();
     vfs_init();
-    delay_calibrate();
+    paging_init();
 
     sti();
     /* Now we're officially in the first process with
@@ -116,8 +118,6 @@ __noreturn void kmain(char *boot_params) {
      */
     kernel_process(init, 0, 0);
     idle();
-
-    while (1);
 
 }
 
@@ -140,16 +140,16 @@ __noreturn void idle() {
  *===========================================================================*/
 static void welcome() {
 
-    printf("myOS v%d.%d for %s\n",
+    printk("myOS v%d.%d for %s\n",
     VERSION_MAJ, VERSION_MIN, stringify(ARCH));
 #if DEBUG
-    printf("Debug=%d\n", DEBUG);
+    printk("Debug=%d\n", DEBUG);
 #endif
-    printf("Builded on %s %s\n",
+    printk("Builded on %s %s\n",
     COMPILE_SYSTEM, COMPILE_ARCH);
-    printf("Compiled on %sby %s@%s\n", COMPILER, COMPILE_BY, COMPILE_HOST);
-    printf("Copyright (C) 2016, MP\n\n");
-    printf("Welcome!\n\n");
+    printk("Compiled on %sby %s@%s\n", COMPILER, COMPILE_BY, COMPILE_HOST);
+    printk("Copyright (C) 2016, MP\n\n");
+    printk("Welcome!\n\n");
 
 }
 
@@ -220,6 +220,7 @@ int init() {
     }
 
     waitpid(child_pid, &status, 0);
+    while (1);
 
     return 0;
 
@@ -375,8 +376,8 @@ struct kernel_symbol *symbol_find_address(unsigned int address) {
     int i;
 
     for (i = 0; i < kernel_symbols_size; i++) {
-        if ((address < kernel_symbols[i].address + kernel_symbols[i].size)
-                && (address > kernel_symbols[i].address))
+        if ((address <= kernel_symbols[i].address + kernel_symbols[i].size)
+                && (address >= kernel_symbols[i].address))
             return &kernel_symbols[i];
     }
 
