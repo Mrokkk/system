@@ -42,13 +42,4 @@ SECTIONS
 	
 	_end = .;
 	
-	. = 32M;
-	
-	.user_text BLOCK(4K) : ALIGN(4K)
-	{
-	   _suser_text = .;
-	   KEEP(*(.user_text))
-	   _euser_text = .;
-	}
-
 }
