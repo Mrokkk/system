@@ -54,6 +54,8 @@
 #define __NR_sigreturn 119
 #define __NR_clone 120
 
+#define __NR_syscalls 120
+
 #ifndef __ASSEMBLER__
 
 #include <kernel/types.h>

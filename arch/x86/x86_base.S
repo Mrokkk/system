@@ -5,6 +5,7 @@
 #include <arch/register.h>
 #include <arch/segment.h>
 #include <kernel/unistd.h>
+#include <kernel/errno.h>
 
 /*===========================================================================*
  *                            __semaphore_wake                               *
@@ -78,16 +79,24 @@ ENTRY(syscall_handler) /* INT 0x80 handler */
 
         SAVE_ALL
 
-        call *SYMBOL_NAME(syscalls)(, %eax, 4)
+        cmp $__NR_syscalls, %eax
+        jg bad_syscall
+        mov SYMBOL_NAME(syscalls)(, %eax, 4), %ebx
+        cmp $0, %ebx
+        jz bad_syscall
+        call *%ebx
         mov %eax, REGS_EAX(%esp) /* Put value returned by *
                                   * syscall in pt_regs    */
+ENDPROC(syscall_handler)
 
-    ENTRY(ret_from_syscall)
+ENTRY(ret_from_syscall)
         RESTORE_ALL
         iret
-    ENDPROC(ret_from_syscall)
+ENDPROC(ret_from_syscall)
 
-ENDPROC(syscall_handler)
+bad_syscall:
+    movl $-ENOSYS, REGS_EAX(%esp)
+    jmp ret_from_syscall
 
 /*===========================================================================*
  *                              timer_handler                                *
