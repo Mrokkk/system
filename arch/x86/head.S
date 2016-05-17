@@ -32,10 +32,33 @@ ENTRY(_start)
         pushl $0
         popfl
 
+        /* Move pointer to the multiboot struct
+         * to the EDX */
+        mov %eax, %edx
+
+        /* Initialize page table *
+         * (load pages for 4MB)  */
+        mov $page0, %edi
+        movl $0x07, %eax
+    1:
+        stosl
+        add $0x1000, %eax
+        cmp $1024*0x1000+7, %eax
+        jne 1b
+
+        /* Load page directory */
+        mov $page_dir, %eax
+        movl %eax, %cr3
+
+        /* Enable paging */
+        mov %cr0, %eax
+        or $0x80000000, %eax
+        mov %eax, %cr0
+
         /* Set up stack register */
         movl $init_process_stack, %esp
         addl $1024, %esp
-        push %eax
+        push %edx
         push %ebx
 
         /* Clear BSS */
@@ -69,4 +92,15 @@ ENTRY(_start)
         jmp 2b
 
 ENDPROC(_start)
+
+.align 0x1000
+.org 0x1000
+ENTRY(page_dir)
+    .long 0x103007
+    .fill 1023, 4, 0
+
+.org 0x2000
+ENTRY(page0)
+.org 0x3000
+
 

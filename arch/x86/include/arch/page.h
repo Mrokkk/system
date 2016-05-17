@@ -29,23 +29,8 @@ struct page_table {
     unsigned int address:20;
 } __attribute__((packed));
 
-extern inline void paging_enable() {
-    register long dummy = 0;
-    asm volatile(
-            "mov %%cr0, %0;"
-            "or $0x80000000, %0;"
-            "mov %0, %%cr0;"
-            : "=a" (dummy)
-            : "a" (dummy)
-            : "memory"
-    );
-}
-
 extern inline void page_directory_load(struct page_directory *pgd) {
     asm volatile("mov %0, %%cr3;" :: "r" (pgd) : "memory");
 }
-
-extern struct page_directory kernel_directories[1024];
-extern struct page_directory user_directories[1024];
 
 #endif /* ARCH_X86_INCLUDE_ARCH_PAGE_H_ */

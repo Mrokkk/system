@@ -184,11 +184,6 @@ void FASTCALL(__process_switch(struct process *prev, struct process *next)) {
 
     (void)prev; (void)next;
 
-    if (process_is_kernel(next))
-        page_directory_load(kernel_directories);
-    else
-        page_directory_load(user_directories);
-
     descriptor_set_base(gdt_entries, FIRST_TSS_ENTRY, base);
 
     gdt_entries[FIRST_TSS_ENTRY].access &= 0xf9; /* Clear busy bit */
@@ -282,9 +277,6 @@ __noreturn int sys_exec(struct pt_regs regs) {
     user_stack = process_current->mm.end;
 
     exec_kernel_stack_frame(&kernel_stack, (unsigned int)user_stack, eip);
-
-    process_current->context.cr3 = (unsigned int)user_directories;
-    page_directory_load(user_directories);
 
     irq_restore(flags);
 

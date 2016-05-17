@@ -15,7 +15,6 @@ static void welcome();
 int init();
 void delay_calibrate(void);
 void irqs_configure();
-int paging_init();
 
 struct cpu_info cpu_info;
 
@@ -104,7 +103,6 @@ __noreturn void kmain(char *boot_params) {
     delay_calibrate();
     processes_init();
     vfs_init();
-    paging_init();
 
     sti();
     /* Now we're officially in the first process with
@@ -145,9 +143,9 @@ static void welcome() {
 #if DEBUG
     printk("Debug=%d\n", DEBUG);
 #endif
-    printk("Builded on %s %s\n",
-    COMPILE_SYSTEM, COMPILE_ARCH);
-    printk("Compiled on %sby %s@%s\n", COMPILER, COMPILE_BY, COMPILE_HOST);
+    printk("Builded on %s %s by %s@%s\n",
+    COMPILE_SYSTEM, COMPILE_ARCH, COMPILE_BY, COMPILE_HOST);
+    printk("Compiled on %s\n", COMPILER);
     printk("Copyright (C) 2016, MP\n\n");
     printk("Welcome!\n\n");
 
