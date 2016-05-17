@@ -16,46 +16,9 @@
 #define __syscall_handler(x) void syscall_handler();
 #include <arch/isr.h>
 
+extern struct gdt_entry __gdt_entries[];
 
-struct gdt_entry gdt_entries[] = {
-
-    /* Null segment */
-    descriptor_entry(0, 0, 0),
-
-    /* Kernel code segment */
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff),
-
-    /* Kernel data segment */
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff),
-
-    /* User code segment */
-    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff),
-
-    /* User data segment */
-    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffff),
-
-    /* TSS */
-    descriptor_entry(GDT_FLAGS_TYPE_32TSS, 0, 0),
-
-    /* APM code (32bit) */
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_1B | GDT_FLAGS_32BIT, 0, 0xffffffff),
-
-    /* APM code (16bit) */
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_1B | GDT_FLAGS_16BIT, 0, 0xffffffff),
-
-    /* APM data */
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_1B | GDT_FLAGS_32BIT, 0, 0xffffffff),
-
-    /* LDT #1 */
-    /* LDT #2 */
-    /* ...... */
-
-};
-
-struct gdt gdt = {
-        sizeof(struct gdt_entry) * 4096 - 1,
-        (unsigned long)&gdt_entries
-};
+struct gdt_entry *gdt_entries = __gdt_entries;
 
 struct idt_entry idt_entries[256];
 
@@ -63,13 +26,6 @@ struct idt idt = {
         sizeof(struct idt_entry) * 256 - 1,
         (unsigned long)&idt_entries
 };
-
-struct gdt old_gdt = {
-        0,
-        0
-};
-
-struct gdt_entry *old_gdt_entries;
 
 /*===========================================================================*
  *                                 gdt_print                                 *
@@ -103,7 +59,7 @@ static void idt_set_gate(unsigned char num, unsigned long base,
 /*===========================================================================*
  *                                 tss_init                                  *
  *===========================================================================*/
-static void tss_init() {
+void tss_init() {
 
     unsigned int base = (unsigned int)&process_current->context;
     unsigned int limit = sizeof(struct tss) - 128; /* Set once */
@@ -123,7 +79,7 @@ static void tss_init() {
 /*===========================================================================*
  *                              idt_configure                                *
  *===========================================================================*/
-static void idt_configure() {
+void idt_configure() {
 
     #undef __isr
     #undef __pic_isr
@@ -153,18 +109,6 @@ static void idt_configure() {
     #include <arch/exception.h>
 
     idt_load(&idt);
-
-}
-
-void descriptor_init() {
-
-    /* Store descriptors set by the bootloader */
-    gdt_store(&old_gdt);
-    old_gdt_entries = (struct gdt_entry *)old_gdt.base;
-
-    gdt_load(&gdt);
-    idt_configure();
-    tss_init();
 
 }
 

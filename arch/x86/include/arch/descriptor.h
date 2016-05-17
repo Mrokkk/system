@@ -63,7 +63,7 @@ struct idt {
    unsigned long base;
 } __attribute__ ((packed));
 
-extern struct gdt_entry gdt_entries[];
+extern struct gdt_entry *gdt_entries;
 
 extern inline void idt_load(struct idt *idt) {
     asm volatile(

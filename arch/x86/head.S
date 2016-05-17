@@ -2,14 +2,13 @@
 #include <arch/x86_asm.h>
 #include <arch/register.h>
 #include <arch/segment.h>
+#include <arch/descriptor.h>
 
 #define FLAGS         MULTIBOOT_HEADER_FLAGS
 #define MAGIC         MULTIBOOT_HEADER_MAGIC
 #define CHECKSUM     -(MAGIC + FLAGS)
 
 SECTION(.multiboot)
-
-ALIGN(4)
 
 ENTRY(multiboot_header)
     .long MAGIC
@@ -36,12 +35,18 @@ ENTRY(_start)
          * to the EDX */
         mov %eax, %edx
 
+        /* Set segment registers */
+        mov $KERNEL_DS, %eax
+        mov %ax, %ds
+        mov %ax, %es
+        mov %ax, %fs
+        mov %ax, %gs
+
         /* Initialize page table *
          * (load pages for 4MB)  */
         mov $page0, %edi
         movl $0x07, %eax
-    1:
-        stosl
+    1:  stosl
         add $0x1000, %eax
         cmp $1024*0x1000+7, %eax
         jne 1b
@@ -54,8 +59,14 @@ ENTRY(_start)
         mov %cr0, %eax
         or $0x80000000, %eax
         mov %eax, %cr0
+        mov $1f, %eax
+        jmp *%eax
 
-        /* Set up stack register */
+    1:  /* Load global descriptors table */
+        lgdt (gdt)
+        ljmp $0x08, $1f
+
+    1:  /* Set up stack register */
         movl $init_process_stack, %esp
         addl $1024, %esp
         push %edx
@@ -69,8 +80,8 @@ ENTRY(_start)
         rep
 
         /* Check if our processor knows CPUID instruction */
-        pushf               /* Place EFLAGS on the stack */
-        pop %eax            /* Pop value from the stack to EAX */
+        pushf       /* Place EFLAGS on the stack */
+        pop %eax    /* Pop value from the stack to EAX */
         mov %eax, %ebx
         /* Set 23th bit in EFLAGS (ID) */
         xorl $register_bit_mask(eflags_id), %ebx
@@ -82,25 +93,57 @@ ENTRY(_start)
         jne 1f
         hlt    /* TODO: 486 processors */
 
-    /* Knows CPUID */
-    1:
+    1:  /* Knows CPUID */
+
+        /* Setup interrupt descriptors table */
+        call idt_configure
+        /* Setup tss */
+        call tss_init
         call_function(multiboot_read)
         push %eax
         call_function(kmain)
 
+    /* Not reachable */
     2:
         jmp 2b
 
 ENDPROC(_start)
 
-.align 0x1000
-.org 0x1000
+ENTRY(gdt)
+    .word 4096 * 8 - 1
+    .long __gdt_entries
+
+ENTRY(__gdt_entries)
+
+    /* Null segment */
+    descriptor_entry(0, 0, 0)
+
+    /* Kernel code segment */
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | \
+                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+
+    /* Kernel data segment */
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
+                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+
+    /* User code segment */
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | \
+                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+
+    /* User data segment */
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
+                     GDT_FLAGS_32BIT, 0x0, 0xffff)
+
+    /* TSS */
+    descriptor_entry(GDT_FLAGS_TYPE_32TSS, 0, 0)
+
+ALIGN(0x1000)
 ENTRY(page_dir)
-    .long 0x103007
+    .long page_table0
     .fill 1023, 4, 0
 
-.org 0x2000
 ENTRY(page0)
-.org 0x3000
-
+    .skip 7
+page_table0:
+    .skip 0x1000 - 7
 

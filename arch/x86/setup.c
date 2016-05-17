@@ -189,7 +189,6 @@ int cpu_info_get() {
 void arch_setup() {
 
     cpu_info_get();
-    descriptor_init();
     nmi_enable();
 
 }
