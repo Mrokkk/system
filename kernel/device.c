@@ -50,12 +50,15 @@ int char_devices_list_get(char *buffer) {
 int char_device_find(const char *name, struct device **dev) {
 
     int i;
+
     *dev = 0;
-    for (i=0; i<16; i++)
+    for (i=0; i<16; i++) {
+        if (!char_devices[i]->name) continue;
         if (!strncmp(char_devices[i]->name, name, 32)) {
             *dev = char_devices[i];
             return i;
         }
+    }
 
     return 0;
 }

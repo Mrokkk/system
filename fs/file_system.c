@@ -71,6 +71,9 @@ int do_mount(struct file_system *fs, const char *mount_point) {
     if (CONSTRUCT(ms, memset(ms, 0, sizeof(struct mounted_system))))
         return -ENOMEM;
 
+    list_init(&ms->mounted_systems);
+    list_init(&sb->super_blocks);
+
     fs->read_super(sb, 0, 0);
     ms->dir = kmalloc(255);
     strcpy(ms->dir, mount_point);
