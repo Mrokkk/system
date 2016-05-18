@@ -7,7 +7,7 @@
 #include <arch/io.h>
 #include <arch/real_mode.h>
 
-#define VIDEO_SEGMENT 0xb8000
+#define VIDEO_SEGMENT (0xb8000+0xc0000000)
 
 #define COLOR_BLACK         0
 #define COLOR_BLUE          1

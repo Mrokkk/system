@@ -168,7 +168,6 @@ int init() {
 
     (void)arch_info; (void)modules_list; (void)irqs_list;
     (void)char_devices_list;
-
     strcpy(process_current->name, "init");
 
     modules_init();

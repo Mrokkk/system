@@ -183,10 +183,19 @@ int cpu_info_get() {
     return 0;
 }
 
+#include <arch/page.h>
+
+extern struct page_directory page_dir[];
+
 /*===========================================================================*
  *                                arch_setup                                 *
  *===========================================================================*/
 void arch_setup() {
+
+    /*
+     * Disable low memory
+     */
+    page_dir[0].present = 0;
 
     cpu_info_get();
     nmi_enable();

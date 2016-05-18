@@ -103,6 +103,8 @@ bad_syscall:
  *===========================================================================*/
 ENTRY(timer_handler) /* IRQ 0 handler */
 
+        //1:
+        //jmp 1b
         incl jiffies
         SAVE_ALL
         PIC_EOI(0)

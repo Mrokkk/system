@@ -86,14 +86,16 @@ int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
         return 0;
     }
 
+    mb = (struct multiboot_info *)((unsigned int)mb + 0xc0000000);
+
     if (mb->flags & MULTIBOOT_FLAGS_MMAP_BIT)
         multiboot_mmap_read(mb);
     if (mb->flags & MULTIBOOT_FLAGS_BOOTDEV_BIT)
         multiboot_boot_device_read(mb);
     if (mb->flags & MULTIBOOT_FLAGS_BL_NAME_BIT)
         bootloader_name = (char *)mb->bootloader_name;
-    if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
-        multiboot_modules_read(mb);
+    //if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
+    //    multiboot_modules_read(mb);
 
     return mb->cmdline;
 

@@ -60,13 +60,15 @@ ENTRY(_start)
         or $0x80000000, %eax
         mov %eax, %cr0
         mov $1f, %eax
+        add $0xc0000000, %eax
         jmp *%eax
 
     1:  /* Load global descriptors table */
         lgdt (gdt)
         ljmp $0x08, $1f
 
-    1:  /* Set up stack register */
+    1:
+    /* Set up stack register */
         movl $init_process_stack, %esp
         addl $1024, %esp
         push %edx
@@ -79,29 +81,14 @@ ENTRY(_start)
         cld
         rep
 
-        /* Check if our processor knows CPUID instruction */
-        pushf       /* Place EFLAGS on the stack */
-        pop %eax    /* Pop value from the stack to EAX */
-        mov %eax, %ebx
-        /* Set 23th bit in EFLAGS (ID) */
-        xorl $register_bit_mask(eflags_id), %ebx
-        push %ebx
-        popf
-        pushf
-        pop %eax
-        cmp %eax, %ecx
-        jne 1f
-        hlt    /* TODO: 486 processors */
-
-    1:  /* Knows CPUID */
-
         /* Setup interrupt descriptors table */
         call idt_configure
         /* Setup tss */
         call tss_init
         call_function(multiboot_read)
         push %eax
-        call_function(kmain)
+        push %eax
+        ljmp $0x08, $kmain
 
     /* Not reachable */
     2:
@@ -140,8 +127,10 @@ ENTRY(__gdt_entries)
 ALIGN(0x1000)
 ENTRY(page_dir)
     .long page_table0
-    .fill 1023, 4, 0
+    .skip 767*4
+    .long page_table0
 
+ALIGN(0x1000)
 ENTRY(page0)
     .skip 7
 page_table0:

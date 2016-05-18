@@ -18,29 +18,14 @@
 
 extern struct gdt_entry __gdt_entries[];
 
-struct gdt_entry *gdt_entries = __gdt_entries;
+struct gdt_entry *gdt_entries = (struct gdt_entry *)((unsigned int)__gdt_entries + 0xc0000000);
 
 struct idt_entry idt_entries[256];
 
 struct idt idt = {
         sizeof(struct idt_entry) * 256 - 1,
-        (unsigned long)&idt_entries
+        (unsigned int)&idt_entries
 };
-
-/*===========================================================================*
- *                                 gdt_print                                 *
- *===========================================================================*/
-void gdt_print(struct gdt_entry *entries, int size) {
-
-    int i;
-
-    for (i=0; i<size; i++) {
-        printk("%u base 0x%x; ", i, descriptor_get_base(entries, i));
-        printk("limit 0x%x; ", descriptor_get_limit(entries, i));
-        printk("type 0x%x\n", descriptor_get_type(entries, i));
-    }
-
-}
 
 /*===========================================================================*
  *                               idt_set_gate                                *
@@ -108,7 +93,7 @@ void idt_configure() {
     #define __exception_debug __exception_noerrno
     #include <arch/exception.h>
 
-    idt_load(&idt);
+    idt_load((struct idt *)((unsigned int)&idt - 0xc0000000));
 
 }
 

@@ -1,25 +1,39 @@
 ENTRY(_start)
 
+_kernel_phys = 0x00100000;
+_kernel_virt = 0xC0100000;
+
+_kernel_offset = _kernel_virt - _kernel_phys;
+
 SECTIONS
 {
 
-	. = 1M;
+	. = _kernel_phys;
 
-	.text BLOCK(4K) : ALIGN(4K)
+    .unpagged BLOCK(4K) : ALIGN(4K)
+    {
+        KEEP(*(.multiboot))
+        KEEP(*(.text.boot))
+    }
+
+    . += _kernel_offset;
+
+    . = ALIGN(4K);
+	.text BLOCK(4K) : AT(ADDR(.text) - _kernel_offset)
 	{
 		_stext = .;
-		KEEP(*(.multiboot))
-		KEEP(*(.text.boot))
 		*(.text)
 		_etext = .;
 	}
 
-	.rodata BLOCK(4K) : ALIGN(4K)
+    . = ALIGN(4K);
+	.rodata BLOCK(4K) : AT(ADDR(.rodata) - _kernel_offset)
 	{
 		*(.rodata)
 	}
 
-	.data BLOCK(4K) : ALIGN(4K)
+    . = ALIGN(4K);
+	.data BLOCK(4K) : AT(ADDR(.data) - _kernel_offset)
 	{
 		_sdata = .;
 		*(.data)
@@ -29,7 +43,8 @@ SECTIONS
 		_edata = .;
 	}	
 
-	.bss BLOCK(4K) : ALIGN(4K)
+    . = ALIGN(4K);
+	.bss BLOCK(4K) : AT(ADDR(.bss) - _kernel_offset)
 	{
 		_sbss = _edata;
 		*(COMMON)

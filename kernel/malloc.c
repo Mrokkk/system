@@ -20,7 +20,8 @@ static inline void *ksbrk(int incr) {
     prev_heap = heap;
 
     /* Check if it wouldn't exceed available RAM */
-    if ((unsigned int)prev_heap + incr >= ram) return 0;
+    if ((unsigned int)prev_heap + incr >= ram + 0xc0000000) /* FIXME: */
+        return 0;
 
     heap += incr;
 
