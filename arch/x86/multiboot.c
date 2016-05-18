@@ -2,6 +2,7 @@
 #include <kernel/mm.h>
 
 #include <arch/multiboot.h>
+#include <arch/page.h>
 
 char *bootloader_name;
 
@@ -53,8 +54,6 @@ static inline void multiboot_boot_device_read(struct multiboot_info *mb) {
 
     (void)mb;
 
-    //printk("boot device: %x\n", (unsigned int)mb->boot_device);
-
 }
 
 /*===========================================================================*
@@ -66,10 +65,10 @@ static inline void multiboot_modules_read(struct multiboot_info *mb) {
     struct module *mod = (struct module *)mb->mods_addr;
 
     for (i=0; i<count; i++) {
-        printk("%d: %s = 0x%x : 0x%x\n", i, (char *)mod->string+1,
-                (unsigned int)mod->mod_start, (unsigned int)mod->mod_end);
-        if (!strcmp((const char *)mod->string+1, "symbols")) {
-            symbols_read((char *)mod->mod_start, mod->mod_end - mod->mod_start);
+        printk("%d: %s = 0x%x : 0x%x\n", i, (char *)virt_address(mod->string) + 1,
+                (unsigned int)virt_address(mod->mod_start), (unsigned int)virt_address(mod->mod_end));
+        if (!strcmp((const char *)virt_address(mod->string) + 1, "symbols")) {
+            symbols_read((char *)virt_address(mod->mod_start), mod->mod_end - mod->mod_start);
         }
         mod++;
     }
@@ -86,7 +85,7 @@ int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
         return 0;
     }
 
-    mb = (struct multiboot_info *)((unsigned int)mb + 0xc0000000);
+    mb = (struct multiboot_info *)(virt_address(mb));
 
     if (mb->flags & MULTIBOOT_FLAGS_MMAP_BIT)
         multiboot_mmap_read(mb);
@@ -94,9 +93,9 @@ int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
         multiboot_boot_device_read(mb);
     if (mb->flags & MULTIBOOT_FLAGS_BL_NAME_BIT)
         bootloader_name = (char *)mb->bootloader_name;
-    //if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
-    //    multiboot_modules_read(mb);
+    if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
+        multiboot_modules_read(mb);
 
-    return mb->cmdline;
+    return virt_address(mb->cmdline);
 
 }

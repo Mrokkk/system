@@ -9,6 +9,8 @@
 #include <kernel/time.h>
 #include <kernel/test.h>
 
+#include <arch/register.h>
+
 void kmain();
 void idle();
 static void welcome();
@@ -168,6 +170,14 @@ int init() {
 
     (void)arch_info; (void)modules_list; (void)irqs_list;
     (void)char_devices_list;
+
+#ifdef CONFIG_X86
+    ASSERT(cs_get() == KERNEL_CS);
+    ASSERT(ds_get() == KERNEL_DS);
+    ASSERT(gs_get() == KERNEL_DS);
+    ASSERT(ss_get() == KERNEL_DS);
+#endif
+
     strcpy(process_current->name, "init");
 
     modules_init();
@@ -191,6 +201,7 @@ int init() {
     char_devices_list_get(char_devices_list);
     printk("%s", char_devices_list);
 #endif
+
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
     printf("This shouldn't be seen\n");
 

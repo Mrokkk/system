@@ -2,6 +2,8 @@
 #include <kernel/malloc.h>
 #include <kernel/string.h>
 
+#include <arch/page.h>
+
 static struct memory_block *kmalloc_create_block(int size);
 
 extern unsigned int ram;
@@ -20,7 +22,7 @@ static inline void *ksbrk(int incr) {
     prev_heap = heap;
 
     /* Check if it wouldn't exceed available RAM */
-    if ((unsigned int)prev_heap + incr >= ram + 0xc0000000) /* FIXME: */
+    if ((unsigned int)prev_heap + incr >= ram + KERNEL_PAGE_OFFSET) /* FIXME: */
         return 0;
 
     heap += incr;

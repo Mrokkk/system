@@ -6,8 +6,9 @@
 #include <arch/bios.h>
 #include <arch/io.h>
 #include <arch/real_mode.h>
+#include <arch/page.h>
 
-#define VIDEO_SEGMENT (0xb8000+0xc0000000)
+#define VIDEO_SEGMENT (0xb8000 + KERNEL_PAGE_OFFSET)
 
 #define COLOR_BLACK         0
 #define COLOR_BLUE          1

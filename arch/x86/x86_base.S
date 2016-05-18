@@ -8,6 +8,15 @@
 #include <kernel/errno.h>
 
 /*===========================================================================*
+ *                             page_dir_flush                                *
+ *===========================================================================*/
+ENTRY(page_dir_flush)
+    mov %cr3, %eax
+    mov %eax, %cr3
+    ret
+ENDPROC(page_dir_flush)
+
+/*===========================================================================*
  *                            __semaphore_wake                               *
  *===========================================================================*/
 ENTRY(__semaphore_wake)
@@ -87,6 +96,8 @@ ENTRY(syscall_handler) /* INT 0x80 handler */
         call *%ebx
         mov %eax, REGS_EAX(%esp) /* Put value returned by *
                                   * syscall in pt_regs    */
+        call syscall_regs_check
+
 ENDPROC(syscall_handler)
 
 ENTRY(ret_from_syscall)
@@ -103,8 +114,6 @@ bad_syscall:
  *===========================================================================*/
 ENTRY(timer_handler) /* IRQ 0 handler */
 
-        //1:
-        //jmp 1b
         incl jiffies
         SAVE_ALL
         PIC_EOI(0)

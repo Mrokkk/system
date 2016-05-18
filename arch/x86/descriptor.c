@@ -2,6 +2,7 @@
 
 #include <arch/descriptor.h>
 #include <arch/segment.h>
+#include <arch/page.h>
 
 /* Exceptions */
 #define __exception_noerrno(x) void exc_##x##_handler();
@@ -18,7 +19,8 @@
 
 extern struct gdt_entry __gdt_entries[];
 
-struct gdt_entry *gdt_entries = (struct gdt_entry *)((unsigned int)__gdt_entries + 0xc0000000);
+struct gdt_entry *gdt_entries =
+        (struct gdt_entry *)((unsigned int)__gdt_entries + KERNEL_PAGE_OFFSET);
 
 struct idt_entry idt_entries[256];
 
@@ -93,7 +95,7 @@ void idt_configure() {
     #define __exception_debug __exception_noerrno
     #include <arch/exception.h>
 
-    idt_load((struct idt *)((unsigned int)&idt - 0xc0000000));
+    idt_load(&idt);
 
 }
 

@@ -3,6 +3,7 @@
 #include <arch/register.h>
 #include <arch/segment.h>
 #include <arch/descriptor.h>
+#include <arch/page.h>
 
 #define FLAGS         MULTIBOOT_HEADER_FLAGS
 #define MAGIC         MULTIBOOT_HEADER_MAGIC
@@ -45,10 +46,10 @@ ENTRY(_start)
         /* Initialize page table *
          * (load pages for 4MB)  */
         mov $page0, %edi
-        movl $0x07, %eax
+        movl $PAGE_INIT_FLAGS, %eax
     1:  stosl
         add $0x1000, %eax
-        cmp $1024*0x1000+7, %eax
+        cmp $1024 * 0x1000 + PAGE_INIT_FLAGS, %eax
         jne 1b
 
         /* Load page directory */
@@ -60,35 +61,58 @@ ENTRY(_start)
         or $0x80000000, %eax
         mov %eax, %cr0
         mov $1f, %eax
-        add $0xc0000000, %eax
         jmp *%eax
 
     1:  /* Load global descriptors table */
-        lgdt (gdt)
+        lgdt (gdt + KERNEL_PAGE_OFFSET)
         ljmp $0x08, $1f
 
-    1:
-    /* Set up stack register */
-        movl $init_process_stack, %esp
+    1:  /* Set up stack register */
+        movl $SYMBOL_NAME(init_process_stack), %esp
         addl $1024, %esp
         push %edx
         push %ebx
 
-        /* Clear BSS */
+        /*
+         * Clear BSS
+         */
         movl $_sbss, %edi
         movl $_ebss, %ecx
         subl %edi, %ecx
         cld
         rep
 
-        /* Setup interrupt descriptors table */
-        call idt_configure
-        /* Setup tss */
-        call tss_init
-        call_function(multiboot_read)
+        /*
+         * Setup interrupt descriptors table
+         */
+        call SYMBOL_NAME(idt_configure)
+
+        /*
+         * Setup tss
+         */
+        call SYMBOL_NAME(tss_init)
+
+        /*
+         * Read multiboot structure
+         * given by the bootloader
+         */
+        call SYMBOL_NAME(multiboot_read)
+
+        /* multiboot_read returns address of
+         * boot command line string, so we push
+         * its value onto the stack
+         */
         push %eax
-        push %eax
-        ljmp $0x08, $kmain
+
+        /* This is tricky - we jump to kmain
+         * indirectly by returning from
+         * page_dir_reload, which reloads
+         * page directory
+         */
+        push $0
+        push $SYMBOL_NAME(kmain)
+        movl $0, page_dir
+        jmp page_dir_flush
 
     /* Not reachable */
     2:
@@ -98,7 +122,7 @@ ENDPROC(_start)
 
 ENTRY(gdt)
     .word 4096 * 8 - 1
-    .long __gdt_entries
+    .long __gdt_entries + KERNEL_PAGE_OFFSET
 
 ENTRY(__gdt_entries)
 
@@ -119,7 +143,7 @@ ENTRY(__gdt_entries)
 
     /* User data segment */
     descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
-                     GDT_FLAGS_32BIT, 0x0, 0xffff)
+                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
     /* TSS */
     descriptor_entry(GDT_FLAGS_TYPE_32TSS, 0, 0)
@@ -127,12 +151,12 @@ ENTRY(__gdt_entries)
 ALIGN(0x1000)
 ENTRY(page_dir)
     .long page_table0
-    .skip 767*4
+    .fill KERNEL_PAGE_OFFSET / 0x400000 - 1, 4, 0
     .long page_table0
 
 ALIGN(0x1000)
 ENTRY(page0)
-    .skip 7
+    .skip PAGE_INIT_FLAGS
 page_table0:
-    .skip 0x1000 - 7
+    .skip 0x1000 - PAGE_INIT_FLAGS
 

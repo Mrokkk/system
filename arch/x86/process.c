@@ -193,6 +193,29 @@ void FASTCALL(__process_switch(struct process *prev, struct process *next)) {
 }
 
 /*===========================================================================*
+ *                            syscall_regs_check                             *
+ *===========================================================================*/
+void syscall_regs_check(struct pt_regs regs) {
+
+    ASSERT(cs_get() == KERNEL_CS);
+    ASSERT(ds_get() == KERNEL_DS);
+    if (process_is_kernel(process_current)) {
+        ASSERT(regs.cs == KERNEL_CS);
+        ASSERT(regs.ds == KERNEL_DS);
+        ASSERT(regs.gs == KERNEL_DS);
+        ASSERT(gs_get() == KERNEL_DS);
+        ASSERT(regs.gs == KERNEL_DS);
+    } else {
+        ASSERT(regs.cs == USER_CS);
+        ASSERT(regs.ds == USER_DS);
+        ASSERT(regs.gs == USER_DS);
+        ASSERT(regs.gs == USER_DS);
+        ASSERT(gs_get() == USER_DS);
+    }
+
+}
+
+/*===========================================================================*
  *                                regs_print                                 *
  *===========================================================================*/
 void regs_print(struct pt_regs *regs) {

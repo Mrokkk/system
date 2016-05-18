@@ -86,10 +86,6 @@
     push %ebx;          /* ebx */
 
 #define RESTORE_ALL \
-    mov $USER_DS, %eax; \
-    mov %ax, %ds; \
-    mov %ax, %es; \
-    mov %ax, %fs; \
     pop %ebx; \
     pop %ecx; \
     pop %edx; \
