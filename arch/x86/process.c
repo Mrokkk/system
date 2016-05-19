@@ -34,7 +34,9 @@ static void *stack_copy(unsigned int *dest, unsigned int *src,
  *===========================================================================*/
 static inline void *stack_create(unsigned int size) {
 
-    return (void *)((unsigned int)kmalloc(size) + size);
+    (void)size;
+
+    return (void *)((unsigned int)page_alloc() + PAGE_SIZE);
 
 }
 
@@ -163,8 +165,8 @@ void arch_process_free(struct process *proc) {
 
     /* Free kernel stack (if exists) */
     if (proc->context.esp0)
-        kfree((void *)((unsigned int)proc->context.esp0 -
-            PROCESS_KERNEL_STACK_SIZE));
+        page_free((void *)((unsigned int)proc->context.esp0 -
+            PAGE_SIZE));
 
 }
 
@@ -279,9 +281,7 @@ static inline void exec_kernel_stack_frame(
  *===========================================================================*/
 __noreturn int sys_exec(struct pt_regs regs) {
 
-    unsigned int *kernel_stack,
-                 *user_stack;
-    unsigned int flags, eip = 0;
+    unsigned int *kernel_stack, *user_stack, flags, eip = 0;
 
     irq_save(flags);
 
@@ -335,15 +335,12 @@ static inline void signal_restore_code_put(unsigned char *user_code,
 
 }
 
-#define SIGHAN_STACK_SIZE 512
-
 /*===========================================================================*
  *                           arch_process_execute                            *
  *===========================================================================*/
 int arch_process_execute(struct process *proc, unsigned int eip) {
 
-    unsigned int *kernel_stack, *sighan_stack,
-                 flags;
+    unsigned int *kernel_stack, *sighan_stack, flags;
     unsigned char *user_code;
 
     irq_save(flags);
@@ -355,7 +352,7 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
     proc->signals->context.esp0 = proc->context.esp0;
     proc->signals->context.eip = proc->context.eip;
 
-    sighan_stack = stack_create(SIGHAN_STACK_SIZE);
+    sighan_stack = stack_create(PAGE_SIZE);
 
     push(process_current->pid, sighan_stack);
     push(user_code, sighan_stack);
@@ -379,10 +376,11 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
  *===========================================================================*/
 __noreturn int sys_sigreturn(unsigned char *stack) {
 
-    kfree(stack - SIGHAN_STACK_SIZE);
+    page_free(stack - PAGE_SIZE);
     process_current->context.esp0 = process_current->signals->context.esp0;
     set_context(process_current->signals->context.esp,
             process_current->signals->context.eip);
+
     while (1);
 
 }

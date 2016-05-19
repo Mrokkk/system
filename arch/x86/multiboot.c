@@ -65,10 +65,14 @@ static inline void multiboot_modules_read(struct multiboot_info *mb) {
     struct module *mod = (struct module *)mb->mods_addr;
 
     for (i=0; i<count; i++) {
-        printk("%d: %s = 0x%x : 0x%x\n", i, (char *)virt_address(mod->string) + 1,
-                (unsigned int)virt_address(mod->mod_start), (unsigned int)virt_address(mod->mod_end));
+        printk("%d: %s = 0x%x : 0x%x\n", i,
+                (char *)virt_address(mod->string) + 1,
+                (unsigned int)virt_address(mod->mod_start),
+                (unsigned int)virt_address(mod->mod_end)
+        );
         if (!strcmp((const char *)virt_address(mod->string) + 1, "symbols")) {
-            symbols_read((char *)virt_address(mod->mod_start), mod->mod_end - mod->mod_start);
+            symbols_read((char *)virt_address(mod->mod_start),
+                    mod->mod_end - mod->mod_start);
         }
         mod++;
     }
@@ -93,8 +97,8 @@ int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
         multiboot_boot_device_read(mb);
     if (mb->flags & MULTIBOOT_FLAGS_BL_NAME_BIT)
         bootloader_name = (char *)mb->bootloader_name;
-    if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
-        multiboot_modules_read(mb);
+    //if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
+    //   multiboot_modules_read(mb);
 
     return virt_address(mb->cmdline);
 

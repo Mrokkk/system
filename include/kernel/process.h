@@ -138,19 +138,19 @@ extern unsigned int context_switches;
 
 int processes_init();
 int process_clone(struct process *parent, struct pt_regs *regs, int clone_flags);
-void process_delete(struct process *proc);
+void process_delete(struct process *p);
 int kernel_process(int (*start)(), void *args, unsigned int flags);
-int process_find(int pid, struct process **proc);
-void process_wake_waiting(struct process *proc);
-int process_find_free_fd(struct process *proc, int *fd);
+int process_find(int pid, struct process **p);
+void process_wake_waiting(struct process *p);
+int process_find_free_fd(struct process *p, int *fd);
 void scheduler();
 void exit(int);
 int fork(void);
 
 /* Arch-dependent functions */
 int arch_process_copy(struct process *dest, struct process *src, struct pt_regs *old_regs);
-void arch_process_free(struct process *proc);
-int arch_process_execute(struct process *proc, unsigned int ip);
+void arch_process_free(struct process *p);
+int arch_process_execute(struct process *p, unsigned int ip);
 void regs_print(struct pt_regs *regs);
 
 static inline char process_state_char(int s) {
@@ -165,42 +165,42 @@ static inline int process_is_zombie(struct process *p) {
     return p->stat == PROCESS_ZOMBIE;
 }
 
-static inline void process_exit(struct process *proc) {
-    list_del(&proc->running);
-    proc->stat = PROCESS_ZOMBIE;
-    process_wake_waiting(proc);
-    if (proc == process_current) {
+static inline void process_exit(struct process *p) {
+    list_del(&p->running);
+    p->stat = PROCESS_ZOMBIE;
+    process_wake_waiting(p);
+    if (p == process_current) {
         scheduler();
         while (1);
     }
 }
 
-static inline void process_stop(struct process *proc) {
-    list_del(&proc->running);
-    proc->stat = PROCESS_STOPPED;
-    if (proc == process_current) scheduler();
+static inline void process_stop(struct process *p) {
+    list_del(&p->running);
+    p->stat = PROCESS_STOPPED;
+    if (p == process_current) scheduler();
 }
 
-static inline void process_wake(struct process *proc) {
-    if (proc->stat != PROCESS_RUNNING)
-        list_add_tail(&proc->running, &running);
-    proc->stat = PROCESS_RUNNING;
+static inline void process_wake(struct process *p) {
+    if (p->stat != PROCESS_RUNNING)
+        list_add_tail(&p->running, &running);
+    p->stat = PROCESS_RUNNING;
 }
 
-static inline void process_wait(struct process *proc) {
-    list_del(&proc->running);
-    proc->stat = PROCESS_WAITING;
-    if (proc == process_current) scheduler();
+static inline void process_wait(struct process *p) {
+    list_del(&p->running);
+    p->stat = PROCESS_WAITING;
+    if (p == process_current) scheduler();
 }
 
-static inline void process_fd_set(struct process *proc, int fd,
+static inline void process_fd_set(struct process *p, int fd,
         struct file *file) {
-    proc->files->files[fd] = file;
+    p->files->files[fd] = file;
 }
 
-static inline int process_fd_get(struct process *proc, int fd,
+static inline int process_fd_get(struct process *p, int fd,
         struct file **file) {
-    if (!(*file = proc->files->files[fd])) return 1;
+    if (!(*file = p->files->files[fd])) return 1;
     return 0;
 }
 

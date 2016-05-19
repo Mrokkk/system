@@ -32,7 +32,7 @@ struct idt idt = {
 /*===========================================================================*
  *                               idt_set_gate                                *
  *===========================================================================*/
-static void idt_set_gate(unsigned char num, unsigned long base,
+static inline void idt_set_gate(unsigned char num, unsigned long base,
                          unsigned short selector, unsigned long flags) {
 
     idt_entries[num].base_lo = (base) & 0xFFFF;

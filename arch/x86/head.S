@@ -43,13 +43,13 @@ ENTRY(_start)
         mov %ax, %fs
         mov %ax, %gs
 
-        /* Initialize page table *
-         * (load pages for 4MB)  */
+        /* Initialize page table to  *
+         * cover whole loaded memory */
         mov $page0, %edi
         movl $PAGE_INIT_FLAGS, %eax
     1:  stosl
         add $0x1000, %eax
-        cmp $1024 * 0x1000 + PAGE_INIT_FLAGS, %eax
+        cmp $_end - KERNEL_PAGE_OFFSET + PAGE_INIT_FLAGS, %eax
         jne 1b
 
         /* Load page directory */
@@ -112,7 +112,7 @@ ENTRY(_start)
         push $0
         push $SYMBOL_NAME(kmain)
         movl $0, page_dir
-        jmp page_dir_flush
+        jmp page_dir_reload
 
     /* Not reachable */
     2:
@@ -150,6 +150,10 @@ ENTRY(__gdt_entries)
 
 ALIGN(0x1000)
 ENTRY(page_dir)
+    /*
+     * First entry will be zeroed just before
+     * the call to the page_dir_reload
+     */
     .long page_table0
     .fill KERNEL_PAGE_OFFSET / 0x400000 - 1, 4, 0
     .long page_table0

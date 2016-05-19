@@ -1,6 +1,7 @@
 #include <kernel/process.h>
 #include <kernel/sys.h>
 #include <arch/register.h>
+#include <arch/page.h>
 
 PROCESS_DECLARE(init_process);
 LIST_DECLARE(running);
@@ -32,7 +33,7 @@ static inline void process_forked(struct process *proc) {
  *                            process_space_free                             *
  *===========================================================================*/
 static inline void process_space_free(struct process *proc) {
-    kfree(proc->mm.start);
+    page_free(proc->mm.start);
 }
 
 /*===========================================================================*
@@ -43,10 +44,10 @@ static inline int process_space_setup(struct process *proc) {
     char *start, *end;
 
     /* Set up process space */
-    if (!(end = start = (char *)kmalloc(PROCESS_SPACE)))
+    if (!(end = start = (char *)page_alloc()))
         return -ENOMEM;
 
-    end += PROCESS_SPACE;
+    end += PAGE_SIZE;
     proc->mm.start = start;
     proc->mm.end = end;
 

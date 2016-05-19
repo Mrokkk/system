@@ -3,35 +3,32 @@
 
 #ifndef __ASSEMBLER__
 
-struct page_directory {
-    unsigned int present:1;
-    unsigned int writeable:1;
-    unsigned int user_access:1;
-    unsigned int write_through:1;
-    unsigned int cache_disabled:1;
-    unsigned int accessed:1;
-    unsigned int reserved:1;
-    unsigned int size:1;
-    unsigned int global_page:1;
-    unsigned int avail:3;
-    unsigned int address:20;
-} __attribute__((packed));
+#define PGD_PRESENT     (1 << 0)
+#define PGD_WRITEABLE   (1 << 1)
+#define PGD_USER        (1 << 2)
+#define PGD_WRITETHR    (1 << 3)
+#define PGD_CACHEDIS    (1 << 4)
+#define PGD_ACCESSED    (1 << 5)
+#define PGD_RESERVED    (1 << 6)
+#define PGD_SIZE        (1 << 7)
 
-struct page_table {
-    unsigned int present:1;
-    unsigned int writeable:1;
-    unsigned int user_access:1;
-    unsigned int write_through:1;
-    unsigned int cache_disabled:1;
-    unsigned int accessed:1;
-    unsigned int dirty:1;
-    unsigned int reserved:1;
-    unsigned int global_page:1;
-    unsigned int avail:3;
-    unsigned int address:20;
-} __attribute__((packed));
+#define PGT_PRESENT     (1 << 0)
+#define PGT_WRITEABLE   (1 << 1)
+#define PGT_USER        (1 << 2)
+#define PGT_WRITETHR    (1 << 3)
+#define PGT_CACHEDIS    (1 << 4)
+#define PGT_ACCESSED    (1 << 5)
+#define PGT_DIRTY       (1 << 6)
+#define PGT_RESERVED    (1 << 7)
+#define PGT_GLOBAL      (1 << 8)
 
-extern inline void page_directory_load(struct page_directory *pgd) {
+typedef unsigned int pgd_t;
+typedef unsigned int pgt_t;
+
+void *page_alloc();
+int page_free(void *address);
+
+extern inline void page_directory_load(pgd_t *pgd) {
     asm volatile(
             "mov %0, %%cr3;"
             "mov $1f, %0;"
@@ -40,7 +37,7 @@ extern inline void page_directory_load(struct page_directory *pgd) {
             :: "r" (pgd) : "memory");
 }
 
-static inline void tlb_flush() {
+static inline void page_directory_reload() {
     register int dummy = 0;
     asm volatile(
             "mov %%cr3, %0;"
@@ -51,8 +48,19 @@ static inline void tlb_flush() {
     );
 }
 
+static inline void invlpg(void *address) {
+    asm volatile(
+            "invlpg (%0);"
+            :: "r" (address)
+            : "memory"
+    );
+}
+
 #endif
 
+#define PAGE_SIZE 0x1000
+#define PAGE_NUMBER 0x100000
+#define PAGE_TABLES_NUMBER 1024
 #define PAGE_INIT_FLAGS (0x7)
 #define KERNEL_PAGE_OFFSET (0xc0000000)
 

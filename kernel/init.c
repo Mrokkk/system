@@ -10,6 +10,7 @@
 #include <kernel/test.h>
 
 #include <arch/register.h>
+#include <arch/segment.h>
 
 void kmain();
 void idle();
@@ -17,6 +18,7 @@ static void welcome();
 int init();
 void delay_calibrate(void);
 void irqs_configure();
+int paging_init();
 
 struct cpu_info cpu_info;
 
@@ -101,6 +103,7 @@ __noreturn void kmain(char *boot_params) {
     printk("Boot params: %s\n", boot_params);
 
     arch_setup();
+    paging_init();
     irqs_configure();
     delay_calibrate();
     processes_init();

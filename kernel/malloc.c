@@ -4,11 +4,12 @@
 
 #include <arch/page.h>
 
-static struct memory_block *kmalloc_create_block(int size);
-
 extern unsigned int ram;
-static char *heap = _end;
+static char *heap;
 LIST_DECLARE(memory_blocks);
+
+#define BLOCK_FREE 1
+#define BLOCK_BUSY 0
 
 /*===========================================================================*
  *                                   ksbrk                                   *
@@ -16,14 +17,34 @@ LIST_DECLARE(memory_blocks);
 static inline void *ksbrk(int incr) {
 
     void *prev_heap;
+    unsigned int last_page, new_page, diff, i;
+    static struct memory_block *temp;
 
-    if (incr < 0) return 0;
+    if (!heap)
+        heap = prev_heap = page_alloc();
 
     prev_heap = heap;
 
-    /* Check if it wouldn't exceed available RAM */
-    if ((unsigned int)prev_heap + incr >= ram + KERNEL_PAGE_OFFSET) /* FIXME: */
-        return 0;
+    last_page = (unsigned int)prev_heap / 4096;
+    new_page = ((unsigned int)prev_heap + incr) / 4096;
+
+    diff = new_page - last_page;
+
+    (void)temp;
+
+    if (diff) {
+        unsigned int size = new_page * 0x1000 - (unsigned)prev_heap;
+        if (size > MEMORY_BLOCK_SIZE) {
+            temp = prev_heap;
+            temp->free = 1;
+            temp->size = size - MEMORY_BLOCK_SIZE;
+            list_init(&temp->blocks);
+            list_add_tail(&temp->blocks, &memory_blocks);
+        }
+        heap = prev_heap = page_alloc();
+        for (i = 1; i < diff; i++)
+            heap = page_alloc();
+    }
 
     heap += incr;
 
@@ -55,6 +76,8 @@ void *kmalloc(size_t size) {
     
     struct memory_block *temp;
     struct memory_block *new;
+
+    ASSERT(size <= PAGE_SIZE);
 
     /* Align size to multiplication of MEMORY_BLOCK_SIZE */
     if (size % MEMORY_BLOCK_SIZE)
@@ -107,6 +130,7 @@ int kfree(void *address) {
             return 0; /* ...and return */
         }
 
+#if 0
         if (temp->blocks.next != &memory_blocks) {
 
             struct memory_block *next =
@@ -119,6 +143,7 @@ int kfree(void *address) {
             }
 
         }
+#endif
 
     }
 
