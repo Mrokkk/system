@@ -62,7 +62,6 @@ void do_exception(
         }
 
         process_exit(process_current);
-        scheduler();
         while (1);
     }
 

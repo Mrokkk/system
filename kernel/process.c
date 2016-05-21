@@ -209,7 +209,7 @@ int process_clone(struct process *parent, struct pt_regs *regs,
         int clone_flags) {
 
     struct process *child;
-    int flags, errno = -ENOMEM;
+    int errno = -ENOMEM;
 
     if (CONSTRUCT(child))
         goto cannot_create_process;
@@ -230,9 +230,8 @@ int process_clone(struct process *parent, struct pt_regs *regs,
     process_parent_child_link(parent, child);
     process_forked(parent);
 
-    irq_save(flags);
     process_wake(child);
-    irq_restore(flags);
+
     return child->pid;
 
 arch_error:
@@ -332,7 +331,6 @@ int sys_getppid() {
 int sys_waitpid(int pid, int *status, int opt) {
 
     struct process *proc;
-    unsigned int flags;
 
     (void)opt;
 
@@ -346,12 +344,8 @@ int sys_waitpid(int pid, int *status, int opt) {
 
 delete_process:
 
-    irq_save(flags);
-
     if (process_is_zombie(proc))
         process_delete(proc);
-
-    irq_restore(flags);
 
     return 0;
 

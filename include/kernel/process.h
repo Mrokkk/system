@@ -166,8 +166,11 @@ static inline int process_is_zombie(struct process *p) {
 }
 
 static inline void process_exit(struct process *p) {
+    unsigned int flags;
+    irq_save(flags);
     list_del(&p->running);
     p->stat = PROCESS_ZOMBIE;
+    irq_restore(flags);
     process_wake_waiting(p);
     if (p == process_current) {
         scheduler();
@@ -176,20 +179,29 @@ static inline void process_exit(struct process *p) {
 }
 
 static inline void process_stop(struct process *p) {
+    unsigned int flags;
+    irq_save(flags);
     list_del(&p->running);
     p->stat = PROCESS_STOPPED;
+    irq_restore(flags);
     if (p == process_current) scheduler();
 }
 
 static inline void process_wake(struct process *p) {
+    unsigned int flags;
+    irq_save(flags);
     if (p->stat != PROCESS_RUNNING)
         list_add_tail(&p->running, &running);
     p->stat = PROCESS_RUNNING;
+    irq_restore(flags);
 }
 
 static inline void process_wait(struct process *p) {
+    unsigned int flags;
+    irq_save(flags);
     list_del(&p->running);
     p->stat = PROCESS_WAITING;
+    irq_restore(flags);
     if (p == process_current) scheduler();
 }
 
