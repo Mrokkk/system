@@ -312,17 +312,11 @@ __noreturn int sys_exec(struct pt_regs regs) {
 /*===========================================================================*
  *                         signal_restore_code_put                           *
  *===========================================================================*/
-static inline void signal_restore_code_put(unsigned char *user_code,
-        unsigned int *sighan_stack) {
+static inline void signal_restore_code_put(unsigned char *user_code) {
 
     /* mov $__NR_sigreturn, %eax */
     *user_code++ = 0xb8;
     *(unsigned long *)user_code = __NR_sigreturn;
-    user_code += 4;
-
-    /* mov $sighan_stack, %ebx */
-    *user_code++ = 0xbb;
-    *((unsigned int *)user_code) = (unsigned int)sighan_stack;
     user_code += 4;
 
     /* int $0x80 */
@@ -342,26 +336,42 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
     irq_save(flags);
 
     user_code = (unsigned char *)proc->mm.start;
-    kernel_stack = (unsigned int *)proc->context.esp;
+    kernel_stack = (unsigned int *)proc->context.esp - 256; /* TODO: */
+    sighan_stack = stack_create(PAGE_SIZE);
 
     proc->signals->context.esp = proc->context.esp;
     proc->signals->context.esp0 = proc->context.esp0;
     proc->signals->context.eip = proc->context.eip;
 
-    sighan_stack = stack_create(PAGE_SIZE);
+    proc->signals->context.eax = (unsigned int)sighan_stack;
 
     push(process_current->pid, sighan_stack);
     push(user_code, sighan_stack);
 
     exec_kernel_stack_frame(&kernel_stack, (unsigned int)sighan_stack, eip);
 
-    signal_restore_code_put(user_code, sighan_stack + 2);
-
     proc->context.eip = (unsigned int)ret_from_syscall;
     proc->context.esp = (unsigned int)kernel_stack;
     proc->context.esp0 = proc->context.esp;
 
+    signal_restore_code_put(user_code);
+
     irq_restore(flags);
+
+    if (proc == process_current) {
+        asm volatile(
+                "movl $1f, %0;"
+                "movl %%esp, %1;"
+                "movl %2, %%esp;"
+                "jmp *%3;"
+                "1:"
+                :: "m" (proc->signals->context.eip),
+                   "m" (proc->signals->context.esp),
+                   "r" (kernel_stack),
+                   "r" (ret_from_syscall)
+                : "memory"
+        );
+    }
 
     return 0;
 
@@ -370,9 +380,10 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
 /*===========================================================================*
  *                               sys_sigreturn                               *
  *===========================================================================*/
-__noreturn int sys_sigreturn(unsigned char *stack) {
+__noreturn int sys_sigreturn() {
 
-    page_free(stack - PAGE_SIZE);
+    page_free((void *)(process_current->signals->context.eax - PAGE_SIZE));
+
     process_current->context.esp0 = process_current->signals->context.esp0;
     set_context(process_current->signals->context.esp,
             process_current->signals->context.eip);
