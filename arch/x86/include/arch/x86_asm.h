@@ -13,60 +13,6 @@
 #define SECTION(sect) \
     .section sect
 
-#define WEAK(name) \
-    .weak name; \
-    name:
-
-#define call_function0(name) \
-    call SYMBOL_NAME(name)
-
-#define call_function call_function0
-
-#define call_function1(name, param1) \
-    push param1; \
-    call SYMBOL_NAME(name); \
-    add $4, %esp;
-
-#define call_function2(name, param1, param2) \
-    push param2; \
-    push param1; \
-    call SYMBOL_NAME(name); \
-    add $8, %esp;
-
-#define call_function3(name, param1, param2, param3) \
-    push param3; \
-    push param2; \
-    push param1; \
-    call SYMBOL_NAME(name); \
-    add $12, %esp;
-
-#define call_function4(name, param1, param2, param3, param4) \
-    push param4; \
-    push param3; \
-    push param2; \
-    push param1; \
-    call SYMBOL_NAME(name); \
-    add $16, %esp;
-
-#define call_function5(name, param1, param2, param3, param4, param5) \
-    push param5; \
-    push param4; \
-    push param3; \
-    push param2; \
-    push param1; \
-    call SYMBOL_NAME(name); \
-    add $20, %esp;
-
-#define call_function6(name, param1, param2, param3, param4, param5, param6) \
-    push param6; \
-    push param5; \
-    push param4; \
-    push param3; \
-    push param2; \
-    push param1; \
-    call SYMBOL_NAME(name); \
-    add $24, %esp;
-
 #define SAVE_ALL \
     pushl %gs;          /* gs */  \
     pushl %fs;          /* fs */  \
