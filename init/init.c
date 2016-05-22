@@ -12,13 +12,10 @@
 #include <arch/register.h>
 #include <arch/segment.h>
 
-void kmain();
-void idle();
-static void welcome();
-int init();
-void delay_calibrate(void);
-void irqs_configure();
-int paging_init();
+static int init(void);
+void irqs_configure(void);
+int paging_init(void);
+int temp_shell(void);
 
 struct cpu_info cpu_info;
 
@@ -42,7 +39,7 @@ unsigned long loops_per_sec = (1<<12);
 /*===========================================================================*
  *                              delay_calibrate                              *
  *===========================================================================*/
-void delay_calibrate(void) {
+static void delay_calibrate(void) {
 
     unsigned int ticks;
     int loopbit;
@@ -94,11 +91,23 @@ void delay_calibrate(void) {
 }
 
 /*===========================================================================*
+ *                                   idle                                    *
+ *===========================================================================*/
+__noreturn static void idle() {
+
+    /*
+     * Remove itself from the running queue
+     */
+
+    process_stop(process_current);
+    while (1);
+
+}
+
+/*===========================================================================*
  *                                   kmain                                   *
  *===========================================================================*/
 __noreturn void kmain(char *boot_params) {
-
-    (void)boot_params;
 
     printk("Boot params: %s\n", boot_params);
 
@@ -125,20 +134,6 @@ __noreturn void kmain(char *boot_params) {
 }
 
 /*===========================================================================*
- *                                   idle                                    *
- *===========================================================================*/
-__noreturn void idle() {
-
-    /*
-     * Remove itself from the running queue
-     */
-
-    process_stop(process_current);
-    while (1);
-
-}
-
-/*===========================================================================*
  *                                  welcome                                  *
  *===========================================================================*/
 static void welcome() {
@@ -156,37 +151,16 @@ static void welcome() {
 
 }
 
-int temp_shell();
-
 /*===========================================================================*
- *                                   init                                    *
+ *                              hardware_print                               *
  *===========================================================================*/
-int init() {
+static inline void hardware_print() {
 
-    /*
-     * Whole is temporary while there's no real fs and binary loading...
-     */
-
-    int child_pid, status;
     char arch_info[128], modules_list[128], irqs_list[128],
             char_devices_list[128];
 
     (void)arch_info; (void)modules_list; (void)irqs_list;
     (void)char_devices_list;
-
-#ifdef CONFIG_X86
-    ASSERT(cs_get() == KERNEL_CS);
-    ASSERT(ds_get() == KERNEL_DS);
-    ASSERT(gs_get() == KERNEL_DS);
-    ASSERT(ss_get() == KERNEL_DS);
-#endif
-
-    strcpy(process_current->name, "init");
-
-    modules_init();
-
-    if (mount("none", "/", "rootfs", 0, 0))
-        printk("Cannot mount root\n");
 
 #ifdef CONFIG_PRINT_ARCH
     arch_info_get(arch_info);
@@ -206,24 +180,37 @@ int init() {
 #endif
 
     printk("RAM: %u MiB (%u B)\n", ram/1024/1024, ram);
-    printf("This shouldn't be seen\n");
 
-    /* Just playing with serial */
-    if (open("/dev/ttyS0", 0)) printf("Cannot open serial\n");
-    fprintf(0, "Hello World!\n");
-    if (close(0)) printf("Can't close ttyS0\n");
-    fprintf(0, "Hello World!\n");
+}
 
-    /* Open standard streams */
+/*===========================================================================*
+ *                                 root_mount                                *
+ *===========================================================================*/
+static inline int root_mount() {
+    return mount("none", "/", "rootfs", 0, 0);
+}
+
+/*===========================================================================*
+ *                                console_open                               *
+ *===========================================================================*/
+static inline int console_open() {
+
     if (open("/dev/tty0", 0) || dup(0) || dup(0))
-        return -1;
+        return 1;
+    return 0;
 
-    /* Say hello */
-    welcome();
+}
+
+/*===========================================================================*
+ *                                 shell_run                                 *
+ *===========================================================================*/
+static inline int shell_run() {
+
+    int child_pid, status;
 
     /* Do fork */
     if ((child_pid = fork()) < 0) {
-        printf("Fork error in init!\n");
+        printk("Fork error in init!\n");
         return -1;
     } else if (!child_pid) {
         strcpy(process_current->name, "shell");
@@ -233,86 +220,40 @@ int init() {
     waitpid(child_pid, &status, 0);
     while (1);
 
-    return 0;
-
 }
 
 /*===========================================================================*
- *                                 read_line                                 *
+ *                                   init                                    *
  *===========================================================================*/
-static inline void read_line(char *line) {
+__noreturn static int init() {
 
-    int size = read(0, line, 32);
-    line[size-1] = 0;
+    /*
+     * Whole is temporary while there's no real fs and binary loading...
+     */
 
-}
+#ifdef CONFIG_X86
+    ASSERT(cs_get() == KERNEL_CS);
+    ASSERT(ds_get() == KERNEL_DS);
+    ASSERT(gs_get() == KERNEL_DS);
+    ASSERT(ss_get() == KERNEL_DS);
+#endif
 
-/*===========================================================================*
- *                                  c_zombie                                 *
- *===========================================================================*/
-static int c_zombie() {
+    strcpy(process_current->name, "init");
 
-    int pid = fork();
+    modules_init();
 
-    exit(pid);
-    return 0;
-}
+    if (root_mount()) printk("Cannot mount root\n");
+    if (console_open()) printk("Cannot open console\n");
 
-/*===========================================================================*
- *                                   c_bug                                   *
- *===========================================================================*/
-static int c_bug() {
+    /* Say something about hardware */
+    hardware_print();
 
-    printf("Bug!!!\n");
-    kill(getppid(), SIGINT);
-    exit(0);
-    return 0;
+    /* Say hello */
+    welcome();
 
-}
+    if (shell_run()) printk("Cannot run shell\n");
 
-#define COMMAND(name) {#name, c_##name}
-
-static struct command {
-    char *name;
-    int (*function)();
-} commands[] = {
-        COMMAND(zombie),
-        COMMAND(bug),
-        {0, 0}
-};
-
-int sighan(int pid) {
-    printf("Got signal from %d\n", pid);
-    return 0;
-}
-
-/*===========================================================================*
- *                                temp_shell                                 *
- *===========================================================================*/
-int temp_shell() {
-
-    char line[32];
-    struct command *com = commands;
-    int i, pid, status = 0;
-
-    signal(SIGINT, sighan);
-
-    while (1) {
-        status ? printf("* ") : printf("# ");
-        read_line(line);
-        if (line[0] == 0) continue;
-        if ((pid=fork()) == 0) {
-            for (i=0; com[i].name; i++) {
-                if (!strcmp(com[i].name, line))
-                    exec(com[i].function);
-            }
-            if (!com[i].name) printf("No such command: %s\n", line);
-            exit(-EBADC);
-        } else if (pid < 0) printf("%s: fork error!\n", line);
-        waitpid(pid, &status, 0);
-    }
-
-    exit(0);
+    while (1);
 
 }
 

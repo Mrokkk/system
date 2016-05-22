@@ -297,6 +297,8 @@ int seriald() {
 
     (void)i; (void)com; (void)line;
 
+    open("/dev/ttyS0", 0);
+
     serial_printf("Seriald\n");
     strcpy(process_current->name, "seriald");
 

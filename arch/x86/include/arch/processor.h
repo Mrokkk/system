@@ -54,7 +54,6 @@ struct pt_regs {
 } __attribute__ ((packed));
 
 extern void ret_from_process();
-extern int init();
 void regs_print(struct pt_regs *regs);
 
 #endif /* __ASSEMBLER__ */

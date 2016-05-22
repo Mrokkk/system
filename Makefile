@@ -62,7 +62,7 @@ CONFIG-H := include/$(NAME)/config.h
 KERNEL-BIN := $(BINDIR)/kernel
 
 # Subdirectories to be build
-DIRS := arch fs kernel lib drivers
+DIRS := arch init fs kernel lib drivers
 ifeq ($(CONFIG_TESTS), y)
 DIRS += tests
 endif
