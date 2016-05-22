@@ -316,22 +316,18 @@ static inline void signal_restore_code_put(unsigned char *user_code,
         unsigned int *sighan_stack) {
 
     /* mov $__NR_sigreturn, %eax */
-    put_user_byte(0xb8, user_code);
-    user_code++;
-    put_user_long(__NR_sigreturn, user_code);
+    *user_code++ = 0xb8;
+    *(unsigned long *)user_code = __NR_sigreturn;
     user_code += 4;
 
     /* mov $sighan_stack, %ebx */
-    put_user_byte(0xbb, user_code);
-    user_code++;
-    put_user_long(sighan_stack, user_code);
+    *user_code++ = 0xbb;
+    *((unsigned int *)user_code) = (unsigned int)sighan_stack;
     user_code += 4;
 
     /* int $0x80 */
-    put_user_byte(0xcd, user_code);
-    user_code++;
-    put_user_byte(0x80, user_code);
-    user_code++;
+    *user_code++ = 0xcd;
+    *user_code++ = 0x80;
 
 }
 

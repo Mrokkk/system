@@ -69,11 +69,8 @@ int do_open(struct file **new_file, const char *filename, int mode) {
  *===========================================================================*/
 int sys_open(const char *filename, int mode) {
 
-    char kbuf[64];
     int fd, errno;
     struct file *file;
-
-    strcpy_from_user(kbuf, filename);
 
     if (process_find_free_fd(process_current, &fd))
         return fd;

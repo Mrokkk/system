@@ -98,19 +98,14 @@ int do_mount(struct file_system *fs, const char *mount_point) {
 int sys_mount(const char *source, const char *target,
         const char *filesystemtype, unsigned long mountflags) {
 
-    char k_fs_name[255];
-    char k_target[255];
     struct file_system *fs;
 
     (void)source; (void)mountflags;
 
-    strcpy_from_user(k_fs_name, filesystemtype);
-    strcpy_from_user(k_target, target);
-
-    if (file_system_get(k_fs_name, &fs))
+    if (file_system_get(filesystemtype, &fs))
         return -ENODEV;
 
-    return do_mount(fs, k_target);
+    return do_mount(fs, target);
 
 }
 
