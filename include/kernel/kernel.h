@@ -55,8 +55,6 @@ void arch_setup();
 
 extern struct cpu_info cpu_info;
 extern volatile unsigned int jiffies;
-extern char *symbols;
-extern unsigned int symbols_size;
 extern unsigned int ram;
 
 #endif
