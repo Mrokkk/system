@@ -240,8 +240,8 @@ __noreturn static int init() {
 
     modules_init();
 
-    if (root_mount()) printk("Cannot mount root\n");
-    if (console_open()) printk("Cannot open console\n");
+    if (root_mount()) panic("Cannot mount root");
+    if (console_open()) panic("Cannot open console");
 
     /* Say something about hardware */
     hardware_print();
@@ -249,7 +249,7 @@ __noreturn static int init() {
     /* Say hello */
     welcome();
 
-    if (shell_run()) printk("Cannot run shell\n");
+    if (shell_run()) panic("Cannot run shell");
 
     while (1);
 
