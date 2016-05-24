@@ -172,7 +172,7 @@ void keyboard_irs() {
 
     /* Check if we have a defined action
      * for this scancode */
-    if (special_scancodes[scan_code]) {
+    if (special_scancodes[scan_code] && scan_code <= L_ALT+0x80) {
         special_scancodes[scan_code]();
         goto end;
     }
