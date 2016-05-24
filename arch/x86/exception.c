@@ -25,7 +25,7 @@ char *exception_messages[] = {
 void do_exception(
     unsigned long nr,       /* Exception number */
     int error_code,         /* Error code */
-    struct pt_regs regs    /* Registers */
+    struct pt_regs regs     /* Registers */
 ) {
 
     struct kernel_symbol *symbol;
@@ -36,61 +36,38 @@ void do_exception(
                  cr3 = cr3_get(),
                  cr4 = cr4_get();
 
+    cli();
+
     symbol = symbol_find_address(regs.eip);
     function = symbol ? symbol->name : "<unknown>";
 
-    if (nr == __NR_debug) { /* TODO: Debug */
-
-        printk("Instruction: 0x%08x : <>", regs.eip);
-
-        return;
-
-    }
-
     /* If we are in user space, kill process and resched */
     if (regs.cs == USER_CS) {
-        printk("%s in process %d (%s) at 0x%x (%s)\n",
+        printk("%s #0x%x in process %d (%s) at 0x%x (%s)\n",
                 exception_messages[nr],
+                error_code,
                 process_current->pid,
                 process_current->name,
                 (unsigned int)regs.eip,
                 function);
 
         if (nr == __NR_page_fault) {
-            printk("error code = 0x%x\ncr2 = 0x%x\n", error_code, cr2);
+            printk("cr2 = 0x%x\n", cr2);
             printk("cr3 = 0x%x\n", cr3);
         }
 
         process_exit(process_current);
-        while (1);
     }
 
-    printk("Exception: %s #0x%x\n", exception_messages[nr], error_code);
     regs_print(&regs);
-    printk("IOPL=%d; ", ((unsigned int)regs.eflags >> 12) & 0x3);
-    eflags_bits_string_get(regs.eflags, string);
-    printk("%s\n", string);
-    printk("Procedure: %s\n", function);
 
-    printk("CR0=0x%x\n", (unsigned int)cr0);
     cr0_bits_string_get(cr0, string);
-    printk("  %s\n", string);
+    printk("CR0=0x%x : %s\n", (unsigned int)cr0, string);
 
     printk("CR2=0x%x; ", (unsigned int)cr2);
     printk("CR3=0x%x; ", (unsigned int)cr3);
     printk("CR4=0x%x\n", (unsigned int)cr4);
-    cr4_bits_string_get(cr4, string);
-    printk("  %s\n", string);
-
-    if (regs.eip < 0x100000) {
-        printk("Bad instruction pointer due to stack corruption or jumping to bad function pointer\n");
-    }
-
-    printk("\nAttempting to reset in 7 seconds...");
-
-    delay(7000);
-
-    reboot();
+    panic("%s #0x%x", exception_messages[nr], error_code);
 
     while (1);
 

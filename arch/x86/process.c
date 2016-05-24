@@ -222,6 +222,8 @@ void syscall_regs_check(struct pt_regs regs) {
  *===========================================================================*/
 void regs_print(struct pt_regs *regs) {
 
+    char string[64];
+
     printk("EAX=0x%08x; ", regs->eax);
     printk("EBX=0x%08x; ", regs->ebx);
     printk("ECX=0x%08x; ", regs->ecx);
@@ -230,7 +232,11 @@ void regs_print(struct pt_regs *regs) {
     printk("EIP=0x%04x:0x%08x\n", regs->cs, regs->eip);
     printk("DS=0x%04x; ES=0x%04x; FS=0x%04x; GS=0x%04x\n",
             regs->ds, regs->es, regs->fs, regs->gs);
-    printk("EFLAGS=0x%08x\n", regs->eflags);
+    printk("EFLAGS=0x%08x : ", regs->eflags);
+
+    eflags_bits_string_get(regs->eflags, string);
+    printk("IOPL=%d ", ((unsigned int)regs->eflags >> 12) & 0x3);
+    printk("%s\n", string);
 
 }
 

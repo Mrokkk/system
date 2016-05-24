@@ -297,6 +297,8 @@ int seriald() {
 
     (void)i; (void)com; (void)line;
 
+    delay(1000);
+
     open("/dev/ttyS0", 0);
 
     serial_printf("Seriald\n");
