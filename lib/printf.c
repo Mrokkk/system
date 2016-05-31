@@ -14,7 +14,7 @@
 #include <kernel/unistd.h>
 #include <kernel/stddef.h>
 
-static int __optimize(0) skip_atoi(const char **s) {
+static int skip_atoi(const char **s) {
 
     int i = 0;
 
@@ -38,7 +38,7 @@ static int __optimize(0) skip_atoi(const char **s) {
         n = ((unsigned long) n) / (unsigned) base; \
         __res; })
 
- static char  __optimize(0) *number(char *str, long num, int base, int size, int precision,
+ static char  *number(char *str, long num, int base, int size, int precision,
             int type)
 {
     /* we are called with base 8, 10 or 16, only, thus don't need "G..."  */
@@ -110,7 +110,7 @@ static int __optimize(0) skip_atoi(const char **s) {
     return str;
 }
 
-int __optimize(0) vsprintf(char *buf, const char *fmt, va_list args) {
+int vsprintf(char *buf, const char *fmt, va_list args) {
 
     int len;
     unsigned long num;
