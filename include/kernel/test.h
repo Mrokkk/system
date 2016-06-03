@@ -3,68 +3,69 @@
 
 #include <kernel/debug.h>
 
-#define ASSERT_FAILED(name, expected, achieved, sign) \
+#define ASSERT_FAILED(expected, achieved, sign) \
     do {                                                                \
-        printk("%s FAILED!\n  ==> "#name ": "               \
+        printk("%s FAILED!\n  ==> "                                     \
             #achieved" "#sign" "#expected" (0x%x "#sign" 0x%x)\n",      \
-            __func__, (unsigned int)achieved, \
+            __func__, (unsigned int)achieved,                           \
             (unsigned int)expected);                                    \
         *assert_failed = *assert_failed + 1;                            \
     } while(0)
 
-#define ASSERT_EQ(name, var, value)                 \
+#define ASSERT_EQ(var, value)                       \
     do {                                            \
         typeof(var) test = (typeof(var))(value);    \
         if (test != var) {                          \
-            ASSERT_FAILED(name, value, var, ==);    \
+            ASSERT_FAILED(value, var, ==);          \
         }                                           \
     } while (0)
 
-#define ASSERT_NEQ(name, var, value)                \
+#define ASSERT_NEQ(var, value)                      \
     do {                                            \
         typeof(var) test = (typeof(var))(value);    \
         if (test == var) {                          \
-            ASSERT_FAILED(name, value, var, !=);    \
+            ASSERT_FAILED(value, var, !=);          \
         }                                           \
     } while (0)
 
-#define ASSERT_GT(name, var, value)                 \
+#define ASSERT_GT(var, value)                       \
     do {                                            \
         typeof(var) test = (typeof(var))(value);    \
         if (!(var > test)) {                        \
-            ASSERT_FAILED(name, value, var, >);     \
+            ASSERT_FAILED(value, var, >);           \
         }                                           \
     } while (0)
 
-#define ASSERT_GE(name, var, value)                 \
+#define ASSERT_GE(var, value)                       \
     do {                                            \
         typeof(var) test = (typeof(var))(value);    \
         if (!(var >= test)) {                       \
-            ASSERT_FAILED(name, value, var, >=);    \
+            ASSERT_FAILED(value, var, >=);          \
         }                                           \
     } while (0)
 
-#define ASSERT_LT(name, var, value)                 \
+#define ASSERT_LT(var, value)                       \
     do {                                            \
         typeof(var) test = (typeof(var))(value);    \
         if (!(var < test)) {                        \
-            ASSERT_FAILED(name, value, var, <);     \
+            ASSERT_FAILED(value, var, <);           \
         }                                           \
     } while (0)
 
-#define ASSERT_LE(name, var, value)                 \
+#define ASSERT_LE(var, value)                       \
     do {                                            \
         typeof(var) test = (typeof(var))(value);    \
-        if (!(var <= test)) {                        \
-            ASSERT_FAILED(name, value, var, <);     \
+        if (!(var <= test)) {                       \
+            ASSERT_FAILED(value, var, <);           \
         }                                           \
     } while (0)
 
 #ifdef CONFIG_TESTS
 
-#define TESTS_RUN() \
-    void tests_run(); \
-    tests_run();
+#define TESTS_RUN()     \
+    void tests_run();   \
+    tests_run();        \
+    while (1);
 
 #else
 
@@ -72,21 +73,20 @@
 
 #endif
 
-#define TEST_SUITE(name) \
-    auto void SUITE_##name(int *);\
-    __assert_failed = 0; \
-    SUITE_##name(&__assert_failed); \
-    if (__assert_failed) \
-        failed++;   \
-    else succeed++; \
-    void SUITE_##name(int *assert_failed)
+#define TEST_CASE(name)             \
+    auto void CASE_##name(int *);   \
+    __assert_failed = 0;            \
+    CASE_##name(&__assert_failed);  \
+    if (__assert_failed)            \
+        failed++;                   \
+    else succeed++;                 \
+    void CASE_##name(int *assert_failed)
 
-#define TEST_PLAN(name) \
-    void test_plan_##name() {    \
+#define TEST_SUITE(name)                                    \
+    void test_suite_##name() {                              \
         int failed = 0, succeed = 0, __assert_failed = 0;
 
-#define TEST_PLAN_END(name) \
-        printk("\nTest plan '"#name"': %d succeed, %d failed\n", succeed, failed);  \
+#define TEST_SUITE_END(name) \
     }
 
 #endif /* INCLUDE_KERNEL_TEST_H_ */
