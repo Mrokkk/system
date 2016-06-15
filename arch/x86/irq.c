@@ -11,6 +11,12 @@ static unsigned short mask = 0xffff;
 #define PIC1 0x20
 #define PIC2 0xA0
 
+#define ICW2_PIC1   0x20
+#define ICW2_PIC2   0x28
+
+#define CLOCK_TICK_RATE 1193182
+#define LATCH  ((CLOCK_TICK_RATE) / HZ) /* TODO: Why is it so inaccurate? */
+
 void pic_disable();
 static void empty_isr() {};
 
@@ -62,9 +68,6 @@ int irqs_list_get(char *buffer) {
 
 }
 
-#define CLOCK_TICK_RATE 1193182
-#define LATCH  ((CLOCK_TICK_RATE) / HZ) /* TODO: Why is it so inaccurate? */
-
 /*===========================================================================*
  *                               pit_configure                               *
  *===========================================================================*/
@@ -76,40 +79,6 @@ void pit_configure() {
     outb(LATCH >> 8, PIT_PORT_CHANNEL0);
 
     irq_enable(0);
-
-}
-
-/*===========================================================================*
- *                               irqs_configure                              *
- *===========================================================================*/
-void irqs_configure() {
-
-    unsigned char pic1 = 0x20;
-    unsigned char pic2 = 0x28;
-
-    /* Send ICW1 */
-    outb(0x11, PIC1);
-    outb(0x11, PIC2);
-
-    /* Send ICW2 */
-    outb(pic1, PIC1 + 1);
-    outb(pic2, PIC2 + 1);
-
-    /* Send ICW3 */
-    outb(4, PIC1 + 1);
-    outb(2, PIC2 + 1);
-
-    /* Send ICW4 */
-    outb(1, PIC1 + 1);
-    outb(1, PIC2 + 1);
-
-    pic_disable();
-
-    pit_configure();
-
-    irq_register(0, &empty_isr, "timer");
-    irq_register(2, &empty_isr, "cascade");
-    irq_register(13, &empty_isr, "fpu");
 
 }
 
@@ -185,4 +154,52 @@ void pic_enable() {
 
 }
 
+/*===========================================================================*
+ *                                 icw1_send                                 *
+ *===========================================================================*/
+static inline void icw1_send() {
+    outb(0x11, PIC1);
+    outb(0x11, PIC2);
+}
+
+/*===========================================================================*
+ *                                 icw2_send                                 *
+ *===========================================================================*/
+static inline void icw2_send() {
+    outb(ICW2_PIC1, PIC1 + 1);
+    outb(ICW2_PIC2, PIC2 + 1);
+}
+
+/*===========================================================================*
+ *                                 icw3_send                                 *
+ *===========================================================================*/
+static inline void icw3_send() {
+    outb(4, PIC1 + 1);
+    outb(2, PIC2 + 1);
+}
+
+/*===========================================================================*
+ *                                 icw4_send                                 *
+ *===========================================================================*/
+static inline void icw4_send() {
+    outb(1, PIC1 + 1);
+    outb(1, PIC2 + 1);
+}
+
+/*===========================================================================*
+ *                               irqs_configure                              *
+ *===========================================================================*/
+void irqs_configure() {
+
+    icw1_send();
+    icw2_send();
+    icw3_send();
+    icw4_send();
+    pic_disable();
+    pit_configure();
+    irq_register(0, &empty_isr, "timer");
+    irq_register(2, &empty_isr, "cascade");
+    irq_register(13, &empty_isr, "fpu");
+
+}
 
