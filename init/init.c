@@ -121,8 +121,6 @@ __noreturn void kmain(char *boot_params) {
      * PID 0 (init_process).
      */
 
-    TESTS_RUN();
-
     /* Create another process called 'init' (ugh...)
      * and change itself into the idle process.
      */

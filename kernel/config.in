@@ -2,4 +2,3 @@ bool 'Print architecture info at boot' CONFIG_PRINT_ARCH
 bool 'Print irqs at boot' CONFIG_PRINT_IRQS
 bool 'Print installed modules at boot' CONFIG_PRINT_MODULES
 bool 'Print registered devices at boot' CONFIG_PRINT_DEVICES
-bool 'Run tests at boot' CONFIG_TESTS

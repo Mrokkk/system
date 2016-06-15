@@ -63,9 +63,6 @@ KERNEL-BIN := $(BINDIR)/kernel
 
 # Subdirectories to be build
 DIRS := arch init fs kernel lib drivers
-ifeq ($(CONFIG_TESTS), y)
-DIRS += tests
-endif
 
 LINKER-SCRIPT := $(TOPDIR)/arch/$(ARCH)/linker.ld
 
@@ -138,7 +135,7 @@ export ARCH-CFLAGS ARCH-LDFLAGS
 
 unexport DIRS
 
-.PHONY: all clean $(DIRS) configure
+.PHONY: all test clean $(DIRS) configure
 
 all: announce create-dirs build-system
 	@echo
