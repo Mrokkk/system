@@ -255,6 +255,9 @@ static inline int current_can_kill(struct process *p) {
     return p->pid != 0;
 }
 
+#define for_each_process(p) \
+    list_for_each_entry(p, &init_process.processes, processes)
+
 #define processes_list_print(list, member) \
     do { \
         struct process *__proc; \

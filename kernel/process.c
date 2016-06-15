@@ -7,7 +7,6 @@ PROCESS_DECLARE(init_process);
 LIST_DECLARE(running);
 
 static pid_t last_pid;
-
 unsigned int total_forks;
 
 /*===========================================================================*
@@ -25,8 +24,8 @@ static inline pid_t find_free_pid() {
  *                              process_forked                               *
  *===========================================================================*/
 static inline void process_forked(struct process *proc) {
-    proc->forks++;
-    total_forks++;
+    ++proc->forks;
+    ++total_forks;
 }
 
 /*===========================================================================*
@@ -160,14 +159,14 @@ int process_find(int pid, struct process **p) {
 
     struct process *proc;
 
-    list_for_each_entry(proc, &init_process.processes, processes)
+    for_each_process(proc)
         if (proc->pid == pid) {
             *p = proc;
             return 0;
         }
 
     *p = 0;
-    return 0;
+    return 1;
 
 }
 
@@ -270,17 +269,14 @@ int process_find_free_fd(struct process *proc, int *fd) {
     int i;
     struct file *dummy;
 
+    *fd = 0;
+
     /* Find first free file descriptor */
     for (i=0; i<PROCESS_FILES; i++)
         if (process_fd_get(proc, i, &dummy)) break;
 
-    if (dummy) {
-        *fd = 0;
-        return 1;
-    }
-
+    if (dummy) return 1;
     *fd = i;
-
     return 0;
 
 }
@@ -289,10 +285,6 @@ int process_find_free_fd(struct process *proc, int *fd) {
  *                                  sys_fork                                 *
  *===========================================================================*/
 int sys_fork(struct pt_regs regs) {
-
-    /*
-     * Not quite compatible with POSIX, but does its work
-     */
 
     return process_clone(process_current, &regs, 0);
 
@@ -335,7 +327,7 @@ int sys_waitpid(int pid, int *status, int opt) {
     (void)opt;
 
     if (process_find(pid, &proc)) return -ESRCH;
-    if (proc->stat != PROCESS_RUNNING) goto delete_process;
+    if (!process_is_running(proc)) goto delete_process;
 
     list_add_tail(&process_current->wait_queue, &proc->wait_queue);
     process_wait(process_current);

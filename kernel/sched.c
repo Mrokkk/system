@@ -1,7 +1,6 @@
 #include <kernel/process.h>
 
 struct process *process_current = &init_process;
-
 unsigned int context_switches;
 
 /*===========================================================================*
@@ -21,7 +20,7 @@ void scheduler() {
         goto end;
     }
 
-    if (process_current->stat != PROCESS_RUNNING) {
+    if (!process_is_running(process_current)) {
         process_current = list_entry(running.next, struct process, running);
     } else {
         struct list_head *temp = process_current->running.next;
