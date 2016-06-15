@@ -211,22 +211,3 @@ void *memsetw(unsigned short *dest, unsigned short val, unsigned int count) {
 
 }
 #endif
-
-/*===========================================================================*
- *                                   bcopy                                   *
- *===========================================================================*/
-#ifndef __HAVE_ARCH_BCOPY
-void bcopy(const void *src, void *dest, unsigned int size) {
-
-    char *s = (char *)src, *d = dest;
-    unsigned int i, len;
-
-    len = strlen(s);
-    if (size > len) size = len;
-
-    for (i=0; i<size; i++) {
-        *d++ = *s++;
-    }
-
-}
-#endif
