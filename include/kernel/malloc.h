@@ -43,10 +43,10 @@ int kfree(void *);
 #define DESTRUCT_1(object)                __DESTRUCT(object, 0)
 #define DESTRUCT_2(object, deinitializer) __DESTRUCT(object, deinitializer)
 
-#define CONSTRUCT(...) \
+#define new(...) \
     REAL_VAR_MACRO_2(CONSTRUCT_1, CONSTRUCT_2, __VA_ARGS__)
 
-#define DESTRUCT(...) \
+#define delete(...) \
     REAL_VAR_MACRO_2(DESTRUCT_1, DESTRUCT_2, __VA_ARGS__)
 
 #endif

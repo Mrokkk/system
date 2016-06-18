@@ -60,15 +60,15 @@ int do_mount(struct file_system *fs, const char *mount_point) {
     struct inode *temp_inode;
     char fullpath[255];
 
-    if (CONSTRUCT(temp_inode))
+    if (new(temp_inode))
         return -ENOMEM;
 
     fullpath_get(mount_point, fullpath);
 
-    if (CONSTRUCT(sb, memset(sb, 0, sizeof(struct super_block))))
+    if (new(sb, memset(sb, 0, sizeof(struct super_block))))
         return -ENOMEM;
 
-    if (CONSTRUCT(ms, memset(ms, 0, sizeof(struct mounted_system))))
+    if (new(ms, memset(ms, 0, sizeof(struct mounted_system))))
         return -ENOMEM;
 
     list_init(&ms->mounted_systems);

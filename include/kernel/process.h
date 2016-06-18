@@ -234,17 +234,17 @@ static inline int process_is_user(struct process *p) {
 
 static inline void process_signals_exit(struct process *p) {
     if (!--p->signals->count)
-        DESTRUCT(p->signals);
+        delete(p->signals);
 }
 
 static inline void process_files_exit(struct process *p) {
     if (!--p->files->count)
-        DESTRUCT(p->files);
+        delete(p->files);
 }
 
 static inline void process_fs_exit(struct process *p) {
     if (!--p->fs->count)
-        DESTRUCT(p->fs);
+        delete(p->fs);
 }
 
 static inline void *process_memory_start(struct process *p) {

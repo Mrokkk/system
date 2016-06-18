@@ -104,7 +104,7 @@ static inline int process_fs_copy(struct process *dest,
         dest->fs = src->fs;
         dest->fs->count++;
     } else {
-        if (CONSTRUCT(dest->fs)) return 1;
+        if (new(dest->fs)) return 1;
         memcpy(dest->fs, src->fs, sizeof(struct fs));
         dest->fs->count = 1;
     }
@@ -123,7 +123,7 @@ static inline int process_files_copy(struct process *dest,
         dest->files = src->files;
         dest->files->count++;
     } else {
-        if (CONSTRUCT(dest->files)) return 1;
+        if (new(dest->files)) return 1;
         dest->files->count = 1;
         memcpy(dest->files->files, src->files->files,
                 sizeof(struct file *) * PROCESS_FILES);
@@ -143,7 +143,7 @@ static inline int process_signals_copy(struct process *dest,
         dest->signals = src->signals;
         dest->signals->count++;
     } else {
-        if (CONSTRUCT(dest->signals)) return 1;
+        if (new(dest->signals)) return 1;
         memcpy(dest->signals, src->signals, sizeof(struct signals));
         dest->signals->count = 1;
     }
@@ -197,7 +197,7 @@ void process_delete(struct process *proc) {
     process_fs_exit(proc);
     process_files_exit(proc);
     process_signals_exit(proc);
-    DESTRUCT(proc);
+    delete(proc);
 
 }
 
@@ -210,7 +210,7 @@ int process_clone(struct process *parent, struct pt_regs *regs,
     struct process *child;
     int errno = -ENOMEM;
 
-    if (CONSTRUCT(child))
+    if (new(child))
         goto cannot_create_process;
     if (process_space_setup(child))
         goto cannot_allocate;
@@ -241,7 +241,7 @@ files_error:
     process_fs_exit(child);
 fs_error:
 cannot_allocate:
-    DESTRUCT(child);
+    delete(child);
 cannot_create_process:
     return errno;
 

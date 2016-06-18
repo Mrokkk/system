@@ -26,7 +26,7 @@ struct inode *lookup(const char *filename) {
     if (*path == '/') path = path_next(path) + 1;
     temp = root;
 
-    CONSTRUCT(temp2); /* FIXME: Not freeing */
+    new(temp2); /* FIXME: Not freeing */
 
     while (1) {
         base_name(path, name);
@@ -47,7 +47,7 @@ int do_open(struct file **new_file, const char *filename, int mode) {
 
     inode = lookup(filename);
 
-    if (CONSTRUCT(*new_file, list_add_tail(&(*new_file)->files, &files)))
+    if (new(*new_file, list_add_tail(&(*new_file)->files, &files)))
         return -ENOMEM;
 
     (*new_file)->inode = inode;
@@ -118,7 +118,7 @@ int sys_close(int fd) {
     process_fd_set(process_current, fd, 0);
 
     if (!--file->count)
-       DESTRUCT(file, list_del(&file->files));
+       delete(file, list_del(&file->files));
 
     return 0;
 

@@ -12,7 +12,7 @@ int __char_device_register(unsigned int major, const char *name,
     struct device *dev;
     struct kernel_module *mod;
 
-    if (CONSTRUCT(dev)) return -ENOMEM;
+    if (new(dev)) return -ENOMEM;
 
     dev->fops = fops;
     dev->owner = 0;
