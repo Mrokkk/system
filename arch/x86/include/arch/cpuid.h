@@ -97,7 +97,7 @@ struct cpuid {
 /*===========================================================================*
  *                                cpuid_read                                 *
  *===========================================================================*/
-extern inline void cpuid_read(unsigned int function, struct cpuid_regs *regs) {
+static inline void cpuid_read(unsigned int function, struct cpuid_regs *regs) {
 
     asm volatile(
         "cpuid\n"

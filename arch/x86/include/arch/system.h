@@ -73,7 +73,7 @@ extern void reboot();
 extern void shutdown();
 unsigned int ram_get();
 
-extern inline void udelay(unsigned long usecs) {
+static inline void udelay(unsigned long usecs) {
 
     usecs *= loops_per_sec/1000000;
 

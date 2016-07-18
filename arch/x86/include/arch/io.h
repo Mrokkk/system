@@ -14,7 +14,7 @@
 /*===========================================================================*
  *                                    inb                                    *
  *===========================================================================*/
-extern inline unsigned char inb(unsigned short port) {
+static inline unsigned char inb(unsigned short port) {
     unsigned char rv;
     asm volatile ("inb %1, %0" : "=a" (rv) : "dN" (port));
     return rv;
@@ -23,46 +23,14 @@ extern inline unsigned char inb(unsigned short port) {
 /*===========================================================================*
  *                                   outb                                    *
  *===========================================================================*/
-extern inline void outb(unsigned char data, unsigned short port) {
-    asm volatile ("outb %1, %0" : : "dN" (port), "a" (data));
-}
-
-/*===========================================================================*
- *                                   inw                                     *
- *===========================================================================*/
-extern inline unsigned short inw(unsigned short port) {
-    unsigned short rv;
-    asm volatile ("inb %1, %0" : "=a" (rv) : "dN" (port));
-    return rv;
-}
-
-/*===========================================================================*
- *                                   outw                                    *
- *===========================================================================*/
-extern inline void outw(unsigned short data, unsigned short port) {
-    asm volatile ("outb %1, %0" : : "dN" (port), "a" (data));
-}
-
-/*===========================================================================*
- *                                   inl                                     *
- *===========================================================================*/
-extern inline unsigned long inl(unsigned long port) {
-    unsigned long rv;
-    asm volatile ("inb %1, %0" : "=a" (rv) : "dN" (port));
-    return rv;
-}
-
-/*===========================================================================*
- *                                   outl                                    *
- *===========================================================================*/
-extern inline void outl(unsigned long data, unsigned long port) {
+static inline void outb(unsigned char data, unsigned short port) {
     asm volatile ("outb %1, %0" : : "dN" (port), "a" (data));
 }
 
 /*===========================================================================*
  *                                 io_wait                                   *
  *===========================================================================*/
-extern inline void io_wait(void) {
+static inline void io_wait(void) {
     asm volatile (
         "jmp 1f;"
         "1:jmp 2f;"

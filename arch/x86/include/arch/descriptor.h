@@ -65,35 +65,35 @@ struct idt {
 
 extern struct gdt_entry *gdt_entries;
 
-extern inline void idt_load(struct idt *idt) {
+static inline void idt_load(struct idt *idt) {
     asm volatile(
         "lidt (%%eax);"
         :: "a" (idt)
     );
 }
 
-extern inline void idt_store(struct idt *idt) {
+static inline void idt_store(struct idt *idt) {
     asm volatile(
         "sidt (%%eax);"
         :: "a" (idt)
     );
 }
 
-extern inline void tss_load(unsigned short sel) {
+static inline void tss_load(unsigned short sel) {
     asm volatile(
         "ltr %%ax;"
         :: "a" (sel)
     );
 }
 
-extern inline void tss_store(unsigned short *sel) {
+static inline void tss_store(unsigned short *sel) {
     asm volatile(
         "str %%ax;"
         : "=a" (*sel)
     );
 }
 
-extern inline void gdt_load(struct gdt *gdt) {
+static inline void gdt_load(struct gdt *gdt) {
     asm volatile(
         "    lgdt (%%eax);"
         "    ljmp $0x08, $1f;"
@@ -102,7 +102,7 @@ extern inline void gdt_load(struct gdt *gdt) {
     );
 }
 
-extern inline void gdt_store(struct gdt *gdt) {
+static inline void gdt_store(struct gdt *gdt) {
     asm volatile(
         "sgdt (%%eax);"
         :: "a" (gdt)

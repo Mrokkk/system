@@ -90,25 +90,25 @@ int cr4_bits_string_get(unsigned int cr4, char *buffer);
 
 extern unsigned long eip_get();
 
-extern inline unsigned int dr0_get() {
+static inline unsigned int dr0_get() {
     unsigned int rv;
     asm volatile("mov %%dr0, %0" : "=r" (rv));
     return rv;
 }
 
-extern inline unsigned int dr1_get() {
+static inline unsigned int dr1_get() {
     unsigned int rv;
     asm volatile("mov %%dr2, %0" : "=r" (rv));
     return rv;
 }
 
-extern inline unsigned int dr2_get() {
+static inline unsigned int dr2_get() {
     unsigned int rv;
     asm volatile("mov %%dr2, %0" : "=r" (rv));
     return rv;
 }
 
-extern inline unsigned int dr3_get() {
+static inline unsigned int dr3_get() {
     unsigned int rv;
     asm volatile("mov %%dr3, %0" : "=r" (rv));
     return rv;

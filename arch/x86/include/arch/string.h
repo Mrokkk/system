@@ -10,7 +10,7 @@
  *                                  strnlen                                  *
  *===========================================================================*/
 #define __HAVE_ARCH_STRNLEN
-extern inline size_t strnlen(const char * s, size_t count) {
+static inline size_t strnlen(const char * s, size_t count) {
     int d0;
     register int __res;
     asm volatile(
@@ -34,7 +34,7 @@ extern inline size_t strnlen(const char * s, size_t count) {
 /*===========================================================================*
  *                               __memcpy_by4                                *
  *===========================================================================*/
-extern inline void * __memcpy_by4(void * to, const void * from, size_t n) {
+static inline void * __memcpy_by4(void * to, const void * from, size_t n) {
     register void *tmp = (void *)to;
     register int dummy1,dummy2;
     asm volatile(
@@ -54,7 +54,7 @@ extern inline void * __memcpy_by4(void * to, const void * from, size_t n) {
 /*===========================================================================*
  *                               __memcpy_by2                                *
  *===========================================================================*/
-extern inline void * __memcpy_by2(void * to, const void * from, size_t n) {
+static inline void * __memcpy_by2(void * to, const void * from, size_t n) {
     register void *tmp = (void *)to;
     register int dummy1,dummy2;
     asm volatile(
@@ -79,7 +79,7 @@ extern inline void * __memcpy_by2(void * to, const void * from, size_t n) {
 /*===========================================================================*
  *                                __memcpy_g                                 *
  *===========================================================================*/
-extern inline void * __memcpy_g(void * to, const void * from, size_t n) {
+static inline void * __memcpy_g(void * to, const void * from, size_t n) {
     int d0, d1, d2;
     register void *tmp = (void *)to;
     asm volatile(
@@ -118,7 +118,7 @@ extern inline void * __memcpy_g(void * to, const void * from, size_t n) {
  *                                  memcpy                                   *
  *===========================================================================*/
 #define __HAVE_ARCH_MEMCPY
-extern inline void *memcpy(void *d, const void *s, size_t count) {
+static inline void *memcpy(void *d, const void *s, size_t count) {
 
     return __memcpy(d, s, count);
 

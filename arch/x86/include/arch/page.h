@@ -28,7 +28,7 @@ typedef unsigned int pgt_t;
 void *page_alloc();
 int page_free(void *address);
 
-extern inline void page_directory_load(pgd_t *pgd) {
+static inline void page_directory_load(pgd_t *pgd) {
     asm volatile(
             "mov %0, %%cr3;"
             "mov $1f, %0;"
