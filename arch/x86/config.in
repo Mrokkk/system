@@ -1,8 +1,0 @@
-choice 'Processor type' \
-    "386        CONFIG_M386 \
-     486        CONFIG_M486 \
-     Pentium    CONFIG_M586 \
-     PPro       CONFIG_M686 \
-     CoreDuo    CONFIG_COREDUO \
-     Core2Duo   CONFIG_CORE2DUO" Core2Duo
-
