@@ -15,3 +15,5 @@ config
 /obj/
 /iso/
 .idea/
+/CMake/config.cmake
+/build/
