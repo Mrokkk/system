@@ -144,12 +144,12 @@ function comment () {
 function define_bool () {
     case "$2" in
      "y")
-        echo "$1=y" >>$CONFIG
+        echo "set($1 y)" >>$CONFIG
         echo "#define $1 1" >>$CONFIG_H
         ;;
 
      "m")
-        echo "$1=m" >>$CONFIG
+        echo "set($1 m)" >>$CONFIG
         echo "#undef  $1" >>$CONFIG_H
         echo "#define $1_MODULE 1" >>$CONFIG_H
         ;;
@@ -283,7 +283,7 @@ function dep_tristate () {
 #   define_int define value
 #
 function define_int () {
-    echo "$1=$2" >>$CONFIG
+    echo "set($1 $2)" >>$CONFIG
     echo "#define $1 ($2)" >>$CONFIG_H
     eval "$1=$2"
 }
@@ -319,7 +319,7 @@ function int () {
 #   define_hex define value
 #
 function define_hex () {
-    echo "$1=$2" >>$CONFIG
+    echo "set($1 $2)" >>$CONFIG
     echo "#define $1 0x${2#*[x,X]}" >>$CONFIG_H
     eval "$1=$2"
 }
