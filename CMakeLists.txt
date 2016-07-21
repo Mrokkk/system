@@ -15,7 +15,7 @@ set(C_FLAGS_OTHER "-fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-str
 set(CMAKE_C_FLAGS " ${C_FLAGS_STANDARD} ${C_FLAGS_FREESTANDING} ${C_FLAGS_OPTIMIZATION} ${C_FLAGS_OTHER} -m32")
 
 set(CMAKE_EXE_LINKER_FLAGS
-        "-Wl,-T${LINKER_SCRIPT} -Wl,--oformat -Wl,elf32-i386 -m32 -Wl,-m -Wl,elf_i386 -Wl,-Map=${PROJECT_SOURCE_DIR}/bin/kernel.map -Wl,--build-id=none")
+        "-Wl,-T${LINKER_SCRIPT} -Wl,--oformat -Wl,elf32-i386 -m32 -Wl,-m -Wl,elf_i386 -Wl,-Map=kernel.map -Wl,--build-id=none")
 
 add_definitions(
         -Wall
@@ -23,9 +23,6 @@ add_definitions(
         -Werror
         -DARCH=${ARCH}
 )
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 include_directories(
         ${PROJECT_SOURCE_DIR}/include
@@ -56,7 +53,7 @@ add_executable(
 
 add_custom_target(
         iso
-        COMMAND ${PROJECT_SOURCE_DIR}/CMake/isomaker.sh ${PROJECT_SOURCE_DIR}
+        COMMAND bash ${PROJECT_SOURCE_DIR}/CMake/isomaker.sh
         DEPENDS ${PROJECT_NAME}
         COMMENT "Building bootable ISO image"
 )
