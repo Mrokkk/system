@@ -1,15 +1,5 @@
-comment "Configure architecture"
-. arch/config.in
-
-comment "Configure arch-dependent features"
-. arch/$arch/config.in
-
-comment "Configure in-kernel features"
-. kernel/config.in
-
-comment "Configure file systems"
-. fs/config.in
-
-comment "Configure drivers"
-. drivers/config.in
-
+option "Architecture" ARCH x86 arm [x86]
+bool "Print architecture info at boot" CONFIG_PRINT_ARCH [y]
+bool "Print irqs at boot" CONFIG_PRINT_IRQS
+bool "Print installed modules at boot" CONFIG_PRINT_MODULES
+bool "Print registered devices at boot" CONFIG_PRINT_DEVICES
