@@ -2,14 +2,13 @@
 
 echo "Configure script for the system"
 
-
 case $1 in
     "default")
         yes '' | scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in > /dev/null ;;
     "ci")
-        cat scripts/ci.in | scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in ;;
+        cat scripts/ci.in | scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in > /dev/null ;;
     *)
         scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in ;;
 esac
 
-[[ $? == 0 ]] && echo "Should be OK"
+[[ $? == 0 ]] && echo "System should be configured correctly"
