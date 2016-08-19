@@ -67,12 +67,14 @@ class Option(Function):
         readline.set_completer(Completer(arguments[2:len(arguments) - 1]).complete)
         query = arguments[0]
         variable_name = arguments[1]
+        if len(arguments) > 1:
+            default_value = arguments[2].strip('[]')
         read_input = ""
         while not read_input:
             read_input = str(input("{} [{}] ".format(query, '/'.join(arguments[2:len(arguments) - 1])))).strip("\r\n")
             if read_input:
                 break
-            print("  -> Enter correct option!")
+            return variable_name, default_value
         return variable_name, read_input
 
 
