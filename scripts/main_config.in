@@ -4,4 +4,6 @@ bool "Print architecture info at boot" CONFIG_PRINT_ARCH [y]
 include scripts/conf.in
 bool "Print installed modules at boot" CONFIG_PRINT_MODULES
 bool "Print registered devices at boot" CONFIG_PRINT_DEVICES
+bool "Use serial as main console" CONFIG_SERIAL_PRIMARY
+
 

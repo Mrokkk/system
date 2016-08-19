@@ -105,6 +105,14 @@ void serial_send(char a, int port) {
 
 }
 
+
+void serial_print(const char *string) {
+
+    for (; *string; string++)
+        serial_send(*string, COM1);
+
+}
+
 /*===========================================================================*
  *                                serial_irs                                 *
  *===========================================================================*/
@@ -354,7 +362,9 @@ int serial_init() {
     irq_register(0x4, &serial_irs, "com1");
     irq_register(0x3, &serial_irs, "com2");
 
+#ifndef CONFIG_SERIAL_PRIMARY
     kernel_process(&seriald, 0, 0);
+#endif
 
     return 0;
 

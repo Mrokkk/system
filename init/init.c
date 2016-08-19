@@ -191,7 +191,12 @@ static inline int root_mount() {
  *===========================================================================*/
 static inline int console_open() {
 
-    if (open("/dev/tty0", 0) || dup(0) || dup(0))
+#ifdef CONFIG_SERIAL_PRIMARY
+    char *console = "/dev/ttyS0";
+#else
+    char *console = "/dev/tty0";
+#endif
+    if (open(console, 0) || dup(0) || dup(0))
         return 1;
     return 0;
 
@@ -246,6 +251,10 @@ __noreturn static int init() {
 
     /* Say hello */
     welcome();
+
+#ifdef CI
+    reboot();
+#endif
 
     if (shell_run()) panic("Cannot run shell");
 

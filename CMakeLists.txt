@@ -29,6 +29,10 @@ add_definitions(
    -DARCH=${ARCH}
 )
 
+if(CI_BUILD)
+    add_definitions(-DCI)
+endif()
+
 include_directories(
    ${PROJECT_SOURCE_DIR}/include
    ${PROJECT_SOURCE_DIR}/arch/${ARCH}/include
