@@ -1,5 +1,7 @@
 option "Architecture" ARCH x86 arm [x86]
 bool "Print architecture info at boot" CONFIG_PRINT_ARCH [y]
-bool "Print irqs at boot" CONFIG_PRINT_IRQS
+# Including conf
+include scripts/conf.in
 bool "Print installed modules at boot" CONFIG_PRINT_MODULES
 bool "Print registered devices at boot" CONFIG_PRINT_DEVICES
+

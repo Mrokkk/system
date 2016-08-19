@@ -1,0 +1,1 @@
+bool "Print irqs at boot" CONFIG_PRINT_IRQS

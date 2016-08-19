@@ -37,7 +37,7 @@ def set_variable(variable, value):
 class Function:
     @staticmethod
     def execute(arguments):
-        pass
+        return "", ""
 
 
 class Bool(Function):
@@ -50,11 +50,9 @@ class Bool(Function):
         while True:
             read_input = str(input("{} [{}] ".format(query, choice))).strip("\r\n")
             if not read_input:
-                set_variable(variable_name, default)
-                return
+                return variable_name, default
             elif read_input.lower() == 'y' or read_input.lower() == 'n':
-                set_variable(variable_name, read_input[0])
-                return
+                return variable_name, read_input[0]
 
     @staticmethod
     def __resolve_choice_text(arguments):
@@ -75,7 +73,7 @@ class Option(Function):
             if read_input:
                 break
             print("  -> Enter correct option!")
-        set_variable(variable_name, read_input)
+        return variable_name, read_input
 
 
 class Include(Function):
@@ -83,6 +81,7 @@ class Include(Function):
     def execute(arguments):
         config_filename = arguments[0]
         parse_file(config_filename)
+        return "", ""
 
 
 class HashComment(Function):
@@ -91,6 +90,7 @@ class HashComment(Function):
         print('#')
         print('# ' + ' '.join(arguments))
         print('#')
+        return "", ""
 
 
 class Generator:
@@ -169,7 +169,10 @@ def parse_line(_line, line_number: str):
 
         try:
             function = get_function(function_name)
-            function.execute(arguments)
+            variable_name, value = function.execute(arguments)
+            if variable_name and value:
+                set_variable(variable_name, value)
+
         except IndexError:
             error_handler("Not enough arguments for: \'{}\'".format(function_name), _line, line_number)
         except NotImplementedError:
@@ -186,6 +189,7 @@ def parse_file(filename: str):
 
 
 if __name__ == '__main__':
+
     signal.signal(signal.SIGINT, signal_handler)
     readline.parse_and_bind('tab: complete')
     generators = []
@@ -218,5 +222,3 @@ if __name__ == '__main__':
         sys.exit(1)
 
     parse_file(input_filename)
-
-sys.exit(0)

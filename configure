@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+echo "Configure script for the system"
+
+scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in
+
+[[ $? == 0 ]] && echo "Should be OK"
