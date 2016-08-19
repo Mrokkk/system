@@ -19,4 +19,5 @@ fi
 
 cp system iso/kernel
 # cp bin/kernel.sym iso/symbols
-mkisofs -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o os.iso iso 2> /dev/null
+MKISO=$(which genisoimage || which mkisofs)
+$MKISO -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o os.iso iso 2> /dev/null

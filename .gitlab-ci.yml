@@ -7,14 +7,14 @@ image: gcc:6
 build:
   stage: build
   before_script: 
-      - apt update && apt -y install make autoconf cmake qemu
+      - apt update && apt -y install make autoconf cmake qemu python3 genisoimage
   script:
     - ./configure ci
     - mkdir build
     - cd build
     - cmake -DCI_BUILD=ON ..
     - make iso
-    - qemu-system-i368 -cdrom build/os.iso -nographic -no-reboot
+    - qemu-system-i386 -cdrom os.iso -nographic -no-reboot
   artifacts:
     paths:
       - "build/os.iso"
