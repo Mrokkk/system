@@ -4,8 +4,10 @@ echo "Configure script for the system"
 
 case $1 in
     "default")
+        echo "Using default settings"
         yes '' | scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in > /dev/null ;;
     "ci")
+        echo "Using settings for CI"
         cat scripts/ci.in | scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in > /dev/null ;;
     *)
         scripts/configure.py -o c,include/kernel/config.h -o cmake,CMake/config.cmake -i scripts/main_config.in ;;

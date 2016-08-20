@@ -17,8 +17,7 @@ class Completer(object):
         if state == 0:
             if text:
                 self.matches = [s
-                                for s in self.options
-                                if s and s.startswith(text)]
+                    for s in self.options if s and s.startswith(text)]
             else:
                 self.matches = self.options[:]
 
@@ -29,18 +28,15 @@ class Completer(object):
         return response
 
 
-def set_variable(variable, value):
-    for generator in generators:
-        generator.generate_define(variable, value)
-
-
 class Function:
+    name = ""
     @staticmethod
     def execute(arguments):
         return "", ""
 
 
 class Bool(Function):
+    name = "bool"
     @staticmethod
     def execute(arguments):
         readline.set_completer(Completer(['y', 'n']).complete)
@@ -62,6 +58,7 @@ class Bool(Function):
 
 
 class Option(Function):
+    name = "option"
     @staticmethod
     def execute(arguments):
         readline.set_completer(Completer(arguments[2:len(arguments) - 1]).complete)
@@ -79,6 +76,7 @@ class Option(Function):
 
 
 class Include(Function):
+    name = "include"
     @staticmethod
     def execute(arguments):
         config_filename = arguments[0]
@@ -87,6 +85,7 @@ class Include(Function):
 
 
 class HashComment(Function):
+    name ="#"
     @staticmethod
     def execute(arguments):
         print('#')
@@ -135,23 +134,16 @@ class CHeaderGenerator(Generator):
             self.output_file.write("#define {} {}\r\n".format(name, value))
 
 
-def signal_handler(s, f):
-    print("")
-    sys.exit(1)
 
+class Variable:
 
-def get_function(function_name):
-    if function_name == "bool":
-        function = Bool()
-    elif function_name == "option":
-        function = Option()
-    elif function_name == "#":
-        function = HashComment()
-    elif function_name == "include":
-        function = Include()
-    else:
-        raise NotImplementedError
-    return function
+    name = ""
+    value = ""
+
+    def __init__(self, _name, _value):
+        self.name = _name
+        self.value = _value
+
 
 
 def error_handler(error_string, line, line_number):
@@ -160,38 +152,64 @@ def error_handler(error_string, line, line_number):
     sys.exit(1)
 
 
-def parse_line(_line, line_number: str):
-    for parsed in csv.reader([_line], delimiter=' ', quotechar='"'):
+class Interpreter:
 
-        if len(parsed) == 0:
-            return
+    list_of_variables = []
+    stack = []
+    builtins = [Bool(), Option(), HashComment(), Include()]
 
-        function_name = parsed[0]
-        arguments = parsed[1:len(parsed)]
-
-        try:
-            function = get_function(function_name)
-            variable_name, value = function.execute(arguments)
-            if variable_name and value:
-                set_variable(variable_name, value)
-
-        except IndexError:
-            error_handler("Not enough arguments for: \'{}\'".format(function_name), _line, line_number)
-        except NotImplementedError:
-            error_handler("No such keyword: \'{}\'".format(function_name), _line, line_number)
+    def __init__(self):
+        pass
 
 
-def parse_file(filename: str):
+    def __get_function(self, function_name):
+        for function in self.builtins:
+            if function.name == function_name:
+                return function
+        raise NotImplementedError
+
+
+    def parse_line(self, _line, line_number):
+        for parsed in csv.reader([_line], delimiter=' ', quotechar='"'):
+
+            if len(parsed) == 0:
+                return
+
+            while not parsed[0]:
+                parsed = parsed[1:len(parsed)]
+
+            function_name = parsed[0]
+            arguments = parsed[1:len(parsed)]
+
+            try:
+                function = self.__get_function(function_name)
+                variable_name, value = function.execute(arguments)
+                if variable_name and value:
+                    self.list_of_variables.append(Variable(variable_name, value))
+
+            except IndexError:
+                error_handler("Not enough arguments for: \'{}\'".format(function_name), _line, line_number)
+            except NotImplementedError:
+                error_handler("No such keyword: \'{}\'".format(function_name), _line, line_number)
+
+
+def parse_file(filename):
     input_file = open(str(filename), 'r')
     line_number = 1
     for line in input_file:
-        parse_line(line, line_number)
+        interpreter.parse_line(line, line_number)
         line_number += 1
     input_file.close()
 
 
+def signal_handler(s, f):
+    print("")
+    sys.exit(1)
+
+
 if __name__ == '__main__':
 
+    interpreter = Interpreter()
     signal.signal(signal.SIGINT, signal_handler)
     readline.parse_and_bind('tab: complete')
     generators = []
@@ -209,9 +227,9 @@ if __name__ == '__main__':
             sys.exit(0)
         elif opt in ("-o", "--ofile"):
             output = str(arg).split(',')
-            for __gen in generator_list:
-                if __gen.name == str(output[0]):
-                    generators.append(__gen(open(str(output[1]), 'w')))
+            for generator in generator_list:
+                if generator.name == str(output[0]):
+                    generators.append(generator(open(str(output[1]), 'w')))
                     break
         elif opt in ("-i", "--ifile"):
             input_filename = arg
@@ -224,3 +242,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     parse_file(input_filename)
+    print("\nConfiguration:")
+    for variable in interpreter.list_of_variables:
+        print("{} = {}".format(variable.name, variable.value))
+        for generator in generators:
+            generator.generate_define(variable.name, variable.value)
+    print("")
+
+
+
