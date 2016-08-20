@@ -5,7 +5,7 @@
 #include <kernel/compile.h>
 #include <kernel/config.h>
 #include <kernel/compiler.h>
-#include <kernel/stddef.h>
+#include <stddef.h>
 #include <kernel/printk.h>
 #include <kernel/sections.h>
 #include <kernel/debug.h>

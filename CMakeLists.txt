@@ -13,7 +13,7 @@ set(LINKER_SCRIPT ${PROJECT_SOURCE_DIR}/arch/${ARCH}/linker.ld)
 
 set(C_FLAGS_STANDARD "-std=gnu99")
 set(C_FLAGS_OPTIMIZATION "-O2")
-set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdinc -nostdlib")
+set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib")
 set(C_FLAGS_OTHER "-fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-strength-reduce")
 
 set(CMAKE_C_FLAGS "${C_FLAGS_STANDARD} ${C_FLAGS_FREESTANDING} ${C_FLAGS_OPTIMIZATION} ${C_FLAGS_OTHER} -m32")

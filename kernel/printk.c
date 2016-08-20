@@ -1,5 +1,5 @@
 #include <kernel/printk.h>
-#include <kernel/stdarg.h>
+#include <stdarg.h>
 #include <arch/system.h>
 
 static void (*console_print)(const char *string) = 0;

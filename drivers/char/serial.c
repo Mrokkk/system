@@ -6,8 +6,8 @@
 #include <kernel/irq.h>
 #include <kernel/buffer.h>
 #include <kernel/time.h>
-#include <kernel/stdarg.h>
-#include <kernel/stddef.h>
+#include <stdarg.h>
+#include <stddef.h>
 #include <kernel/sys.h>
 #include <kernel/mutex.h>
 

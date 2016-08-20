@@ -1,6 +1,6 @@
 #include <kernel/kernel.h>
 #include <kernel/process.h>
-#include <kernel/stdarg.h>
+#include <stdarg.h>
 #include <arch/register.h>
 
 /*===========================================================================*

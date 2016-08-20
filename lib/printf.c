@@ -9,10 +9,10 @@
  * ----------------------------------------------------------------------- */
 
 #include <kernel/ctype.h>
-#include <kernel/stdarg.h>
+#include <stdarg.h>
 #include <kernel/string.h>
 #include <kernel/unistd.h>
-#include <kernel/stddef.h>
+#include <stddef.h>
 
 static int skip_atoi(const char **s) {
 
