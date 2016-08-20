@@ -22,10 +22,6 @@ set(CMAKE_EXE_LINKER_FLAGS
     "-Wl,-Map=kernel.map ${LINKER_FLAGS_ARCH}"
 )
 
-add_definitions(
-   -DARCH=${ARCH}
-)
-
 if(CI_BUILD)
     add_definitions(-DCI)
 endif()
