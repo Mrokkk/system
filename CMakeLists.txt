@@ -69,9 +69,10 @@ add_custom_target(
 
 add_custom_target(
     runqemu
-    COMMAND echo "exec qemu-system-i386 -cdrom ${CMAKE_BINARY_DIR}/os.iso -serial stdio -no-reboot" > ${CMAKE_BINARY_DIR}/runqemu
-    COMMAND echo "exec qemu-system-i386 -cdrom ${CMAKE_BINARY_DIR}/os.iso -display none -serial stdio -no-reboot" > ${CMAKE_BINARY_DIR}/runqemu-nographic
+    COMMAND echo exec qemu-system-i386 -cdrom ${CMAKE_BINARY_DIR}/os.iso -serial stdio -no-reboot \\$$@ > ${CMAKE_BINARY_DIR}/runqemu
+    COMMAND echo exec qemu-system-i386 -cdrom ${CMAKE_BINARY_DIR}/os.iso -display none -serial stdio -no-reboot \\$$@ > ${CMAKE_BINARY_DIR}/runqemu-nographic
     COMMAND chmod +x runqemu*
     DEPENDS iso
+    COMMENT "Creating runqemu executables"
 )
 
