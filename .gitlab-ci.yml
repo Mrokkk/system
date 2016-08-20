@@ -11,8 +11,8 @@ build:
     - mkdir -p build
     - cd build
     - cmake -DCI_BUILD=ON ..
-    - make iso
-    - qemu-system-i386 -cdrom os.iso -nographic -no-reboot
+    - make runqemu
+    - ./runqemu-nographic
   artifacts:
     paths:
       - "build/os.iso"
