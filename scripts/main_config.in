@@ -1,3 +1,6 @@
+output CMake/config.cmake cmake
+output include/kernel/config.h c
+
 option "Architecture" ARCH x86 arm [x86]
 bool "Print architecture info at boot" CONFIG_PRINT_ARCH [y]
 # Including conf

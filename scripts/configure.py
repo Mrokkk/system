@@ -32,14 +32,14 @@ class Completer(object):
 class Function:
     name = ""
     @staticmethod
-    def execute(arguments):
-        return "", ""
+    def execute(arguments, variables, conditions):
+        pass
 
 
 class Bool(Function):
     name = "bool"
     @staticmethod
-    def execute(arguments):
+    def execute(arguments, variables, conditions):
         readline.set_completer(Completer(['y', 'n']).complete)
         query = arguments[0]
         variable_name = arguments[1]
@@ -47,9 +47,11 @@ class Bool(Function):
         while True:
             read_input = str(input("{} [{}] ".format(query, choice))).strip("\r\n")
             if not read_input:
-                return variable_name, default
+                variables.set_variable(variable_name, default)
+                return
             elif read_input.lower() == 'y' or read_input.lower() == 'n':
-                return variable_name, read_input[0]
+                variables.set_variable(variable_name, read_input[0])
+                return
 
 
     @staticmethod
@@ -62,7 +64,7 @@ class Bool(Function):
 class Option(Function):
     name = "option"
     @staticmethod
-    def execute(arguments):
+    def execute(arguments, variables, conditions):
         readline.set_completer(Completer(arguments[2:-1]).complete)
         query = arguments[0]
         variable_name = arguments[1]
@@ -73,91 +75,85 @@ class Option(Function):
             read_input = str(input("{} [{}] ".format(query, '/'.join(arguments[2:len(arguments) - 1])))).strip("\r\n")
             if read_input:
                 break
-            return variable_name, default_value
-        return variable_name, read_input
+            variables.set_variable(variable_name, default_value)
+            return
+        variables.set_variable(variable_name, read_input)
 
 
 class Include(Function):
     name = "include"
     @staticmethod
-    def execute(arguments):
+    def execute(arguments, variables, conditions):
         config_filename = arguments[0]
         parse_file(config_filename)
-        return "", ""
 
 
 class HashComment(Function):
     name ="#"
     @staticmethod
-    def execute(arguments):
+    def execute(arguments, variables, conditions):
         print('#')
         print('# ' + ' '.join(arguments))
         print('#')
-        return "", ""
 
 
 class Output(Function):
     name = "output"
     @staticmethod
-    def execute(arguments):
+    def execute(arguments, variables, conditions):
         for generator in generator_list:
             if generator.name == arguments[1]:
                 interpreter.generators.append(generator(open(arguments[0], "w")))
                 return "", ""
-        return "", ""
 
 
 class If(Function):
     name = "if"
     @staticmethod
-    def execute(arguments):
-        left = interpreter.read_variable(arguments[0])
+    def execute(arguments, variables, conditions):
+        left = variables.get_variable(arguments[0])
         condition = arguments[1]
         if not left:
             left = arguments[0]
-        right = interpreter.read_variable(arguments[2])
+        right = variables.get_variable(arguments[2])
         if not right:
             right = arguments[2]
         if condition == "==":
             if left == right:
-                interpreter.condition_stack.append(True)
+                conditions.append(True)
             else:
-                interpreter.condition_stack.append(False)
-        return "", ""
+                conditions.append(False)
 
 
 class Else(Function):
     name = "else"
     @staticmethod
-    def execute(arguments):
-        interpreter.condition_stack[-1] = not interpreter.condition_stack[-1]
-        return "", ""
+    def execute(arguments, variables, conditions):
+        conditions[-1] = not conditions[-1]
 
 
 class EndIf(Function):
     name = "endif"
     @staticmethod
-    def execute(arguments):
-        if not len(interpreter.condition_stack):
+    def execute(arguments, variables, conditions):
+        if not len(conditions):
             raise IndexError
-        interpreter.condition_stack.pop()
-        return "", ""
+        conditions.pop()
 
 
 class Set(Function):
     name = "set"
     @staticmethod
-    def execute(arguments):
-        return arguments[0], arguments[1]
+    def execute(arguments, variables, conditions):
+        variables.set_variable(arguments[0], arguments[1])
 
 
 class Die(Function):
     name = "die"
     @staticmethod
-    def execute(arguments):
+    def execute(arguments, variables, conditions):
         print("Error: {}".format(" ".join(arguments)))
         sys.exit(1)
-        return "", ""
 
 
 class Generator:
@@ -248,6 +244,7 @@ class Interpreter:
     line = ""
     variable_list = VariableList()
     condition_stack = []
+    condition_instructions = ["endif", "else"]
     builtins = {"bool":Bool(), "option":Option(), "#":HashComment(), "if":If(), "else":Else(), "endif":EndIf(), "set":Set(), "include":Include(), "output":Output(), "die":Die()}
     generators = []
 
@@ -260,10 +257,6 @@ class Interpreter:
         if name in self.builtins:
             return self.builtins[name]
         raise NotImplementedError
-
-
-    def read_variable(self, variable_name):
-        return self.variable_list.get_variable(variable_name)
 
 
     def parse_line(self, _line, line_number):
@@ -283,14 +276,12 @@ class Interpreter:
 
             if len(self.condition_stack):
                 if self.condition_stack[-1] == False:
-                    if not function_name == "endif" and not function_name == "else":
+                    if not function_name in self.condition_instructions:
                        return
 
             try:
                 function = self.__get_function(function_name)
-                variable_name, value = function.execute(arguments)
-                if variable_name and value:
-                    self.variable_list.set_variable(variable_name, value)
+                function.execute(arguments, self.variable_list, self.condition_stack)
 
             except IndexError:
                 error_handler("Not enough arguments for: \'{}\'".format(function_name), _line, line_number)
@@ -305,7 +296,6 @@ class Interpreter:
             print("{} = {}".format(name, value))
             for generator in self.generators:
                 generator.generate_define(name, value)
-        pass
 
 
 def parse_file(filename):
