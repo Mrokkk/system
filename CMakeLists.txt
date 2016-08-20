@@ -8,24 +8,21 @@ endif()
 include(CMake/config.cmake)
 include(CMake/generate_version_h.cmake)
 include(CMake/generate_compile_h.cmake)
-
-set(LINKER_SCRIPT ${PROJECT_SOURCE_DIR}/arch/${ARCH}/linker.ld)
+include(arch/${ARCH}/arch.cmake)
 
 set(C_FLAGS_STANDARD "-std=gnu99")
 set(C_FLAGS_OPTIMIZATION "-O2")
 set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib")
+set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_FLAGS_OTHER "-fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-strength-reduce")
 
 set(CMAKE_C_FLAGS "${C_FLAGS_STANDARD} ${C_FLAGS_FREESTANDING} ${C_FLAGS_OPTIMIZATION} ${C_FLAGS_OTHER} -m32")
 
 set(CMAKE_EXE_LINKER_FLAGS
-    "-Wl,-T${LINKER_SCRIPT} -Wl,--oformat -Wl,elf32-i386 -m32 -Wl,-m -Wl,elf_i386 -Wl,-Map=kernel.map -Wl,--build-id=none"
+    "-Wl,-Map=kernel.map ${LINKER_FLAGS_ARCH}"
 )
 
 add_definitions(
-   -Wall
-   -Wextra
-   -Werror
    -DARCH=${ARCH}
 )
 
@@ -69,8 +66,8 @@ add_custom_target(
 
 add_custom_target(
     runqemu
-    COMMAND echo exec qemu-system-i386 -cdrom ${CMAKE_BINARY_DIR}/os.iso -serial stdio -no-reboot \\$$@ > ${CMAKE_BINARY_DIR}/runqemu
-    COMMAND echo exec qemu-system-i386 -cdrom ${CMAKE_BINARY_DIR}/os.iso -display none -serial stdio -no-reboot \\$$@ > ${CMAKE_BINARY_DIR}/runqemu-nographic
+    COMMAND echo exec qemu-system-i386 -cdrom os.iso -serial stdio -no-reboot \\$$@ > ${CMAKE_BINARY_DIR}/runqemu
+    COMMAND echo exec qemu-system-i386 -cdrom os.iso -display none -serial stdio -no-reboot \\$$@ > ${CMAKE_BINARY_DIR}/runqemu-nographic
     COMMAND chmod +x runqemu*
     DEPENDS iso
     COMMENT "Creating runqemu executables"
