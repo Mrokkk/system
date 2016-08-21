@@ -3,9 +3,7 @@
 #include <kernel/device.h>
 #include <kernel/mutex.h>
 
-#include <arch/bios.h>
 #include <arch/io.h>
-#include <arch/real_mode.h>
 #include <arch/page.h>
 
 #define VIDEO_SEGMENT (0xb8000 + KERNEL_PAGE_OFFSET)
