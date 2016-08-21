@@ -2,6 +2,10 @@
 
 echo "Configure script for the system"
 
+DIR=$(dirname $0)
+
+pushd $DIR > /dev/null
+
 case $@ in
     "default")
         echo "Using default settings"
@@ -19,6 +23,8 @@ case $@ in
     *)
         scripts/configure.py -i scripts/main_config.in ;;
 esac
+
+popd > /dev/null
 
 [[ $? == 0 ]] && echo -e "\nSystem should be configured correctly"
 
