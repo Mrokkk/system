@@ -24,7 +24,6 @@ case $@ in
         scripts/configure.py -i scripts/main_config.in ;;
 esac
 
-popd > /dev/null
-
 [[ $? == 0 ]] && echo -e "\nSystem should be configured correctly"
 
+popd > /dev/null

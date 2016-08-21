@@ -43,148 +43,18 @@ class Asker:
         return ""
 
 
-class Function:
-    name = ""
-    def execute(arguments, variables, conditions):
-        pass
-
-
-class Bool(Function):
-    name = "bool"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-
-
-    def execute(self, arguments):
-        query = arguments[0]
-        variable_name = arguments[1]
-        default = arguments[2].strip('[]') if len(arguments) > 2 else 'n'
-        self.__variables.set_variable(variable_name, Asker.ask(query, ['y', 'n'], default))
-
-
-class Option(Function):
-    name = "option"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-
-
-    def execute(self, arguments):
-        query = arguments[0]
-        variable_name = arguments[1]
-        default_value = arguments[2].strip('[]') if len(arguments) > 1 else ''
-        self.__variables.set_variable(variable_name, Asker.ask(query, arguments[2:len(arguments) - 1], default_value))
-
-
-class HashComment(Function):
-    name ="#"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-
-
-    def execute(self, arguments):
-        print('#')
-        print('# ' + ' '.join(arguments))
-        print('#')
-
-
-class Output(Function):
-    name = "output"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-
-
-    def execute(self, arguments):
-        for generator in generator_list:
-            if generator.name == arguments[1]:
-                interpreter.generators.append(generator(open(arguments[0], "w")))
-
-
-class If(Function):
-    name = "if"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-        self.__conditions = conditions
-
-
-    def execute(self, arguments):
-        left = self.__variables.get_variable(arguments[0])
-        condition = arguments[1]
-        if not left:
-            left = arguments[0]
-        right = self.__variables.get_variable(arguments[2])
-        if not right:
-            right = arguments[2]
-        if condition == "==":
-            if left == right:
-                self.__conditions.append(True)
-            else:
-                self.__conditions.append(False)
-
-
-class Else(Function):
-    name = "else"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-        self.__conditions = conditions
-
-    def execute(self, arguments):
-        self.__conditions[-1] = not self.__conditions[-1]
-
-
-class EndIf(Function):
-    name = "endif"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-        self.__conditions = conditions
-
-    def execute(self, arguments):
-        if not len(self.__conditions):
-            raise IndexError
-        self.__conditions.pop()
-
-
-class Set(Function):
-    name = "set"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-
-
-    def execute(self, arguments):
-        self.__variables.set_variable(arguments[0], arguments[1])
-
-
-class Die(Function):
-    name = "die"
-
-    def __init__(self, variables, conditions):
-        self.__variables = variables
-
-
-    def execute(self, arguments):
-        print("Error: {}".format(" ".join(arguments)))
-        sys.exit(1)
-
-
-class Generator:
+class FileWriter:
 
     name = ""
 
     def __init__(self, file):
         self.output_file = file
 
-    def generate_define(self, name, value):
+    def write_variable(self, name, value):
         return ""
 
 
-class CMakeGenerator(Generator):
+class CMakeWriter(FileWriter):
 
     name = "cmake"
 
@@ -192,11 +62,11 @@ class CMakeGenerator(Generator):
         super().__init__(file)
         self.output_file = file
 
-    def generate_define(self, name, value):
+    def write_variable(self, name, value):
         self.output_file.write("set({} {})\r\n".format(name, value))
 
 
-class CHeaderGenerator(Generator):
+class CHeaderWriter(FileWriter):
 
     name = "c"
 
@@ -204,7 +74,7 @@ class CHeaderGenerator(Generator):
         super().__init__(file)
         self.output_file = file
 
-    def generate_define(self, name, value):
+    def write_variable(self, name, value):
         if value == 'y':
             self.output_file.write("#define {} 1\r\n".format(name))
         elif value == 'n':
@@ -213,47 +83,56 @@ class CHeaderGenerator(Generator):
             self.output_file.write("#define {} {}\r\n".format(name, value))
 
 
-def error_handler(error_string, line, line_number):
-    print("Error at line {}: {}".format(line_number, error_string))
+def error_handler(error_string, filename, line, line_number):
+    print("Error in {} at line {}: {}".format(filename, line_number, error_string))
     print("\t-> {}".format(line.strip("\r\n")))
     sys.exit(1)
 
 
-class Variable:
-
-    name = ""
-    value = ""
-
-    def __init__(self, _name, _value):
-        self.name = _name
-        self.value = _value
-
-
 class VariableList:
 
-    __variables = {}
+    variables = {}
 
     def get_variable(self, name):
-        if name in self.__variables:
-            return self.__variables[name]
+        if name in self.variables:
+            return self.variables[name]
         return os.environ.get(name)
 
-
     def set_variable(self, name, value):
-        self.__variables[name] = value
-
+        self.variables[name] = value
 
     def unset_variable(self, name):
         pass
 
-
     def get(self):
         values = []
         names = []
-        for key, value in self.__variables.items():
+        for key, value in self.variables.items():
             names.append(key)
             values.append(value)
         return names, values
+
+
+class Environment:
+
+    asker = None
+    file_readers = None
+    file_writers = None
+    variables = None
+    condition_stack = None
+
+    def __init__(self, asker, variables, condition_stack, file_readers, file_writers):
+        self.asker = asker
+        self.variables = variables
+        self.condition_stack = condition_stack
+        self.file_readers - file_readers
+        self.file_writers = file_writers
+        pass
+
+
+class InterpreterError(Exception):
+    def __init__(self, message, errors):
+        super(InterpreterError, self).__init__(message)
 
 
 class Interpreter:
@@ -261,112 +140,138 @@ class Interpreter:
     variable_list = VariableList()
     condition_stack = []
     condition_instructions = ["endif", "else"]
-    builtins = {Bool.name:Bool(variable_list, condition_stack),
-                Option.name:Option(variable_list, condition_stack),
-                HashComment.name:HashComment(variable_list, condition_stack),
-                If.name:If(variable_list, condition_stack),
-                Else.name:Else(variable_list, condition_stack),
-                EndIf.name:EndIf(variable_list, condition_stack),
-                Set.name:Set(variable_list, condition_stack),
-                Output.name:Output(variable_list, condition_stack),
-                Die.name:Die(variable_list, condition_stack)}
-    generators = []
-    __file_parser = []
+    file_writers = []
+    file_readers = []
 
-
-    def __init__(self, file_parser):
-        self.__file_parser.append(file_parser)
+    def __init__(self, reader):
+        self.reader = reader
         pass
 
+    def builtin_bool(self, arguments):
+        query = arguments[0]
+        variable_name = arguments[1]
+        default = arguments[2].strip('[]') if len(arguments) > 2 else 'n'
+        self.variable_list.set_variable(variable_name, Asker.ask(query, ['y', 'n'], default))
 
-    def __get_function(self, name):
-        if name in self.builtins:
-            return self.builtins[name]
-        raise NotImplementedError
+    def builtin_option(self, arguments):
+        query = arguments[0]
+        variable_name = arguments[1]
+        default_value = arguments[2].strip('[]') if len(arguments) > 1 else ''
+        self.variable_list.set_variable(variable_name, Asker.ask(query, arguments[2:len(arguments) - 1], default_value))
 
+    def builtin_comment(self, arguments):
+        print(' '.join(arguments))
 
-    def parse_line(self):
+    def builtin_if(self, arguments):
+        left = self.variable_list.get_variable(arguments[0])
+        condition = arguments[1]
+        if not left:
+            left = arguments[0]
+        right = self.variable_list.get_variable(arguments[2])
+        if not right:
+            right = arguments[2]
+        if condition == "==":
+            if left == right:
+                self.condition_stack.append(True)
+            else:
+                self.condition_stack.append(False)
 
-        parsed = self.__file_parser[-1].parse_line()
+    def builtin_else(self, arguments):
+        self.condition_stack[-1] = not self.condition_stack[-1]
+
+    def builtin_endif(self, arguments):
+        if not len(self.condition_stack):
+            raise IndexError
+        self.condition_stack.pop()
+
+    def builtin_set(self, arguments):
+        self.variable_list.set_variable(arguments[0], arguments[1])
+
+    def builtin_die(self, arguments):
+        print("Error: {}".format(" ".join(arguments)))
+        sys.exit(1)
+
+    def builtin_include(self, arguments):
+        filename = arguments[0]
+        self.file_readers.append(self.reader(filename))
+
+    def builtin_output(self, arguments):
+        writer = eval(arguments[1] + "Writer")
+        self.file_writers.append(writer(open(arguments[0], "w")))
+
+    def get_function(self, name):
+        if not hasattr(Interpreter, "builtin_" + name):
+            raise NotImplementedError
+        function = eval("self.builtin_" + name)
+        return function
+
+    def interpret_line(self, parsed):
         if not parsed:
-            self.__file_parser.pop()
-            if not len(self.__file_parser):
+            self.file_readers.pop()
+            if not len(self.file_readers):
                 return 1
             return
-        function_name = parsed[0]
+        self.function_name = parsed[0]
         arguments = parsed[1:len(parsed)]
-
         if len(self.condition_stack):
             if self.condition_stack[-1] == False:
-                if not function_name in self.condition_instructions:
+                if not self.function_name in self.condition_instructions:
                     return
-
-        try:
-            if function_name == "include":
-                filename = arguments[0]
-                self.__file_parser.append(FileParser(filename))
-                return
-            function = self.__get_function(function_name)
-            function.execute(arguments)
-
-        except IndexError:
-            error_handler("Not enough arguments for: \'{}\'".format(function_name), self.__file_parser[-1].get_line(), self.__file_parser[-1].get_line_number())
-        except NotImplementedError:
-            error_handler("No such keyword: \'{}\'".format(function_name), self.__file_parser[-1].get_line(), self.__file_parser[-1].get_line_number())
-
+        function = self.get_function(self.function_name)
+        function(arguments)
 
     def generate_output(self):
         print("\nConfiguration:")
         names, values = self.variable_list.get()
         for name, value in zip(names, values):
             print("{} = {}".format(name, value))
-            for generator in self.generators:
-                generator.generate_define(name, value)
+            for writer in self.file_writers:
+                writer.write_variable(name, value)
 
-
-    def start(self):
+    def run(self, filename):
+        self.file_readers.append(self.reader(filename))
         while True:
-            if self.parse_line():
-                return
+            try:
+                if self.interpret_line(self.file_readers[-1].read_line()):
+                    return
+            except IndexError:
+                error_handler("Not enough arguments for: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
+            except NotImplementedError:
+                error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
+             #except AttributeError:
+             #   error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
 
 
-class FileParser:
-
+class FileReader:
     def __init__(self, filename):
-        self.__filename = filename
-        self.__file = open(filename, "r+")
-        self.__line = ""
-        self.__line_number = 1
-
+        self.filename = filename
+        self.file = open(filename, "r")
+        self.line = ""
+        self.line_number = 0
 
     def __del__(self):
-        self.__file.close()
+        self.file.close()
 
-
-    def parse_line(self):
-        self.__line = self.__file.readline()
-        if not self.__line:
+    def read_line(self):
+        self.line = self.file.readline()
+        self.line_number += 1
+        if not self.line:
             return None
-        for parsed in csv.reader([self.__line], delimiter=' ', quotechar='"'):
+        for parsed in csv.reader([self.line], delimiter=' ', quotechar='"'):
             if len(parsed) == 0:
-                self.__line_number += 1
-                return self.parse_line()
+                return self.read_line()
             while not parsed[0]:
                 parsed = parsed[1:len(parsed)]
-            self.__line_number += 1
             return parsed
 
-
     def get_filename(self):
-        return self.__filename
-
+        return self.filename
 
     def get_line(self):
-        return self.__line
-
+        return self.line
 
     def get_line_number(self):
-        return self.__line_number
+        return self.line_number
 
 
 def signal_handler(s, f):
@@ -378,7 +283,6 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
     readline.parse_and_bind('tab: complete')
-    generator_list = [CMakeGenerator, CHeaderGenerator]
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hi:", ["ifile="])
@@ -395,7 +299,7 @@ if __name__ == '__main__':
             print("Not recognized option: {}".format(arg))
             sys.exit(1)
 
-    interpreter = Interpreter(FileParser(input_filename))
-    interpreter.start()
+    interpreter = Interpreter(FileReader)
+    interpreter.run(input_filename)
     interpreter.generate_output()
 
