@@ -29,69 +29,62 @@ class Completer(object):
         return response
 
 
+class Asker:
+    @staticmethod
+    def ask(query, values, default):
+        readline.set_completer(Completer(values).complete)
+        choice = "/".join(values)
+        while True:
+            read_input = str(input("{} [{}/def:{}] ".format(query, choice, default))).strip("\r\n")
+            if not read_input and default:
+                return default
+            elif read_input in values:
+                return read_input
+        return ""
+
+
 class Function:
     name = ""
-    @staticmethod
     def execute(arguments, variables, conditions):
         pass
 
 
 class Bool(Function):
     name = "bool"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        readline.set_completer(Completer(['y', 'n']).complete)
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+
+
+    def execute(self, arguments):
         query = arguments[0]
         variable_name = arguments[1]
-        choice, default = Bool.__resolve_choice_text(arguments[2:len(arguments)])
-        while True:
-            read_input = str(input("{} [{}] ".format(query, choice))).strip("\r\n")
-            if not read_input:
-                variables.set_variable(variable_name, default)
-                return
-            elif read_input.lower() == 'y' or read_input.lower() == 'n':
-                variables.set_variable(variable_name, read_input[0])
-                return
-
-
-    @staticmethod
-    def __resolve_choice_text(arguments):
-        default = "n" if not arguments else ''.join(arguments[0]).strip('[]')
-        choice = "Y/n" if default == "y" else "y/N"
-        return choice, default
+        default = arguments[2].strip('[]') if len(arguments) > 2 else 'n'
+        self.__variables.set_variable(variable_name, Asker.ask(query, ['y', 'n'], default))
 
 
 class Option(Function):
     name = "option"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        readline.set_completer(Completer(arguments[2:-1]).complete)
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+
+
+    def execute(self, arguments):
         query = arguments[0]
         variable_name = arguments[1]
-        if len(arguments) > 1:
-            default_value = arguments[2].strip('[]')
-        read_input = ""
-        while not read_input:
-            read_input = str(input("{} [{}] ".format(query, '/'.join(arguments[2:len(arguments) - 1])))).strip("\r\n")
-            if read_input:
-                break
-            variables.set_variable(variable_name, default_value)
-            return
-        variables.set_variable(variable_name, read_input)
-
-
-class Include(Function):
-    name = "include"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        config_filename = arguments[0]
-        parse_file(config_filename)
+        default_value = arguments[2].strip('[]') if len(arguments) > 1 else ''
+        self.__variables.set_variable(variable_name, Asker.ask(query, arguments[2:len(arguments) - 1], default_value))
 
 
 class HashComment(Function):
     name ="#"
-    @staticmethod
-    def execute(arguments, variables, conditions):
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+
+
+    def execute(self, arguments):
         print('#')
         print('# ' + ' '.join(arguments))
         print('#')
@@ -99,59 +92,83 @@ class HashComment(Function):
 
 class Output(Function):
     name = "output"
-    @staticmethod
-    def execute(arguments, variables, conditions):
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+
+
+    def execute(self, arguments):
         for generator in generator_list:
             if generator.name == arguments[1]:
                 interpreter.generators.append(generator(open(arguments[0], "w")))
-                return "", ""
 
 
 class If(Function):
     name = "if"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        left = variables.get_variable(arguments[0])
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+        self.__conditions = conditions
+
+
+    def execute(self, arguments):
+        left = self.__variables.get_variable(arguments[0])
         condition = arguments[1]
         if not left:
             left = arguments[0]
-        right = variables.get_variable(arguments[2])
+        right = self.__variables.get_variable(arguments[2])
         if not right:
             right = arguments[2]
         if condition == "==":
             if left == right:
-                conditions.append(True)
+                self.__conditions.append(True)
             else:
-                conditions.append(False)
+                self.__conditions.append(False)
 
 
 class Else(Function):
     name = "else"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        conditions[-1] = not conditions[-1]
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+        self.__conditions = conditions
+
+    def execute(self, arguments):
+        self.__conditions[-1] = not self.__conditions[-1]
 
 
 class EndIf(Function):
     name = "endif"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        if not len(conditions):
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+        self.__conditions = conditions
+
+    def execute(self, arguments):
+        if not len(self.__conditions):
             raise IndexError
-        conditions.pop()
+        self.__conditions.pop()
 
 
 class Set(Function):
     name = "set"
-    @staticmethod
-    def execute(arguments, variables, conditions):
-        variables.set_variable(arguments[0], arguments[1])
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+
+
+    def execute(self, arguments):
+        self.__variables.set_variable(arguments[0], arguments[1])
 
 
 class Die(Function):
     name = "die"
-    @staticmethod
-    def execute(arguments, variables, conditions):
+
+    def __init__(self, variables, conditions):
+        self.__variables = variables
+
+
+    def execute(self, arguments):
         print("Error: {}".format(" ".join(arguments)))
         sys.exit(1)
 
@@ -219,7 +236,7 @@ class VariableList:
     def get_variable(self, name):
         if name in self.__variables:
             return self.__variables[name]
-        return ""
+        return os.environ.get(name)
 
 
     def set_variable(self, name, value):
@@ -241,15 +258,24 @@ class VariableList:
 
 class Interpreter:
 
-    line = ""
     variable_list = VariableList()
     condition_stack = []
     condition_instructions = ["endif", "else"]
-    builtins = {"bool":Bool(), "option":Option(), "#":HashComment(), "if":If(), "else":Else(), "endif":EndIf(), "set":Set(), "include":Include(), "output":Output(), "die":Die()}
+    builtins = {Bool.name:Bool(variable_list, condition_stack),
+                Option.name:Option(variable_list, condition_stack),
+                HashComment.name:HashComment(variable_list, condition_stack),
+                If.name:If(variable_list, condition_stack),
+                Else.name:Else(variable_list, condition_stack),
+                EndIf.name:EndIf(variable_list, condition_stack),
+                Set.name:Set(variable_list, condition_stack),
+                Output.name:Output(variable_list, condition_stack),
+                Die.name:Die(variable_list, condition_stack)}
     generators = []
+    __file_parser = []
 
 
-    def __init__(self):
+    def __init__(self, file_parser):
+        self.__file_parser.append(file_parser)
         pass
 
 
@@ -259,34 +285,34 @@ class Interpreter:
         raise NotImplementedError
 
 
-    def parse_line(self, _line, line_number):
+    def parse_line(self):
 
-        for parsed in csv.reader([_line], delimiter=' ', quotechar='"'):
+        parsed = self.__file_parser[-1].parse_line()
+        if not parsed:
+            self.__file_parser.pop()
+            if not len(self.__file_parser):
+                return 1
+            return
+        function_name = parsed[0]
+        arguments = parsed[1:len(parsed)]
 
-            line = _line
+        if len(self.condition_stack):
+            if self.condition_stack[-1] == False:
+                if not function_name in self.condition_instructions:
+                    return
 
-            if len(parsed) == 0:
+        try:
+            if function_name == "include":
+                filename = arguments[0]
+                self.__file_parser.append(FileParser(filename))
                 return
+            function = self.__get_function(function_name)
+            function.execute(arguments)
 
-            while not parsed[0]:
-                parsed = parsed[1:len(parsed)]
-
-            function_name = parsed[0]
-            arguments = parsed[1:len(parsed)]
-
-            if len(self.condition_stack):
-                if self.condition_stack[-1] == False:
-                    if not function_name in self.condition_instructions:
-                       return
-
-            try:
-                function = self.__get_function(function_name)
-                function.execute(arguments, self.variable_list, self.condition_stack)
-
-            except IndexError:
-                error_handler("Not enough arguments for: \'{}\'".format(function_name), _line, line_number)
-            except NotImplementedError:
-                error_handler("No such keyword: \'{}\'".format(function_name), _line, line_number)
+        except IndexError:
+            error_handler("Not enough arguments for: \'{}\'".format(function_name), self.__file_parser[-1].get_line(), self.__file_parser[-1].get_line_number())
+        except NotImplementedError:
+            error_handler("No such keyword: \'{}\'".format(function_name), self.__file_parser[-1].get_line(), self.__file_parser[-1].get_line_number())
 
 
     def generate_output(self):
@@ -298,13 +324,49 @@ class Interpreter:
                 generator.generate_define(name, value)
 
 
-def parse_file(filename):
-    input_file = open(str(filename), 'r')
-    line_number = 1
-    for line in input_file:
-        interpreter.parse_line(line, line_number)
-        line_number += 1
-    input_file.close()
+    def start(self):
+        while True:
+            if self.parse_line():
+                return
+
+
+class FileParser:
+
+    def __init__(self, filename):
+        self.__filename = filename
+        self.__file = open(filename, "r+")
+        self.__line = ""
+        self.__line_number = 1
+
+
+    def __del__(self):
+        self.__file.close()
+
+
+    def parse_line(self):
+        self.__line = self.__file.readline()
+        if not self.__line:
+            return None
+        for parsed in csv.reader([self.__line], delimiter=' ', quotechar='"'):
+            if len(parsed) == 0:
+                self.__line_number += 1
+                return self.parse_line()
+            while not parsed[0]:
+                parsed = parsed[1:len(parsed)]
+            self.__line_number += 1
+            return parsed
+
+
+    def get_filename(self):
+        return self.__filename
+
+
+    def get_line(self):
+        return self.__line
+
+
+    def get_line_number(self):
+        return self.__line_number
 
 
 def signal_handler(s, f):
@@ -314,11 +376,9 @@ def signal_handler(s, f):
 
 if __name__ == '__main__':
 
-    interpreter = Interpreter()
     signal.signal(signal.SIGINT, signal_handler)
     readline.parse_and_bind('tab: complete')
     generator_list = [CMakeGenerator, CHeaderGenerator]
-    input_filename = ''
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hi:", ["ifile="])
@@ -335,6 +395,7 @@ if __name__ == '__main__':
             print("Not recognized option: {}".format(arg))
             sys.exit(1)
 
-    parse_file(input_filename)
+    interpreter = Interpreter(FileParser(input_filename))
+    interpreter.start()
     interpreter.generate_output()
 
