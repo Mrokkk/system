@@ -91,7 +91,8 @@ def error_handler(error_string, filename, line, line_number):
 
 class VariableList:
 
-    variables = {}
+    def __init__(self):
+        self.variables = {}
 
     def get_variable(self, name):
         if name in self.variables:
@@ -137,14 +138,15 @@ class InterpreterError(Exception):
 
 class Interpreter:
 
-    variable_list = VariableList()
-    condition_stack = []
     condition_instructions = ["endif", "else"]
-    file_writers = []
-    file_readers = []
 
     def __init__(self, reader):
         self.reader = reader
+        self.variable_list = VariableList()
+        self.condition_stack = []
+        self.file_writers = []
+        self.file_readers = []
+        self.modules = []
         pass
 
     def builtin_bool(self, arguments):
@@ -199,11 +201,17 @@ class Interpreter:
         writer = eval(arguments[1] + "Writer")
         self.file_writers.append(writer(open(arguments[0], "w")))
 
+    def builtin_import(self, arguments):
+        self.modules.append(__import__(arguments[0]))
+
     def get_function(self, name):
-        if not hasattr(Interpreter, "builtin_" + name):
+        if hasattr(Interpreter, "builtin_" + name):
+            function = eval("self.builtin_" + name)
+            return function
+        elif hasattr(self.modules[0], "extern_" + name):
+            return getattr(self.modules[0], "extern_" + name).execute
+        else:
             raise NotImplementedError
-        function = eval("self.builtin_" + name)
-        return function
 
     def interpret_line(self, parsed):
         if not parsed:
@@ -243,14 +251,24 @@ class Interpreter:
 
 
 class FileReader:
+
     def __init__(self, filename):
         self.filename = filename
-        self.file = open(filename, "r")
+
+
+class Parser:
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.file = self.open_file(filename)
         self.line = ""
         self.line_number = 0
 
     def __del__(self):
         self.file.close()
+
+    def open_file(self, filename):
+        return open(filename, "r")
 
     def read_line(self):
         self.line = self.file.readline()
@@ -299,7 +317,7 @@ if __name__ == '__main__':
             print("Not recognized option: {}".format(arg))
             sys.exit(1)
 
-    interpreter = Interpreter(FileReader)
+    interpreter = Interpreter(Parser)
     interpreter.run(input_filename)
     interpreter.generate_output()
 
