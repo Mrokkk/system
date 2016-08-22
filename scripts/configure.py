@@ -214,11 +214,6 @@ class Interpreter:
             raise NotImplementedError
 
     def interpret_line(self, parsed):
-        if not parsed:
-            self.file_readers.pop()
-            if not len(self.file_readers):
-                return 1
-            return
         self.function_name = parsed[0]
         arguments = parsed[1:len(parsed)]
         if len(self.condition_stack):
@@ -238,14 +233,22 @@ class Interpreter:
 
     def run(self, filename):
         self.file_readers.append(self.reader(filename))
+        parser = Parser()
         while True:
             try:
-                if self.interpret_line(self.file_readers[-1].read_line()):
-                    return
+                line = self.file_readers[-1].readline()
+                if line:
+                    if self.interpret_line(parser.parse_line(line)):
+                        return
+                else:
+                    print("Nothing to interpret in {}".format(self.file_readers[-1].filename))
+                    self.file_readers.pop()
+                    if not len(self.file_readers):
+                        return
             except IndexError:
-                error_handler("Not enough arguments for: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
+                error_handler("Not enough arguments for: \'{}\'".format(self.function_name), self.file_readers[-1].filename, self.file_readers[-1].line, self.file_readers[-1].line_number)
             except NotImplementedError:
-                error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
+                error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].filename, self.file_readers[-1].line, self.file_readers[-1].line_number)
              #except AttributeError:
              #   error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
 
@@ -254,30 +257,47 @@ class FileReader:
 
     def __init__(self, filename):
         self.filename = filename
-
-
-class Parser:
-
-    def __init__(self, filename):
-        self.filename = filename
-        self.file = self.open_file(filename)
+        self.file = open(filename)
         self.line = ""
         self.line_number = 0
 
     def __del__(self):
         self.file.close()
 
-    def open_file(self, filename):
-        return open(filename, "r")
-
-    def read_line(self):
+    def readline(self):
+        self.line = ""
         self.line = self.file.readline()
         self.line_number += 1
         if not self.line:
             return None
-        for parsed in csv.reader([self.line], delimiter=' ', quotechar='"'):
-            if len(parsed) == 0:
-                return self.read_line()
+        if self.line == "\n" or self.line == '\r\n':
+            return self.readline()
+        return self.line
+
+
+class ConsoleReader:
+
+    def __init__(self, filename):
+        self.filename = "stdin"
+        self.line = ""
+        self.line_number = 0
+
+    def readline(self):
+        read_input = ""
+        while read_input == "":
+            read_input = input("> ")
+        return read_input.strip("\r\n")
+
+
+class Parser:
+
+    def __init__(self):
+        pass
+
+    def parse_line(self, line):
+        if line == "":
+            return None
+        for parsed in csv.reader([line], delimiter=' ', quotechar='"'):
             while not parsed[0]:
                 parsed = parsed[1:len(parsed)]
             return parsed
@@ -317,7 +337,7 @@ if __name__ == '__main__':
             print("Not recognized option: {}".format(arg))
             sys.exit(1)
 
-    interpreter = Interpreter(Parser)
+    interpreter = Interpreter(FileReader)
     interpreter.run(input_filename)
     interpreter.generate_output()
 
