@@ -233,7 +233,7 @@ class Interpreter:
 
     def run(self, filename):
         self.file_readers.append(self.reader(filename))
-        parser = Parser()
+        parser = Parser
         while True:
             try:
                 line = self.file_readers[-1].readline()
@@ -241,7 +241,6 @@ class Interpreter:
                     if self.interpret_line(parser.parse_line(line)):
                         return
                 else:
-                    print("Nothing to interpret in {}".format(self.file_readers[-1].filename))
                     self.file_readers.pop()
                     if not len(self.file_readers):
                         return
@@ -249,8 +248,6 @@ class Interpreter:
                 error_handler("Not enough arguments for: \'{}\'".format(self.function_name), self.file_readers[-1].filename, self.file_readers[-1].line, self.file_readers[-1].line_number)
             except NotImplementedError:
                 error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].filename, self.file_readers[-1].line, self.file_readers[-1].line_number)
-             #except AttributeError:
-             #   error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].get_filename(), self.file_readers[-1].get_line(), self.file_readers[-1].get_line_number())
 
 
 class FileReader:
@@ -291,10 +288,8 @@ class ConsoleReader:
 
 class Parser:
 
-    def __init__(self):
-        pass
-
-    def parse_line(self, line):
+    @staticmethod
+    def parse_line(line):
         if line == "":
             return None
         for parsed in csv.reader([line], delimiter=' ', quotechar='"'):
@@ -302,23 +297,13 @@ class Parser:
                 parsed = parsed[1:len(parsed)]
             return parsed
 
-    def get_filename(self):
-        return self.filename
-
-    def get_line(self):
-        return self.line
-
-    def get_line_number(self):
-        return self.line_number
-
 
 def signal_handler(s, f):
     print("")
     sys.exit(1)
 
 
-if __name__ == '__main__':
-
+def main():
     signal.signal(signal.SIGINT, signal_handler)
     readline.parse_and_bind('tab: complete')
 
@@ -340,4 +325,8 @@ if __name__ == '__main__':
     interpreter = Interpreter(FileReader)
     interpreter.run(input_filename)
     interpreter.generate_output()
+
+
+if __name__ == '__main__':
+    main()
 

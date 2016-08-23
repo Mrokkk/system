@@ -2,61 +2,76 @@
 
 import unittest
 import configure
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-class File:
-
-    def readline(self):
-        print("called readline")
-        return "set mmm x"
-
-    def close(self):
-        print("called close")
 
 class ParserTests(unittest.TestCase):
 
     def setUp(self):
-        pass
+        self.parser = configure.Parser()
 
-    def test_reading(self):
-        configure.Parser.open_file = MagicMock(return_value=File())
-        self.reader = configure.Parser("")
-        read = self.reader.read_line()
-        self.assertTrue(read == ['set', 'mmm', 'x'])
+    def tearDown(self):
+        del self.parser
+
+    def test_can_parse(self):
+        parsed = self.parser.parse_line('python is OK')
+        self.assertEqual(parsed, ['python', 'is', 'OK'])
+
+    def test_can_parse_null(self):
+        parsed = self.parser.parse_line('')
+        self.assertIsNone(parsed)
+
+    def test_can_parse_quotes(self):
+        parsed = self.parser.parse_line('test "multiple phrases" "on parser"')
+        self.assertEqual(parsed, ['test', 'multiple phrases', 'on parser'])
+
+    def test_can_handle_nonclosed_quotes(self):
+        parsed = self.parser.parse_line('test "multiple phrases on parser')
+        self.assertEqual(parsed, ['test', 'multiple phrases on parser'])
+
+
+class ReaderStub:
+
+    def __init__(self, filename):
+        self.num = 0
+
+    def readline(self):
+        if self.num == 0:
+            self.num += 1
+            return "something"
+        else:
+            self.num = 0
 
 
 class InterpreterTests(unittest.TestCase):
 
-    def interpreter_init(self):
-        return configure.Interpreter(configure.Parser)
-
     def setUp(self):
-        self.interpreter = self.interpreter_init()
+        self.interpreter = configure.Interpreter(ReaderStub)
+        self.parse_line = configure.Parser.parse_line
 
     def tearDown(self):
-        self.interpreter.variable_list = None
-        self.interpreter = None
+        del self.interpreter.variable_list
+        del self.interpreter
 
     def test_can_set_variable(self):
-        self.interpreter.interpret_line(['set', 'VAR', 'myvar'])
-        self.assertTrue(self.interpreter.variable_list.get_variable('VAR') == 'myvar')
-        keys, values = self.interpreter.variable_list.get()
-        self.assertTrue(len(keys) == 1)
-
-    def test_can_set_2_variables(self):
-        self.interpreter.interpret_line(['set', 'VAR1', 'y'])
-        self.interpreter.interpret_line(['set', 'VAR2', 'n'])
-        self.assertTrue(self.interpreter.variable_list.get_variable('VAR1') == 'y')
-        self.assertTrue(self.interpreter.variable_list.get_variable('VAR2') == 'n')
-        self.assertFalse(self.interpreter.variable_list.get_variable('VAR'))
-        keys, values = self.interpreter.variable_list.get()
-        self.assertTrue(len(keys) == 2)
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['set', 'VAR', 'myvar'])):
+            self.interpreter.run("fdsf")
+            self.assertTrue(self.interpreter.variable_list.get_variable('VAR') == 'myvar')
+            keys, values = self.interpreter.variable_list.get()
+            self.assertEqual(len(keys), 1)
 
 
+class AskerTests(unittest.TestCase):
 
-def main():
-    unittest.main()
+    def setUp(self):
+        self.asker = configure.Asker
+
+    def test_can_ask(self):
+        with patch('builtins.input', MagicMock(return_value='a')):
+            read = self.asker.ask("Ask for something", ['y', 'n', 'a'], None)
+            self.assertEqual(read, 'a')
+
 
 if __name__ == '__main__':
-    main()
+    unittest.main()
 
