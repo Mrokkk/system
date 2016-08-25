@@ -17,8 +17,8 @@ class Completer(object):
     def complete(self, text, state):
         if state == 0:
             if text:
-                self.matches = [s
-                    for s in self.options if s and s.startswith(text)]
+                self.matches = \
+                    [s for s in self.options if s and s.startswith(text)]
             else:
                 self.matches = self.options[:]
 
@@ -35,7 +35,9 @@ class Asker:
         readline.set_completer(Completer(values).complete)
         choice = "/".join(values)
         while True:
-            read_input = str(input("{} [{}/def:{}] ".format(query, choice, default))).strip("\r\n")
+            read_input = input(
+                "{} [{}/def:{}] ".format(query, choice, default)
+            ).strip("\r\n")
             if not read_input and default:
                 return default
             elif read_input in values:
@@ -84,7 +86,8 @@ class CHeaderWriter(FileWriter):
 
 
 def error_handler(error_string, filename, line, line_number):
-    print("Error in {} at line {}: {}".format(filename, line_number, error_string))
+    print("Error in {} at line {}: {}".format(
+        filename, line_number, error_string))
     print("\t-> {}".format(line.strip("\r\n")))
     sys.exit(1)
 
@@ -122,7 +125,9 @@ class Environment:
     variables = None
     condition_stack = None
 
-    def __init__(self, asker, variables, condition_stack, file_readers, file_writers):
+    def __init__(
+        self, asker, variables, condition_stack, file_readers, file_writers
+    ):
         self.asker = asker
         self.variables = variables
         self.condition_stack = condition_stack
@@ -153,13 +158,17 @@ class Interpreter:
         query = arguments[0]
         variable_name = arguments[1]
         default = arguments[2].strip('[]') if len(arguments) > 2 else 'n'
-        self.variable_list.set_variable(variable_name, Asker.ask(query, ['y', 'n'], default))
+        self.variable_list.set_variable(
+            variable_name, Asker.ask(
+                query, ['y', 'n'], default))
 
     def builtin_option(self, arguments):
         query = arguments[0]
         variable_name = arguments[1]
         default_value = arguments[2].strip('[]') if len(arguments) > 1 else ''
-        self.variable_list.set_variable(variable_name, Asker.ask(query, arguments[2:len(arguments) - 1], default_value))
+        self.variable_list.set_variable(
+            variable_name, Asker.ask(
+                query, arguments[2:len(arguments) - 1], default_value))
 
     def builtin_comment(self, arguments):
         print(' '.join(arguments))
@@ -208,8 +217,9 @@ class Interpreter:
         if hasattr(Interpreter, "builtin_" + name):
             function = eval("self.builtin_" + name)
             return function
-        elif hasattr(self.modules[0], "extern_" + name):
-            return getattr(self.modules[0], "extern_" + name).execute
+        elif len(self.modules):
+            if hasattr(self.modules[0], "extern_" + name):
+                return getattr(self.modules[0], "extern_" + name).execute
         else:
             raise NotImplementedError
 
@@ -217,8 +227,8 @@ class Interpreter:
         self.function_name = parsed[0]
         arguments = parsed[1:len(parsed)]
         if len(self.condition_stack):
-            if self.condition_stack[-1] == False:
-                if not self.function_name in self.condition_instructions:
+            if self.condition_stack[-1] is False:
+                if self.function_name not in self.condition_instructions:
                     return
         function = self.get_function(self.function_name)
         function(arguments)
@@ -245,9 +255,18 @@ class Interpreter:
                     if not len(self.file_readers):
                         return
             except IndexError:
-                error_handler("Not enough arguments for: \'{}\'".format(self.function_name), self.file_readers[-1].filename, self.file_readers[-1].line, self.file_readers[-1].line_number)
+                error_handler(
+                    "Not enough arguments for: \'{}\'".format(
+                        self.function_name),
+                    self.file_readers[-1].filename,
+                    self.file_readers[-1].line,
+                    self.file_readers[-1].line_number)
             except NotImplementedError:
-                error_handler("No such keyword: \'{}\'".format(self.function_name), self.file_readers[-1].filename, self.file_readers[-1].line, self.file_readers[-1].line_number)
+                error_handler("No such keyword: \'{}\'".format(
+                    self.function_name),
+                    self.file_readers[-1].filename,
+                    self.file_readers[-1].line,
+                    self.file_readers[-1].line_number)
 
 
 class FileReader:
@@ -329,4 +348,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

@@ -47,7 +47,6 @@ class InterpreterTests(unittest.TestCase):
 
     def setUp(self):
         self.interpreter = configure.Interpreter(ReaderStub)
-        self.parse_line = configure.Parser.parse_line
 
     def tearDown(self):
         del self.interpreter.variable_list
@@ -56,9 +55,43 @@ class InterpreterTests(unittest.TestCase):
     def test_can_set_variable(self):
         with patch('configure.Parser.parse_line', MagicMock(return_value=['set', 'VAR', 'myvar'])):
             self.interpreter.run("fdsf")
-            self.assertTrue(self.interpreter.variable_list.get_variable('VAR') == 'myvar')
-            keys, values = self.interpreter.variable_list.get()
-            self.assertEqual(len(keys), 1)
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR'), 'myvar')
+        keys, values = self.interpreter.variable_list.get()
+        self.assertEqual(len(keys), 1)
+
+    def test_can_set_two_variables(self):
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['set', 'VAR1', 'myvar1'])):
+            self.interpreter.run("fdsf")
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['set', 'VAR2', 'myvar2'])):
+            self.interpreter.run("fdsf")
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR1'), 'myvar1')
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR2'), 'myvar2')
+        keys, values = self.interpreter.variable_list.get()
+        self.assertEqual(len(keys), 2)
+
+    def test_can_set_bool(self):
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['bool', '"Test variable 1"', 'VAR1'])), \
+                patch('configure.Asker.ask', MagicMock(return_value='n')):
+            self.interpreter.run("fdsf")
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['bool', '"Test variable 2"', 'VAR2'])), \
+                patch('configure.Asker.ask', MagicMock(return_value='y')):
+            self.interpreter.run("fdsf")
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR1'), 'n')
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR2'), 'y')
+        keys, values = self.interpreter.variable_list.get()
+        self.assertEqual(len(keys), 2)
+
+    def test_can_set_option(self):
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['option', '"Test variable 1"', 'VAR1', 'val1', 'val2', 'val3'])), \
+                patch('configure.Asker.ask', MagicMock(return_value='val1')):
+            self.interpreter.run("fdsf")
+        with patch('configure.Parser.parse_line', MagicMock(return_value=['option', '"Test variable 2"', 'VAR2', 'val1', 'val2', 'val3'])), \
+                patch('configure.Asker.ask', MagicMock(return_value='val2')):
+            self.interpreter.run("fdsf")
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR1'), 'val1')
+        self.assertEqual(self.interpreter.variable_list.get_variable('VAR2'), 'val2')
+        keys, values = self.interpreter.variable_list.get()
+        self.assertEqual(len(keys), 2)
 
 
 class AskerTests(unittest.TestCase):
