@@ -16,3 +16,5 @@ build:
   cache:
     paths:
       - "build/"
+  tags:
+      - shared
