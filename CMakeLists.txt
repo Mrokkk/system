@@ -17,6 +17,7 @@ set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_FLAGS_OTHER "-fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-strength-reduce")
 
 set(CMAKE_C_FLAGS "${C_FLAGS_STANDARD} ${C_FLAGS_FREESTANDING} ${C_FLAGS_OPTIMIZATION} ${C_FLAGS_OTHER} -m32")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_EXE_LINKER_FLAGS
     "-Wl,-Map=kernel.map ${LINKER_FLAGS_ARCH}"
@@ -67,5 +68,20 @@ add_custom_target(
     COMMAND chmod +x runqemu*
     DEPENDS iso
     COMMENT "Creating runqemu executables"
+)
+
+get_property(INCLUDE_DIRS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+
+add_custom_target(
+    clang_complete
+    COMMAND echo "${CMAKE_C_FLAGS}" | tr ' ' '\\n' > ${CMAKE_SOURCE_DIR}/.clang_complete
+    COMMAND echo ${INCLUDE_DIRS} | sed -e 's/ /\\n/g' | sed -e 's/^/-I/g' >> ${CMAKE_SOURCE_DIR}/.clang_complete
+)
+
+add_custom_target(
+    syntastic
+    COMMAND echo "${CMAKE_C_FLAGS}" | tr ' ' '\\n' > ${CMAKE_SOURCE_DIR}/.syntastic_c_config
+    COMMAND echo ${INCLUDE_DIRS} | sed -e 's/ /\\n/g' | sed -e 's/^/-I/g' >> ${CMAKE_SOURCE_DIR}/.syntastic_c_config
+    COMMAND cp ${CMAKE_SOURCE_DIR}/.syntastic_c_config ${CMAKE_SOURCE_DIR}/.syntastic_asm_config
 )
 

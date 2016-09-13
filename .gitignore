@@ -17,3 +17,5 @@ config
 .idea/
 /CMake/config.cmake
 /build/
+.syntastic*
+.clang_complete
