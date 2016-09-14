@@ -16,7 +16,9 @@ set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib")
 set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_FLAGS_OTHER "-fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-strength-reduce")
 
-set(CMAKE_C_FLAGS "${C_FLAGS_STANDARD} ${C_FLAGS_FREESTANDING} ${C_FLAGS_OPTIMIZATION} ${C_FLAGS_OTHER} -m32")
+set(CMAKE_C_FLAGS "${C_FLAGS_STANDARD} ${C_FLAGS_FREESTANDING} ${C_FLAGS_OPTIMIZATION} ${C_FLAGS_OTHER} ${C_FLAGS_WARNINGS} ${C_FLAGS_ARCH}")
+
+# Export compile commands to JSON file
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_EXE_LINKER_FLAGS
@@ -83,5 +85,10 @@ add_custom_target(
     COMMAND echo "${CMAKE_C_FLAGS}" | tr ' ' '\\n' > ${CMAKE_SOURCE_DIR}/.syntastic_c_config
     COMMAND echo ${INCLUDE_DIRS} | sed -e 's/ /\\n/g' | sed -e 's/^/-I/g' >> ${CMAKE_SOURCE_DIR}/.syntastic_c_config
     COMMAND cp ${CMAKE_SOURCE_DIR}/.syntastic_c_config ${CMAKE_SOURCE_DIR}/.syntastic_asm_config
+)
+
+add_custom_target(
+    style-check
+    COMMAND ${CMAKE_SOURCE_DIR}/CMake/style-checker.sh ${CMAKE_SOURCE_DIR}
 )
 
