@@ -1,6 +1,4 @@
 ### System
-[![build status](https://gitlab.com/mrokkk/system/badges/master/build.svg)](https://gitlab.com/mrokkk/system/commits/master)
+[![build status](https://travis-ci.org/Mrokkk/system.svg?branch=master)](https://travis-ci.org/Mrokkk/system)
 
 UNIX-based operating system
-
-

@@ -1,0 +1,26 @@
+sudo: required
+dist: trusty
+addons:
+    apt:
+        sources:
+            - ubuntu-toolchain-r-test
+        packages:
+            - g++-6
+            - valgrind
+            - qemu
+            - python3
+            - genisoimage
+            
+compiler: g++-6
+
+cache:
+    - ccache
+    - packages
+
+language: c
+script:
+    - ./configure ci
+    - mkdir -p build && cd build
+    - CXX=g++-6 CC=gcc-6 cmake -DCI_BUILD=ON ..
+    - make runqemu -j$(nproc)
+    - ./runqemu-nographic
