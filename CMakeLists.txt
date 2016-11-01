@@ -84,21 +84,6 @@ add_custom_target(
     COMMENT "Creating runqemu executables"
 )
 
-get_property(INCLUDE_DIRS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-
-add_custom_target(
-    clang_complete
-    COMMAND echo "${CMAKE_C_FLAGS}" | tr ' ' '\\n' > ${CMAKE_SOURCE_DIR}/.clang_complete
-    COMMAND echo ${INCLUDE_DIRS} | sed -e 's/ /\\n/g' | sed -e 's/^/-I/g' >> ${CMAKE_SOURCE_DIR}/.clang_complete
-)
-
-add_custom_target(
-    syntastic
-    COMMAND echo "${CMAKE_C_FLAGS}" | tr ' ' '\\n' > ${CMAKE_SOURCE_DIR}/.syntastic_c_config
-    COMMAND echo ${INCLUDE_DIRS} | sed -e 's/ /\\n/g' | sed -e 's/^/-I/g' >> ${CMAKE_SOURCE_DIR}/.syntastic_c_config
-    COMMAND cp ${CMAKE_SOURCE_DIR}/.syntastic_c_config ${CMAKE_SOURCE_DIR}/.syntastic_asm_config
-)
-
 add_custom_target(
     style-check
     COMMAND ${CMAKE_SOURCE_DIR}/CMake/style-checker.sh ${CMAKE_SOURCE_DIR}
