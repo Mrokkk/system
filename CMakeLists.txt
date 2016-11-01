@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.0)
 project(system C)
 
+set(VERSION_MAJ 0)
+set(VERSION_MIN 0)
+
 if (NOT EXISTS ${PROJECT_SOURCE_DIR}/CMake/config.cmake)
     message(FATAL_ERROR "Run configure first")
 endif()
 
 include(CMake/config.cmake)
-include(CMake/generate_version_h.cmake)
-include(CMake/generate_compile_h.cmake)
 include(arch/${ARCH}/arch.cmake)
 
 set(C_FLAGS_STANDARD "-std=gnu99")
@@ -24,6 +25,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_EXE_LINKER_FLAGS
     "-Wl,-Map=kernel.map ${LINKER_FLAGS_ARCH}"
 )
+
+execute_process(COMMAND date +%X OUTPUT_VARIABLE COMPILE_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND date +%x OUTPUT_VARIABLE COMPILE_DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND uname -s OUTPUT_VARIABLE COMPILE_SYSTEM OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND uname -m OUTPUT_VARIABLE COMPILE_ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND whoami OUTPUT_VARIABLE COMPILE_BY OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND hostname OUTPUT_VARIABLE COMPILE_HOST OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE COMPILER OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+configure_file(${CMAKE_SOURCE_DIR}/include/kernel/compile.h.in ${CMAKE_SOURCE_DIR}/include/kernel/compile.h)
+configure_file(${CMAKE_SOURCE_DIR}/include/kernel/version.h.in ${CMAKE_SOURCE_DIR}/include/kernel/version.h)
 
 if(CI_BUILD)
     add_definitions(-DCI)
