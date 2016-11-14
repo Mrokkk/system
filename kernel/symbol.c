@@ -133,4 +133,3 @@ int symbols_read(char *symbols, unsigned int size) {
 
 }
 
-

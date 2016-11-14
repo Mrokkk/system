@@ -62,3 +62,4 @@ int char_device_find(const char *name, struct device **dev) {
 
     return 0;
 }
+

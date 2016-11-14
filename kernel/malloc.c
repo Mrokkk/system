@@ -73,7 +73,7 @@ static struct memory_block *kmalloc_create_block(int size) {
  *                                  kmalloc                                  *
  *===========================================================================*/
 void *kmalloc(size_t size) {
-    
+
     struct memory_block *temp;
     struct memory_block *new;
 
@@ -148,7 +148,7 @@ int kfree(void *address) {
     }
 
     printk("cannot free 0x%x\n", (unsigned int)address);
-    
+
     return -ENXIO;
 
 }

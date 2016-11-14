@@ -14,7 +14,6 @@ LIST_DECLARE(modules);
 int modules_init() {
 
     struct kernel_module *module = 0;
-    unsigned int i;
 
     printk("Configuring modules... \n");
 
@@ -31,7 +30,6 @@ int modules_init() {
                printk("FAILED\n");
            else printk("OK\n");
         }
-        i++;
 
     }
 
