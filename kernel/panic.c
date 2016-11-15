@@ -19,6 +19,10 @@ void panic(const char *fmt, ...) {
 
     printk("Kernel panic: %s\n", buf);
 
+#ifdef CI
+    reboot();
+#endif
+
     while (1);
 
 }
