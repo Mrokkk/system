@@ -74,7 +74,7 @@ int sys_open(const char *filename, int mode) {
     if ((errno = do_open(&file, filename, mode)))
         return errno;
     process_fd_set(process_current, fd, file);
-    file->ref_count = 1;
+    file->ref_count = 1; // FIXME: what if two processes open the same file?
 
     return 0;
 
