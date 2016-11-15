@@ -7,20 +7,13 @@
 #include <kernel/wait.h>
 #include <kernel/list.h>
 
-typedef unsigned int off_t;
-
-#define MAY_EXEC 1
-#define MAY_WRITE 2
-#define MAY_READ 4
-
-#define READ 0
-#define WRITE 1
-
 struct super_block;
 
 struct inode {
+    unsigned int nr;
     dev_t device_id;
     struct super_block *super_block;
+    struct list_head inodes;
     struct inode_operations {
         struct file_operations *file_ops;
         int (*create)(struct inode *, const char *, int, int, struct inode **);
@@ -35,7 +28,6 @@ struct file {
     struct inode *inode;
     struct list_head files;
     struct file_operations {
-        int (*lseek)(struct inode *, struct file *, off_t, int);
         int (*read)(struct inode *, struct file *, char *, int);
         int (*write)(struct inode *, struct file *, char *, int);
         int (*readdir)(struct inode *, struct file *, struct dirent *, int);
@@ -48,11 +40,12 @@ struct super_block {
     struct inode *covered;
     struct inode *mounted;
     void *data;
+    struct list_head super_blocks;
+    struct file_system *file_system;
     struct super_operations {
         void (*read_inode)(struct inode *);
         void (*write_inode)(struct inode *);
     } *ops;
-    struct list_head super_blocks;
 };
 
 struct file_system {
@@ -61,13 +54,6 @@ struct file_system {
     int requires_dev;
     struct list_head file_systems;
     struct list_head super_blocks;
-};
-
-struct mounted_system {
-    dev_t dev;
-    char *dir;
-    struct super_block *sb;
-    struct list_head mounted_systems;
 };
 
 extern struct list_head files;
@@ -82,3 +68,4 @@ int do_open(struct file **new_file, const char *filename, int mode);
 struct file *file_create();
 
 #endif /* INCLUDE_KERNEL_FS_H_ */
+
