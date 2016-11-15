@@ -32,7 +32,7 @@ static struct file_operations rootfs_fops = {
 
 static struct inode_operations rootfs_inode_ops = {
         .lookup = &rootfs_lookup,
-        .default_file_ops = &rootfs_fops,
+        .file_ops = &rootfs_fops,
 };
 
 static struct inode_operations dev_ops;
@@ -81,9 +81,9 @@ int rootfs_lookup(struct inode *dir, const char *name, int len, struct inode **r
     major = char_device_find(dev_name, &dev);
     if ((dev) != 0) {
         minor = get_minor(name);
-        dev_ops.default_file_ops = dev->fops;
+        dev_ops.file_ops = dev->fops;
         (*result)->ops = &dev_ops;
-        (*result)->dev = MKDEV(major, minor);
+        (*result)->device_id = MKDEV(major, minor);
     } else
         (*result)->ops = &rootfs_inode_ops;
 

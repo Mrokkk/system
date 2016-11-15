@@ -45,7 +45,7 @@ int serial_open(struct inode *inode, struct file *file) {
 
     (void)inode; (void)file;
 
-    minor = MINOR(inode->dev);
+    minor = MINOR(inode->device_id);
 
     switch (minor) {
         case 0: PORT = COM1; break;

@@ -28,7 +28,6 @@ int file_system_register(struct file_system *fs) {
 int sys_mount(const char *source, const char *target, const char *fs_type, int mount_flags, void *data) {
     (void)source; (void)target; (void)fs_type;
     (void)mount_flags; (void)data;
-    return 0;
+    return -1;
 }
-
 

@@ -189,11 +189,11 @@ int keyboard_init(void) {
 
     keyboard_disable();
     keyboard_send_command(CMD_DISABLE_SECOND);
-    
+
     while (inb(STATUS_PORT) & 1)
         inb(DATA_PORT);
     io_wait();
-    
+
     keyboard_send_command(CMD_TEST_CONTROLLER);
     byte = keyboard_receive();
     if (byte != 0x55) return -1;
@@ -211,7 +211,7 @@ int keyboard_init(void) {
         if (!(keyboard_receive() & (1 << 6)))
             return -1;
     }
-    
+
     /* Enable interrupt */
     if (!(byte & 0x1)) {
         byte |= 0x1;
@@ -223,7 +223,7 @@ int keyboard_init(void) {
     keyboard_enable();
 
     irq_register(0x01, keyboard_irs, "keyboard");
-    
+
     return 0;
 
 }
