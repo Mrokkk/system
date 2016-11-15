@@ -27,6 +27,7 @@ struct inode {
 struct file {
     struct inode *inode;
     struct list_head files;
+    unsigned char ref_count;
     struct file_operations {
         int (*read)(struct inode *, struct file *, char *, int);
         int (*write)(struct inode *, struct file *, char *, int);

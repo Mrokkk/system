@@ -44,6 +44,7 @@ struct inode *lookup(const char *filename) {
 int do_open(struct file **new_file, const char *filename, int mode) {
 
     struct inode *inode;
+    (void) mode;
 
     inode = lookup(filename);
 
@@ -51,8 +52,7 @@ int do_open(struct file **new_file, const char *filename, int mode) {
         return -ENOMEM;
 
     (*new_file)->inode = inode;
-    (*new_file)->ops = inode->ops->default_file_ops;
-    (*new_file)->mode = mode;
+    (*new_file)->ops = inode->ops->file_ops;
     if (!(*new_file)->ops) {
         printk("File ops is NULL!\n");
         return -ENODEV;
@@ -74,7 +74,7 @@ int sys_open(const char *filename, int mode) {
     if ((errno = do_open(&file, filename, mode)))
         return errno;
     process_fd_set(process_current, fd, file);
-    file->count = 1;
+    file->ref_count = 1;
 
     return 0;
 
@@ -92,7 +92,7 @@ int sys_dup(int fd) {
     if (process_fd_get(process_current, fd, &file))
         return -EBADF;
     process_fd_set(process_current, new_fd, file);
-    file->count++;
+    file->ref_count++;
 
     return 0;
 
@@ -108,7 +108,7 @@ int sys_close(int fd) {
         return -EBADF;
     process_fd_set(process_current, fd, 0);
 
-    if (!--file->count)
+    if (!--file->ref_count)
        delete(file, list_del(&file->files));
 
     return 0;
