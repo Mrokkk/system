@@ -164,10 +164,6 @@ static inline void hardware_print() {
 
 }
 
-static inline int root_mount() {
-    return mount("none", "/", "rootfs", 0, 0);
-}
-
 static inline int console_open() {
 
 #ifdef CONFIG_SERIAL_PRIMARY
@@ -216,7 +212,7 @@ __noreturn static int init() {
 
     modules_init();
 
-    if (root_mount()) panic("Cannot mount root");
+    if (root_mount("nodev")) panic("Cannot mount root");
     if (console_open()) panic("Cannot open console");
 
     /* Say something about hardware */

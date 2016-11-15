@@ -62,6 +62,7 @@ extern struct list_head mounted_inodes;
 extern struct inode *root;
 
 int vfs_init();
+int root_mount(const char *dev_name);
 int file_system_register(struct file_system *fs);
 struct inode *lookup(const char *filename);
 int do_mount(struct file_system *fs, const char *mount_point);
