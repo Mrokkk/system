@@ -3,9 +3,6 @@
 struct kernel_symbol *kernel_symbols;
 int kernel_symbols_size;
 
-/*===========================================================================*
- *                                 word_read                                 *
- *===========================================================================*/
 char *word_read(char *string, char *output) {
 
     while(*string != '\n' && *string != '\0'
@@ -20,9 +17,6 @@ char *word_read(char *string, char *output) {
 
 }
 
-/*===========================================================================*
- *                                strhex2uint                                *
- *===========================================================================*/
 unsigned int strhex2uint(char *s) {
 
     unsigned int result = 0;
@@ -42,9 +36,6 @@ unsigned int strhex2uint(char *s) {
     return result;
 }
 
-/*===========================================================================*
- *                                symbol_read                                *
- *===========================================================================*/
 char *symbol_read(char *temp, struct kernel_symbol *symbol) {
 
     char str_address[16], str_size[16],
@@ -65,9 +56,6 @@ char *symbol_read(char *temp, struct kernel_symbol *symbol) {
 
 }
 
-/*===========================================================================*
- *                                symbol_find                                *
- *===========================================================================*/
 struct kernel_symbol *symbol_find(const char *name) {
 
     int i;
@@ -81,9 +69,6 @@ struct kernel_symbol *symbol_find(const char *name) {
 
 }
 
-/*===========================================================================*
- *                            symbol_find_address                            *
- *===========================================================================*/
 struct kernel_symbol *symbol_find_address(unsigned int address) {
 
     int i;
@@ -98,9 +83,6 @@ struct kernel_symbol *symbol_find_address(unsigned int address) {
 
 }
 
-/*===========================================================================*
- *                            symbols_get_number                             *
- *===========================================================================*/
 int symbols_get_number(char *symbols, unsigned int size) {
 
     char *temp = symbols;
@@ -113,9 +95,6 @@ int symbols_get_number(char *symbols, unsigned int size) {
 
 }
 
-/*===========================================================================*
- *                               symbols_read                                *
- *===========================================================================*/
 int symbols_read(char *symbols, unsigned int size) {
 
     int nr = 0, i = 0;

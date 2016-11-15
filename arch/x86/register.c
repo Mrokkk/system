@@ -29,9 +29,6 @@ char *cr4_hibits[] = {
     "SMXE", 0, 0, "PCIDE", "OSXSAVE", 0, "SMEP", "SMAP"
 };
 
-/*===========================================================================*
- *                           eflags_bits_string_get                          *
- *===========================================================================*/
 int eflags_bits_string_get(unsigned int eflags, char *buffer) {
 
     int i, len = 0;
@@ -49,9 +46,6 @@ int eflags_bits_string_get(unsigned int eflags, char *buffer) {
 
 }
 
-/*===========================================================================*
- *                            cr0_bits_string_get                            *
- *===========================================================================*/
 int cr0_bits_string_get(unsigned int cr0, char *buffer) {
 
     int i, len = 0;
@@ -69,9 +63,6 @@ int cr0_bits_string_get(unsigned int cr0, char *buffer) {
 
 }
 
-/*===========================================================================*
- *                            cr4_bits_string_get                            *
- *===========================================================================*/
 int cr4_bits_string_get(unsigned int cr4, char *buffer) {
 
     int i, len = 0;

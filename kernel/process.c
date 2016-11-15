@@ -9,9 +9,6 @@ LIST_DECLARE(running);
 static pid_t last_pid;
 unsigned int total_forks;
 
-/*===========================================================================*
- *                               find_free_pid                               *
- *===========================================================================*/
 static inline pid_t find_free_pid() {
     /*
      * Just incrementing PID. Maybe it should be more
@@ -20,24 +17,15 @@ static inline pid_t find_free_pid() {
     return ++last_pid;
 }
 
-/*===========================================================================*
- *                              process_forked                               *
- *===========================================================================*/
 static inline void process_forked(struct process *proc) {
     ++proc->forks;
     ++total_forks;
 }
 
-/*===========================================================================*
- *                            process_space_free                             *
- *===========================================================================*/
 static inline void process_space_free(struct process *proc) {
     page_free(proc->mm.start);
 }
 
-/*===========================================================================*
- *                            process_space_setup                            *
- *===========================================================================*/
 static inline int process_space_setup(struct process *proc) {
 
     char *start, *end;
@@ -54,9 +42,6 @@ static inline int process_space_setup(struct process *proc) {
 
 }
 
-/*===========================================================================*
- *                            process_struct_init                            *
- *===========================================================================*/
 static inline void process_struct_init(struct process *proc) {
 
     proc->pid = find_free_pid();
@@ -72,9 +57,6 @@ static inline void process_struct_init(struct process *proc) {
 
 }
 
-/*===========================================================================*
- *                          process_parent_child_link                        *
- *===========================================================================*/
 static inline void process_parent_child_link(struct process *parent,
         struct process *child) {
 
@@ -84,9 +66,6 @@ static inline void process_parent_child_link(struct process *parent,
 
 }
 
-/*===========================================================================*
- *                             process_name_copy                             *
- *===========================================================================*/
 static inline void process_name_copy(struct process *dest,
         struct process *src) {
 
@@ -94,9 +73,6 @@ static inline void process_name_copy(struct process *dest,
 
 }
 
-/*===========================================================================*
- *                              process_fs_copy                              *
- *===========================================================================*/
 static inline int process_fs_copy(struct process *dest,
         struct process *src, int clone_flags) {
 
@@ -113,9 +89,6 @@ static inline int process_fs_copy(struct process *dest,
 
 }
 
-/*===========================================================================*
- *                            process_files_copy                             *
- *===========================================================================*/
 static inline int process_files_copy(struct process *dest,
         struct process *src, int clone_flags) {
 
@@ -133,9 +106,6 @@ static inline int process_files_copy(struct process *dest,
 
 }
 
-/*===========================================================================*
- *                           process_signals_copy                            *
- *===========================================================================*/
 static inline int process_signals_copy(struct process *dest,
         struct process *src, int clone_flags) {
 
@@ -152,9 +122,6 @@ static inline int process_signals_copy(struct process *dest,
 
 }
 
-/*===========================================================================*
- *                               process_find                                *
- *===========================================================================*/
 int process_find(int pid, struct process **p) {
 
     struct process *proc;
@@ -170,9 +137,6 @@ int process_find(int pid, struct process **p) {
 
 }
 
-/*===========================================================================*
- *                            process_wake_waiting                           *
- *===========================================================================*/
 void process_wake_waiting(struct process *proc) {
 
     struct process *temp;
@@ -184,9 +148,6 @@ void process_wake_waiting(struct process *proc) {
 
 }
 
-/*===========================================================================*
- *                              process_delete                               *
- *===========================================================================*/
 void process_delete(struct process *proc) {
 
     list_del(&proc->siblings);
@@ -201,9 +162,6 @@ void process_delete(struct process *proc) {
 
 }
 
-/*===========================================================================*
- *                               process_clone                               *
- *===========================================================================*/
 int process_clone(struct process *parent, struct pt_regs *regs,
         int clone_flags) {
 
@@ -247,9 +205,6 @@ cannot_create_process:
 
 }
 
-/*===========================================================================*
- *                               kernel_process                              *
- *===========================================================================*/
 int kernel_process(int (*start)(), void *args, unsigned int flags) {
 
     int pid;
@@ -261,9 +216,6 @@ int kernel_process(int (*start)(), void *args, unsigned int flags) {
 
 }
 
-/*===========================================================================*
- *                            process_find_free_fd                           *
- *===========================================================================*/
 int process_find_free_fd(struct process *proc, int *fd) {
 
     int i;
@@ -281,18 +233,12 @@ int process_find_free_fd(struct process *proc, int *fd) {
 
 }
 
-/*===========================================================================*
- *                                  sys_fork                                 *
- *===========================================================================*/
 int sys_fork(struct pt_regs regs) {
 
     return process_clone(process_current, &regs, 0);
 
 }
 
-/*===========================================================================*
- *                                  sys_exit                                 *
- *===========================================================================*/
 int sys_exit(int return_value) {
 
     process_current->exit_code = return_value;
@@ -303,23 +249,14 @@ int sys_exit(int return_value) {
 
 }
 
-/*===========================================================================*
- *                                 sys_getpid                                *
- *===========================================================================*/
 int sys_getpid() {
     return process_current->pid;
 }
 
-/*===========================================================================*
- *                                sys_getppid                                *
- *===========================================================================*/
 int sys_getppid() {
     return process_current->ppid;
 }
 
-/*===========================================================================*
- *                               sys_waitpid                                 *
- *===========================================================================*/
 int sys_waitpid(int pid, int *status, int opt) {
 
     struct process *proc;
@@ -343,9 +280,6 @@ delete_process:
 
 }
 
-/*===========================================================================*
- *                               processes_init                              *
- *===========================================================================*/
 int processes_init() {
 
     /*

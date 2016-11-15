@@ -2,9 +2,6 @@
 
 struct device *char_devices[16];
 
-/*===========================================================================*
- *                           char_register_device                            *
- *===========================================================================*/
 int __char_device_register(unsigned int major, const char *name,
                            struct file_operations *fops,
                            unsigned int this_module) {
@@ -25,9 +22,6 @@ int __char_device_register(unsigned int major, const char *name,
 
 }
 
-/*===========================================================================*
- *                           char_devices_list_get                           *
- *===========================================================================*/
 int char_devices_list_get(char *buffer) {
 
     int i, len = 0;
@@ -44,9 +38,6 @@ int char_devices_list_get(char *buffer) {
 
 }
 
-/*===========================================================================*
- *                             char_device_find                              *
- *===========================================================================*/
 int char_device_find(const char *name, struct device **dev) {
 
     int i;

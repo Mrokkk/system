@@ -6,9 +6,6 @@ static void (*console_print)(const char *string) = 0;
 static char printk_buffer[1024];
 static int printk_index = 0;
 
-/*===========================================================================*
- *                                  printk                                   *
- *===========================================================================*/
 int printk(const char *fmt, ...) {
 
     char printf_buf[512];
@@ -37,9 +34,6 @@ int printk(const char *fmt, ...) {
 
 }
 
-/*===========================================================================*
- *                             console_register                              *
- *===========================================================================*/
 void console_register(void (*func)(const char *string)) {
 
     unsigned int flags;

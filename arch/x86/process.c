@@ -16,9 +16,6 @@
 
 extern void ret_from_syscall();
 
-/*===========================================================================*
- *                                stack_copy                                 *
- *===========================================================================*/
 static void *stack_copy(unsigned int *dest, unsigned int *src,
         unsigned int size) {
 
@@ -29,9 +26,6 @@ static void *stack_copy(unsigned int *dest, unsigned int *src,
 
 }
 
-/*===========================================================================*
- *                              stack_create                                 *
- *===========================================================================*/
 static inline void *stack_create(unsigned int size) {
 
     (void)size;
@@ -40,9 +34,6 @@ static inline void *stack_create(unsigned int size) {
 
 }
 
-/*===========================================================================*
- *                           fork_kernel_stack_frame                         *
- *===========================================================================*/
 static inline void fork_kernel_stack_frame(unsigned int **kernel_stack,
         unsigned int *user_stack, struct pt_regs *regs) {
 
@@ -68,9 +59,6 @@ static inline void fork_kernel_stack_frame(unsigned int **kernel_stack,
 
 }
 
-/*===========================================================================*
- *                        kernel_process_setup_stack                         *
- *===========================================================================*/
 unsigned int kernel_process_setup_stack(struct process *dest,
         struct process *src,
         struct pt_regs *src_regs) {
@@ -111,9 +99,6 @@ unsigned int kernel_process_setup_stack(struct process *dest,
 
 }
 
-/*===========================================================================*
- *                         user_process_setup_stack                          *
- *===========================================================================*/
 unsigned int user_process_setup_stack(struct process *dest,
         struct process *src,
         struct pt_regs *src_regs) {
@@ -136,9 +121,6 @@ unsigned int user_process_setup_stack(struct process *dest,
 
 }
 
-/*===========================================================================*
- *                             arch_process_copy                             *
- *===========================================================================*/
 int arch_process_copy(struct process *dest, struct process *src,
         struct pt_regs *src_regs) {
 
@@ -158,9 +140,6 @@ int arch_process_copy(struct process *dest, struct process *src,
 
 }
 
-/*===========================================================================*
- *                             arch_process_free                             *
- *===========================================================================*/
 void arch_process_free(struct process *proc) {
 
     /* Free kernel stack (if exists) */
@@ -172,9 +151,6 @@ void arch_process_free(struct process *proc) {
 
 #define FASTCALL(x) __attribute__((regparm(3))) x
 
-/*===========================================================================*
- *                             __process_switch                              *
- *===========================================================================*/
 void FASTCALL(__process_switch(struct process *prev, struct process *next)) {
 
     unsigned int base = (unsigned int)&next->context;
@@ -194,9 +170,6 @@ void FASTCALL(__process_switch(struct process *prev, struct process *next)) {
 
 }
 
-/*===========================================================================*
- *                            syscall_regs_check                             *
- *===========================================================================*/
 void syscall_regs_check(struct pt_regs regs) {
 
     ASSERT(cs_get() == KERNEL_CS);
@@ -217,9 +190,6 @@ void syscall_regs_check(struct pt_regs regs) {
 
 }
 
-/*===========================================================================*
- *                                regs_print                                 *
- *===========================================================================*/
 void regs_print(struct pt_regs *regs) {
 
     char string[64];
@@ -240,9 +210,6 @@ void regs_print(struct pt_regs *regs) {
 
 }
 
-/*===========================================================================*
- *                                 sys_clone                                 *
- *===========================================================================*/
 int sys_clone(struct pt_regs regs) {
 
     unsigned int sp = regs.ecx;
@@ -253,9 +220,6 @@ int sys_clone(struct pt_regs regs) {
 
 }
 
-/*===========================================================================*
- *                           exec_kernel_stack_frame                         *
- *===========================================================================*/
 static inline void exec_kernel_stack_frame(
         unsigned int **kernel_stack, unsigned int esp, unsigned int eip) {
 
@@ -282,9 +246,6 @@ static inline void exec_kernel_stack_frame(
                "r" (ip));       \
     } while (0)
 
-/*===========================================================================*
- *                                  sys_exec                                 *
- *===========================================================================*/
 __noreturn int sys_exec(struct pt_regs regs) {
 
     unsigned int *kernel_stack, *user_stack, flags, eip = 0;
@@ -315,9 +276,6 @@ __noreturn int sys_exec(struct pt_regs regs) {
 
 }
 
-/*===========================================================================*
- *                         signal_restore_code_put                           *
- *===========================================================================*/
 static inline void signal_restore_code_put(unsigned char *user_code) {
 
     /* mov $__NR_sigreturn, %eax */
@@ -331,9 +289,6 @@ static inline void signal_restore_code_put(unsigned char *user_code) {
 
 }
 
-/*===========================================================================*
- *                           arch_process_execute                            *
- *===========================================================================*/
 int arch_process_execute(struct process *proc, unsigned int eip) {
 
     unsigned int *kernel_stack, *sighan_stack, flags;
@@ -383,9 +338,6 @@ int arch_process_execute(struct process *proc, unsigned int eip) {
 
 }
 
-/*===========================================================================*
- *                               sys_sigreturn                               *
- *===========================================================================*/
 __noreturn int sys_sigreturn() {
 
     page_free((void *)(process_current->signals->context.eax - PAGE_SIZE));

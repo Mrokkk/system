@@ -6,9 +6,6 @@
 
 char *bootloader_name;
 
-/*===========================================================================*
- *                           multiboot_mmap_read                             *
- *===========================================================================*/
 static inline void multiboot_mmap_read(struct multiboot_info *mb) {
 
     struct memory_map *mm;
@@ -47,18 +44,12 @@ static inline void multiboot_mmap_read(struct multiboot_info *mb) {
 
 }
 
-/*===========================================================================*
- *                        multiboot_boot_device_read                         *
- *===========================================================================*/
 static inline void multiboot_boot_device_read(struct multiboot_info *mb) {
 
     (void)mb;
 
 }
 
-/*===========================================================================*
- *                          multiboot_modules_read                           *
- *===========================================================================*/
 static inline void multiboot_modules_read(struct multiboot_info *mb) {
 
     int count = mb->mods_count, i;
@@ -79,9 +70,6 @@ static inline void multiboot_modules_read(struct multiboot_info *mb) {
 
 }
 
-/*===========================================================================*
- *                              multiboot_read                               *
- *===========================================================================*/
 int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
 
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {

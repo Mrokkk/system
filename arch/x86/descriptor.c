@@ -29,9 +29,6 @@ struct idt idt = {
         (unsigned int)&idt_entries
 };
 
-/*===========================================================================*
- *                               idt_set_gate                                *
- *===========================================================================*/
 static inline void idt_set_gate(unsigned char num, unsigned long base,
                          unsigned short selector, unsigned long flags) {
 
@@ -43,9 +40,6 @@ static inline void idt_set_gate(unsigned char num, unsigned long base,
 
 }
 
-/*===========================================================================*
- *                                 tss_init                                  *
- *===========================================================================*/
 void tss_init() {
 
     unsigned int base = (unsigned int)&process_current->context;
@@ -63,9 +57,6 @@ void tss_init() {
 
 }
 
-/*===========================================================================*
- *                              idt_configure                                *
- *===========================================================================*/
 void idt_configure() {
 
     #undef __isr

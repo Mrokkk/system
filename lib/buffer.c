@@ -1,9 +1,6 @@
 #include <kernel/buffer.h>
 #include <kernel/kernel.h>
 
-/*===========================================================================*
- *                                 buffer_put                                *
- *===========================================================================*/
 void buffer_put(struct buffer *buffer, char c) {
 
     buffer->data[buffer->in++] = c;
@@ -12,9 +9,6 @@ void buffer_put(struct buffer *buffer, char c) {
 
 }
 
-/*===========================================================================*
- *                                 buffer_get                                *
- *===========================================================================*/
 int buffer_get(struct buffer *buffer, char *c) {
 
     if (buffer_empty(buffer))

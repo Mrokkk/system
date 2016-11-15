@@ -1,9 +1,6 @@
 #include <kernel/process.h>
 #include <kernel/fs.h>
 
-/*===========================================================================*
- *                                  sys_write                                *
- *===========================================================================*/
 int sys_write(int fd, const char *buffer, size_t size) {
 
     struct file *file;
@@ -18,9 +15,6 @@ int sys_write(int fd, const char *buffer, size_t size) {
 
 }
 
-/*===========================================================================*
- *                                  sys_read                                 *
- *===========================================================================*/
 int sys_read(int fd, char *buffer, size_t n) {
 
     struct file *file;

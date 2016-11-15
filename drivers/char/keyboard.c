@@ -97,9 +97,6 @@ char *scancodes[] = {
 BUFFER_DECLARE(keyboard_buffer, 32);
 WAIT_QUEUE_HEAD_DECLARE(keyboard_wq);
 
-/*===========================================================================*
- *                               keyboard_wait                               *
- *===========================================================================*/
 static void keyboard_wait(void) {
 
     int i;
@@ -112,9 +109,6 @@ static void keyboard_wait(void) {
 
 }
 
-/*===========================================================================*
- *                           keyboard_send_command                           *
- *===========================================================================*/
 static void keyboard_send_command(unsigned char byte) {
 
     keyboard_wait();
@@ -123,9 +117,6 @@ static void keyboard_send_command(unsigned char byte) {
 
 }
 
-/*===========================================================================*
- *                             keyboard_receive                              *
- *===========================================================================*/
 static unsigned char keyboard_receive(void) {
 
     while ((inb(STATUS_PORT) & 0x1) != 1);
@@ -133,9 +124,6 @@ static unsigned char keyboard_receive(void) {
 
 }
 
-/*===========================================================================*
- *                              keyboard_read                                *
- *===========================================================================*/
 int keyboard_read(struct inode *inode, struct file *file, char *buffer,
         unsigned int size) {
 
@@ -160,9 +148,6 @@ int keyboard_read(struct inode *inode, struct file *file, char *buffer,
 
 }
 
-/*===========================================================================*
- *                              keyboard_irs                                 *
- *===========================================================================*/
 void keyboard_irs() {
 
     unsigned char scan_code = keyboard_receive();
@@ -198,9 +183,6 @@ end:
 
 }
 
-/*===========================================================================*
- *                              keyboard_init                                *
- *===========================================================================*/
 int keyboard_init(void) {
 
     unsigned char byte;

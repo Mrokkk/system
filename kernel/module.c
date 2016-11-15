@@ -8,9 +8,6 @@
 
 LIST_DECLARE(modules);
 
-/*===========================================================================*
- *                               modules_init                                *
- *===========================================================================*/
 int modules_init() {
 
     struct kernel_module *module = 0;
@@ -37,9 +34,6 @@ int modules_init() {
 
 }
 
-/*===========================================================================*
- *                              modules_list_get                             *
- *===========================================================================*/
 int modules_list_get(char *buffer) {
 
     int i = 0, len = 0;
@@ -55,9 +49,6 @@ int modules_list_get(char *buffer) {
 
 }
 
-/*===========================================================================*
- *                                module_find                                *
- *===========================================================================*/
 struct kernel_module *module_find(unsigned int this_module) {
 
     struct kernel_module *temp;
@@ -70,9 +61,6 @@ struct kernel_module *module_find(unsigned int this_module) {
 
 }
 
-/*===========================================================================*
- *                              modules_shutdown                             *
- *===========================================================================*/
 void modules_shutdown() {
 
     struct kernel_module *temp;

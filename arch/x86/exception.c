@@ -19,9 +19,6 @@ char *exception_messages[] = {
     #include <arch/exception.h>
 };
 
-/*===========================================================================*
- *                               do_exception                                *
- *===========================================================================*/
 void do_exception(
     unsigned long nr,       /* Exception number */
     int error_code,         /* Error code */

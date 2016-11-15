@@ -3,9 +3,6 @@
 struct process *process_current = &init_process;
 unsigned int context_switches;
 
-/*===========================================================================*
- *                                scheduler                                  *
- *===========================================================================*/
 void scheduler() {
 
     /* Simple RR scheduler */

@@ -4,9 +4,6 @@
  * Kernel uses these if arch-dependent part doesn't define them
  */
 
-/*===========================================================================*
- *                                   strcmp                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRCMP
 int strcmp(const char *string1, const char *string2) {
 
@@ -26,9 +23,6 @@ int strcmp(const char *string1, const char *string2) {
 }
 #endif
 
-/*===========================================================================*
- *                                  strncmp                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRNCMP
 int strncmp(const char *cs, const char *ct, size_t count) {
 
@@ -44,9 +38,6 @@ int strncmp(const char *cs, const char *ct, size_t count) {
 }
 #endif
 
-/*===========================================================================*
- *                                  strrchr                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRRCHR
 char *strrchr(const char *string, int c) {
 
@@ -68,9 +59,6 @@ char *strrchr(const char *string, int c) {
 }
 #endif
 
-/*===========================================================================*
- *                                   strlen                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRLEN
 unsigned int strlen(const char *string) {
 
@@ -81,9 +69,6 @@ unsigned int strlen(const char *string) {
 }
 #endif
 
-/*===========================================================================*
- *                                  strnlen                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRNLEN
 unsigned int strnlen(const char *s, unsigned int maxlen) {
 
@@ -98,9 +83,6 @@ unsigned int strnlen(const char *s, unsigned int maxlen) {
 }
 #endif
 
-/*===========================================================================*
- *                                   strcpy                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRCPY
 char *strcpy(char *dest, const char *src) {
 
@@ -111,9 +93,6 @@ char *strcpy(char *dest, const char *src) {
 }
 #endif
 
-/*===========================================================================*
- *                                   strchr                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_STRCHR
 char *strchr(const char *string, int c) {
 
@@ -133,9 +112,6 @@ char *strchr(const char *string, int c) {
 }
 #endif
 
-/*===========================================================================*
- *                                   memcpy                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_MEMCPY
 void *memcpy(void *dest, const void *src, unsigned int size) {
 
@@ -158,9 +134,6 @@ void *memcpy(void *dest, const void *src, unsigned int size) {
 }
 #endif
 
-/*===========================================================================*
- *                                  memcpyw                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_MEMCPYW
 void *memcpyw(unsigned short *dest, const unsigned short *src, unsigned int count) {
 
@@ -176,9 +149,6 @@ void *memcpyw(unsigned short *dest, const unsigned short *src, unsigned int coun
 }
 #endif
 
-/*===========================================================================*
- *                                   memset                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_MEMSET
 void *memset(void *ptr, int c, unsigned int size) {
 
@@ -194,9 +164,6 @@ void *memset(void *ptr, int c, unsigned int size) {
 }
 #endif
 
-/*===========================================================================*
- *                                  memsetw                                  *
- *===========================================================================*/
 #ifndef __HAVE_ARCH_MEMSETW
 void *memsetw(unsigned short *dest, unsigned short val, unsigned int count) {
 

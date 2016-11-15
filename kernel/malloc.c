@@ -11,9 +11,6 @@ LIST_DECLARE(memory_blocks);
 #define BLOCK_FREE 1
 #define BLOCK_BUSY 0
 
-/*===========================================================================*
- *                                   ksbrk                                   *
- *===========================================================================*/
 static inline void *ksbrk(int incr) {
 
     void *prev_heap;
@@ -52,9 +49,6 @@ static inline void *ksbrk(int incr) {
 
 }
 
-/*===========================================================================*
- *                            kmalloc_create_block                           *
- *===========================================================================*/
 static struct memory_block *kmalloc_create_block(int size) {
 
     struct memory_block *new;
@@ -69,9 +63,6 @@ static struct memory_block *kmalloc_create_block(int size) {
 
 }
 
-/*===========================================================================*
- *                                  kmalloc                                  *
- *===========================================================================*/
 void *kmalloc(size_t size) {
 
     struct memory_block *temp;
@@ -115,9 +106,6 @@ void *kmalloc(size_t size) {
 
 }
 
-/*===========================================================================*
- *                                   kfree                                   *
- *===========================================================================*/
 int kfree(void *address) {
 
     struct memory_block *temp;

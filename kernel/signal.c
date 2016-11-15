@@ -2,9 +2,6 @@
 #include <kernel/process.h>
 #include <kernel/signal.h>
 
-/*===========================================================================*
- *                                sys_signal                                 *
- *===========================================================================*/
 int sys_signal(int signum, sighandler_t handler) {
 
     if (!signum_exists(signum)) return -EINVAL;
@@ -20,9 +17,6 @@ int sys_signal(int signum, sighandler_t handler) {
 
 }
 
-/*===========================================================================*
- *                             default_sighandler                            *
- *===========================================================================*/
 static void default_sighandler(struct process *p, int signum) {
 
     switch (signum) {
@@ -49,9 +43,6 @@ static void default_sighandler(struct process *p, int signum) {
 
 }
 
-/*===========================================================================*
- *                                  sys_kill                                 *
- *===========================================================================*/
 int sys_kill(int pid, int signum) {
 
     struct process *p;
