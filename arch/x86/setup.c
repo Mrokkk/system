@@ -14,9 +14,12 @@ static inline void nmi_enable(void) {
     outb(0x70, inb(0x70) & 0x7f);
 }
 
+/* Not used */
+#if 0
 static inline void nmi_disable(void) {
     outb(0x70, inb(0x70) | 0x80);
 }
+#endif
 
 void delay(unsigned int msec) {
 

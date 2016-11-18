@@ -69,9 +69,12 @@ static inline void cursor_x_dec() {
     csr_x[current_page]--;
 }
 
+/* Not used */
+#if 0
 static inline void cursor_y_dec() {
     csr_y[current_page]--;
 }
+#endif
 
 static inline int cursor_x_get() {
     return csr_x[current_page];

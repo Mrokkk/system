@@ -50,6 +50,8 @@ static inline void multiboot_boot_device_read(struct multiboot_info *mb) {
 
 }
 
+/* Not used */
+#if 0
 static inline void multiboot_modules_read(struct multiboot_info *mb) {
 
     int count = mb->mods_count, i;
@@ -69,6 +71,7 @@ static inline void multiboot_modules_read(struct multiboot_info *mb) {
     }
 
 }
+#endif
 
 int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
 

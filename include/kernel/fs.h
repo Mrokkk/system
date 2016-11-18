@@ -7,8 +7,6 @@
 #include <kernel/wait.h>
 #include <kernel/list.h>
 
-typedef unsigned int off_t;
-
 #define MAY_EXEC 1
 #define MAY_WRITE 2
 #define MAY_READ 4
