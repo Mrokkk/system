@@ -44,7 +44,7 @@ int char_device_find(const char *name, struct device **dev) {
 
     *dev = 0;
     for (i=0; i<16; i++) {
-        if (!char_devices[i]->name) continue;
+        if (!char_devices[i]) continue;
         if (!strncmp(char_devices[i]->name, name, 32)) {
             *dev = char_devices[i];
             return i;
