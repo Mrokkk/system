@@ -124,13 +124,13 @@ static void welcome() {
 
     printk("myOS v%d.%d for %s\n",
     VERSION_MAJ, VERSION_MIN, stringify(ARCH));
+    printk("Licensed under GPL3\n\n");
 #if DEBUG
     printk("Debug=%d\n", DEBUG);
 #endif
     printk("Built on %s %s by %s@%s\n",
     COMPILE_SYSTEM, COMPILE_ARCH, COMPILE_BY, COMPILE_HOST);
     printk("Compiled on %s\n", COMPILER);
-    printk("Copyright (C) 2016, MP\n\n");
     printk("Welcome!\n\n");
 
 }
