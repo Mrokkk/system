@@ -1,4 +1,0 @@
-choice 'Machine' \
-    "RaspberryPi    CONFIG_RASPI \
-     Versatile      CONFIG_VERSATILE" Versatile
-
