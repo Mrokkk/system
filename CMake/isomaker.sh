@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+base_dir=$(dirname $0)
+
 mkdir -p iso/boot/grub
 
 if [ ! -f iso/boot/grub/menu.lst ]; then
@@ -12,9 +14,7 @@ if [ ! -f iso/boot/grub/menu.lst ]; then
 fi
 
 if [ ! -f iso/boot/grub/stage2_eltorito ]; then
-    echo Downloading bootloader stage2...
-    wget -q ftp://ftp.free.org/mirrors/rsync.frugalware.org/frugalware-testing/boot/grub/stage2_eltorito
-    mv stage2_eltorito iso/boot/grub/stage2_eltorito
+    cp $base_dir/stage2_eltorito iso/boot/grub/stage2_eltorito
 fi
 
 cp system iso/kernel
