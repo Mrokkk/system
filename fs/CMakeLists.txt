@@ -1,2 +1,2 @@
 file(GLOB fs_src "*.c")
-add_library(fs OBJECT file_system.c files.c inode.c open.c read_write.c rootfs/root.c)
+add_library(fs OBJECT ${fs_src} ramfs/ramfs.c mbfs/mbfs.c devfs/devfs.c)

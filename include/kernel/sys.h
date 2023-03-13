@@ -1,5 +1,4 @@
-#ifndef INCLUDE_KERNEL_SYS_H_
-#define INCLUDE_KERNEL_SYS_H_
+#pragma once
 
 #undef __syscall0
 #undef __syscall1
@@ -12,5 +11,3 @@
 #define __syscall3(call, ...) int sys_##call();
 #define __syscall4(call, ...) int sys_##call();
 #include <kernel/unistd.h>
-
-#endif /* INCLUDE_KERNEL_SYS_H_ */

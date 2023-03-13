@@ -1,18 +1,19 @@
 #include <arch/io.h>
-#include <kernel/kernel.h>
+
 #include <kernel/irq.h>
-#include <kernel/module.h>
-#include <kernel/device.h>
-#include <kernel/buffer.h>
 #include <kernel/wait.h>
+#include <kernel/buffer.h>
+#include <kernel/device.h>
+#include <kernel/kernel.h>
+#include <kernel/module.h>
+#include <kernel/process.h>
 #include <kernel/spinlock.h>
-#include <kernel/semaphore.h>
 
-int keyboard_init();
+#include "console.h"
 
-#define CMD_PORT 0x64
-#define DATA_PORT 0x60
-#define STATUS_PORT 0x64
+#define CMD_PORT                        0x64
+#define DATA_PORT                       0x60
+#define STATUS_PORT                     0x64
 
 #define CMD_ENABLE_FIRST                0xae
 #define CMD_DISABLE_FIRST               0xad
@@ -37,29 +38,33 @@ static int shift = 0;
 static char ctrl = 0;
 static char alt = 0;
 
-/* Scancodes actions */
-
-static void s_shift_up() {
+static void s_shift_up()
+{
     shift = 1;
 }
 
-static void s_shift_down() {
+static void s_shift_down()
+{
     shift = 0;
 }
 
-static void s_ctrl_up() {
+static void s_ctrl_up()
+{
     ctrl = 1;
 }
 
-static void s_ctrl_down() {
+static void s_ctrl_down()
+{
     ctrl = 0;
 }
 
-static void s_alt_up() {
+static void s_alt_up()
+{
     alt = 1;
 }
 
-static void s_alt_down() {
+static void s_alt_down()
+{
     alt =  0;
 }
 
@@ -80,7 +85,7 @@ saction_t special_scancodes[] = {
         [L_ALT+0x80] = &s_alt_down
 };
 
-/* It's not the nicest looking thing, but does its work ... */
+// It's not the nicest looking thing, but does its job ...
 char *scancodes[] = {
         "\0\0", "\0\0",
         "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "-_", "=+", "\b\b",
@@ -97,123 +102,168 @@ char *scancodes[] = {
 BUFFER_DECLARE(keyboard_buffer, 32);
 WAIT_QUEUE_HEAD_DECLARE(keyboard_wq);
 
-static void keyboard_wait(void) {
+static void keyboard_wait(void)
+{
+    for (int i = 0; i < 10000; i++)
+    {
+        if (!(inb(STATUS_PORT) & 0x2)) return;
+    }
 
-    int i;
-
-    for (i=0; i<10000; i++)
-        if (!(inb(STATUS_PORT) & 0x2))
-            return;
-
-    printk("Keyboard waiting timeout\n");
-
+    log_debug("keyboard waiting timeout");
 }
 
-static void keyboard_send_command(unsigned char byte) {
-
+static void keyboard_send_command(uint8_t byte)
+{
     keyboard_wait();
     outb(byte, CMD_PORT);
     io_wait();
-
 }
 
-static unsigned char keyboard_receive(void) {
-
+static uint8_t keyboard_receive(void)
+{
     while ((inb(STATUS_PORT) & 0x1) != 1);
     return inb(DATA_PORT);
-
 }
 
-int keyboard_read(struct inode *inode, struct file *file, char *buffer,
-        unsigned int size) {
-
-    unsigned int i;
+int keyboard_read(
+    struct file*,
+    char* buffer,
+    int size)
+{
+    int i;
     WAIT_QUEUE_DECLARE(kb, process_current);
 
-    (void)inode; (void)buffer; (void)size; (void)file; (void)kb;
+    flags_t flags;
+    irq_save(flags);
 
-    for (i=0; i<size; i++) {
-        while (buffer_get(&keyboard_buffer, &buffer[i])) {
+    for (i = 0; i < size; i++)
+    {
+        while (buffer_get(&keyboard_buffer, &buffer[i]))
+        {
             wait_queue_push(&kb, &keyboard_wq);
-            process_wait(process_current);
+            process_wait(process_current, flags);
         }
-        if (buffer[i] == '\n') return i+1;
-        if (buffer[i] == '\b' && i > 0) {
+        if (buffer[i] == '\n')
+        {
+            ++i;
+            goto finish;
+        }
+        else if (buffer[i] == 4)
+        {
+            i = 0;
+            goto finish;
+        }
+        else if (buffer[i] == 3)
+        {
+            do_kill(process_current, SIGINT);
+            i = 1;
+            buffer[0] = 0;
+            goto finish;
+        }
+        else if (buffer[i] == '\b' && i > 0)
+        {
             buffer[i--] = 0;
             buffer[i--] = 0;
         }
     }
 
+finish:
     return i;
-
 }
 
-void keyboard_irs() {
-
-    unsigned char scan_code = keyboard_receive();
+void keyboard_irs()
+{
+    uint8_t scan_code = keyboard_receive();
     char character = 0;
 
     keyboard_disable();
 
-    /* Check if we have a defined action
-     * for this scancode */
-    if (special_scancodes[scan_code] && scan_code <= L_ALT+0x80) {
+    // Check if we have a defined action for this scancode
+    if (special_scancodes[scan_code] && scan_code <= L_ALT+0x80)
+    {
         special_scancodes[scan_code]();
         goto end;
     }
 
-    /* TODO: Number of implemented scancodes */
-    if (scan_code > 0x39) goto end;
-    character = scancodes[scan_code][shift];
-    if (ctrl && character) {
-        printk("^%c\n", character);
-    } else {
-        /* Insert character to circular buffer */
-        buffer_put(&keyboard_buffer, character);
-        printk("%c", character); /* and print it */
+    // TODO: Number of implemented scancodes
+    if (scan_code > 0x39)
+    {
+        goto end;
+    }
 
-        if (!wait_queue_empty(&keyboard_wq)) {
+    character = scancodes[scan_code][shift];
+    if (ctrl && character)
+    {
+        if (character == 'c')
+        {
+            buffer_put(&keyboard_buffer, 3);
+            goto wake;
+        }
+        else if (character == 'd')
+        {
+            buffer_put(&keyboard_buffer, 4);
+            goto wake;
+        }
+    }
+    else
+    {
+        buffer_put(&keyboard_buffer, character);
+        //  FIXME: printing shouldn't be here; bug: if I press key on early startup, it crashes kernel
+        console_putch(character);
+
+wake:
+        if (!wait_queue_empty(&keyboard_wq))
+        {
             struct process *proc = wait_queue_pop(&keyboard_wq);
             process_wake(proc);
-        } /* TODO: printing shouldn't be here */
+        }
     }
 
 end:
     keyboard_enable();
-
 }
 
-int keyboard_init(void) {
-
-    unsigned char byte;
+int keyboard_init(void)
+{
+    uint8_t byte;
 
     keyboard_disable();
     keyboard_send_command(CMD_DISABLE_SECOND);
-    
+
     while (inb(STATUS_PORT) & 1)
+    {
         inb(DATA_PORT);
+    }
+
     io_wait();
-    
+
     keyboard_send_command(CMD_TEST_CONTROLLER);
     byte = keyboard_receive();
-    if (byte != 0x55) return -1;
+    if (byte != 0x55)
+    {
+        return -1;
+    }
 
     keyboard_send_command(CMD_READ_CONFIGURATION_BYTE);
     byte = keyboard_receive();
 
-    /* If translation is disabled, try to enable it */
-    if (!(byte & (1 << 6))) {
+    // If translation is disabled, try to enable it
+    if (!(byte & (1 << 6)))
+    {
         byte |= (1 << 6);
         keyboard_send_command(CMD_WRITE_CONFIGURATION_BYTE);
         outb(byte, DATA_PORT);
         keyboard_wait();
         keyboard_send_command(CMD_READ_CONFIGURATION_BYTE);
         if (!(keyboard_receive() & (1 << 6)))
+        {
             return -1;
+        }
     }
-    
-    /* Enable interrupt */
-    if (!(byte & 0x1)) {
+
+    // Enable interrupt
+    if (!(byte & 0x1))
+    {
         byte |= 0x1;
         keyboard_send_command(CMD_WRITE_CONFIGURATION_BYTE);
         outb(byte, DATA_PORT);
@@ -223,8 +273,6 @@ int keyboard_init(void) {
     keyboard_enable();
 
     irq_register(0x01, keyboard_irs, "keyboard");
-    
+
     return 0;
-
 }
-

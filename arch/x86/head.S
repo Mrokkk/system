@@ -1,13 +1,13 @@
-#include <arch/multiboot.h>
-#include <arch/x86_asm.h>
-#include <arch/register.h>
-#include <arch/segment.h>
-#include <arch/descriptor.h>
+#include <arch/asm.h>
 #include <arch/page.h>
+#include <arch/segment.h>
+#include <arch/register.h>
+#include <arch/multiboot.h>
+#include <arch/descriptor.h>
 
-#define FLAGS         MULTIBOOT_HEADER_FLAGS
-#define MAGIC         MULTIBOOT_HEADER_MAGIC
-#define CHECKSUM     -(MAGIC + FLAGS)
+#define FLAGS       MULTIBOOT_HEADER_FLAGS_ALIGNED | MULTIBOOT_HEADER_FLAGS_MEMORY | MULTIBOOT_HEADER_FLAGS_VIDEO
+#define MAGIC       MULTIBOOT_HEADER_MAGIC
+#define CHECKSUM    -(MAGIC + FLAGS)
 
 SECTION(.multiboot)
 
@@ -15,106 +15,75 @@ ENTRY(multiboot_header)
     .long MAGIC
     .long FLAGS
     .long CHECKSUM
+    .long 0 // header_addr
+    .long 0 // load_addr
+    .long 0 // load_end_addr
+    .long 0 // bss_end_addr
+    .long 0 // entry_addr
+    .long MULTIBOOT_VIDEO_MODE_LIN // mode_type
+    .long 1024 // width
+    .long 768 // height
+    .long 32 // depth
 END(multiboot_header)
 
 SECTION(.text.boot)
 
-/*===========================================================================*
- *                                 _start                                    *
- *===========================================================================*/
 ENTRY(_start)
 
-    /* According to Multiboot specification, there's *
-     * a magic number in EAX and pointer to          *
-     * multiboot_info structure in EBX               */
+    // According to Multiboot specification, there's
+    // a magic number in EAX and pointer to
+    // multiboot_info structure in EBX
 
-        /* Zero EFLAGS register */
+        // Zero EFLAGS register
         pushl $0
         popfl
 
-        /* Move pointer to the multiboot struct
-         * to the EDX */
+        // Move pointer to the multiboot struct to the EDX
         mov %eax, %edx
 
-        /* Set segment registers */
-        mov $KERNEL_DS, %eax
-        mov %ax, %ds
-        mov %ax, %es
-        mov %ax, %fs
-        mov %ax, %gs
-
-        /* Initialize page table to  *
-         * cover whole loaded memory */
+        // Initialize page table to cover whole loaded memory
         mov $page0, %edi
-        movl $PAGE_INIT_FLAGS, %eax
+        movl $PAGE_KERNEL_FLAGS, %eax
     1:  stosl
-        add $0x1000, %eax
-        cmp $_end - KERNEL_PAGE_OFFSET + PAGE_INIT_FLAGS, %eax
+        add $PAGE_SIZE, %eax
+        cmp $_end - KERNEL_PAGE_OFFSET + PAGE_KERNEL_FLAGS, %eax
         jne 1b
 
-        /* Load page directory */
+        // Load page directory
         mov $page_dir, %eax
         movl %eax, %cr3
 
-        /* Enable paging */
+        // Enable paging
         mov %cr0, %eax
         or $0x80000000, %eax
         mov %eax, %cr0
         mov $1f, %eax
         jmp *%eax
 
-    1:  /* Load global descriptors table */
+    1:  // Load global descriptors table
         lgdt (gdt + KERNEL_PAGE_OFFSET)
-        ljmp $0x08, $1f
 
-    1:  /* Set up stack register */
+        // Set segment registers
+        mov $KERNEL_DS, %eax
+        mov %ax, %ds
+        mov %ax, %es
+        mov %ax, %fs
+        mov %ax, %gs
+        mov %ax, %ss
+
+        ljmp $KERNEL_CS, $1f
+
+    1:  // Set up stack register
         movl $SYMBOL_NAME(init_process_stack), %esp
-        addl $1024, %esp
+        addl $INIT_PROCESS_STACK_SIZE * 4, %esp
+
+        // Push multiboot data on stack
         push %edx
         push %ebx
 
-        /*
-         * Clear BSS
-         */
-        movl $_sbss, %edi
-        movl $_ebss, %ecx
-        subl %edi, %ecx
-        cld
-        rep
+        call SYMBOL_NAME(kmain)
 
-        /*
-         * Setup interrupt descriptors table
-         */
-        call SYMBOL_NAME(idt_configure)
-
-        /*
-         * Setup tss
-         */
-        call SYMBOL_NAME(tss_init)
-
-        /*
-         * Read multiboot structure
-         * given by the bootloader
-         */
-        call SYMBOL_NAME(multiboot_read)
-
-        /* multiboot_read returns address of
-         * boot command line string, so we push
-         * its value onto the stack
-         */
-        push %eax
-
-        /* This is tricky - we jump to kmain
-         * indirectly by returning from
-         * page_dir_reload, which reloads
-         * page directory
-         */
-        push $0
-        push $SYMBOL_NAME(kmain)
-        movl $0, page_dir
-        jmp page_dir_reload
-
-    /* Not reachable */
+    // Not reachable
     2:
         jmp 2b
 
@@ -126,41 +95,37 @@ ENTRY(gdt)
 
 ENTRY(__gdt_entries)
 
-    /* Null segment */
+    // Null segment
     descriptor_entry(0, 0, 0)
 
-    /* Kernel code segment */
+    // Kernel code segment
     descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | \
                      GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
-    /* Kernel data segment */
+    // Kernel data segment
     descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
                      GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
-    /* User code segment */
+    // User code segment
     descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | \
                      GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
-    /* User data segment */
+    // User data segment
     descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
                      GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
-    /* TSS */
+    // TSS
     descriptor_entry(GDT_FLAGS_TYPE_32TSS, 0, 0)
 
-ALIGN(0x1000)
+ALIGN(PAGE_SIZE)
 ENTRY(page_dir)
-    /*
-     * First entry will be zeroed just before
-     * the call to the page_dir_reload
-     */
+    // First entry will be zeroed in paging_init; we need it available at boot
     .long page_table0
-    .fill KERNEL_PAGE_OFFSET / 0x400000 - 1, 4, 0
+    .fill KERNEL_PAGE_OFFSET / (PAGE_SIZE * 1024) - 1, 4, 0
     .long page_table0
 
-ALIGN(0x1000)
+ALIGN(PAGE_SIZE)
 ENTRY(page0)
-    .skip PAGE_INIT_FLAGS
+    .skip PAGE_KERNEL_FLAGS
 page_table0:
-    .skip 0x1000 - PAGE_INIT_FLAGS
-
+    .skip 0x1000 - PAGE_KERNEL_FLAGS

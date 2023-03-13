@@ -1,25 +1,26 @@
-#ifndef __DEBUG_H_
-#define __DEBUG_H_
-
-#include <kernel/compiler.h>
+#pragma once
 
 #if 1
 
-    #include <kernel/string.h>
+#include <kernel/string.h>
+#include <kernel/backtrace.h>
 
-    #define ASSERT(cond)                                        \
-        do {                                                    \
-            int a = (int)(cond);                                \
-            if (!a) {                                           \
-                printk("%s:%d: %s: assertion '%s' failed\n",    \
-                __FILENAME__, __LINE__, __func__, #cond);       \
-            }                                                   \
-        } while (0)
+#define ASSERT(cond) \
+    do { \
+        int a = (int)(cond); (void)a; \
+        if (!a) \
+        { \
+            log_error("assertion "#cond" failed"); \
+            backtrace_dump(); \
+        } \
+    } while (0)
+
+#define ASSERT_NOT_REACHED() \
+    do { \
+        panic("Should not reach!"); \
+    } while (1)
 
 #else
-    #define ASSERT(cond) do { } while(0)
-#endif
-    
-    #define kernel_trace(string, ...)
-
+#define ASSERT(cond) do { } while(0)
+#define ASSERT_NOT_REACHED()
 #endif

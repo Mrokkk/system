@@ -1,10 +1,7 @@
-#ifndef INCLUDE_KERNEL_SPINLOCK_H_
-#define INCLUDE_KERNEL_SPINLOCK_H_
+#pragma once
 
-/* I hate typedefs because of hiding real things,
- * but that's the only case they are justified
- */
-typedef struct spinlock {
+typedef struct spinlock
+{
     volatile unsigned int lock;
 } spinlock_t;
 
@@ -19,10 +16,7 @@ typedef struct spinlock {
 
 #define spinlock_init(x)    (x)->lock = SPINLOCK_UNLOCKED
 
-/* Include arch-dependent header, which defines
- * all spin-lock operations, i.e. lock, unlock,
- * trylock
- */
+// Include arch-dependent header, which defines
+// all spin-lock operations, i.e. lock, unlock,
+// trylock
 #include <arch/spinlock.h>
-
-#endif /* INCLUDE_KERNEL_SPINLOCK_H_ */

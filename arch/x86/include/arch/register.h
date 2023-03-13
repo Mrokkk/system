@@ -1,8 +1,7 @@
-#ifndef __REGISTER_H_
-#define __REGISTER_H_
+#pragma once
 
-#include <kernel/compiler.h>
 #include <arch/processor.h>
+#include <kernel/compiler.h>
 
 #define eflags_cf_pos       0
 #define eflags_pf_pos       2
@@ -59,146 +58,157 @@
 #ifndef __ASSEMBLER__
 
 #define general_reg_union(letter) \
-    {                                   \
-        unsigned int e##letter##x;      \
-        unsigned short letter##x;       \
-        struct {                        \
-            unsigned char letter##l;    \
-            unsigned char letter##h;    \
-        };                              \
+    { \
+        uint32_t e##letter##x; \
+        uint16_t letter##x; \
+        struct \
+        { \
+            uint8_t letter##l; \
+            uint8_t letter##h; \
+        }; \
     }
 
 #define index_reg_union(letter) \
-    {                                   \
-        unsigned int e##letter##i;      \
-        unsigned short letter##i;       \
+    { \
+        uint32_t e##letter##i; \
+        uint16_t letter##i; \
     }
 
-struct regs_struct {
+struct regs
+{
     union general_reg_union(a);
     union general_reg_union(b);
     union general_reg_union(c);
     union general_reg_union(d);
     union index_reg_union(s);
     union index_reg_union(d);
-    unsigned int eflags;
-} __attribute__ ((packed));
+    uint32_t eflags;
+} __packed;
 
-int eflags_bits_string_get(unsigned int eflags, char *buffer);
-int cr0_bits_string_get(unsigned int cr0, char *buffer);
-int cr4_bits_string_get(unsigned int cr4, char *buffer);
+int eflags_bits_string_get(uint32_t eflags, char* buffer);
+int cr0_bits_string_get(uint32_t cr0, char* buffer);
+int cr4_bits_string_get(uint32_t cr4, char* buffer);
 
-extern unsigned long eip_get();
+extern uint32_t eip_get();
 
-static inline unsigned int dr0_get() {
-    unsigned int rv;
+static inline uint32_t dr0_get()
+{
+    uint32_t rv;
     asm volatile("mov %%dr0, %0" : "=r" (rv));
     return rv;
 }
 
-static inline unsigned int dr1_get() {
-    unsigned int rv;
+static inline uint32_t dr1_get()
+{
+    uint32_t rv;
     asm volatile("mov %%dr2, %0" : "=r" (rv));
     return rv;
 }
 
-static inline unsigned int dr2_get() {
-    unsigned int rv;
+static inline uint32_t dr2_get()
+{
+    uint32_t rv;
     asm volatile("mov %%dr2, %0" : "=r" (rv));
     return rv;
 }
 
-static inline unsigned int dr3_get() {
-    unsigned int rv;
+static inline uint32_t dr3_get()
+{
+    uint32_t rv;
     asm volatile("mov %%dr3, %0" : "=r" (rv));
     return rv;
 }
 
 #define eflags_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("pushf; pop %0" : "=r" (rv));  \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("pushf; pop %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define cr0_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%cr0, %0" : "=r" (rv));  \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%cr0, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define cr2_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%cr2, %0" : "=r" (rv));  \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%cr2, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define cr3_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%cr3, %0" : "=r" (rv));  \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%cr3, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define cr4_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%cr4, %0" : "=r" (rv));  \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%cr4, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define cs_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%cs, %0" : "=r" (rv));   \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%cs, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define ds_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%ds, %0" : "=r" (rv));   \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%ds, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define es_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%es, %0" : "=r" (rv));   \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%es, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define fs_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%fs, %0" : "=r" (rv));   \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%fs, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define gs_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%gs, %0" : "=r" (rv));   \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%gs, %0" : "=r" (rv)); \
+        rv; \
     })
 
 #define ss_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%ss, %0" : "=r" (rv));   \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%ss, %0" : "=r" (rv)); \
+        rv; \
     })
 
 
 #define esp_get() \
-    ({                                              \
-        unsigned int rv;                            \
-        asm volatile("mov %%esp, %0" : "=r" (rv));  \
-        rv;                                         \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%esp, %0" : "=r" (rv)); \
+        rv; \
     })
 
-#endif /* __ASSEMBLER__ */
+#define ebp_get() \
+    ({ \
+        uint32_t rv; \
+        asm volatile("mov %%ebp, %0" : "=r" (rv)); \
+        rv; \
+    })
 
-#endif /* __REGISTER_H_ */
+#endif // __ASSEMBLER__

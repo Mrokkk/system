@@ -12,6 +12,7 @@ SECTIONS {
     .unpagged BLOCK(4K) : ALIGN(4K) {
         KEEP(*(.multiboot))
         KEEP(*(.text.boot))
+        KEEP(*(.user))
     }
 
     . += _kernel_offset;

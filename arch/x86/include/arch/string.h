@@ -1,16 +1,13 @@
-#ifndef __X86_STRING_H_
-#define __X86_STRING_H_
+#pragma once
 
-#include <kernel/compiler.h>
 #include <kernel/types.h>
+#include <kernel/compiler.h>
 
-/* These functions are part of Linux source */
+// These functions are part of Linux source
 
-/*===========================================================================*
- *                                  strnlen                                  *
- *===========================================================================*/
 #define __HAVE_ARCH_STRNLEN
-static inline size_t strnlen(const char * s, size_t count) {
+static inline size_t strnlen(const char* s, size_t count)
+{
     int d0;
     register int __res;
     asm volatile(
@@ -31,11 +28,9 @@ static inline size_t strnlen(const char * s, size_t count) {
     return __res;
 }
 
-/*===========================================================================*
- *                               __memcpy_by4                                *
- *===========================================================================*/
-static inline void * __memcpy_by4(void * to, const void * from, size_t n) {
-    register void *tmp = (void *)to;
+static inline void* __memcpy_by4(void* to, const void* from, size_t n)
+{
+    register void* tmp = (void*)to;
     register int dummy1,dummy2;
     asm volatile(
         "1:                     \n"
@@ -51,11 +46,9 @@ static inline void * __memcpy_by4(void * to, const void * from, size_t n) {
     return (to);
 }
 
-/*===========================================================================*
- *                               __memcpy_by2                                *
- *===========================================================================*/
-static inline void * __memcpy_by2(void * to, const void * from, size_t n) {
-    register void *tmp = (void *)to;
+static inline void* __memcpy_by2(void* to, const void* from, size_t n)
+{
+    register void* tmp = (void*)to;
     register int dummy1,dummy2;
     asm volatile(
         "shrl $1, %3            \n"
@@ -76,12 +69,10 @@ static inline void * __memcpy_by2(void * to, const void * from, size_t n) {
     return (to);
 }
 
-/*===========================================================================*
- *                                __memcpy_g                                 *
- *===========================================================================*/
-static inline void * __memcpy_g(void * to, const void * from, size_t n) {
+static inline void* __memcpy_g(void* to, const void* from, size_t n)
+{
     int d0, d1, d2;
-    register void *tmp = (void *)to;
+    register void* tmp = (void*)to;
     asm volatile(
         "shrl $1, %%ecx         \n"
         "jnc 1f                 \n"
@@ -99,9 +90,6 @@ static inline void * __memcpy_g(void * to, const void * from, size_t n) {
     return (to);
 }
 
-/*===========================================================================*
- *                                __memcpy_c                                 *
- *===========================================================================*/
 #define __memcpy_c(d,s,count) \
 ((count%4==0) ? \
  __memcpy_by4((d),(s),(count)) : \
@@ -114,14 +102,29 @@ static inline void * __memcpy_g(void * to, const void * from, size_t n) {
      __memcpy_c((d),(s),(count)) : \
      __memcpy_g((d),(s),(count)));
 
-/*===========================================================================*
- *                                  memcpy                                   *
- *===========================================================================*/
 #define __HAVE_ARCH_MEMCPY
-static inline void *memcpy(void *d, const void *s, size_t count) {
-
+static inline void* memcpy(void* d, const void* s, size_t count)
+{
     return __memcpy(d, s, count);
-
 }
 
-#endif /* __X86_STRING_H_ */
+#define __HAVE_ARCH_STRCMP
+static inline int strcmp(const char *cs, const char *ct)
+{
+    int d0, d1;
+    int res;
+    asm volatile("1:\tlodsb\n\t"
+        "scasb\n\t"
+        "jne 2f\n\t"
+        "testb %%al,%%al\n\t"
+        "jne 1b\n\t"
+        "xorl %%eax,%%eax\n\t"
+        "jmp 3f\n"
+        "2:\tsbbl %%eax,%%eax\n\t"
+        "orb $1,%%al\n"
+        "3:"
+        : "=a" (res), "=&S" (d0), "=&D" (d1)
+        : "1" (cs), "2" (ct)
+        : "memory");
+    return res;
+}

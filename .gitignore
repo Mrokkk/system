@@ -9,9 +9,7 @@ compile.h
 *.files
 *~
 .*~
-config.h
 config
-/bin/
 /obj/
 /iso/
 .idea/

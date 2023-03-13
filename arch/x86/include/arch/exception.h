@@ -65,6 +65,12 @@
 #define __SIGNAL_general_protection SIGKILL
 #define __SIGNAL_page_fault         SIGKILL
 
+#define PF_PRESENT  1
+#define PF_WRITE    2
+#define PF_USER     4
+#define PF_RESERVED 8
+#define PF_IFETCH   16
+
 #endif
 
 #ifndef __exception_noerrno

@@ -1,37 +1,50 @@
-#ifndef __DEVICE_H_
-#define __DEVICE_H_
+#pragma once
 
-#include <kernel/kernel.h>
-#include <kernel/module.h>
 #include <kernel/fs.h>
 #include <kernel/dev.h>
 #include <kernel/list.h>
+#include <kernel/kernel.h>
+#include <kernel/module.h>
 
+#define CHAR_DEVICES_SIZE 16
+#define CHAR_DEVICE_NAME_SIZE 32
+
+#define MAJOR_CHR_FB        3
 #define MAJOR_CHR_TTY       4
 #define MAJOR_CHR_SERIAL    5
 #define MAJOR_BLK_FLOPPY    5
 
-struct device {
-    char name[32];
-    struct kernel_module *owner;
-    struct file_operations *fops;
-};
+typedef struct device
+{
+    char name[CHAR_DEVICE_NAME_SIZE];
+    struct kernel_module* owner;
+    struct file_operations* fops;
+    dev_t max_minor;
+    void* private;
+} device_t;
 
-int __char_device_register(unsigned int major, const char *name, struct file_operations *fops, unsigned int this_module);
-int char_devices_list_get(char *buffer);
-int char_device_find(const char *name, struct device **dev);
+int __char_device_register(
+    unsigned int major,
+    const char* name,
+    struct file_operations* fops,
+    dev_t max_minor,
+    void* private,
+    unsigned int this_module);
 
-extern struct device *char_devices[16];
+int char_devices_list_get(char* buffer);
+int char_device_find(const char* name, struct device** dev);
 
-static inline struct device *char_device_get(unsigned int major) {
+extern device_t* char_devices[CHAR_DEVICES_SIZE];
+
+static inline device_t* char_device_get(unsigned int major)
+{
     return char_devices[major];
 }
 
-static inline struct file_operations *char_fops_get(unsigned int major) {
+static inline struct file_operations* char_fops_get(unsigned int major)
+{
     return char_devices[major]->fops;
 }
 
-#define char_device_register(major, name, fops) \
-    __char_device_register(major, name, fops, (unsigned int)&this_module)
-
-#endif /* __DEVICE_H_ */
+#define char_device_register(major, name, fops, max_minor, private) \
+    __char_device_register(major, name, fops, max_minor, private, addr(&this_module))

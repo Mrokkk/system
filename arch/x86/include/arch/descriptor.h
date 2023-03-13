@@ -1,115 +1,97 @@
-#ifndef __DESCRIPTOR_H_
-#define __DESCRIPTOR_H_
+#pragma once
 
 #ifndef __ASSEMBLER__
 
+#include <arch/processor.h>
 #include <kernel/compiler.h>
 
-struct gdt_entry {
-    unsigned short limit_low;
-    unsigned short base_low;
-    unsigned char base_middle;
-    unsigned char access;
-    unsigned char granularity;
-    unsigned char base_high;
-} __attribute__ ((packed));
+struct gdt_entry
+{
+    uint16_t limit_low;
+    uint16_t base_low;
+    uint8_t base_middle;
+    uint8_t access;
+    uint8_t granularity;
+    uint8_t base_high;
+} __packed;
 
-struct gdt {
-    unsigned short limit;
-    unsigned int base;
-} __attribute__ ((packed));
+struct gdt
+{
+    uint16_t limit;
+    uint32_t base;
+} __packed;
 
-struct tss {
-   unsigned long prev_tss;
-   unsigned long esp0;
-   unsigned long ss0;
-   unsigned long esp1;
-   unsigned long ss1;
-   unsigned long esp2;
-   unsigned long ss2;
-   unsigned long cr3;
-   unsigned long eip;
-   unsigned long eflags;
-   unsigned long eax;
-   unsigned long ecx;
-   unsigned long edx;
-   unsigned long ebx;
-   unsigned long esp;
-   unsigned long ebp;
-   unsigned long esi;
-   unsigned long edi;
-   unsigned long es;
-   unsigned long cs;
-   unsigned long ss;
-   unsigned long ds;
-   unsigned long fs;
-   unsigned long gs;
-   unsigned long ldt;
-   unsigned short trap;
-   unsigned short iomap_offset;
-   unsigned char io_bitmap[128];
-} __attribute__ ((packed));
+struct idt_entry
+{
+   uint16_t base_lo;
+   uint16_t sel;
+   uint8_t always0;
+   uint8_t flags;
+   uint16_t base_hi;
+} __packed;
 
-struct idt_entry {
-   unsigned short base_lo;
-   unsigned short sel;
-   unsigned char  always0;
-   unsigned char  flags;
-   unsigned short base_hi;
-} __attribute__ ((packed));
+struct idt
+{
+   uint16_t limit;
+   uint32_t base;
+} __packed;
 
-struct idt {
-   unsigned short limit;
-   unsigned long base;
-} __attribute__ ((packed));
+extern struct gdt_entry* gdt_entries;
 
-extern struct gdt_entry *gdt_entries;
-
-static inline void idt_load(struct idt *idt) {
+static inline void idt_load(struct idt* idt)
+{
     asm volatile(
         "lidt (%%eax);"
         :: "a" (idt)
     );
 }
 
-static inline void idt_store(struct idt *idt) {
+static inline void idt_store(struct idt* idt)
+{
     asm volatile(
         "sidt (%%eax);"
         :: "a" (idt)
     );
 }
 
-static inline void tss_load(unsigned short sel) {
+static inline void tss_load(uint16_t sel)
+{
     asm volatile(
         "ltr %%ax;"
         :: "a" (sel)
     );
 }
 
-static inline void tss_store(unsigned short *sel) {
+static inline void tss_store(uint16_t* sel)
+{
     asm volatile(
         "str %%ax;"
         : "=a" (*sel)
     );
 }
 
-static inline void gdt_load(struct gdt *gdt) {
+static inline void gdt_load(struct gdt* gdt)
+{
     asm volatile(
-        "    lgdt (%%eax);"
-        "    ljmp $0x08, $1f;"
+        "lgdt (%%eax);"
+        "ljmp $0x08, $1f;"
         "1:"
         :: "a" (gdt)
     );
 }
 
-static inline void gdt_store(struct gdt *gdt) {
+static inline void gdt_store(struct gdt* gdt)
+{
     asm volatile(
         "sgdt (%%eax);"
         :: "a" (gdt)
     );
 }
 
-#endif /* !__ASSEMBLER__ */
+void tss_init(void);
+void idt_init(void);
+
+#endif // !__ASSEMBLER__
 
 #define FIRST_TSS_ENTRY 5
 #define FIRST_APM_ENTRY 6
@@ -138,14 +120,13 @@ static inline void gdt_store(struct gdt *gdt) {
 #define GDT_HI_FLAGS(flags) \
     (((flags) >> 1) & 0xf0)
 
-/* flags has following layout:
- *
- * MSB                      LSB
- * 9   8   7  6  5   4      0
- * [ G | D | DPL | S | TYPE ]
- *
- * Warn: TYPE includes also access bit (A)
- */
+// flags has following layout:
+//
+// MSB                      LSB
+// 9   8   7  6  5   4      0
+// [ G | D | DPL | S | TYPE ]
+//
+// Note: TYPE includes also access bit (A)
 
 #ifndef __ASSEMBLER__
 
@@ -177,7 +158,7 @@ static inline void gdt_store(struct gdt *gdt) {
 #define descriptor_get_type(gdt, num) \
     (gdt[num].access & 0x1e)
 
-#else /* __ASSEMBLER__ */
+#else // __ASSEMBLER__
 
 #define descriptor_entry(flags, base, limit) \
         .word GDT_LOW_LIMIT(limit); \
@@ -187,23 +168,23 @@ static inline void gdt_store(struct gdt *gdt) {
         .byte GDT_HI_LIMIT(limit) | GDT_HI_FLAGS(flags); \
         .byte GDT_HI_BASE(base);
 
-#endif /* !__ASSEMBLER__ */
+#endif // !__ASSEMBLER__
 
-/* DPL in flags */
+// DPL in flags
 #define GDT_FLAGS_RING0         (0 << 5)
 #define GDT_FLAGS_RING1         (1 << 5)
 #define GDT_FLAGS_RING2         (2 << 5)
 #define GDT_FLAGS_RING3         (3 << 5)
 
-/* G in flags */
+// G in flags
 #define GDT_FLAGS_4KB           (1 << 8)
 #define GDT_FLAGS_1B            (0 << 8)
 
-/* D in flags */
+// D in flags
 #define GDT_FLAGS_16BIT         (0 << 7)
 #define GDT_FLAGS_32BIT         (1 << 7)
 
-/* TYPE */
+// TYPE
 #define GDT_FLAGS_TYPE_CODE         (0x1a)
 #define GDT_FLAGS_TYPE_DATA         (0x12)
 #define GDT_FLAGS_TYPE_16TSS        (0x1)
@@ -213,5 +194,3 @@ static inline void gdt_store(struct gdt *gdt) {
 #define GDT_FLAGS_TYPE_16TRAP_GATE  (0x7)
 #define GDT_FLAGS_TYPE_32TRAP_GATE  (0xf)
 #define GDT_FLAGS_TYPE_TASK_GATE    (0x5)
-
-#endif /* __DESCRIPTOR_H_ */

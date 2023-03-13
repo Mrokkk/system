@@ -1,5 +1,4 @@
-#ifndef __PIT_H_
-#define __PIT_H_
+#pragma once
 
 #define PIT_PORT_CHANNEL0 0x40
 #define PIT_PORT_CHANNEL1 0x41
@@ -27,6 +26,3 @@
 #define PIT_CHANNEL1    (1 << 6)
 #define PIT_CHANNEL2    (2 << 6)
 #define PIT_READ_BACK   (3 << 6)
-
-
-#endif /* __PIT_H_ */

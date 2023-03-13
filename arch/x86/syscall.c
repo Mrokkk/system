@@ -1,9 +1,5 @@
 #include <kernel/kernel.h>
 
-/*
- * Syscall table moved from x86_base.S
- */
-
 typedef int (*syscall_t)();
 
 #define __syscall0(call) int sys_##call();
@@ -31,5 +27,3 @@ typedef int (*syscall_t)();
 syscall_t syscalls[] = {
 #include <kernel/unistd.h>
 };
-
-

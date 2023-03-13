@@ -1,5 +1,4 @@
-#ifndef INCLUDE_KERNEL_MACRO_H_
-#define INCLUDE_KERNEL_MACRO_H_
+#pragma once
 
 #define GET_1ND_ARG(arg1, ...) \
     arg1
@@ -23,6 +22,4 @@
     MACRO_CHOOSER_2(macro1, macro2, __VA_ARGS__)(__VA_ARGS__)
 
 #define REAL_VAR_MACRO_3(macro1, macro2, macro3, ...) \
-    MACRO_CHOOSER_2(macro1, macro2, macro3,  __VA_ARGS__)(__VA_ARGS__)
-
-#endif /* INCLUDE_KERNEL_MACRO_H_ */
+    MACRO_CHOOSER_3(macro1, macro2, macro3,  __VA_ARGS__)(__VA_ARGS__)

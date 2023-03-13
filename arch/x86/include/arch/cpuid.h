@@ -1,28 +1,32 @@
-#ifndef __CPUID_H_
-#define __CPUID_H_
+#pragma once
 
-struct cpuid_regs {
-    unsigned int eax;
-    unsigned int ebx;
-    unsigned int ecx;
-    unsigned int edx;
-    unsigned int null;
-} __attribute__ ((packed));
+#include <stdint.h>
+#include <kernel/compiler.h>
 
-struct cpuid {
+struct cpuid_regs
+{
+    uint32_t eax;
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t null;
+} __packed;
+
+struct cpuid
+{
     char vendor[13];
     char brand[46];
-    unsigned char brand_id;
-    unsigned short model;
-    unsigned short family;
-    unsigned char type;
-    unsigned short ext_model;
-    unsigned short ext_family;
-    unsigned short stepping;
+    uint8_t brand_id;
+    uint16_t model;
+    uint16_t family;
+    uint8_t type;
+    uint16_t ext_model;
+    uint16_t ext_family;
+    uint16_t stepping;
     union {
-        unsigned int intel_ext;
-        unsigned int amd_ext;
-    } dep;
+        uint32_t intel_ext;
+        uint32_t amd_ext;
+    };
 };
 
 #define INTEL_FPU       (1)
@@ -92,22 +96,17 @@ struct cpuid {
 #define INTEL_PBE_STRING    "Pending Break Enable"
 
 #define cpuid_ext_avl(flags, ext) \
-    ((flags) & (ext)) && 1
+    (((flags) & (ext)) && 1)
 
-/*===========================================================================*
- *                                cpuid_read                                 *
- *===========================================================================*/
-static inline void cpuid_read(unsigned int function, struct cpuid_regs *regs) {
-
+static inline void cpuid_read(uint32_t function, struct cpuid_regs* regs)
+{
     asm volatile(
-        "cpuid\n"
+        "cpuid;"
         : "=a" (regs->eax), "=b" (regs->ebx), "=c" (regs->ecx), "=d" (regs->edx)
         : "a" (function)
         : "cc"
     );
-
 }
 
-void cpuid_extensions_print(unsigned int ext);
-
-#endif
+void cpuid_extensions_print(uint32_t ext);
+int cpu_info_get(void);

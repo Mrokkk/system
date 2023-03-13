@@ -33,23 +33,25 @@
 #define __NR_utime 30
 #define __NR_stty 31
 #define __NR_gtty 32
-//#define __NR_nosys3 33
+#define __NR_mkdir 33
 #define __NR_nice 34
 #define __NR_sleep 35
 #define __NR_sync 36
 #define __NR_kill 37
 #define __NR_switch 38
-//#define __NR_xxxx
-//#define __NR_xxxxx
+#define __NR_reboot 39
+#define __NR_getcwd 40
 #define __NR_dup 41
 #define __NR_pipe 42
 #define __NR_times 43
 #define __NR_prof 44
-//#define __NR_xxxxxx
+#define __NR_getdents 45
 #define __NR_setgid 46
 #define __NR_getgid 47
 #define __NR_signal 48
 #define __NR_readdir 49
+#define __NR_dup2 50
+#define __NR_sbrk 51
 #define __NR_getppid 64
 #define __NR_sigreturn 119
 #define __NR_clone 120
@@ -60,28 +62,30 @@
 
 #include <kernel/types.h>
 
-struct syscall_trace {
-    char *name;
-    char params[4];
-};
-
 int fork(void);
-pid_t getpid();
-pid_t getppid();
+pid_t getpid(void);
+pid_t getppid(void);
 void exit(int);
-int write(int, const char *, size_t);
-int read(int, void *, size_t);
-int open(const char *, int);
+int write(int, const char*, size_t);
+int read(int, void*, size_t);
+int open(const char*, int, int);
 int close(int);
 int dup(int);
-int waitpid(int, int *, int);
-int exec();
-int mount(const char *, const char *, const char *, int, void *);
-int clone(unsigned int flags, void *stack);
+int waitpid(int, int*, int);
+int exec(const char*, char* const argv[]);
+int mount(const char*, const char*, const char*, int, void*);
+int mkdir(const char*, int);
+int creat(const char*, int);
+int clone(unsigned int flags, void* stack);
+int getdents(unsigned int, void*, size_t);
+int reboot(int magic, int magic2, int cmd);
+int chdir(const char* buf);
+int getcwd(char* buf, size_t size);
+void* sbrk(size_t incr);
 
-#endif /* __ASSEMBLER__ */
+#endif // __ASSEMBLER__
 
-#endif /* __SYSCALLS_H_ */
+#endif // __SYSCALLS_H_
 
 #ifndef __syscall0
 #define __syscall0(call)
@@ -121,11 +125,11 @@ __syscall1(exit, TYPE_SL_DEC)
 __syscall0(fork)
 __syscall3(read, TYPE_UL_DEC, TYPE_STRING, TYPE_UL_DEC)
 __syscall3(write, TYPE_UL_DEC, TYPE_STRING, TYPE_UL_DEC)
-__syscall2(open, TYPE_STRING, TYPE_UL_DEC)
+__syscall3(open, TYPE_STRING, TYPE_UL_DEC, TYPE_UL_DEC)
 __syscall1(dup, TYPE_SL_DEC)
 __syscall1(close, int)
 __syscall3(waitpid, int, int *, int)
-__syscall1(exec, int)
+__syscall2(exec, const char*, char* const[])
 __syscall5(mount, const char *, const char *, const char *, 0, 0)
 __syscall2(clone, unsigned int, void *)
 __syscall2(kill, int, int)
@@ -133,4 +137,12 @@ __syscall2(signal, int, int (*)(int))
 __syscall1(sigreturn, int)
 __syscall0(getpid)
 __syscall0(getppid)
-
+__syscall2(mkdir, const char*, int)
+__syscall2(creat, const char*, int)
+__syscall3(getdents, unsigned int, void*, size_t)
+__syscall3(reboot, int, int, int)
+__syscall1(chdir, const char*)
+__syscall2(getcwd, char*, size_t)
+__syscall2(dup2, int, int)
+__syscall1(sbrk, size_t)
+__syscall2(stat, const char*, struct stat*)

@@ -1,2 +1,2 @@
-file(GLOB drivers_src "*.c" "char/*.c")
-add_library(drivers OBJECT ${drivers_src})
+file(GLOB_RECURSE SRC "*.c")
+add_library(drivers OBJECT ${SRC})

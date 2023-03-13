@@ -1,7 +1,4 @@
-#ifndef INCLUDE_KERNEL_SIGNAL_H_
-#define INCLUDE_KERNEL_SIGNAL_H_
-
-#include <kernel/kernel.h>
+#pragma once
 
 #define SIGHUP       1
 #define SIGINT       2
@@ -42,15 +39,18 @@
 
 typedef int (*sighandler_t)();
 
+struct process;
+
 int signal(int signum, sighandler_t handler);
 int kill(int pid, int signum);
+int do_kill(struct process* proc, int signum);
 
-static inline int signum_exists(int s) {
+static inline int signum_exists(int s)
+{
     return (s < NSIGNALS && s > 0);
 }
 
-static inline int signal_can_be_trapped(int s) {
+static inline int signal_can_be_trapped(int s)
+{
     return (s != SIGKILL && s != SIGSTOP);
 }
-
-#endif /* INCLUDE_KERNEL_SIGNAL_H_ */

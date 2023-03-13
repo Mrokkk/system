@@ -1,243 +1,280 @@
-#include <arch/processor.h>
-#include <arch/descriptor.h>
+#include <arch/io.h>
+#include <arch/vm.h>
+#include <arch/page.h>
 #include <arch/string.h>
 #include <arch/segment.h>
 #include <arch/register.h>
-#include <arch/io.h>
-#include <arch/page.h>
+#include <arch/processor.h>
+#include <arch/descriptor.h>
 
-#include <kernel/unistd.h>
+#include <kernel/fs.h>
+#include <kernel/debug.h>
 #include <kernel/process.h>
 
-#define PROCESS_KERNEL_STACK_SIZE 4096
-
 #define push(val, stack) \
-    (stack)--; *stack = (typeof(*stack))(val);
+    { (stack)--; *stack = (typeof(*stack))(val); }
 
 extern void ret_from_syscall();
 
-static void *stack_copy(unsigned int *dest, unsigned int *src,
-        unsigned int size) {
-
-    void *dest_begin = (void *)((unsigned int)dest - size);
-    void *src_begin = (void *)((unsigned int)src - size);
+static void* stack_copy(
+    uint32_t* dest,
+    uint32_t* src,
+    uint32_t size)
+{
+    void* dest_begin = ptr(addr(dest) - size);
+    void* src_begin = ptr(addr(src) - size);
 
     return memcpy(dest_begin, src_begin, size);
-
 }
 
-static inline void *stack_create(unsigned int size) {
-
-    (void)size;
-
-    return (void *)((unsigned int)page_alloc() + PAGE_SIZE);
-
-}
-
-static inline void fork_kernel_stack_frame(unsigned int **kernel_stack,
-        unsigned int *user_stack, struct pt_regs *regs) {
-
-    if (regs->cs == USER_CS) {
-        push(USER_DS, *kernel_stack);                   /* ss */
-        push(user_stack, *kernel_stack);                /* esp */
+static inline void fork_kernel_stack_frame(
+    uint32_t** kernel_stack,
+    uint32_t* user_stack,
+    struct pt_regs* regs,
+    uint32_t ebp)
+{
+#define pushk(v) push((v), *kernel_stack)
+    if (!ebp)
+    {
+        ebp = regs->ebp;
     }
-    push(regs->eflags | 0x200, *kernel_stack);          /* eflags */
-    push(regs->cs, *kernel_stack);                      /* cs */
-    push(regs->eip, *kernel_stack);                     /* eip */
-    push(regs->gs, *kernel_stack);                      /* gs */
-    push(regs->fs, *kernel_stack);                      /* fs */
-    push(regs->es, *kernel_stack);                      /* es */
-    push(regs->ds, *kernel_stack);                      /* ds */
-    push(0, *kernel_stack);                             /* eax */
-    push((unsigned int)user_stack + regs->ebp
-            - (unsigned int)regs->esp, *kernel_stack);  /* ebp */
-    push(regs->edi, *kernel_stack);                     /* edi */
-    push(regs->esi, *kernel_stack);                     /* esi */
-    push(regs->edx, *kernel_stack);                     /* edx */
-    push(regs->ecx, *kernel_stack);                     /* ecx */
-    push(regs->ebx, *kernel_stack);                     /* ebx */
 
+    uint32_t eflags = regs->eflags | 0x200;
+    if (regs->cs == USER_CS)
+    {
+        pushk(USER_DS);     // ss
+        pushk(user_stack);  // esp
+    }
+    pushk(eflags);      // eflags
+    pushk(regs->cs);    // cs
+    pushk(regs->eip);   // eip
+    pushk(regs->gs);    // gs
+    pushk(regs->fs);    // fs
+    pushk(regs->es);    // es
+    pushk(regs->ds);    // ds
+    pushk(0)            // eax; return value in child
+    pushk(ebp);         // ebp
+    pushk(regs->edi);   // edi
+    pushk(regs->esi);   // esi
+    pushk(regs->edx);   // edx
+    pushk(regs->ecx);   // ecx
+    pushk(regs->ebx);   // ebx
+#undef pushk
 }
 
-unsigned int kernel_process_setup_stack(struct process *dest,
-        struct process *src,
-        struct pt_regs *src_regs) {
+uint32_t kernel_process_setup_stack(
+    struct process* dest,
+    struct process* src,
+    struct pt_regs* src_regs)
+{
+    uint32_t* dest_stack = dest->mm->kernel_stack;
+    uint32_t* temp;
 
-    unsigned int *dest_stack = (unsigned int *)dest->mm.end,
-                 *process_stack;
-
-    /*
-     * We're not creating kernel stack for kernel process,
-     * because it would never be used (except for one case)
-     */
-
-    (void)src;
-
-    /*
-     * If we'are not changing privilege level, which we don't do in that case
-     * (privilege levels in the process and in the handler are the same), we
-     * don't have the EIP value in the pt_regs (exactly we have but it points
-     * to some random value). But we can figure out its address. If CPU doesn't
-     * change privileges in the exception entry, it doesn't change stacks, so
-     * it simply pushes appropriate values (EFLAGS, CS and EIP) on the
-     * currently using stack. So, the ESP value that has been used in the
-     * process before exception is the address 4 bytes after EFLAGS, which
-     * is the address of the ESP field in the pt_regs.
-     */
+    // If we'are not changing privilege level, which we don't do in that case
+    // (privilege levels in the process and in the handler are the same), we
+    // don't have the EIP value in the pt_regs (exactly we have but it points
+    // to some random value). But we can figure out its address. If CPU doesn't
+    // change privileges in the exception entry, it doesn't change stacks, so
+    // it simply pushes appropriate values (EFLAGS, CS and EIP) on the
+    // currently used stack. So, the ESP value that has been used in the
+    // process before exception is the address 4 bytes after EFLAGS, which
+    // is the address of the ESP field in the pt_regs.
 
     dest_stack = stack_copy(
-            (unsigned int *)dest_stack,
-            (unsigned int *)src->mm.end,
-            (unsigned int)src->mm.end - (unsigned int)&src_regs->esp);
+        dest_stack,
+        src->mm->kernel_stack,
+        addr(src->mm->kernel_stack) - addr(&src_regs->esp));
 
-    process_stack = dest_stack;
+    temp = dest_stack;
     dest->context.esp0 = 0;
 
-    fork_kernel_stack_frame(&dest_stack, process_stack, src_regs);
+    // FIXME: this should not be done; ideally, all stacks should be mapped to same
+    // virtual address; and they are for user processes, but not the kernel ones
+    uint32_t ebp_offset = addr(src->mm->kernel_stack) - src_regs->ebp;
+    uint32_t ebp = addr(dest->mm->kernel_stack) - ebp_offset;
 
-    return (unsigned int)dest_stack;
+    fork_kernel_stack_frame(&dest_stack, temp, src_regs, ebp);
 
+    log_debug("stack=%x", dest_stack);
+
+    return addr(dest_stack);
 }
 
-unsigned int user_process_setup_stack(struct process *dest,
-        struct process *src,
-        struct pt_regs *src_regs) {
+uint32_t user_process_setup_stack(
+    struct process* dest,
+    struct process* src,
+    struct pt_regs* src_regs)
+{
+    uint32_t* kernel_stack;
+    vm_area_t* src_stack_vma = process_stack_vm_area(src);
+    vm_area_t* dest_stack_vma = process_stack_vm_area(dest);
 
-    unsigned int *kernel_stack;
-    unsigned int *user_stack;
-    unsigned int *dest_stack_start = (unsigned int *)dest->mm.end;
-    unsigned int *src_stack_start = (unsigned int *)src->mm.end;
-    unsigned int *src_stack_end = (unsigned int *)src_regs->esp;
+    uint32_t size = vm_virt_end(src_stack_vma) - src_regs->esp;
 
-    dest->context.esp0 = (unsigned int)(kernel_stack =
-            stack_create(PROCESS_KERNEL_STACK_SIZE));
+    // We can use virt addr of user space directly, as it should be mapped to our vm
+    uint32_t* src_stack_start = ptr(vm_virt_end(src_stack_vma));
+    uint32_t* dest_stack_start = virt_ptr(vm_paddr_end(dest_stack_vma, ptr(dest->mm->pgd)));
 
-    user_stack = stack_copy((unsigned int *)dest_stack_start, src_stack_start,
-            (unsigned int)src_stack_start - (unsigned int)src_stack_end);
+    dest->context.esp0 = addr(kernel_stack = dest->mm->kernel_stack);
 
-    fork_kernel_stack_frame(&kernel_stack, user_stack, src_regs);
+    log_debug("src_user_stack=%x size=%u", src_stack_start, size);
 
-    return (unsigned int)kernel_stack;
+    stack_copy(
+        ptr(dest_stack_start),
+        src_stack_start,
+        size);
 
+    log_debug("copied %u B; new dest esp=%x",
+        size,
+        dest_stack_vma->virt_address + dest_stack_vma->size - size);
+
+    fork_kernel_stack_frame(
+        &kernel_stack,
+        ptr(vm_virt_end(dest_stack_vma) - size),
+        src_regs,
+        0);
+
+    return addr(kernel_stack);
 }
 
-int arch_process_copy(struct process *dest, struct process *src,
-        struct pt_regs *src_regs) {
+int arch_process_copy(
+    struct process* dest,
+    struct process* src,
+    struct pt_regs* src_regs)
+{
+    dest->context.esp = process_is_kernel(dest)
+        ? kernel_process_setup_stack(dest, src, src_regs)
+        : user_process_setup_stack(dest, src, src_regs);
 
-    if (process_is_kernel(dest))
-        dest->context.esp = kernel_process_setup_stack(dest, src, src_regs);
-    else
-        dest->context.esp = user_process_setup_stack(dest, src, src_regs);
-
-    dest->context.eip = (unsigned int)&ret_from_syscall;
-    dest->context.iomap_offset = 104;
+    dest->context.eip = addr(&ret_from_syscall);
+    dest->context.iomap_offset = IOMAP_OFFSET;
     dest->context.ss0 = KERNEL_DS;
 
-    /* Copy ports permissions */
-    memcpy(dest->context.io_bitmap, src->context.io_bitmap, 128);
+    memcpy(dest->context.io_bitmap, src->context.io_bitmap, IO_BITMAP_SIZE);
 
     return 0;
-
 }
 
-void arch_process_free(struct process *proc) {
-
-    /* Free kernel stack (if exists) */
-    if (proc->context.esp0)
-        page_free((void *)((unsigned int)proc->context.esp0 -
-            PAGE_SIZE));
-
+void arch_process_free(struct process*)
+{
 }
 
 #define FASTCALL(x) __attribute__((regparm(3))) x
 
-void FASTCALL(__process_switch(struct process *prev, struct process *next)) {
-
-    unsigned int base = (unsigned int)&next->context;
-
-    /*
-     * Simply reload TSS with the address of process's context
-     * structure
-     */
-
-    (void)prev; (void)next;
-
+void FASTCALL(__process_switch(struct process*, struct process* next))
+{
+    // Change TSS and clear busy bit
+    uint32_t base = addr(&next->context);
     descriptor_set_base(gdt_entries, FIRST_TSS_ENTRY, base);
+    gdt_entries[FIRST_TSS_ENTRY].access &= 0xf9;
 
-    gdt_entries[FIRST_TSS_ENTRY].access &= 0xf9; /* Clear busy bit */
-
+    // Reload TSS with the address of process's
+    // context structure and load its pgd
     tss_load(FIRST_TSS_ENTRY << 3);
-
+    pgd_load(phys_ptr(next->mm->pgd));
 }
 
-void syscall_regs_check(struct pt_regs regs) {
-
+void syscall_regs_check(struct pt_regs regs)
+{
     ASSERT(cs_get() == KERNEL_CS);
     ASSERT(ds_get() == KERNEL_DS);
-    if (process_is_kernel(process_current)) {
+    if (process_is_kernel(process_current))
+    {
         ASSERT(regs.cs == KERNEL_CS);
         ASSERT(regs.ds == KERNEL_DS);
         ASSERT(regs.gs == KERNEL_DS);
         ASSERT(gs_get() == KERNEL_DS);
         ASSERT(regs.gs == KERNEL_DS);
-    } else {
+    }
+    else
+    {
         ASSERT(regs.cs == USER_CS);
         ASSERT(regs.ds == USER_DS);
         ASSERT(regs.gs == USER_DS);
         ASSERT(regs.gs == USER_DS);
         ASSERT(gs_get() == USER_DS);
     }
-
 }
 
-void regs_print(struct pt_regs *regs) {
-
-    char string[64];
-
-    printk("EAX=0x%08x; ", regs->eax);
-    printk("EBX=0x%08x; ", regs->ebx);
-    printk("ECX=0x%08x; ", regs->ecx);
-    printk("EDX=0x%08x\n", regs->edx);
-    printk("ESP=0x%04x:0x%08x; ", regs->ss, regs->esp);
-    printk("EIP=0x%04x:0x%08x\n", regs->cs, regs->eip);
-    printk("DS=0x%04x; ES=0x%04x; FS=0x%04x; GS=0x%04x\n",
-            regs->ds, regs->es, regs->fs, regs->gs);
-    printk("EFLAGS=0x%08x : ", regs->eflags);
-
-    eflags_bits_string_get(regs->eflags, string);
-    printk("IOPL=%d ", ((unsigned int)regs->eflags >> 12) & 0x3);
-    printk("%s\n", string);
-
-}
-
-int sys_clone(struct pt_regs regs) {
-
-    unsigned int sp = regs.ecx;
-
-    if (!sp) sp = regs.esp;
-
+int sys_clone(struct pt_regs regs)
+{
     return process_clone(process_current, &regs, regs.ebx);
-
 }
 
 static inline void exec_kernel_stack_frame(
-        unsigned int **kernel_stack, unsigned int esp, unsigned int eip) {
-
-    push(USER_DS, *kernel_stack);   /* ss */
-    push(esp, *kernel_stack);       /* esp */
-    push(0x200, *kernel_stack);     /* eflags */
-    push(USER_CS, *kernel_stack);   /* cs */
-    push(eip, *kernel_stack);       /* eip */
-    push(USER_DS, *kernel_stack);   /* gs */
-    push(USER_DS, *kernel_stack);   /* fs */
-    push(USER_DS, *kernel_stack);   /* es */
-    push(USER_DS, *kernel_stack);   /* ds */
-    push(0, *kernel_stack);         /* eax */
-    *kernel_stack -= 6;
-
+    uint32_t** kernel_stack,
+    uint32_t esp,
+    uint32_t eip)
+{
+#define pushk(v) push((v), *kernel_stack)
+    pushk(USER_DS); // ss
+    pushk(esp);     // esp
+    pushk(0x200);   // eflags
+    pushk(USER_CS); // cs
+    pushk(eip);     // eip
+    pushk(USER_DS); // gs
+    pushk(USER_DS); // fs
+    pushk(USER_DS); // es
+    pushk(USER_DS); // ds
+    pushk(0);       // eax
+    pushk(0);       // ebp
+    pushk(0);       // edi
+    pushk(0);       // esi
+    pushk(0);       // edx
+    pushk(0);       // ecx
+    pushk(0);       // ebx
+#undef pushk
 }
 
-#define set_context(stack, ip) \
+static inline vm_area_t* user_space_create(
+    uint32_t address,
+    pgd_t* pgd,
+    int vm_apply_flags)
+{
+    int errno;
+    vm_area_t* vma;
+
+    page_t* page = page_alloc1();
+
+    if (unlikely(!page))
+    {
+        return NULL;
+    }
+
+    vma = vm_create(
+        page,
+        address,
+        PAGE_SIZE,
+        VM_WRITE | VM_READ);
+
+    if (unlikely(!vma))
+    {
+        goto error;
+    }
+
+    errno = vm_apply(vma, pgd, vm_apply_flags);
+
+    if (unlikely(errno))
+    {
+        goto error;
+    }
+
+    return vma;
+
+error:
+    page_free(page_virt_ptr(page));
+    return NULL;
+}
+
+int sys_exec(struct pt_regs regs)
+{
+    const char* pathname = cptr(regs.ebx);
+    const char* const* argv = (const char* const*)(regs.ecx);
+    do_exec(pathname, argv);
+    return 0;
+}
+
+#define set_context(stack, ip)  \
     do {                        \
         asm volatile(           \
             "movl %0, %%esp;"   \
@@ -246,107 +283,191 @@ static inline void exec_kernel_stack_frame(
                "r" (ip));       \
     } while (0)
 
-__noreturn int sys_exec(struct pt_regs regs) {
-
-    unsigned int *kernel_stack, *user_stack, flags, eip = 0;
-
+__noreturn int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack)
+{
+    flags_t flags;
     irq_save(flags);
-
-    eip = regs.ebx;
-
-    if (process_is_kernel(process_current)) {
-        /* We change kernel process to the user process. To do so,
-         * we must create the kernel stack for it.
-         */
-        kernel_stack = stack_create(PROCESS_KERNEL_STACK_SIZE);
-        process_current->context.esp0 = (unsigned int)kernel_stack;
-    } else kernel_stack = (unsigned int *)process_current->context.esp0;
-
-    process_current->type = 0;
-
-    user_stack = process_current->mm.end;
-
-    exec_kernel_stack_frame(&kernel_stack, (unsigned int)user_stack, eip);
-
-    irq_restore(flags);
-
+    exec_kernel_stack_frame(&kernel_stack, user_stack, addr(entry));
     set_context(kernel_stack, &ret_from_syscall);
-
-    while (1);
-
+    ASSERT_NOT_REACHED();
 }
 
-static inline void signal_restore_code_put(unsigned char *user_code) {
+int arch_process_execute_sighan(struct process* proc, uint32_t eip)
+{
+    extern void __sigreturn();
 
-    /* mov $__NR_sigreturn, %eax */
-    *user_code++ = 0xb8;
-    *(unsigned long *)user_code = __NR_sigreturn;
-    user_code += 4;
-
-    /* int $0x80 */
-    *user_code++ = 0xcd;
-    *user_code++ = 0x80;
-
-}
-
-int arch_process_execute(struct process *proc, unsigned int eip) {
-
-    unsigned int *kernel_stack, *sighan_stack, flags;
-    unsigned char *user_code;
+    int errno;
+    uint32_t* kernel_stack;
+    uint32_t* sighan_stack;
+    uint32_t flags;
+    vm_area_t* user_stack_area = NULL;
+    vm_area_t* user_code_area = NULL;
+    pgd_t* pgd = ptr(proc->mm->pgd);
+    uint32_t sigret_addr = addr(&__sigreturn);
+    uint32_t virt_sigret_addr = USER_SIGRET_VIRT_ADDRESS;
+    uint32_t virt_stack_addr = USER_SIGSTACK_VIRT_ADDRESS;
 
     irq_save(flags);
 
-    user_code = (unsigned char *)proc->mm.start;
-    kernel_stack = (unsigned int *)proc->context.esp - 256; /* TODO: */
-    sighan_stack = stack_create(PAGE_SIZE);
+    user_stack_area = user_space_create(virt_stack_addr, pgd, VM_APPLY_REPLACE_PG);
+
+    if (unlikely(!user_stack_area))
+    {
+        irq_restore(flags);
+        return -ENOMEM;
+    }
+
+    user_code_area = vm_create(
+        page_range_get(sigret_addr, 1),
+        virt_sigret_addr,
+        PAGE_SIZE,
+        VM_EXEC | VM_READ | VM_NONFREEABLE);
+
+    if (unlikely(!user_code_area))
+    {
+        irq_restore(flags);
+        return -ENOMEM;
+    }
+
+    if ((errno = vm_apply(user_code_area, pgd, VM_APPLY_REPLACE_PG)))
+    {
+        irq_restore(flags);
+        return errno;
+    }
+
+    proc->signals->user_stack = user_stack_area;
+    proc->signals->user_code = user_code_area;
+
+    sighan_stack = ptr(addr(page_virt_ptr(list_front(&user_stack_area->pages->head, page_t, list_entry))) + PAGE_SIZE);
+    kernel_stack = ptr(addr(proc->context.esp) - 1024); // TODO:
 
     proc->signals->context.esp = proc->context.esp;
     proc->signals->context.esp0 = proc->context.esp0;
     proc->signals->context.eip = proc->context.eip;
-
-    proc->signals->context.eax = (unsigned int)sighan_stack;
+    proc->signals->context.eax = vm_virt_end(user_stack_area);
 
     push(process_current->pid, sighan_stack);
-    push(user_code, sighan_stack);
+    push(virt_sigret_addr, sighan_stack);
 
-    exec_kernel_stack_frame(&kernel_stack, (unsigned int)sighan_stack, eip);
+    exec_kernel_stack_frame(&kernel_stack, vm_virt_end(user_stack_area) - 8, eip);
 
-    proc->context.eip = (unsigned int)ret_from_syscall;
-    proc->context.esp = (unsigned int)kernel_stack;
+    proc->context.eip = addr(&ret_from_syscall);
+    proc->context.esp = addr(kernel_stack);
     proc->context.esp0 = proc->context.esp;
-
-    signal_restore_code_put(user_code);
 
     irq_restore(flags);
 
-    if (proc == process_current) {
+    if (proc == process_current)
+    {
         asm volatile(
-                "movl $1f, %0;"
-                "movl %%esp, %1;"
-                "movl %2, %%esp;"
-                "jmp *%3;"
-                "1:"
-                :: "m" (proc->signals->context.eip),
-                   "m" (proc->signals->context.esp),
-                   "r" (kernel_stack),
-                   "r" (ret_from_syscall)
-                : "memory"
-        );
+            "pushl %%ebx;"
+            "pushl %%ecx;"
+            "pushl %%esi;"
+            "pushl %%edi;"
+            "pushl %%ebp;"
+            "movl $1f, %0;"
+            "movl %%esp, %1;"
+            "movl %2, %%esp;"
+            "jmp *%3;"
+            "1:"
+            "popl %%ebp;"
+            "popl %%edi;"
+            "popl %%esi;"
+            "popl %%ecx;"
+            "popl %%ebx;"
+            :: "m" (proc->signals->context.eip),
+               "m" (proc->signals->context.esp),
+               "r" (kernel_stack),
+               "r" (ret_from_syscall)
+            : "memory");
     }
 
     return 0;
-
 }
 
-__noreturn int sys_sigreturn() {
+__noreturn int sys_sigreturn(struct pt_regs)
+{
+    log_debug("");
 
-    page_free((void *)(process_current->signals->context.eax - PAGE_SIZE));
+    vm_area_t* area;
+
+    if ((area = process_current->signals->user_stack))
+    {
+        vm_remove(area, ptr(process_current->mm->pgd), 1);
+        delete(area);
+    }
+
+    if ((area = process_current->signals->user_code))
+    {
+        vm_remove(area, ptr(process_current->mm->pgd), 1);
+        delete(area);
+    }
+
+    log_debug("setting stack to %x and jumping to %x",
+        process_current->signals->context.esp,
+        process_current->signals->context.eip);
 
     process_current->context.esp0 = process_current->signals->context.esp0;
-    set_context(process_current->signals->context.esp,
-            process_current->signals->context.eip);
 
-    while (1);
+    set_context(
+        process_current->signals->context.esp,
+        process_current->signals->context.eip);
 
+    ASSERT_NOT_REACHED();
 }
 
+void* sys_sbrk(size_t incr)
+{
+    vm_area_t* brk_vma;
+    uint32_t previous_brk = process_current->mm->brk;
+    uint32_t current_brk = previous_brk + incr;
+    uint32_t previous_page = page_beginning(previous_brk);
+    uint32_t next_page = page_align(current_brk);
+
+    log_debug("incr=%x previous_brk=%x", incr, previous_brk);
+
+    brk_vma = process_brk_vm_area(process_current);
+
+    if (unlikely(!brk_vma))
+    {
+        vm_print(process_current->mm->vm_areas);
+        panic("no brk vma; brk = %x", previous_brk, brk_vma);
+        ASSERT_NOT_REACHED();
+    }
+    else if (brk_vma->pages->count > 1)
+    {
+        // Get own pages
+        copy_on_write(brk_vma);
+    }
+
+    if (previous_page == next_page)
+    {
+        log_debug("no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
+        process_current->mm->brk = current_brk;
+        return ptr(previous_brk);
+    }
+
+    uint32_t needed_pages = (next_page - previous_page) / PAGE_SIZE;
+
+    page_t* new_page = page_alloc(needed_pages, PAGE_ALLOC_DISCONT);
+
+    if (unlikely(!new_page))
+    {
+        return ptr(-ENOMEM);
+    }
+
+    vm_extend(
+        brk_vma,
+        new_page,
+        0,
+        needed_pages);
+
+    vm_apply(
+        brk_vma,
+        ptr(process_current->mm->pgd),
+        VM_APPLY_DONT_REPLACE);
+
+    process_current->mm->brk = current_brk;
+
+    return ptr(previous_brk);
+}

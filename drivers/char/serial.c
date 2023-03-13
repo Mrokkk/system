@@ -1,30 +1,32 @@
 #include <arch/io.h>
-#include <arch/register.h>
-#include <kernel/module.h>
-#include <kernel/device.h>
-#include <kernel/string.h>
+
+#include <kernel/fs.h>
 #include <kernel/irq.h>
 #include <kernel/buffer.h>
-#include <kernel/time.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <kernel/sys.h>
-#include <kernel/mutex.h>
+#include <kernel/device.h>
+#include <kernel/module.h>
+#include <kernel/string.h>
+#include <kernel/process.h>
 
 #define COM1 0x3f8
 #define COM2 0x2f8
 #define COM3 0x3e8
 #define COM4 0x2e8
 
-void serial_send(char a, int port);
-int serial_open();
-int serial_write();
-int serial_read();
-void serial_irs();
+KERNEL_MODULE(serial);
+module_init(serial_init);
+module_exit(serial_deinit);
 
 BUFFER_DECLARE(serial_buffer, 32);
+WAIT_QUEUE_HEAD_DECLARE(serial_wq);
 
 char serial_status[4];
+
+void serial_send(char a, uint16_t port);
+int serial_open(struct file*);
+int serial_write(struct file* file, char* buffer, int size);
+int serial_read(struct file* file, char* buffer, int size);
+void serial_irs(void);
 
 static struct file_operations fops = {
     .open = &serial_open,
@@ -32,304 +34,191 @@ static struct file_operations fops = {
     .write = &serial_write,
 };
 
-KERNEL_MODULE(serial);
-module_init(serial_init);
-module_exit(serial_deinit);
+uint16_t minor_to_port(int minor)
+{
+    switch (minor)
+    {
+        case 0: return COM1;
+        case 1: return COM2;
+        case 2: return COM3;
+        case 3: return COM4;
+        default: return 0;
+    }
+}
 
-SEMAPHORE_DECLARE(serial_sem, 1);
-
-int serial_open(struct inode *inode, struct file *file) {
-
-    unsigned short PORT;
+int serial_open(struct file* file)
+{
+    uint16_t port;
     int minor;
 
-    (void)inode; (void)file;
+    minor = MINOR(file->inode->dev);
 
-    minor = MINOR(inode->dev);
+    log_debug("minor = %u", minor);
 
-    switch (minor) {
-        case 0: PORT = COM1; break;
-        case 1: PORT = COM2; break;
-        case 2: PORT = COM3; break;
-        case 3: PORT = COM4; break;
-        default: PORT = COM1;
+    if (!(port = minor_to_port(minor)))
+    {
+        return -EINVAL;
     }
 
-    outb(0x00, PORT + 1);    /* Disable all interrupts*/
-    outb(0x80, PORT + 3);    /* Enable DLAB (set baud rate divisor) */
-    outb(0x01, PORT + 0);    /* Set divisor to 3 (lo byte) 38400 baud */
-    outb(0x00, PORT + 1);    /*                  (hi byte) */
-    outb(0x03, PORT + 3);    /* 8 bits, no parity, one stop bit */
-    outb(0xc7, PORT + 2);    /* Enable FIFO, clear them, with 14-byte threshold */
-    outb(0x0b, PORT + 4);    /* IRQs enabled, RTS/DSR set */
+    outb(0x00, port + 1);    // Disable all interrupts
+    outb(0x80, port + 3);    // Enable DLAB (set baud rate divisor)
+    outb(0x01, port + 0);    // Set divisor to 3 (lo byte) 38400 baud
+    outb(0x00, port + 1);    //                  (hi byte)
+    outb(0x03, port + 3);    // 8 bits, no parity, one stop bit
+    outb(0xc7, port + 2);    // Enable FIFO, clear them, with 14-byte threshold
+    outb(0x0b, port + 4);    // IRQs enabled, RTS/DSR set
     serial_status[minor] = 1;
 
-    /* Enable interrupt for receiving */
-    outb(0x01, PORT + 1);
+    // Enable interrupt for receiving
+    outb(0x01, port + 1);
 
     return 0;
-
 }
 
-static inline char serial_receive(int port) {
-
+static inline char serial_receive(uint16_t port)
+{
     return inb(port);
-
 }
 
-static inline int is_transmit_empty() {
-
+static inline int is_transmit_empty()
+{
     return inb(COM1 + 5) & 0x20;
-
 }
 
-void serial_send(char a, int port) {
-
+void serial_send(char a, uint16_t port)
+{
     if (a == '\n')
+    {
         serial_send('\r', port);
+    }
+
     while (is_transmit_empty() == 0);
 
     outb(a, port);
-
 }
 
-
-void serial_print(const char *string) {
-
-    for (; *string; string++)
-        serial_send(*string, COM1);
-
+void serial_print(const char* string)
+{
+    for (; *string; serial_send(*string++, COM1));
 }
 
-void serial_irs() {
-
+void serial_irs()
+{
+    flags_t flags;
     char c = serial_receive(COM1);
 
-    if (c == '\r') c = '\n';
+    irq_save(flags);
+
+    if (c == '\r')
+    {
+        c = '\n';
+    }
+    else if (c < 32)
+    {
+        if (c == 4) // ctrl+d
+        {
+            buffer_put(&serial_buffer, 4);
+            goto wake_process;
+        }
+        else if (c == 3)
+        {
+            buffer_put(&serial_buffer, 3);
+            goto wake_process;
+        }
+        // TODO: handle other chars
+        goto finish;
+    }
+    else if (c == 0x7f) // backspace
+    {
+        buffer_put(&serial_buffer, '\b');
+        serial_send(8, COM1);
+        serial_send(' ', COM1);
+        serial_send(8, COM1);
+        goto wake_process;
+    }
 
     buffer_put(&serial_buffer, c);
-
     serial_send(c, COM1);
-
+wake_process:
+    if (!wait_queue_empty(&serial_wq))
+    {
+        struct process* proc = wait_queue_pop(&serial_wq);
+        process_wake(proc);
+    }
+finish:
+    irq_restore(flags);
 }
 
-MUTEX_DECLARE(serial_lock);
-
-int serial_write(struct inode *inode, struct file *file, const char *buffer,
-        unsigned int size) {
-
-    unsigned int old = size;
-
-    (void)inode; (void)file;
-
-    mutex_lock(&serial_lock);
-
-    while (size--) serial_send(*buffer++, COM1);
-
-    mutex_unlock(&serial_lock);
-
+int serial_write(
+    struct file* file,
+    char* buffer,
+    int size)
+{
+    int old = size;
+    int minor = MINOR(file->inode->dev);
+    while (size--)
+    {
+        serial_send(*buffer++, minor_to_port(minor));
+    }
     return old;
-
 }
 
-int serial_read(struct inode *inode, struct file *file, char *buffer,
-        unsigned int size) {
+int serial_read(
+    struct file*,
+    char* buffer,
+    int size)
+{
+    int i;
+    WAIT_QUEUE_DECLARE(temp, process_current);
 
-    unsigned int i;
+    flags_t flags;
+    irq_save(flags);
 
-    (void)inode; (void)buffer; (void)size; (void)file;
-
-    for (i=0; i<size; i++) {
-        while (buffer_get(&serial_buffer, &buffer[i]));
-        if (buffer[i] == '\n') return i+1;
-        if (buffer[i] == '\b' && i > 0) {
+    for (i = 0; i < size; i++)
+    {
+        // FIXME: we put process to sleep after every char; this is bad
+        while (buffer_get(&serial_buffer, &buffer[i]))
+        {
+            wait_queue_push(&temp, &serial_wq);
+            process_wait(process_current, flags);
+        }
+        if (buffer[i] == 4)
+        {
+            i = 0;
+            goto finish;
+        }
+        else if (buffer[i] == 3)
+        {
+            do_kill(process_current, SIGINT);
+            i = 1;
+            buffer[0] = 0;
+            goto finish;
+        }
+        if (buffer[i] == '\n')
+        {
+            ++i;
+            goto finish;
+        }
+        if (buffer[i] == '\b' && i > 0)
+        {
             buffer[i--] = 0;
             buffer[i--] = 0;
         }
     }
 
+finish:
     return i;
-
 }
 
-static inline void read_line(char *line) {
-
-    int size = serial_read(0, 0, line, 32);
-    line[size-1] = 0;
-
-}
-
-int serial_printf(const char *fmt, ...) {
-
-    char printf_buf[128];
-    va_list args;
-    int printed;
-
-    va_start(args, fmt);
-    printed = vsprintf(printf_buf, fmt, args);
-    va_end(args);
-
-    serial_write(0, 0, printf_buf, strlen(printf_buf));
-
-    return printed;
-
-}
-
-static int c_running() {
-
-    struct process *proc;
-
-    list_for_each_entry(proc, &running, running) {
-        serial_printf("pid=%d name=%s stat=%d\n", proc->pid, proc->name,
-                proc->stat);
-    }
-    return 0;
-
-}
-
-static int c_ps() {
-
-    struct process *proc;
-
-    list_for_each_entry(proc, &init_process.processes, processes) {
-        serial_printf("pid=%d name=%s stat=%c\n", proc->pid, proc->name,
-                process_state_char(proc->stat));
-    }
-
-    return 0;
-}
-
-static int c_kstat() {
-
-    #define print_data(data) \
-        serial_printf(#data"=%d\n", data);
-
-    int uptime = jiffies/HZ;
-
-    semaphore_down(&serial_sem);
-
-    print_data(jiffies);
-    print_data(uptime);
-    print_data(context_switches);
-    print_data(total_forks);
-
-    semaphore_up(&serial_sem);
-
-    return 0;
-
-}
-
-int kexit() {
-
-    return 0;
-
-}
-
-static int c_zombie() {
-
-    kernel_process(&kexit, 0, 0);
-
-    return 0;
-
-}
-
-static int c_bug() {
-
-    return 0;
-
-}
-
-#define COMMAND(name) {#name, c_##name}
-
-static struct command {
-    char *name;
-    int (*function)();
-} commands[] = {
-        COMMAND(ps),
-        COMMAND(kstat),
-        COMMAND(zombie),
-        COMMAND(bug),
-        COMMAND(running),
-        {0, 0}
-};
-
-#include <arch/register.h>
-
-int seriald() {
-
-    char line[32];
-    struct command *com = commands;
-    int i, pid, status;
-
-    (void)i; (void)com; (void)line;
-
-    delay(1000);
-
-    open("/dev/ttyS0", 0);
-
-    serial_printf("Seriald\n");
-    strcpy(process_current->name, "seriald");
-
-    while(1) {
-        serial_printf("$$ ");
-        read_line(line);
-        if (line[0] == 0) continue;
-        for (i=0; com[i].name; i++) {
-            if (!strcmp(com[i].name, line)) {
-                pid = kernel_process(com[i].function, 0, 0);
-                if (pid > 0) waitpid(pid, &status, 0);
-                break;
-            }
-        }
-        if (!com[i].name) {
-            struct kernel_symbol *sym = symbol_find(line);
-            if (sym) {
-                serial_printf("%s = ", line);
-                switch (sym->size) {
-                    case 1:
-                        serial_printf("%u", *((unsigned char *)sym->address));
-                        break;
-                    case 2:
-                        serial_printf("%u", *((unsigned short *)sym->address));
-                        break;
-                    case 4:
-                        serial_printf("%u", *((unsigned int *)sym->address));
-                        break;
-                    default:
-                        serial_printf("0x%x", *((unsigned int *)sym->address));
-                        break;
-                }
-                serial_printf(" @ 0x%x\n", sym->address);
-
-            } else
-                serial_printf("No such command: %s\n", line);
-        }
-    }
-
-    return 0;
-
-}
-
-int serial_init() {
-
-    char_device_register(MAJOR_CHR_SERIAL, "ttyS", &fops);
-
+int serial_init()
+{
+    char_device_register(MAJOR_CHR_SERIAL, "ttyS", &fops, 3, NULL);
     irq_register(0x4, &serial_irs, "com1");
     irq_register(0x3, &serial_irs, "com2");
-
-#ifndef CONFIG_SERIAL_PRIMARY
-    kernel_process(&seriald, 0, 0);
-#endif
-
     return 0;
-
 }
 
-int serial_deinit() {
-
-    serial_printf("Killing seriald\n");
-
+int serial_deinit()
+{
     return 0;
-
 }
-

@@ -1,14 +1,14 @@
-#ifndef __DIRENT_H_
-#define __DIRENT_H_
+#pragma once
 
 #include <kernel/types.h>
 
-struct dirent {
-    int d_ino;
-    size_t d_off;
-    size_t d_len;
-    char d_type;
+struct dirent
+{
+    int ino;
+    size_t off;
+    size_t len;
+    char type;
     char name[256];
 };
 
-#endif /* __DIRENT_H_ */
+int getdents(unsigned int, void*, size_t);

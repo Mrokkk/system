@@ -1,12 +1,12 @@
-#ifndef INCLUDE_KERNEL_TERMIOS_H_
-#define INCLUDE_KERNEL_TERMIOS_H_
+#pragma once
 
 typedef unsigned char   cc_t;
 typedef unsigned int    speed_t;
 typedef unsigned int    tcflag_t;
 
 #define NCCS 19
-struct termios {
+struct termios
+{
     tcflag_t c_iflag;       /* input mode flags */
     tcflag_t c_oflag;       /* output mode flags */
     tcflag_t c_cflag;       /* control mode flags */
@@ -164,6 +164,3 @@ struct termios {
 #define TCSANOW     0
 #define TCSADRAIN   1
 #define TCSAFLUSH   2
-
-
-#endif /* INCLUDE_KERNEL_TERMIOS_H_ */

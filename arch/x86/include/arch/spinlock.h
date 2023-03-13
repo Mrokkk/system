@@ -1,14 +1,9 @@
-#ifndef ARCH_X86_INCLUDE_ARCH_SPINLOCK_H_
-#define ARCH_X86_INCLUDE_ARCH_SPINLOCK_H_
+#pragma once
 
 #include <kernel/spinlock.h>
 
-/*
- * Quite obvious and common implementation
- */
-
-static inline void spinlock_lock(spinlock_t *lock) {
-
+static inline void spinlock_lock(spinlock_t* lock)
+{
     register int dummy = SPINLOCK_LOCKED;
 
     asm volatile(
@@ -19,11 +14,10 @@ static inline void spinlock_lock(spinlock_t *lock) {
         : "=m" (lock->lock)
         : "r" (dummy)
         : "memory");
-
 }
 
-static inline void spinlock_unlock(spinlock_t *lock) {
-
+static inline void spinlock_unlock(spinlock_t* lock)
+{
     register int dummy = SPINLOCK_UNLOCKED;
 
     asm volatile(
@@ -31,7 +25,4 @@ static inline void spinlock_unlock(spinlock_t *lock) {
         : "=m" (lock->lock)
         : "r" (dummy)
         : "memory");
-
 }
-
-#endif /* ARCH_X86_INCLUDE_ARCH_SPINLOCK_H_ */

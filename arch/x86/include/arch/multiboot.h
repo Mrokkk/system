@@ -1,5 +1,4 @@
-#ifndef __MULTIBOOT_H_
-#define __MULTIBOOT_H_
+#pragma once
 
 #define MULTIBOOT_HEADER_MAGIC          0x1BADB002
 
@@ -8,21 +7,11 @@
 #define MULTIBOOT_HEADER_FLAGS_VIDEO    (1 << 2)
 #define MULTIBOOT_HEADER_FLAGS_ADDRESS  (1 << 16)
 
-#ifdef __ELF__
-
 #define MULTIBOOT_HEADER_FLAGS \
     MULTIBOOT_HEADER_FLAGS_ALIGNED | MULTIBOOT_HEADER_FLAGS_MEMORY | \
     MULTIBOOT_HEADER_FLAGS_VIDEO
 
-#else /* __ELF__ */
-
-#define MULTIBOOT_HEADER_FLAGS \
-    MULTIBOOT_HEADER_FLAGS_ALIGNED | MULTIBOOT_HEADER_FLAGS_MEMORY | \
-    MULTIBOOT_HEADER_FLAGS_VIDEO | MULTIBOOT_HEADER_FLAGS_ADDRESS
-
-#endif /* __ELF__ */
-
-/* Magic number passed from Multiboot 1 compliant bootloader */
+// Magic number passed from Multiboot 1 compliant bootloader
 #define MULTIBOOT_BOOTLOADER_MAGIC  0x2BADB002
 
 #define MULTIBOOT_VIDEO_MODE_LIN    0
@@ -32,36 +21,41 @@
 
 #ifndef __ASSEMBLER__
 
-/* The Multiboot header. */
-struct multiboot_header {
-    unsigned long magic;
-    unsigned long flags;
-    unsigned long checksum;
-    unsigned long header_addr;
-    unsigned long load_addr;
-    unsigned long load_end_addr;
-    unsigned long bss_end_addr;
-    unsigned long entry_addr;
+#include <stdint.h>
+
+// The Multiboot header.
+struct multiboot_header
+{
+    uint32_t magic;
+    uint32_t flags;
+    uint32_t checksum;
+    uint32_t header_addr;
+    uint32_t load_addr;
+    uint32_t load_end_addr;
+    uint32_t bss_end_addr;
+    uint32_t entry_addr;
 };
 
-/* The symbol table for a.out. */
-struct aout_symbol_table {
+// The symbol table for a.out
+struct aout_symbol_table
+{
     unsigned long tabsize;
     unsigned long strsize;
     unsigned long addr;
     unsigned long reserved;
 };
 
-/* The section header table for ELF. */
-struct elf_section_header_table {
+// The section header table for ELF
+struct elf_section_header_table
+{
     unsigned long num;
     unsigned long size;
     unsigned long addr;
     unsigned long shndx;
 };
 
-/* The Multiboot information. */
-struct multiboot_info {
+struct multiboot_info
+{
     unsigned long flags;
     unsigned long mem_lower;
     unsigned long mem_upper;
@@ -69,7 +63,8 @@ struct multiboot_info {
     unsigned long cmdline;
     unsigned long mods_count;
     unsigned long mods_addr;
-    union {
+    union
+    {
         struct aout_symbol_table aout_sym;
         struct elf_section_header_table elf_sec;
     };
@@ -80,27 +75,59 @@ struct multiboot_info {
     unsigned long config_table;
     unsigned long bootloader_name;
     unsigned long apm_table;
-    struct vbe_struct {
+    struct vbe_struct
+    {
         unsigned long control_info;
         unsigned long mode_info;
-        unsigned long mode;
-        unsigned long interface_seg;
-        unsigned long interface_off;
-        unsigned long interface_len;
+        unsigned short mode;
+        unsigned short interface_seg;
+        unsigned short interface_off;
+        unsigned short interface_len;
     } vbe;
+
+    struct framebuffer
+    {
+        uint64_t addr;
+        uint32_t pitch;
+        uint32_t width;
+        uint32_t height;
+        uint8_t bpp;
+#define MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED      0
+#define MULTIBOOT_FRAMEBUFFER_TYPE_RGB          1
+#define MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT     2
+        uint8_t type;
+
+        union
+        {
+            struct
+            {
+                uint32_t palette_addr;
+                uint16_t palette_num_colors;
+            };
+            struct
+            {
+                uint8_t red_field_position;
+                uint8_t red_mask_size;
+                uint8_t green_field_position;
+                uint8_t green_mask_size;
+                uint8_t blue_field_position;
+                uint8_t blue_mask_size;
+            };
+        };
+    } framebuffer;
 };
 
-/* The module structure. */
-struct module {
+struct module
+{
     unsigned long mod_start;
     unsigned long mod_end;
     unsigned long string;
     unsigned long reserved;
 };
 
-/* The memory map. Be careful that the offset 0 is base_addr_low
-but no size. */
-struct memory_map {
+// The memory map. Be careful that the offset 0 is base_addr_low but no size.
+struct memory_map
+{
     unsigned long size;
     unsigned long base_addr_low;
     unsigned long base_addr_high;
@@ -109,7 +136,8 @@ struct memory_map {
     unsigned long type;
 };
 
-struct multiboot_drives_struct {
+struct multiboot_drives_struct
+{
     unsigned int size;
     unsigned char drive_number;
     unsigned char drive_mode;
@@ -119,7 +147,8 @@ struct multiboot_drives_struct {
     unsigned char drive_ports;
 };
 
-struct multiboot_apm_table_struct {
+struct multiboot_apm_table_struct
+{
     unsigned short version;
     unsigned short cseg;
     unsigned int offset;
@@ -130,6 +159,12 @@ struct multiboot_apm_table_struct {
     unsigned short cseg_16_len;
     unsigned short dseg_len;
 };
+
+typedef struct modules_table
+{
+    struct module* modules;
+    uint32_t count;
+} modules_table_t;
 
 #define MULTIBOOT_FLAGS_MEM_BIT             (1 << 0)
 #define MULTIBOOT_FLAGS_BOOTDEV_BIT         (1 << 1)
@@ -142,9 +177,15 @@ struct multiboot_apm_table_struct {
 #define MULTIBOOT_FLAGS_BL_NAME_BIT         (1 << 9)
 #define MULTIBOOT_FLAGS_APM_TABLE_BIT       (1 << 10)
 #define MULTIBOOT_FLAGS_VBE_BIT             (1 << 11)
+#define MULTIBOOT_FLAGS_FB_BIT              (1 << 12)
 
-int multiboot_read(struct multiboot_info *mb, unsigned int magic);
+char* multiboot_read(struct multiboot_info *mb, unsigned int magic);
+modules_table_t* modules_table_get();
 
-#endif /* __ASSEMBLER__ */
+extern uint32_t module_start;
+extern uint32_t module_end;
+extern struct framebuffer* framebuffer_ptr;
+extern void* tux;
+extern uint32_t tux_size;
 
-#endif /* __MULTIBOOT_H_ */
+#endif // __ASSEMBLER__

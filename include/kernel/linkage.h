@@ -1,26 +1,10 @@
-#ifndef __LINKAGE_H_
-#define __LINKAGE_H_
+#pragma once
 
 #define asmlinkage
-
-#ifdef __ELF__
 
 #define SYMBOL_NAME(x) x
 #define SYMBOL_NAME_LABEL(x) x:
 #define SYMBOL_NAME_STRING(x) #x
-
-#else    /* __ELF__ */
-
-#define SYMBOL_NAME(x) _##x
-#ifdef __STDC__
-#define SYMBOL_NAME_LABEL(x) _##x:
-#else
-#define SYMBOL_NAME_LABEL(x) _/**/x/**/:
-#endif
-
-#define SYMBOL_NAME_STRING(x) "_"#x
-
-#endif    /* __ELF__ */
 
 #ifdef __ASSEMBLER__
 
@@ -39,6 +23,4 @@
     .type SYMBOL_NAME(name), @function; \
     END(name)
 
-#endif    /* __ASSEMBLER__ */
-
-#endif /* __LINKAGE_H_ */
+#endif  // __ASSEMBLER__

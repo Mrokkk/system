@@ -1,8 +1,7 @@
-#ifndef ARCH_X86_SERIAL_H_
-#define ARCH_X86_SERIAL_H_
+#pragma once
 
 int serial_init();
 void write_serial(char a);
 void serial_print(const char *string);
-
-#endif /* ARCH_X86_SERIAL_H_ */
+void serial_log_print(const char *string);
+int serial_printf(const char *fmt, ...);

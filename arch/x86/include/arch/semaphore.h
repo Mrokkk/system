@@ -1,21 +1,17 @@
-#ifndef ARCH_X86_INCLUDE_ARCH_SEMAPHORE_H_
-#define ARCH_X86_INCLUDE_ARCH_SEMAPHORE_H_
+#pragma once
 
-#include <kernel/process.h>
-
-static inline void semaphore_up(semaphore_t *sem) {
-
+static inline void semaphore_up(semaphore_t* sem)
+{
     asm volatile(
         "incl %0;"
         "call __semaphore_wake;"
         : "=m" (sem->count)
         : "c" (sem)
         : "memory");
-
 }
 
-static inline void semaphore_down(semaphore_t *sem) {
-
+static inline void semaphore_down(semaphore_t* sem)
+{
     asm volatile(
         "1:"
         "decl %0;"
@@ -27,7 +23,4 @@ static inline void semaphore_down(semaphore_t *sem) {
         : "=m" (sem->count)
         : "c" (sem)
         : "memory");
-
 }
-
-#endif /* ARCH_X86_INCLUDE_ARCH_SEMAPHORE_H_ */

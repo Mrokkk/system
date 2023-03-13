@@ -1,96 +1,113 @@
-#include <kernel/kernel.h>
-#include <kernel/mm.h>
+#include <kernel/memory.h>
 
-#include <arch/multiboot.h>
 #include <arch/page.h>
+#include <arch/multiboot.h>
 
-char *bootloader_name;
+char* bootloader_name;
+uint32_t module_start;
+uint32_t module_end;
 
-static inline void multiboot_mmap_read(struct multiboot_info *mb) {
+void* tux;
+uint32_t tux_size;
 
-    struct memory_map *mm;
+static modules_table_t modules_table;
+struct framebuffer* framebuffer_ptr;
+
+modules_table_t* modules_table_get(void)
+{
+    return &modules_table;
+}
+
+static inline void multiboot_mmap_read(struct multiboot_info* mb)
+{
+    struct memory_map* mm;
+    int mm_type;
     int i;
 
-    for (mm = (struct memory_map *)mb->mmap_addr, i = 0;
+    for (mm = ptr(mb->mmap_addr), i = 0;
          mm->base_addr_low + (mm->length_low - 1) != 0xffffffff;
-         i++)
+         ++i)
     {
+        mm = ptr((uint32_t)mm + mm->size + 4);
 
-        mm = (struct memory_map *)((unsigned int)mm + mm->size + 4);
-        switch (mm->type) {
-            case 1:
-                mmap[i].type = MMAP_TYPE_AVL;
-                break;
-            case 2:
-                mmap[i].type = MMAP_TYPE_NA;
-                break;
-            case 3:
-                mmap[i].type = MMAP_TYPE_DEV;
-                break;
-            case 4:
-                mmap[i].type = MMAP_TYPE_DEV;
-                break;
-            default:
-                mmap[i].type = MMAP_TYPE_NDEF;
+        switch (mm->type)
+        {
+            case 1: mm_type = MMAP_TYPE_AVL; break;
+            case 2: mm_type = MMAP_TYPE_NA; break;
+            case 3: mm_type = MMAP_TYPE_DEV; break;
+            case 4: mm_type = MMAP_TYPE_DEV; break;
+            default: mm_type = MMAP_TYPE_NDEF;
         }
 
-        mmap[i].base = mm->base_addr_low;
-        mmap[i].size = mm->length_low;
+        memory_area_add(mm->base_addr_low, mm->length_low, mm_type);
     }
-
-    mmap[i].base = 0;
-
-    ram = ram_get();
-
 }
 
-static inline void multiboot_boot_device_read(struct multiboot_info *mb) {
+static inline void multiboot_modules_read(struct multiboot_info* mb)
+{
+    modules_table.count = mb->mods_count;
+    modules_table.modules = virt_ptr(mb->mods_addr);
 
-    (void)mb;
+    struct module* mod = ptr(mb->mods_addr);
 
-}
+    for (size_t i = 0; i < modules_table.count; ++i)
+    {
+        log_debug("%d: %s = %x : %x",
+            i,
+            (char*)virt(mod->string), // FIXME: why there was +1?
+            virt(mod->mod_start),
+            virt(mod->mod_end));
 
-/* Not used */
-#if 0
-static inline void multiboot_modules_read(struct multiboot_info *mb) {
-
-    int count = mb->mods_count, i;
-    struct module *mod = (struct module *)mb->mods_addr;
-
-    for (i=0; i<count; i++) {
-        printk("%d: %s = 0x%x : 0x%x\n", i,
-                (char *)virt_address(mod->string) + 1,
-                (unsigned int)virt_address(mod->mod_start),
-                (unsigned int)virt_address(mod->mod_end)
-        );
-        if (!strcmp((const char *)virt_address(mod->string) + 1, "symbols")) {
-            symbols_read((char *)virt_address(mod->mod_start),
-                    mod->mod_end - mod->mod_start);
+        if (!strcmp((char*)virt(mod->string), "tux.tga"))
+        {
+            tux = virt_ptr(mod->mod_start);
+            tux_size = mod->mod_end - mod->mod_start;
         }
+
+        if (!module_start)
+        {
+            module_start = virt(mod->mod_start);
+        }
+
+        module_end = virt(mod->mod_end);
         mod++;
     }
-
 }
-#endif
 
-int multiboot_read(struct multiboot_info *mb, unsigned int magic) {
+static inline void multiboot_fb_read(struct multiboot_info* mb)
+{
+    struct framebuffer* framebuffer = &mb->framebuffer;
+    framebuffer_ptr = virt_ptr(framebuffer);
+}
 
-    if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        printk("ERROR: Not Multiboot v1 compilant bootloader!\n");
+char* multiboot_read(struct multiboot_info* mb, uint32_t magic)
+{
+    if (magic != MULTIBOOT_BOOTLOADER_MAGIC)
+    {
+        log_warning("not Multiboot v1 compilant bootloader!");
         return 0;
     }
 
-    mb = (struct multiboot_info *)(virt_address(mb));
-
     if (mb->flags & MULTIBOOT_FLAGS_MMAP_BIT)
+    {
         multiboot_mmap_read(mb);
+    }
     if (mb->flags & MULTIBOOT_FLAGS_BOOTDEV_BIT)
-        multiboot_boot_device_read(mb);
+    {
+        // TODO
+    }
     if (mb->flags & MULTIBOOT_FLAGS_BL_NAME_BIT)
-        bootloader_name = (char *)mb->bootloader_name;
-    //if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
-    //   multiboot_modules_read(mb);
+    {
+        bootloader_name = virt_ptr(mb->bootloader_name);
+    }
+    if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
+    {
+        multiboot_modules_read(mb);
+    }
+    if (mb->flags & MULTIBOOT_FLAGS_FB_BIT)
+    {
+        multiboot_fb_read(mb);
+    }
 
-    return virt_address(mb->cmdline);
-
+    return virt_ptr(mb->cmdline);
 }

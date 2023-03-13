@@ -1,8 +1,10 @@
-#ifndef __X86_SYSTEM_H_
-#define __X86_SYSTEM_H_
+#pragma once
 
-#include <kernel/compiler.h>
+#include <stdint.h>
 #include <arch/segment.h>
+#include <kernel/compiler.h>
+
+typedef uint32_t flags_t;
 
 #define mb() \
     asm volatile("" : : : "memory")
@@ -19,9 +21,6 @@
 #define cli() \
     asm volatile("cli" : : : "memory")
 
-/* As long I don't support SMP I don't
- * need a spinlock on irq_save and irq_restore
- */
 #define irq_save(x) \
     { flags_save(x); cli(); }
 
@@ -32,11 +31,9 @@
     asm volatile("nop")
 
 #define halt() \
-    asm volatile("hlt")
+    ({ asm volatile("hlt"); 0; })
 
-#include <kernel/process.h>
-
-/* Context switching */
+// Context switching
 #define process_switch(prev, next) \
     do {                                \
         asm volatile(                   \
@@ -64,21 +61,3 @@
               "m" (next->context.eip),  \
               "a" (prev), "d" (next));  \
     } while (0)
-
-extern unsigned long loops_per_sec;
-extern void do_delay();
-extern void irq_enable(unsigned int);
-extern void delay(unsigned int);
-extern void reboot();
-extern void shutdown();
-unsigned int ram_get();
-
-static inline void udelay(unsigned long usecs) {
-
-    usecs *= loops_per_sec/1000000;
-
-    do_delay(usecs);
-
-}
-
-#endif /* __X86_SYSTEM_H_ */

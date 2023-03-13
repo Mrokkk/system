@@ -1,5 +1,4 @@
-#ifndef __ERRNO_H_
-#define __ERRNO_H_
+#pragma once
 
 #define ENOERR 0    /* No error */
 #define EPERM 1        /* Not owner */
@@ -35,5 +34,4 @@
 #define EDENIED 31 /* Access denied */
 #define ENOSYS 32 /* Bad system call */
 #define ENOOPS 33 /* No such operation */
-
-#endif
+#define ERANGE 34 /* Wrong range */

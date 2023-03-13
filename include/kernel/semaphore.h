@@ -1,9 +1,9 @@
-#ifndef INCLUDE_KERNEL_SEMAPHORE_H_
-#define INCLUDE_KERNEL_SEMAPHORE_H_
+#pragma once
 
 #include <kernel/wait.h>
 
-typedef struct semaphore {
+typedef struct semaphore
+{
     volatile int count;
     volatile int waiting;
     struct wait_queue_head queue;
@@ -15,6 +15,11 @@ typedef struct semaphore {
 #define SEMAPHORE_DECLARE(sem, count) \
     semaphore_t sem = SEMAPHORE_INIT(sem, count)
 
-#include <arch/semaphore.h>
+static inline void semaphore_init(semaphore_t* semaphore, int count)
+{
+    semaphore->count = count;
+    semaphore->waiting = 0;
+    wait_queue_head_init(&semaphore->queue);
+}
 
-#endif /* INCLUDE_KERNEL_SEMAPHORE_H_ */
+#include <arch/semaphore.h>

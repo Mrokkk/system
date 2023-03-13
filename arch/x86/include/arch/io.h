@@ -1,41 +1,33 @@
-#ifndef __IO_H_
-#define __IO_H_
+#pragma once
 
+#include <stdint.h>
 #include <kernel/compiler.h>
 
-#define readb(address) (*(unsigned char *)(address))
-#define readw(address) (*(unsigned short *)(address))
-#define readl(address) (*(unsigned long *)(address))
+#define readb(address) (*(uint8_t*)(address))
+#define readw(address) (*(uint16_t*)(address))
+#define readl(address) (*(uint32_t*)(address))
 
-#define writeb(data, address) ((*(unsigned char *)(address)) = (data))
-#define writew(data, address) ((*(unsigned short *)(address)) = (data))
-#define writel(data, address) ((*(unsigned long *)(address)) = (data))
+#define writeb(data, address) ((*(uint8_t*)(address)) = (data))
+#define writew(data, address) ((*(uint16_t*)(address)) = (data))
+#define writel(data, address) ((*(uint32_t*)(address)) = (data))
 
-/*===========================================================================*
- *                                    inb                                    *
- *===========================================================================*/
-static inline unsigned char inb(unsigned short port) {
-    unsigned char rv;
-    asm volatile ("inb %1, %0" : "=a" (rv) : "dN" (port));
+static inline uint8_t inb(uint16_t port)
+{
+    uint8_t rv;
+    asm volatile("inb %1, %0" : "=a" (rv) : "dN" (port));
     return rv;
 }
 
-/*===========================================================================*
- *                                   outb                                    *
- *===========================================================================*/
-static inline void outb(unsigned char data, unsigned short port) {
-    asm volatile ("outb %1, %0" : : "dN" (port), "a" (data));
+static inline void outb(uint8_t data, uint16_t port)
+{
+    asm volatile("outb %1, %0" : : "dN" (port), "a" (data));
 }
 
-/*===========================================================================*
- *                                 io_wait                                   *
- *===========================================================================*/
-static inline void io_wait(void) {
-    asm volatile (
+static inline void io_wait(void)
+{
+    asm volatile(
         "jmp 1f;"
         "1:jmp 2f;"
         "2:"
     );
 }
-
-#endif
