@@ -1,6 +1,6 @@
-#include <arch/page.h>
 #include <arch/multiboot.h>
 
+#include <kernel/page.h>
 #include <kernel/font.h>
 #include <kernel/kernel.h>
 

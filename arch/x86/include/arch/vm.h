@@ -1,6 +1,8 @@
 #pragma once
 
-#include <arch/page.h>
+#include <stddef.h>
+#include <kernel/page.h>
+#include <kernel/errno.h>
 #include <kernel/compiler.h>
 
 #define VM_READ         0x00000001
@@ -28,46 +30,21 @@ typedef struct vm_area
 
 #define VM_AREA_INIT() {NULL, 0, 0, 0, NULL}
 
-vm_area_t* vm_create(
-    page_t* page_range,
-    uint32_t virt_address,
-    uint32_t size,
-    int vm_flags);
+vm_area_t* vm_create(page_t* page_range, uint32_t virt_address, uint32_t size, int vm_flags);
+vm_area_t* vm_extend(vm_area_t* vma, page_t* page_range, int vm_flags, int count); // FIXME: count is not needed
+vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
-
-vm_area_t* vm_extend(
-    vm_area_t* area,
-    page_t* page_range,
-    int vm_flags,
-    int count); // FIXME: count is not needed
 
 #define VM_APPLY_DONT_REPLACE   0
 #define VM_APPLY_REPLACE_PG     1
 
-int vm_apply(
-    vm_area_t* area,
-    pgd_t* pgd,
-    int vm_apply_flags);
+int vm_apply(vm_area_t* vma, pgd_t* pgd, int vm_apply_flags);
+int vm_remove(vm_area_t* vma, pgd_t* pgd, int remove_pte);
+int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, const pgd_t* src_pgd);
+int vm_copy_on_write(vm_area_t* vma);
 
-int vm_remove(
-    vm_area_t* area,
-    pgd_t* pgd,
-    int remove_pte);
-
-int vm_copy(
-    vm_area_t* dest_area,
-    const vm_area_t* src_area,
-    pgd_t* dest_pgd,
-    const pgd_t* src_pgd);
-
-vm_area_t* vm_find(
-    uint32_t virt_address,
-    vm_area_t* areas);
-
-void vm_print(const vm_area_t* area);
-
-int copy_on_write(vm_area_t* area);
+void vm_print(const vm_area_t* vma);
 
 static inline uint32_t pde_flags_get(int)
 {
@@ -115,20 +92,41 @@ static inline uint32_t vm_paddr_end(vm_area_t* a, pgd_t* pgd)
     return (pgt[pte_index] & ~PAGE_MASK) + PAGE_SIZE;
 }
 
-#define vm_print_single(area) \
+#define VERIFY_READ     1
+#define VERIFY_WRITE    2
+
+int __vm_verify(char verify, uint32_t vaddr, size_t size, vm_area_t* vma);
+
+static inline int vm_verify(char verify, const void* ptr, size_t size, vm_area_t* vma)
+{
+    if (!vma)
+    {
+        // FIXME: hack for kernel processes
+        return 0;
+    }
+
+    if (unlikely(kernel_address(addr(ptr))))
+    {
+        return -EFAULT;
+    }
+
+    return __vm_verify(verify, addr(ptr), size, vma);
+}
+
+#define vm_print_single(vma, flag) \
     do { \
         page_t* p; \
         int safety = 0; \
-        log_debug("vm_area={%x, vaddr={%x-%x}, size=%x, pages={count=%u", \
-            area, \
-            area->virt_address, \
-            area->virt_address + area->size - 1, \
-            area->size, \
-            area->pages->count); \
-        list_for_each_entry(p, &area->pages->head, list_entry) \
+        log_debug(flag, "vm_area={%x, vaddr={%x-%x}, size=%x, pages={count=%u", \
+            vma, \
+            vma->virt_address, \
+            vma->virt_address + vma->size - 1, \
+            vma->size, \
+            vma->pages->count); \
+        list_for_each_entry(p, &vma->pages->head, list_entry) \
         { \
-            log_debug("\t\tpage: %x", page_phys(p)); \
+            log_debug(flag, "\t\tpage: %x", page_phys(p)); \
             if (++safety > 100) { panic("infinite loop detection"); } \
         } \
-        log_debug("}"); \
+        log_debug(flag, "}"); \
     } while(0)

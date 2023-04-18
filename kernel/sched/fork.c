@@ -19,9 +19,7 @@ static inline void process_forked(struct process* proc)
     ++total_forks;
 }
 
-vm_area_t* stack_create(
-    uint32_t address,
-    pgd_t* pgd)
+vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
 {
     int errno;
     vm_area_t* stack_vma;
@@ -104,7 +102,7 @@ static inline int process_space_copy(struct process* dest, struct process* src, 
         goto free_kstack;
     }
 
-    log_debug("pgd=%x", pgd);
+    log_debug(DEBUG_PROCESS, "pgd=%x", pgd);
 
     mutex_init(&dest->mm->lock);
     dest->mm->pgd = pgd;
@@ -129,9 +127,9 @@ static inline int process_space_copy(struct process* dest, struct process* src, 
 
     src_stack_vma = process_stack_vm_area(src);
 
+    // Copy all vma except for stack
     for (src_vma = src->mm->vm_areas; src_vma; src_vma = src_vma->next)
     {
-        // Copy all vma except for stack
         if (src_vma == src_stack_vma)
         {
             continue;
@@ -165,7 +163,7 @@ static inline int process_space_copy(struct process* dest, struct process* src, 
 
     vm_add(&dest->mm->vm_areas, dest_stack_vma);
 
-    log_debug("new areas:", dest->pid);
+    log_debug(DEBUG_PROCESS, "new areas:", dest->pid);
     vm_print(dest->mm->vm_areas);
 
     return 0;
@@ -182,98 +180,96 @@ error:
     return errno;
 }
 
-static inline void process_struct_init(struct process* proc)
+static inline void process_init(struct process* child, struct process* parent)
 {
-    proc->pid = find_free_pid();
-    proc->exit_code = 0;
-    proc->forks = 0;
-    proc->context_switches = 0;
-    proc->stat = PROCESS_ZOMBIE;
-    *proc->name = 0;
-    list_init(&proc->children);
-    list_init(&proc->siblings);
-    list_init(&proc->running);
-    wait_queue_head_init(&proc->wait_child);
+    list_init(&child->running);
+    child->pid = find_free_pid();
+    child->stat = PROCESS_ZOMBIE;
+    child->exit_code = 0;
+    child->type = parent->type;
+    child->context_switches = 0;
+    child->forks = 0;
+    strcpy(child->name, parent->name);
+    wait_queue_head_init(&child->wait_child);
+    list_init(&child->children);
+    list_init(&child->siblings);
 }
 
-static inline void process_parent_child_link(
-    struct process* parent,
-    struct process* child)
+static inline void process_parent_child_link(struct process* parent, struct process* child)
 {
     child->parent = parent;
     child->ppid = parent->pid;
     list_add(&child->siblings, &parent->children);
 }
 
-static inline void process_name_copy(
-    struct process* dest,
-    struct process* src)
+static inline void fs_init(struct fs* dest, struct fs* src)
 {
-    strcpy(dest->name, src->name);
+    copy_struct(dest, src);
+    dest->count = 1;
 }
 
-static inline int process_fs_copy(
-    struct process* dest,
-    struct process* src,
-    int clone_flags)
+static inline int process_fs_copy(struct process* child, struct process* parent, int clone_flags)
 {
     if (clone_flags & CLONE_FS)
     {
-        dest->fs = src->fs;
-        dest->fs->count++;
+        child->fs = parent->fs;
+        child->fs->count++;
+        return 0;
     }
-    else
+
+    if (!(child->fs = alloc(struct fs, fs_init(this, parent->fs))))
     {
-        if (new(dest->fs))
-        {
-            return 1;
-        }
-        copy_struct(dest->fs, src->fs);
-        dest->fs->count = 1;
+        return -ENOMEM;
     }
 
     return 0;
 }
 
-static inline int process_files_copy(
-    struct process* dest,
-    struct process* src,
-    int clone_flags)
+static inline void files_init(struct files* dest, struct files* src)
+{
+    copy_array(dest->files, src->files, PROCESS_FILES);
+    dest->count = 1;
+}
+
+static inline int process_files_copy(struct process* child, struct process* parent, int clone_flags)
 {
     if (clone_flags & CLONE_FILES)
     {
-        dest->files = src->files;
-        dest->files->count++;
+        child->files = parent->files;
+        child->files->count++;
+        return 0;
     }
-    else
+
+    if (!(child->files = alloc(struct files, files_init(this, parent->files))))
     {
-        if (new(dest->files)) return 1;
-        dest->files->count = 1;
-        copy_array(
-            dest->files->files,
-            src->files->files,
-            PROCESS_FILES);
+        return -ENOMEM;
     }
 
     return 0;
 }
 
+static inline void signals_init(struct signals* dest, struct signals* src)
+{
+    copy_struct(dest, src);
+    dest->count = 1;
+    dest->user_stack = NULL;
+}
+
 static inline int process_signals_copy(
-    struct process* dest,
-    struct process* src,
+    struct process* child,
+    struct process* parent,
     int clone_flags)
 {
     if (clone_flags & CLONE_SIGHAND)
     {
-        dest->signals = src->signals;
-        dest->signals->count++;
+        child->signals = parent->signals;
+        child->signals->count++;
+        return 0;
     }
-    else
+
+    if (!(child->signals = alloc(struct signals, signals_init(this, parent->signals))))
     {
-        if (new(dest->signals)) return 1;
-        memcpy(dest->signals, src->signals, sizeof(struct signals));
-        dest->signals->count = 1;
-        dest->signals->user_stack = NULL;
+        return -ENOMEM;
     }
 
     return 0;
@@ -284,23 +280,17 @@ int process_clone(
     struct pt_regs* regs,
     int clone_flags)
 {
-    log_debug("");
     flags_t flags;
     struct process* child;
     int errno = -ENOMEM;
 
+    log_debug(DEBUG_PROCESS, "parent: pid %d name \"%s\"", parent->pid, parent->name);
+
     // FIXME: remove this, I don't need blocking everything during fork
     irq_save(flags);
 
-    if (new(child)) goto cannot_create_process;
-
-    child->type = parent->type;
-
+    if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, clone_flags)) goto cannot_allocate;
-
-    process_struct_init(child);
-    process_name_copy(child, parent);
-
     if (process_fs_copy(child, parent, clone_flags)) goto fs_error;
     if (process_files_copy(child, parent, clone_flags)) goto files_error;
     if (process_signals_copy(child, parent, clone_flags)) goto signals_error;
@@ -343,7 +333,7 @@ int kernel_process(int (*start)(), void* args, unsigned int)
 
 int sys_fork(struct pt_regs regs)
 {
-    log_debug("");
+    log_debug(DEBUG_PROCESS, "");
     return process_clone(process_current, &regs, 0);
 }
 
@@ -351,15 +341,16 @@ void processes_stats_print(void)
 {
     struct process* proc;
 
-    log_debug("processes stats:");
+    log_info("processes stats:");
 
     list_for_each_entry(proc, &init_process.processes, processes)
     {
-        log_debug("pid=%d name=%s stat=%c",
+        log_info("pid=%d name=%s stat=%c",
             proc->pid,
             proc->name,
             process_state_char(proc->stat));
     }
-    log_debug("total_forks=%u", total_forks);
-    log_debug("context_switches=%u", context_switches);
+
+    log_info("total_forks=%u", total_forks);
+    log_info("context_switches=%u", context_switches);
 }

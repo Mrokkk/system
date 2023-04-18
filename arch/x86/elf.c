@@ -44,7 +44,7 @@ static inline char* elf_get_machine(uint8_t v)
 
 static inline void elf_header_print(const char* name, const elf32_header_t* header)
 {
-    log_debug("%s: ELF %s %s %s, %s",
+    log_debug(DEBUG_ELF, "%s: ELF %s %s %s, %s",
         name,
         elf_get_architecture(header->e_ident[EI_CLASS]),
         elf_get_bitorder(header->e_ident[EI_DATA]),
@@ -71,7 +71,7 @@ static inline void elf_shdr_print(elf32_shdr_t* section, const char* strings)
 {
     char buffer[64];
     elf_shdr_flags_get(section, buffer);
-    log_debug("name=%s sh_flags=%s sh_addr=%x sh_offset=%x sh_size=%x",
+    log_debug(DEBUG_ELF, "name=%s sh_flags=%s sh_addr=%x sh_offset=%x sh_size=%x",
         &strings[section->sh_name],
         buffer,
         section->sh_addr,
@@ -109,7 +109,7 @@ static inline int elf_validate(const char* name, const elf32_header_t* header)
 // FIXME: big issue - if process did exec a binary and this binary forks, and execs the same binary,
 // page_range_get causes pages's assigned to different list, thus breaking original list
 
-void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* brk)
+int read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* brk, void** entry)
 {
     elf32_shdr_t* sections;
     elf32_shdr_t* string_table;
@@ -118,8 +118,8 @@ void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* 
 
     if (elf_validate(name, header))
     {
-        log_debug("not an ELF: %x", data);
-        return NULL;
+        log_debug(DEBUG_ELF, "not an ELF: %x", data);
+        return -ENOEXEC;
     }
 
     sections = ptr(addr(header) + header->e_shoff);
@@ -141,11 +141,6 @@ void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* 
         // Check if address of section is within already existing vm_area
         if (new_area && sections[i].sh_addr < new_area->virt_address + new_area->size)
         {
-            log_debug("not creating new area; old area={vaddr=%x, size=%x}, new=%x",
-                new_area->virt_address,
-                new_area->size,
-                sections[i].sh_addr);
-
             uint32_t new_size = page_align(sections[i].sh_addr + sections[i].sh_size - new_area->virt_address);
             uint32_t prev_size = new_area->size;
 
@@ -154,10 +149,7 @@ void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* 
             {
                 uint32_t needed_pages = (new_size - prev_size) / PAGE_SIZE;
 
-                log_debug("extending size to %x from %x needed_pages=%x, section_addr=%x",
-                    new_size,
-                    prev_size,
-                    needed_pages, phys(addr(header) + sections[i].sh_addr));
+                log_debug(DEBUG_ELF, "extending size from %x to %x", prev_size, new_size);
 
                 page_t* page_range;
 
@@ -173,7 +165,7 @@ void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* 
 
                 if (unlikely(!page_range))
                 {
-                    return NULL;
+                    return -ENOMEM;
                 }
 
                 vm_extend(new_area, page_range, vm_flags_get(&sections[i]), needed_pages);
@@ -192,13 +184,14 @@ void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* 
 
             if (unlikely(!first_page))
             {
-                return NULL;
+                log_debug(DEBUG_ELF, "cannot allocate page");
+                return -ENOMEM;
             }
 
             src_vaddr = ptr(page_beginning(addr(header) + sections[i].sh_addr));
             dest_vaddr = page_virt_ptr(first_page);
 
-            log_debug("copying %u from %x to %x", size, src_vaddr, dest_vaddr);
+            log_debug(DEBUG_ELF, "copying %u B from %x to %x", size, src_vaddr, dest_vaddr);
             memcpy(dest_vaddr, src_vaddr, size);
 
             new_area = vm_create(
@@ -226,5 +219,7 @@ void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* 
         }
     }
 
-    return ptr(header->e_entry);
+    *entry = ptr(header->e_entry);
+
+    return 0;
 }

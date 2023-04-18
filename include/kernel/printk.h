@@ -41,10 +41,11 @@ void ensure_printk_will_print(void);
         __printk(&e, &fmt[1], ##__VA_ARGS__); \
     })
 
-#define log_debug(...) printk(KERN_DEBUG __VA_ARGS__)
+#define log_debug(flag, ...) { if (flag) printk(KERN_DEBUG __VA_ARGS__); }
 #define log_info(...) printk(KERN_INFO __VA_ARGS__)
 #define log_notice(...) printk(KERN_NOTICE __VA_ARGS__)
 #define log_warning(...) printk(KERN_WARN __VA_ARGS__)
 #define log_error(...) printk(KERN_ERR __VA_ARGS__)
 #define log_exception(...) printk(KERN_ERR __VA_ARGS__)
 #define log_critical(...) printk(KERN_CRIT __VA_ARGS__)
+#define log_trace(flag, ...) { if (flag) log_debug(__VA_ARGS__); }

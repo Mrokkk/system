@@ -1,9 +1,9 @@
 #pragma once
 
 #include <arch/vm.h>
-#include <arch/page.h>
 
 #include <kernel/fs.h>
+#include <kernel/page.h>
 #include <kernel/wait.h>
 #include <kernel/mutex.h>
 #include <kernel/dentry.h>
@@ -31,10 +31,8 @@
 #define CLONE_MM            (1 << 3)
 
 // TODO: those shouldn't be hardcoded
-#define USER_SIGRET_VIRT_ADDRESS    (KERNEL_PAGE_OFFSET - 5 * PAGE_SIZE)
-#define USER_SIGSTACK_VIRT_ADDRESS  (KERNEL_PAGE_OFFSET - 4 * PAGE_SIZE)
-#define USER_STACK_VIRT_ADDRESS     (KERNEL_PAGE_OFFSET - 3 * PAGE_SIZE)
-#define USER_ARGV_VIRT_ADDRESS      (KERNEL_PAGE_OFFSET - PAGE_SIZE)
+#define USER_SIGRET_VIRT_ADDRESS    (KERNEL_PAGE_OFFSET - 3 * PAGE_SIZE)
+#define USER_STACK_VIRT_ADDRESS     (KERNEL_PAGE_OFFSET - 2 * PAGE_SIZE)
 #define USER_STACK_SIZE             (2 * PAGE_SIZE)
 
 // Every process has its own kernel stack, user stack (in first
@@ -104,7 +102,7 @@ struct process
     struct list_head processes;
 };
 
-#define PROCESS_SPACE_DECLARE(name) \
+#define PROCESS_STACK_DECLARE(name) \
     unsigned long name##_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, }
 
 #define PROCESS_MM_DECLARE(name) \
@@ -137,7 +135,7 @@ struct process
     }
 
 #define PROCESS_DECLARE(name) \
-    PROCESS_SPACE_DECLARE(name); \
+    PROCESS_STACK_DECLARE(name); \
     PROCESS_MM_DECLARE(name); \
     PROCESS_FS_DECLARE(name); \
     PROCESS_FILES_DECLARE(name); \
@@ -161,7 +159,7 @@ int process_find(int pid, struct process** p);
 void process_wake_waiting(struct process* p);
 int process_find_free_fd(struct process* p, int* fd);
 void scheduler();
-void exit(int);
+int exit(int);
 int fork(void);
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[]);
@@ -244,18 +242,12 @@ static inline void process_wait(struct process* p, flags_t flags)
     }
 }
 
-static inline void process_fd_set(
-    struct process* p,
-    int fd,
-    struct file* file)
+static inline void process_fd_set(struct process* p, int fd, struct file* file)
 {
     p->files->files[fd] = file;
 }
 
-static inline int process_fd_get(
-    struct process* p,
-    int fd,
-    struct file** file)
+static inline int process_fd_get(struct process* p, int fd, struct file** file)
 {
     return !(*file = p->files->files[fd]);
 }

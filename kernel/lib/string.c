@@ -63,7 +63,7 @@ char* strrchr(const char* string, int c)
 #endif
 
 #ifndef __HAVE_ARCH_STRLEN
-unsigned int strlen(const char* string)
+size_t strlen(const char* string)
 {
     char* temp;
     for (temp = (char*)string; *temp != 0; temp++);
@@ -72,7 +72,7 @@ unsigned int strlen(const char* string)
 #endif
 
 #ifndef __HAVE_ARCH_STRNLEN
-unsigned int strnlen(const char* s, size_t maxlen)
+size_t strnlen(const char* s, size_t maxlen)
 {
     register const char* e;
     size_t n;

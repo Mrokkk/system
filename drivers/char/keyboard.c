@@ -109,7 +109,7 @@ static void keyboard_wait(void)
         if (!(inb(STATUS_PORT) & 0x2)) return;
     }
 
-    log_debug("keyboard waiting timeout");
+    log_warning("keyboard waiting timeout");
 }
 
 static void keyboard_send_command(uint8_t byte)

@@ -87,4 +87,4 @@ typedef struct elf32_segment_header
 } elf32_shdr_t;
 
 int elf_check_file(struct elf32_header* hdr);
-void* read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* brk);
+int read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* brk, void** entry);

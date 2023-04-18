@@ -1,11 +1,10 @@
-#include <arch/page.h>
+#include <kernel/page.h>
 #include <kernel/bitset.h>
 #include <kernel/kernel.h>
 #include <kernel/malloc.h>
 
-BITSET_DECLARE(bitset, FAST_MALLOC_AREA / FAST_MALLOC_BLOCK_SIZE);
-
-char* fmalloc_mem;
+static char* fmalloc_mem;
+static BITSET_DECLARE(bitset, FAST_MALLOC_AREA / FAST_MALLOC_BLOCK_SIZE);
 
 static struct fmalloc_stats
 {
@@ -22,13 +21,11 @@ void* fmalloc(size_t size)
 
     if (frame < 0)
     {
-        log_debug("cannot allocate");
+        log_debug(DEBUG_FMALLOC, "cannot allocate");
         return NULL;
     }
 
-#if TRACE_FMALLOC
-    log_debug("allocating %u blocks at pos:%u", blocks, frame);
-#endif
+    log_debug(DEBUG_FMALLOC, "allocating %u blocks at pos:%u", blocks, frame);
 
     bitset_set_range(bitset, frame, blocks);
 
@@ -40,9 +37,7 @@ int ffree(void* ptr, size_t size)
     size_t frame = (addr(ptr) - addr(fmalloc_mem)) / FAST_MALLOC_BLOCK_SIZE;
     size_t blocks = align_to_block_size(size, FAST_MALLOC_BLOCK_SIZE) / FAST_MALLOC_BLOCK_SIZE;
 
-#if TRACE_FMALLOC
-    log_debug("freeing %x, %u blocks at pos:%u", ptr, blocks, frame);
-#endif
+    log_debug(DEBUG_FMALLOC, "freeing %x, %u blocks at pos:%u", ptr, blocks, frame);
 
     bitset_clear_range(bitset, frame, blocks);
 
@@ -67,8 +62,8 @@ void fmalloc_stats_print()
 {
     size_t used_blocks = bitset_count_set(bitset);
 
-    log_debug("used=%u B", used_blocks * FAST_MALLOC_BLOCK_SIZE);
-    log_debug("free=%u B", FAST_MALLOC_AREA - used_blocks * FAST_MALLOC_BLOCK_SIZE);
-    log_debug("fmalloc_cals=%u", fmalloc_stats.fmalloc_calls);
-    log_debug("ffree_cals=%u", fmalloc_stats.ffree_calls);
+    log_info("used=%u B", used_blocks * FAST_MALLOC_BLOCK_SIZE);
+    log_info("free=%u B", FAST_MALLOC_AREA - used_blocks * FAST_MALLOC_BLOCK_SIZE);
+    log_info("fmalloc_cals=%u", fmalloc_stats.fmalloc_calls);
+    log_info("ffree_cals=%u", fmalloc_stats.ffree_calls);
 }

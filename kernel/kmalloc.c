@@ -1,10 +1,9 @@
+#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/kernel.h>
 #include <kernel/malloc.h>
 #include <kernel/string.h>
 #include <kernel/spinlock.h>
-
-#include <arch/page.h>
 
 #define BLOCK_FREE 1
 #define BLOCK_BUSY 0
@@ -21,7 +20,7 @@ typedef struct memory_block
             uint16_t size;
             char free;
             struct list_head blocks;
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
             void* caller;
 #endif
         };
@@ -146,7 +145,7 @@ void* kmalloc(size_t size)
                 list_add(&new->blocks, &temp->blocks);
             }
 
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
             temp->caller = __builtin_return_address(0);
 #endif
 
@@ -162,7 +161,7 @@ void* kmalloc(size_t size)
         return 0;
     }
     list_add_tail(&new->blocks, &memory_blocks);
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
     new->caller = __builtin_return_address(0);
 #endif
 
@@ -182,7 +181,7 @@ int kfree(void* ptr)
         if (addr(temp->block_ptr) == addr(ptr))
         {
             temp->free = 1;
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
             temp->caller = NULL;
 #endif
             spinlock_unlock(&kmalloc_lock);
@@ -191,7 +190,7 @@ int kfree(void* ptr)
     }
 
     spinlock_unlock(&kmalloc_lock);
-    log_debug("cannot free %x", ptr);
+    log_warning("cannot free %x", ptr);
 
     return -ENXIO;
 }
@@ -215,9 +214,9 @@ void kmalloc_stats_print(void)
     unsigned free = 0;
     unsigned used = 0;
     size_t i;
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
     alloc_data_t* alloc_data = single_page();
-    __builtin_memset(alloc_data, 0, PAGE_SIZE);
+    memset(alloc_data, 0, PAGE_SIZE);
     size_t max_entries = PAGE_SIZE / sizeof(alloc_data) - 1;
 #endif
 
@@ -229,7 +228,7 @@ void kmalloc_stats_print(void)
         }
         else
         {
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
             for (i = 0; i < max_entries; ++i)
             {
                 if (alloc_data[i].caller == temp->caller)
@@ -249,9 +248,9 @@ void kmalloc_stats_print(void)
         }
     }
 
-#if TRACE_KMALLOC
+#if DEBUG_KMALLOC
     char symbol[80];
-    log_debug("used[B]  symbol");
+    log_info("used[B]  symbol");
     for (i = 0; i < max_entries; ++i)
     {
         void* caller = alloc_data[i].caller;
@@ -263,7 +262,7 @@ void kmalloc_stats_print(void)
         }
 
         ksym_string(symbol, addr(caller));
-        log_debug("%- 8u %s", size, symbol);
+        log_info("%- 8u %s", size, symbol);
     }
     page_free(alloc_data);
 #endif
@@ -275,9 +274,9 @@ void kmalloc_stats_print(void)
         ++i;
     }
 
-    log_debug("free=%u (%u kB)", free, free / 1024);
-    log_debug("used=%u (%u kB)", used, used / 1024);
-    log_debug("used_pages=%u", i);
-    log_debug("kmalloc_calls=%u", kmalloc_stats.kmalloc_calls);
-    log_debug("kfree_calls=%u", kmalloc_stats.kfree_calls);
+    log_info("free=%u (%u kB)", free, free / 1024);
+    log_info("used=%u (%u kB)", used, used / 1024);
+    log_info("used_pages=%u", i);
+    log_info("kmalloc_calls=%u", kmalloc_stats.kmalloc_calls);
+    log_info("kfree_calls=%u", kmalloc_stats.kfree_calls);
 }

@@ -5,7 +5,7 @@
 
 #define MMAP_TYPE_AVL   1
 #define MMAP_TYPE_DEV   2
-#define MMAP_TYPE_NA    3
+#define MMAP_TYPE_RES   3
 #define MMAP_TYPE_NDEF  4
 
 #define MEMORY_AREAS_SIZE 10
@@ -23,10 +23,10 @@ static inline const char* memory_area_type_string(int type)
 {
     switch (type)
     {
-        case MMAP_TYPE_AVL: return "AVL";
-        case MMAP_TYPE_DEV: return "DEV";
-        case MMAP_TYPE_NA: return "N/A";
-        default: return "UNDEF";
+        case MMAP_TYPE_AVL: return "AVAILABLE";
+        case MMAP_TYPE_DEV: return "DEVICE";
+        case MMAP_TYPE_RES: return "RESERVED";
+        default: return "UNDEFINED";
     }
 }
 
@@ -37,7 +37,7 @@ static inline const char* memory_area_type_string(int type)
         { \
             ma = &memory_areas[i]; \
             if (ma->size == 0) continue; \
-            log_debug("range={%08x - %08x}, %s", \
+            log_info("area={%08x - %08x}: %s", \
                 ma->base, \
                 ma->base + ma->size - 1, \
                 memory_area_type_string(ma->type)); \

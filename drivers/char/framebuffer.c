@@ -2,9 +2,9 @@
 
 #include <kernel/fs.h>
 #include <kernel/font.h>
+#include <kernel/page.h>
 #include <kernel/device.h>
 
-#include <arch/page.h>
 #include <arch/multiboot.h>
 
 int framebuffer_open();

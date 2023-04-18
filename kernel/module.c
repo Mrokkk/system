@@ -6,23 +6,21 @@ LIST_DECLARE(modules);
 
 int modules_init()
 {
-    struct kernel_module* module;
+    kmod_t* module;
 
-    for (module = (struct kernel_module*)_smodules_data;
-         module < (struct kernel_module*)_emodules_data;
-         module++)
+    for (module = (kmod_t*)_smodules_data; module < (kmod_t*)_emodules_data; module++)
     {
         module_add(module);
 
-        if (module->init != 0)
+        if (module->init != NULL)
         {
            if (module->init())
            {
-               log_debug("%s: FAIL", module->name);
+               log_info("%s: FAIL", module->name);
            }
            else
            {
-               log_debug("%s: SUCCESS", module->name);
+               log_info("%s: SUCCESS", module->name);
            }
         }
     }
@@ -30,9 +28,9 @@ int modules_init()
     return 0;
 }
 
-struct kernel_module* module_find(unsigned int this_module)
+kmod_t* module_find(unsigned int this_module)
 {
-    struct kernel_module* temp;
+    kmod_t* temp = NULL;
 
     list_for_each_entry(temp, &modules, modules)
     {
@@ -47,7 +45,7 @@ struct kernel_module* module_find(unsigned int this_module)
 
 void modules_shutdown()
 {
-    struct kernel_module* temp;
+    kmod_t* temp;
 
     list_for_each_entry(temp, &modules, modules)
     {

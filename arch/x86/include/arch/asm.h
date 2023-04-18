@@ -31,6 +31,11 @@
     push %ecx;          /* ecx */ \
     push %ebx;          /* ebx */
 
+#define SAVE_USER_ESP \
+    mov SYMBOL_NAME(process_current), %ecx; \
+    mov REGS_ESP(%esp), %edx; \
+    mov %edx, CONTEXT_ESP2(%ecx);
+
 #define RESTORE_ALL \
     pop %ebx; \
     pop %ecx; \
@@ -54,6 +59,7 @@
 #define __pic_isr(x) \
     ENTRY(isr_##x) \
         SAVE_ALL; \
+        SAVE_USER_ESP; \
         push %esp; \
         push $x-0x20; \
         call SYMBOL_NAME(do_irq); \
@@ -67,49 +73,52 @@
 
 #define __exception_noerrno(x) \
     ENTRY(exc_##x##_handler) \
-        SAVE_ALL; \
         push $0; \
+        SAVE_ALL; \
+        SAVE_USER_ESP; \
         push $__NR_##x; \
         call do_exception; \
-        add $12, %esp; \
+        add $4, %esp; \
         RESTORE_ALL; \
+        add $4, %esp; \
         iret; \
     ENDPROC(exc_##x##_handler)
 
 #define __exception_errno(x) \
     ENTRY(exc_##x##_handler) \
-        mov (%esp), %eax; \
-        add $4, %esp; \
         SAVE_ALL; \
-        push %eax; \
+        SAVE_USER_ESP; \
         push $__NR_##x; \
         call do_exception; \
-        add $8, %esp; \
+        add $4, %esp; \
         RESTORE_ALL; \
+        add $4, %esp; \
         iret; \
     ENDPROC(exc_##x##_handler)
 
 #define __exception_debug(x) \
     ENTRY(exc_##x##_handler) \
-        SAVE_ALL; \
         push $0; \
+        SAVE_ALL; \
+        SAVE_USER_ESP; \
         push $__NR_##x; \
         call do_exception; \
         movl $0, %eax; \
         mov %eax, %dr6; \
-        add $12, %esp; \
+        add $4, %esp; \
         RESTORE_ALL; \
+        add $4, %esp; \
         iret; \
     ENDPROC(exc_##x##_handler)
 
-#define __syscall0(name) \
+#define __syscall0(name, ...) \
     ENTRY(name) \
         mov $__NR_##name, %eax; \
         int $0x80; \
         ret; \
     ENDPROC(name)
 
-#define __syscall1(name, type1) \
+#define __syscall1(name, ...) \
     ENTRY(name) \
         push %ebx; \
         mov $__NR_##name, %eax; \
@@ -119,7 +128,7 @@
         ret; \
     ENDPROC(name)
 
-#define __syscall2(name, type1, type2) \
+#define __syscall2(name, ...) \
     ENTRY(name) \
         push %ebx; \
         mov $__NR_##name, %eax; \
@@ -130,7 +139,7 @@
         ret; \
     ENDPROC(name)
 
-#define __syscall3(name, type1, type2, type3) \
+#define __syscall3(name, ...) \
     ENTRY(name) \
         push %ebx; \
         mov $__NR_##name, %eax; \
@@ -142,7 +151,7 @@
         ret; \
     ENDPROC(name)
 
-#define __syscall4(name, type1, type2, type3, type4) \
+#define __syscall4(name, ...) \
     ENTRY(name) \
         push %ebx; \
         push %esi; \
@@ -157,7 +166,7 @@
         ret; \
     ENDPROC(name)
 
-#define __syscall5(name, type1, type2, type3, type4, type5) \
+#define __syscall5(name, ...) \
     ENTRY(name) \
         push %ebx; \
         push %esi; \

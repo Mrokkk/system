@@ -5,7 +5,7 @@
 #undef __syscall2
 #undef __syscall3
 #undef __syscall4
-#define __syscall0(call) int sys_##call();
+#define __syscall0(call, ...) int sys_##call();
 #define __syscall1(call, ...) int sys_##call();
 #define __syscall2(call, ...) int sys_##call();
 #define __syscall3(call, ...) int sys_##call();

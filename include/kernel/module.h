@@ -12,18 +12,20 @@ struct kernel_module
     struct list_head modules;
 };
 
-#define KERNEL_MODULE(name) \
+typedef struct kernel_module kmod_t;
+
+#define KERNEL_MODULE(n) \
     static int kmodule_init(); \
     static int kmodule_deinit(); \
-    static unsigned int this_module; \
     __attribute__ ((section(".modules_data"))) \
-    struct kernel_module km_##name = { \
-            kmodule_init, \
-            kmodule_deinit, \
-            #name, \
-            (unsigned int)&this_module, \
-            LIST_INIT(km_##name.modules) \
-    }
+    kmod_t km_##n = { \
+        .init = kmodule_init, \
+        .deinit = kmodule_deinit, \
+        .name = #n, \
+        .this_module = addr(&km_##n), \
+        .modules = LIST_INIT(km_##n.modules) \
+    }; \
+    static unsigned int this_module = addr(&km_##n); \
 
 #define module_init(init) \
     static int kmodule_init() __alias(init)
@@ -33,16 +35,16 @@ struct kernel_module
 
 extern struct list_head modules;
 
-static inline void module_add(struct kernel_module* new)
+static inline void module_add(kmod_t* new)
 {
     list_add_tail(&new->modules, &modules);
 }
 
-static inline void module_remove(struct kernel_module* module)
+static inline void module_remove(kmod_t* module)
 {
     list_del(&module->modules);
 }
 
 int modules_init();
 void modules_shutdown();
-struct kernel_module* module_find(unsigned int this_module);
+kmod_t* module_find(unsigned int this_module);

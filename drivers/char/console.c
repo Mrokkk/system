@@ -3,9 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <arch/page.h>
-
 #include <kernel/font.h>
+#include <kernel/page.h>
 #include <kernel/kernel.h>
 
 #include "framebuffer.h"
@@ -270,7 +269,7 @@ finish:
     irq_restore(flags);
 }
 
-int console_write(struct file*, char* buffer, int size)
+int console_write(struct file*, const char* buffer, int size)
 {
     for (int i = 0; i < size; ++i)
     {

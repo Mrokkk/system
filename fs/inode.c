@@ -1,16 +1,42 @@
 #include <kernel/fs.h>
 #include <kernel/kernel.h>
 
-LIST_DECLARE(files);
 LIST_DECLARE(mounted_inodes);
-struct inode *root;
+LIST_DECLARE(free_inodes);
+inode_t* root;
 
-void inode_init(inode_t* inode)
+int inode_get(inode_t** inode)
 {
-    memset(inode, 0, sizeof(inode_t));
+    if (list_empty(&free_inodes))
+    {
+        *inode = alloc(inode_t);
+    }
+    else
+    {
+        *inode = list_front(&free_inodes, inode_t, list);
+        list_del(&(*inode)->list);
+    }
+
+    if (unlikely(!*inode))
+    {
+        return -ENOMEM;
+    }
+
+    memset(*inode, 0, sizeof(inode_t));
+
+    list_init(&(*inode)->list);
+
 #ifdef USE_MAGIC
-    inode->magic = INODE_MAGIC;
+    (*inode)->magic = INODE_MAGIC;
 #endif
+    return 0;
+}
+
+int inode_put(inode_t* inode)
+{
+    list_del(&inode->list);
+    list_add_tail(&inode->list, &free_inodes);
+    return 0;
 }
 
 char* inode_print(const void* data, char* str)

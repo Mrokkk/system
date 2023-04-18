@@ -4,10 +4,16 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#define MAX_ENTRIES 10
+#define MAX_ENTRIES 100
+#define BUFFER_SIZE 1024
+
+#define DEVICE      "\033[35m"
+#define DIRECTORY   "\033[34m"
+#define RESET       "\033[0m"
 
 void dirent_print(struct dirent* dirent, struct stat* s)
 {
+    const char* type = "";
     int errno = stat(dirent->name, s);
     if (errno)
     {
@@ -15,29 +21,39 @@ void dirent_print(struct dirent* dirent, struct stat* s)
         return;
     }
 
-    printf("%-10u %-10u %s\n",
+    if (dirent->type == DT_CHR)
+    {
+        type = DEVICE;
+    }
+    else if (dirent->type == DT_DIR)
+    {
+        type = DIRECTORY;
+    }
+
+    printf("%-10u %-10u %s%s"RESET"\n",
         s->st_ino,
         s->st_size,
+        type,
         dirent->name);
 }
 
 int main()
 {
-    char cwd[128];
-    struct dirent dirents[MAX_ENTRIES];
+    char buf[BUFFER_SIZE];
     struct stat stats[MAX_ENTRIES];
+    struct dirent* dirent;
     int dirfd, count;
 
-    getcwd(cwd, 128);
+    getcwd(buf, BUFFER_SIZE);
 
-    dirfd = open(cwd, 0, 0);
+    dirfd = open(buf, O_RDONLY | O_DIRECTORY, 0);
 
     if (dirfd < 0)
     {
         printf("failed open %d\n", dirfd);
     }
 
-    count = getdents(dirfd, dirents, MAX_ENTRIES);
+    count = getdents(dirfd, buf, BUFFER_SIZE);
 
     if (count < 0)
     {
@@ -45,13 +61,11 @@ int main()
         return -1;
     }
 
+    dirent = (struct dirent*)buf;
     for (int i = 0; i < count; ++i)
     {
-        if (strlen(dirents[i].name) == 0)
-        {
-            break;
-        }
-        dirent_print(dirents + i, stats + i);
+        dirent_print(dirent, stats + i);
+        dirent = (struct dirent*)((char*)dirent + dirent->len);
     }
 
     return 0;

@@ -1,10 +1,10 @@
 #include <stdarg.h>
 
-#include <arch/page.h>
 #include <arch/system.h>
 #include <arch/register.h>
 
 #include <kernel/fs.h>
+#include <kernel/page.h>
 #include <kernel/printk.h>
 #include <kernel/backtrace.h>
 
@@ -15,12 +15,12 @@
 #define RESET       "\e[0m"
 
 static void (*printk_fallback)(const char *string);
-static int (*printk_write)(struct file*, char*, int);
+static int (*printk_write)(struct file*, const char*, int);
 static file_t* printk_file;
 
 #define PRINTK_INITIALIZED 0xFEED
 static int printk_initialized;
-static char printk_buffer[PAGE_SIZE * 3]; // FIXME: may cause random crashes
+static char printk_buffer[PAGE_SIZE * 4]; // FIXME: may cause random crashes
 static int printk_index = 0;
 
 static inline void push_entry(
@@ -28,7 +28,7 @@ static inline void push_entry(
     int len,
     int* index,
     char* logger_buffer,
-    int (*write)(struct file*, char*, int))
+    int (*write)(struct file*, const char*, int))
 {
     // If console print function is registered just print text using function,
     // else save text to given logger_buffer
@@ -58,12 +58,6 @@ int __printk(struct printk_entry* entry, const char *fmt, ...)
     if (
         0
         /*|| entry->log_level < LOGLEVEL_NOTICE*/
-        || !strcmp(filename, "open.c")
-        || !strcmp(filename, "lookup.c")
-        || !strcmp(filename, "mbfs.c")
-        || !strcmp(filename, "ramfs.c")
-        /*|| !strcmp(filename, "dentry.c")*/
-        /*|| !strcmp(filename, "devfs.c")*/
         )
     {
         return 0;

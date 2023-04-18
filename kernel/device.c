@@ -1,6 +1,6 @@
 #include <kernel/device.h>
 
-struct device* char_devices[CHAR_DEVICES_SIZE];
+device_t* char_devices[CHAR_DEVICES_SIZE];
 
 int __char_device_register(
     unsigned int major,
@@ -10,16 +10,17 @@ int __char_device_register(
     void* private,
     unsigned int this_module)
 {
-    struct device* dev;
-    struct kernel_module* mod;
+    device_t* dev;
+    kmod_t* mod;
 
-    if (new(dev))
+    if (!(dev = alloc(device_t)))
     {
         return -ENOMEM;
     }
 
     dev->fops = fops;
     dev->owner = 0;
+    dev->major = major;
     dev->max_minor = max_minor;
     dev->private = private;
     strcpy(dev->name, name);
@@ -34,22 +35,7 @@ int __char_device_register(
     return 0;
 }
 
-int char_devices_list_get(char* buffer)
-{
-    int len = sprintf(buffer, "Installed char devices: \n");
-
-    for (int i = 0; i < CHAR_DEVICES_SIZE; i++)
-    {
-        if (char_devices[i])
-        {
-            len += sprintf(buffer+len, "%u %s\n", i, char_devices[i]->name);
-        }
-    }
-
-    return len;
-}
-
-int char_device_find(const char* name, struct device** dev)
+int char_device_find(const char* name, device_t** dev)
 {
     *dev = 0;
     for (int i = 0; i < CHAR_DEVICES_SIZE; i++)

@@ -61,6 +61,7 @@ ENDPROC(eip_get)
 
 ENTRY(syscall_handler) // INT 0x80 handler
     SAVE_ALL
+    SAVE_USER_ESP
     cmp $__NR_syscalls, %eax
     jg bad_syscall
     mov SYMBOL_NAME(syscalls)(, %eax, 4), %eax
@@ -70,6 +71,7 @@ ENTRY(syscall_handler) // INT 0x80 handler
     mov %eax, REGS_EAX(%esp) // Put value returned by syscall in pt_regs
     call syscall_regs_check
 ENDPROC(syscall_handler)
+
 ENTRY(ret_from_syscall)
     RESTORE_ALL
     iret
@@ -83,6 +85,7 @@ ENDPROC(bad_syscall)
 ENTRY(timer_handler) // IRQ 0 handler
     incl jiffies
     SAVE_ALL
+    SAVE_USER_ESP
     PIC_EOI(0)
     call SYMBOL_NAME(scheduler)
     RESTORE_ALL

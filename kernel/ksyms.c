@@ -1,4 +1,4 @@
-#include <arch/page.h>
+#include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/ksyms.h>
 
@@ -107,7 +107,7 @@ int ksyms_load(char* symbols, size_t size)
     required_size = page_align(count * sizeof(ksym_t));
     required_pages = required_size / PAGE_SIZE;
 
-    log_debug("got %u symbols; allocating %u B", count, count * sizeof(ksym_t));
+    log_info("got %u symbols; allocating %u B", count, count * sizeof(ksym_t));
     page_t* pages = page_alloc(required_pages, PAGE_ALLOC_CONT);
 
     if (unlikely(!pages))
@@ -123,8 +123,6 @@ int ksyms_load(char* symbols, size_t size)
     {
         symbols = symbol_read(symbols, &kernel_symbols[i]);
     }
-
-    log_debug("read %d symbols", count);
 
     return 0;
 }

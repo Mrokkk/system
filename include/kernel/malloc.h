@@ -4,8 +4,6 @@
 #define FAST_MALLOC_BLOCK_SIZE  8
 #define FAST_MALLOC_AREA        (4096 * 2)
 
-#ifndef __ASSEMBLER__
-
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,41 +16,43 @@ int ffree(void* ptr, size_t size);
 void fmalloc_init(void);
 void fmalloc_stats_print(void);
 
+void* slab_alloc(size_t size);
+void slab_free(void* ptr, size_t size);
+void slab_allocator_init(void);
+
 void kmalloc_init(void);
 void* kmalloc(unsigned int);
 int kfree(void*);
 void kmalloc_stats_print(void);
 
-// Generic constructor
-#define __CONSTRUCT(object, initializer) \
-    ({ object = (typeof(object))kmalloc(sizeof(typeof(*object))); if (object) (void)initializer; !object; })
+#define USE_SLAB_ALLOCATION 1
 
-#define __CONSTRUCT2(type, initializer) \
-    ({ type* this = (type*)kmalloc(sizeof(type)); if (this) { (void)initializer; } this; })
+#if USE_SLAB_ALLOCATION
 
-// Generic destructor
-#define __DESTRUCT(object, deinitializer) \
-    do { \
-        (void)deinitializer; \
-        kfree(object); \
-    } while (0)
+#define __CONSTRUCT(type, init) \
+    ({ type* this = slab_alloc(sizeof(type)); if (likely(this)) { (void)init; } this; })
 
-#define CONSTRUCT_1(object)              __CONSTRUCT(object, 0)
-#define CONSTRUCT_2(object, initializer) __CONSTRUCT(object, initializer)
+#define __DESTRUCT(object, deinit) \
+    ({ (void)deinit; slab_free(object, sizeof(*object)); })
 
-#define CONSTRUCT_3(type)              __CONSTRUCT2(type, 0)
-#define CONSTRUCT_4(type, initializer) __CONSTRUCT2(type, initializer)
+#else
 
-#define DESTRUCT_1(object)                __DESTRUCT(object, 0)
-#define DESTRUCT_2(object, deinitializer) __DESTRUCT(object, deinitializer)
+#define alloc_array(type, count) \
+    ({ type* this = slab_alloc(sizeof(type) * count); this; })
 
-#define new(...) \
-    REAL_VAR_MACRO_2(CONSTRUCT_1, CONSTRUCT_2, __VA_ARGS__)
+#define __CONSTRUCT(type, init) \
+    ({ type* this = kmalloc(sizeof(type)); if (likely(this)) { (void)init; } this; })
 
-#define delete(...) \
-    REAL_VAR_MACRO_2(DESTRUCT_1, DESTRUCT_2, __VA_ARGS__)
+#define __DESTRUCT(object, deinit) \
+    ({ (void)deinit; kfree(object); })
 
-#define alloc(...) \
-    REAL_VAR_MACRO_2(CONSTRUCT_3, CONSTRUCT_4, __VA_ARGS__)
+#endif
 
-#endif // __ASSEMBLER__
+#define CONSTRUCT_1(type)           __CONSTRUCT(type, 0)
+#define CONSTRUCT_2(type, init)     __CONSTRUCT(type, init)
+
+#define DESTRUCT_1(object)          __DESTRUCT(object, 0)
+#define DESTRUCT_2(object, deinit)  __DESTRUCT(object, deinit)
+
+#define alloc(...)      REAL_VAR_MACRO_2(CONSTRUCT_1, CONSTRUCT_2, __VA_ARGS__)
+#define delete(...)     REAL_VAR_MACRO_2(DESTRUCT_1, DESTRUCT_2, __VA_ARGS__)

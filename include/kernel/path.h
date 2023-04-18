@@ -21,6 +21,6 @@ static inline const char* find_last_slash(const char* path)
         : path;
 }
 
-int construct_path(dentry_t* dentry, char* output, size_t size);
+int path_construct(dentry_t* dentry, char* output, size_t size);
 int path_validate(const char* path);
 void dirname(const char* path, char* output);

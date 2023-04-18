@@ -19,6 +19,7 @@ typedef struct device
     char name[CHAR_DEVICE_NAME_SIZE];
     struct kernel_module* owner;
     struct file_operations* fops;
+    dev_t major;
     dev_t max_minor;
     void* private;
 } device_t;
@@ -31,20 +32,19 @@ int __char_device_register(
     void* private,
     unsigned int this_module);
 
-int char_devices_list_get(char* buffer);
-int char_device_find(const char* name, struct device** dev);
+int char_device_find(const char* name, device_t** dev);
 
 extern device_t* char_devices[CHAR_DEVICES_SIZE];
 
-static inline device_t* char_device_get(unsigned int major)
+static inline device_t* char_device_get(dev_t major)
 {
     return char_devices[major];
 }
 
-static inline struct file_operations* char_fops_get(unsigned int major)
+static inline struct file_operations* char_fops_get(dev_t major)
 {
     return char_devices[major]->fops;
 }
 
 #define char_device_register(major, name, fops, max_minor, private) \
-    __char_device_register(major, name, fops, max_minor, private, addr(&this_module))
+    __char_device_register(major, name, fops, max_minor, private, this_module)

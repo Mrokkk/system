@@ -64,19 +64,6 @@ static inline const char* word_read(const char* string, char* output)
     return string;
 }
 
-static inline void print_errno(const char* line, int errno)
-{
-    switch (errno)
-    {
-        case -EISDIR: printf("%s: is a directory\n", line); break;
-        case -ENOENT: printf("%s: no such file or directory\n", line); break;
-        case -EACCES: printf("%s: permission denied\n", line); break;
-        case -ENOOPS: printf("%s: operation not possible\n", line); break;
-        case -ERANGE: printf("%s: bad range\n", line); break;
-        default: printf("%s: unknown error\n", line); break;
-    }
-}
-
 int c_cd(const char* arg)
 {
     if (!arg || !arg[0])
@@ -140,7 +127,7 @@ static inline void cmd_args_read(char* command, int* argc, char* argv[], char* b
 
 static inline int execute(const char* command, int argc, char* argv[], int* status)
 {
-    int errno, pid;
+    int pid;
     (void)argc;
 
     for (int i = 0; commands[i].name; ++i)
@@ -149,7 +136,7 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
         {
             if ((*status = commands[i].function(argv[1])))
             {
-                print_errno(argv[0], *status);
+                perror(argv[1]);
             }
             return 0;
         }
@@ -164,8 +151,8 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
 
     if ((pid = fork()) == 0)
     {
-        errno = exec(command, argv);
-        print_errno(command, errno);
+        exec(command, argv);
+        perror(command);
         exit(errno);
     }
     else if (pid < 0)

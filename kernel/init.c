@@ -42,9 +42,9 @@ __noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloade
     paging_init();
     kmalloc_init();
     fmalloc_init();
+    slab_allocator_init();
     irqs_configure();
     processes_init();
-    vfs_init();
     modules_init();
 
     ASSERT(init_in_progress == INIT_IN_PROGRESS);
@@ -77,6 +77,7 @@ __noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloade
 static inline void rootfs_prepare()
 {
     int errno;
+
     if ((errno = mount("none", "/", "ramfs", 0, 0)))
     {
         panic("cannot mount root; errno = %d", errno);
@@ -90,6 +91,8 @@ static inline void rootfs_prepare()
     mkdir("/test", 0);
     mkdir("/test/test1", 0);
     mkdir("/test/test1/test2", 0);
+    mkdir("/tmp", 0);
+    mount("none", "/tmp", "ramfs", 0, 0);
 
     if (mkdir("/dev", 0) || mkdir("/bin", 0))
     {

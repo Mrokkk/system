@@ -6,9 +6,6 @@
 
 struct process;
 
-// Implementation of a wait queue is built on the top
-// of list_head.
-
 struct wait_queue
 {
     struct process* data;
@@ -79,15 +76,15 @@ static inline struct process* __wait_queue_pop(struct wait_queue_head* head)
     return data;
 }
 
-#if TRACE_WAIT_QUEUE
+#if DEBUG_WAIT_QUEUE
 
 #include <kernel/printk.h>
 
 #define wait_queue_push(new, head) \
-    { log_debug("wait_queue_push: new=%x head=%x", (new), (head)); __wait_queue_push(new, head); }
+    { log_debug(DEBUG_WAIT_QUEUE, "wait_queue_push: new=%x head=%x", new, head); __wait_queue_push(new, head); }
 
 #define wait_queue_pop(head) \
-    ({ log_debug("wait_queue_pop: head=%x", (head)); struct process* tmp = __wait_queue_pop(head); tmp; })
+    ({ log_debug(DEBUG_WAIT_QUEUE, "wait_queue_pop: head=%x", head); __wait_queue_pop(head); })
 
 #else
 

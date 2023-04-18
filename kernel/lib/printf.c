@@ -367,6 +367,7 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 {
                     switch (*magic)
                     {
+#if 0
                         case DENTRY_MAGIC:
                             extern char* dentry_print();
                             str = dentry_print(magic, str);
@@ -375,6 +376,7 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                             extern char* inode_print();
                             str = inode_print(magic, str);
                             continue;
+#endif
                         default:
                             str += sprintf(str, "<ptr:%x>", (uint32_t)magic);
                             continue;

@@ -1,8 +1,8 @@
+#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/mutex.h>
 #include <kernel/memory.h>
 
-#include <arch/page.h>
 #include <arch/segment.h>
 #include <arch/multiboot.h>
 #include <arch/descriptor.h>
@@ -12,11 +12,10 @@ extern pgt_t page0[];
 
 MUTEX_DECLARE(page_mutex);
 LIST_DECLARE(free_pages);
-uint32_t virt_end;
-pgt_t* page_table;
-pgd_t* kernel_page_dir;
-page_t* page_map;
 
+page_t* page_map;
+static pgt_t* page_table;
+static pgd_t* kernel_page_dir;
 static uint32_t last_frame;
 
 static struct page_stats
@@ -37,19 +36,17 @@ static inline void pge_set(int nr, uint32_t val)
 
 static inline page_t* free_page_find()
 {
-    flags_t flags;
-    for (uint32_t i = 0; i < last_frame; ++i)
+    if (unlikely(list_empty(&free_pages)))
     {
-        irq_save(flags);
-        if (!page_map[i].count)
-        {
-            irq_restore(flags);
-            return &page_map[i];
-        }
-        irq_restore(flags);
+        log_exception("no free page!");
+        return NULL;
     }
-    log_exception("no free page!");
-    return NULL;
+
+    page_t* page = list_front(&free_pages, page_t, list_entry);
+
+    list_del(&page->list_entry);
+
+    return page;
 }
 
 static inline page_t* free_page_range_find_discont(const int count)
@@ -65,9 +62,7 @@ static inline page_t* free_page_range_find_discont(const int count)
             goto no_pages;
         }
 
-#if TRACE_PAGE
-        log_debug("[alloc] %x", page_phys(temp_page));
-#endif
+        log_debug(DEBUG_PAGE, "[alloc] %x", page_phys(temp_page));
         list_del(&temp_page->list_entry);
         temp_page->count = 1;
 
@@ -118,9 +113,7 @@ static inline page_t* free_page_range_find(const int count)
 
     for (int i = 0; i < count; ++i)
     {
-#if TRACE_PAGE
-        log_debug("[alloc] %x", page_phys(&first_page[i]));
-#endif
+        log_debug(DEBUG_PAGE, "[alloc] %x", page_phys(&first_page[i]));
         first_page[i].count = 1;
         list_del(&first_page[i].list_entry);
         if (i != 0)
@@ -152,6 +145,23 @@ static inline void page_kernel_identity_mapping_range(page_t* page)
     }
 }
 
+static inline int frame_free(uint32_t address)
+{
+    uint32_t frame = address / PAGE_SIZE;
+
+    log_debug(DEBUG_PAGE, "[free] paddr=%x count_after_free=%u", address, page_map[frame].count - 1);
+
+    if (unlikely(!page_map[frame].count))
+    {
+        panic("frame is already free or reserved: %x", address);
+    }
+
+    list_del(&page_map[frame].list_entry);
+    list_add(&page_map[frame].list_entry, &free_pages);
+
+    return --page_map[frame].count;
+}
+
 page_t* __page_alloc(int count, int flags)
 {
     page_t* first_page;
@@ -175,7 +185,7 @@ page_t* __page_alloc(int count, int flags)
 
     page_kernel_identity_mapping_range(first_page);
 
-#if TRACE_PAGE_DETAILED
+#if DEBUG_PAGE_DETAILED
     void* caller = __builtin_return_address(0);
     first_page->caller = caller;
     page_t* temp;
@@ -188,19 +198,6 @@ page_t* __page_alloc(int count, int flags)
     mutex_unlock(&page_mutex);
 
     return first_page;
-}
-
-static inline int __frame_free(uint32_t address)
-{
-    uint32_t frame = address / PAGE_SIZE;
-
-    log_debug("[free] paddr=%x count_after_free=%u", address, page_map[frame].count - 1);
-
-    if (unlikely(!page_map[frame].count))
-    {
-        panic("frame is already free or reserved: %x", address);
-    }
-    return --page_map[frame].count;
 }
 
 int __page_free(void* ptr)
@@ -230,7 +227,7 @@ page_t* __page_range_get(uint32_t paddr, int count)
 
     if (!list_empty(&first_page->list_entry))
     {
-        log_debug("paddr=%x vaddr=%x is used somewhere!", paddr, page_virt(first_page));
+        log_info("paddr=%x vaddr=%x is used somewhere!", paddr, page_virt(first_page));
         list_init(&first_page->list_entry);
     }
 
@@ -238,7 +235,7 @@ page_t* __page_range_get(uint32_t paddr, int count)
     {
         temp = first_page + i;
         list_init(&temp->list_entry);
-        list_add(&temp->list_entry, &first_page->list_entry);
+        list_add_tail(&temp->list_entry, &first_page->list_entry);
     }
 
     mutex_unlock(&page_mutex);
@@ -296,7 +293,7 @@ pgd_t* pgd_alloc(pgd_t* old_pgd)
 
     memset(new_pgd, 0, PAGE_SIZE);
 
-    log_debug("copying %u kernel pte from %u", PTE_IN_PDE - KERNEL_PDE_OFFSET, KERNEL_PDE_OFFSET);
+    log_debug(DEBUG_PAGE, "copying %u kernel pte from %u", PTE_IN_PDE - KERNEL_PDE_OFFSET, KERNEL_PDE_OFFSET);
 
     memcpy(
         new_pgd + KERNEL_PDE_OFFSET,
@@ -326,10 +323,9 @@ pgd_t* init_pgd_get(void)
 
 void page_kernel_identity_map(uint32_t paddr, uint32_t size)
 {
-    log_debug("mapping %x size=%x", paddr, size);
+    log_debug(DEBUG_PAGE, "mapping %x size=%x", paddr, size);
     for (uint32_t temp = paddr; temp < paddr + size; temp += PAGE_SIZE)
     {
-        //log_debug("mapping %x", temp);
         uint32_t pde_index = pde_index(temp);
         uint32_t pte_index = pte_index(temp);
         pgt_t* pgt;
@@ -343,12 +339,10 @@ void page_kernel_identity_map(uint32_t paddr, uint32_t size)
                 return;
             }
 
-            //log_debug("creating pgt at %u", pde_index);
             kernel_page_dir[pde_index] = phys_addr(pgt) | PAGE_KERNEL_FLAGS;
         }
         else
         {
-            //log_debug("entry already exists at %u", pde_index);
             pgt = virt_ptr(kernel_page_dir[pde_index] & PAGE_ADDRESS);
         }
 
@@ -359,7 +353,7 @@ void page_kernel_identity_map(uint32_t paddr, uint32_t size)
 
 void page_stats_print()
 {
-    log_debug("memory stats:");
+    log_info("memory stats:");
 
     uint32_t frames_used = 0;
     uint32_t frames_free = 0;
@@ -391,25 +385,25 @@ void page_stats_print()
         }
     }
 
-    log_debug("virt_end=%x", virt_end);
-    log_debug("module_start=%x", module_start);
-    log_debug("frames_used=%u (%u kB)", frames_used, frames_used * 4);
-    log_debug("frames_free=%u (%u kB)", frames_free, frames_free * 4);
-    log_debug("frames_lost=%u (%u kB)", frames_lost, frames_lost * 4);
-    log_debug("frames_unavailable=%u (%u kB)", frames_unavailable, frames_unavailable * 4);
-    log_debug("page_alloc_calls=%u", page_stats.page_alloc_calls);
-    log_debug("page_free_calls=%u", page_stats.page_free_calls);
+    log_info("last_frame=%x", last_frame);
+    log_info("module_start=%x", module_start);
+    log_info("frames_used=%u (%u kB)", frames_used, frames_used * 4);
+    log_info("frames_free=%u (%u kB)", frames_free, frames_free * 4);
+    log_info("frames_lost=%u (%u kB)", frames_lost, frames_lost * 4);
+    log_info("frames_unavailable=%u (%u kB)", frames_unavailable, frames_unavailable * 4);
+    log_info("page_alloc_calls=%u", page_stats.page_alloc_calls);
+    log_info("page_free_calls=%u", page_stats.page_free_calls);
 
-#if TRACE_PAGE_DETAILED
+#if DEBUG_PAGE_DETAILED
     char symbol[80];
-    log_debug("count paddr      symbol");
+    log_info("count paddr      symbol");
     for (uint32_t i = 0; i < last_frame; ++i)
     {
         if (page_map[i].caller && page_map[i].count)
         {
             void* caller = page_map[i].caller;
             ksym_string(symbol, addr(caller));
-            log_debug("%- 5u %08x %s",
+            log_info("%- 5u %08x %s",
                 page_map[i].count,
                 page_phys(&page_map[i]),
                 symbol);
@@ -452,7 +446,7 @@ uint32_t page_map_allocate(uint32_t virt_end)
     uint32_t needed_pages = last_frame;
     uint32_t offset = addr(page_map) - virt_end + page_align(needed_pages * sizeof(page_t));
 
-    log_debug("additional %u kB for metadata (%u entries; %u B each); virt_end=%x; page_map=%x",
+    log_info("additional %u kB for metadata (%u entries; %u B each); virt_end=%x; page_map=%x",
         offset / 1024,
         needed_pages,
         sizeof(page_t),
@@ -475,7 +469,7 @@ static inline uint32_t pgt_init(pgt_t* prev_pgt, const uint32_t virt_end)
     uint32_t frame_nr = address / PAGE_SIZE;
     uint32_t pages_for_pgt = min(1024 * 1024 * 1024, page_align(ram)) / PAGE_SIZE / 1024 + 1;
 
-    log_debug("%u pages needed for kernel page tables", pages_for_pgt);
+    log_info("%u pages needed for kernel page tables", pages_for_pgt);
 
     prev_pgt[frame_nr] = address | PTE_PRESENT | PTE_WRITEABLE;
 
@@ -511,8 +505,6 @@ static inline uint32_t pgt_init(pgt_t* prev_pgt, const uint32_t virt_end)
         list_add_tail(&page_map[frame_nr].list_entry, &free_pages);
     }
 
-    log_debug("frame nr = %u", frame_nr);
-
     return pages_for_pgt * PAGE_SIZE;
 }
 
@@ -522,7 +514,7 @@ static inline uint32_t virt_end_init()
     {
         // FIXME: Grub leaves a blank space between kernel end and first module;
         // mark frames as used only for selected region
-        log_debug("changing end ptr to %x from %x (gap %u kB)", module_end, _end, (module_start - addr(_end)) / 1024);
+        log_info("changing end ptr to %x from %x (gap %u kB)", module_end, _end, (module_start - addr(_end)) / 1024);
         return module_end;
     }
     else
@@ -533,6 +525,8 @@ static inline uint32_t virt_end_init()
 
 int paging_init()
 {
+    uint32_t virt_end;
+
     last_frame = ram / PAGE_SIZE;
     pgt_t* temp_pgt = virt_ptr(page0);
     kernel_page_dir = virt_ptr(page_dir);
@@ -541,9 +535,8 @@ int paging_init()
     virt_end += page_map_allocate(virt_end);
     virt_end += pgt_init(temp_pgt, virt_end);
 
-    log_debug("virt_end=%x, need %u frames", virt_end, phys_addr(virt_end) / PAGE_SIZE);
+    log_debug(DEBUG_PAGE, "virt_end=%x, need %u frames", virt_end, phys_addr(virt_end) / PAGE_SIZE);
 
-    // nullptr page
     page_dir[0] = 0;
 
     ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].count);

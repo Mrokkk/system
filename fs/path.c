@@ -1,10 +1,12 @@
+#include <arch/vm.h>
 #include <kernel/path.h>
 #include <kernel/kernel.h>
+#include <kernel/process.h>
 
-int path_validate(const char*)
+int path_validate(const char* path)
 {
-    // TODO
-    return 0;
+    // FIXME: do proper validation
+    return vm_verify(VERIFY_READ, path, 1, process_current->mm->vm_areas);
 }
 
 void dirname(const char* path, char* output)
@@ -27,7 +29,7 @@ struct path_list
     struct path_list* next;
 };
 
-int construct_path(dentry_t* dentry, char* output, size_t size)
+int path_construct(dentry_t* dentry, char* output, size_t size)
 {
     struct path_list* null = NULL;
     struct path_list* path;

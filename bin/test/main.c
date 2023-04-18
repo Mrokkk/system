@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <signal.h>
 #include <stdint.h>
@@ -9,6 +10,14 @@
 int data;
 int data2 = 13;
 int data3[1028];
+
+volatile int sigreceived;
+
+int sighan()
+{
+    sigreceived = 1;
+    return 0;
+}
 
 #define FORK_TEST_CASE_EQ(expected_error_code) \
     int status, pid = fork(); \
@@ -78,6 +87,81 @@ TEST(getppid)
     FORK_TEST_CASE_EQ(0)
     {
         EXPECT_EQ(getppid(), parent_pid);
+        exit(*assert_failed);
+    }
+}
+
+TEST(getdents_bad_ptr1)
+{
+    FORK_TEST_CASE_EQ(0)
+    {
+        char buf[128];
+        int dirfd, count;
+
+        getcwd(buf, 128);
+
+        dirfd = open(buf, O_RDONLY | O_DIRECTORY, 0);
+
+        if (dirfd < 0)
+        {
+            printf("failed open %d\n", dirfd);
+        }
+
+        count = getdents(dirfd, (void*)0xc0000000, 0x1000);
+
+        EXPECT_EQ(count, -1);
+        EXPECT_EQ(errno, -EFAULT);
+
+        exit(*assert_failed);
+    }
+}
+
+TEST(getdents_bad_ptr2)
+{
+    FORK_TEST_CASE_EQ(0)
+    {
+        char buf[128];
+        int dirfd, count;
+
+        getcwd(buf, 128);
+
+        dirfd = open(buf, O_RDONLY | O_DIRECTORY, 0);
+
+        if (dirfd < 0)
+        {
+            printf("failed open %d\n", dirfd);
+        }
+
+        count = getdents(dirfd, (void*)0xcfffff00, 0x1000);
+
+        EXPECT_EQ(count, -1);
+        EXPECT_EQ(errno, -EFAULT);
+
+        exit(*assert_failed);
+    }
+}
+
+TEST(signal)
+{
+    int status, pid = fork();
+    if (pid > 0)
+    {
+        int i = 10000000;
+        while (i--)
+        {
+            asm volatile("nop");
+        }
+        kill(pid, SIGUSR1);
+        kill(pid, SIGCONT);
+        waitpid(pid, &status, 0);
+        EXPECT_GT(WIFEXITED(status), 0);
+        EXPECT_EQ(WEXITSTATUS(status), 0);
+    }
+    else
+    {
+        signal(SIGUSR1, &sighan);
+        kill(getpid(), SIGSTOP);
+        EXPECT_EQ(sigreceived, 1);
         exit(*assert_failed);
     }
 }

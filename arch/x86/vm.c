@@ -1,32 +1,35 @@
 #include <arch/vm.h>
-#include <arch/page.h>
 
+#include <kernel/page.h>
 #include <kernel/process.h>
 
-vm_area_t* vm_create(
-    page_t* page_range,
-    uint32_t virt_address,
-    uint32_t size,
-    int vm_flags)
+vm_area_t* vm_create(page_t* page_range, uint32_t virt_address, uint32_t size, int vm_flags)
 {
-    vm_area_t* area = alloc(vm_area_t);
+    vm_area_t* vma = alloc(vm_area_t);
 
-    if (unlikely(!area))
+    if (unlikely(!vma))
     {
-        log_debug("no mem");
+        log_debug(DEBUG_VM, "cannot allocate vm_area");
         return NULL;
     }
 
-    area->pages = alloc(pages_t);
-    area->pages->count = 1;
-    list_init(&area->pages->head);
-    list_merge(&area->pages->head, &page_range->list_entry);
-    area->virt_address = virt_address;
-    area->size = size;
-    area->vm_flags = vm_flags;
-    area->next = NULL;
+    vma->pages = alloc(pages_t);
 
-    return area;
+    if (unlikely(!vma->pages))
+    {
+        log_debug(DEBUG_VM, "cannot allocate vma->pages");
+        return NULL;
+    }
+
+    vma->pages->count = 1;
+    list_init(&vma->pages->head);
+    list_merge(&vma->pages->head, &page_range->list_entry);
+    vma->virt_address = virt_address;
+    vma->size = size;
+    vma->vm_flags = vm_flags;
+    vma->next = NULL;
+
+    return vma;
 }
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma)
@@ -67,40 +70,34 @@ int vm_add(vm_area_t** head, vm_area_t* new_vma)
     return 0;
 }
 
-vm_area_t* vm_extend(
-    vm_area_t* area,
-    page_t* page_range,
-    int vm_flags,
-    int count)
+vm_area_t* vm_extend(vm_area_t* vma, page_t* page_range, int vm_flags, int count)
 {
-    log_debug("page_range=%x paddr=%x vaddr=%x count=%u",
+    log_debug(DEBUG_VM, "page_range=%x paddr=%x vaddr=%x count=%u",
         page_range,
         page_phys(page_range),
         page_virt(page_range),
         count);
 
-    area->size += count * PAGE_SIZE;
-    area->vm_flags |= vm_flags;
-    list_merge(&area->pages->head, &page_range->list_entry);
-    return area;
+    vma->size += count * PAGE_SIZE;
+    vma->vm_flags |= vm_flags;
+    list_merge(&vma->pages->head, &page_range->list_entry);
+    return vma;
 }
 
-int vm_apply(
-    vm_area_t* area,
-    pgd_t* pgd,
-    int vm_apply_flags)
+int vm_apply(vm_area_t* vma, pgd_t* pgd, int vm_apply_flags)
 {
     uint32_t paddress;
-    uint32_t vaddress = area->virt_address;
-    size_t size = area->size;
-    int vm_flags = area->vm_flags;
+    uint32_t vaddress = vma->virt_address;
+    size_t size = vma->size;
+    int vm_flags = vma->vm_flags;
     int replace_pg = vm_apply_flags & VM_APPLY_REPLACE_PG;
 
     pgt_t* pgt;
     uint32_t pde_index = pde_index(vaddress);
     uint32_t pte_index;
 
-    log_debug("with v=%x, size=%x, pgd=%x",
+    log_debug(DEBUG_VM_APPLY,
+        "with v=%x, size=%x, pgd=%x",
         vaddress,
         size,
         pgd);
@@ -121,7 +118,7 @@ int vm_apply(
         }
 
         memset(pgt, 0, PAGE_SIZE);
-        log_debug("creating pde at offset %u", pde_index);
+        log_debug(DEBUG_VM_APPLY, "creating pde at offset %u", pde_index);
         uint32_t frame = phys_addr(pgt);
 
         pgd[pde_index] = frame | pde_flags_get(vm_flags);
@@ -129,12 +126,12 @@ int vm_apply(
     else
     {
         pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS);
-        log_debug("pde exists; %x", pgt);
+        log_debug(DEBUG_VM_APPLY, "pde exists; %x", pgt);
     }
 
-    log_debug("pgt=%x", pgt);
+    log_debug(DEBUG_VM_APPLY, "pgt=%x", pgt);
 
-    page_t* page = list_front(&area->pages->head, page_t, list_entry);
+    page_t* page = list_front(&vma->pages->head, page_t, list_entry);
     for (uint32_t vaddr = vaddress;
          vaddr < vaddress + size;
          vaddr += PAGE_SIZE, page = list_next_entry(&page->list_entry, page_t, list_entry))
@@ -142,47 +139,42 @@ int vm_apply(
         paddress = page_phys(page);
         pte_index = pte_index(vaddr);
 
-        log_debug("PTE entry at offset %u", pte_index);
+        log_debug(DEBUG_VM_APPLY, "PTE entry at offset %u", pte_index);
         if (!pgt[pte_index] || replace_pg)
         {
-            log_debug("mapping vaddress=%x <=> paddress=%x", vaddr, paddress);
+            log_debug(DEBUG_VM_APPLY, "mapping vaddress=%x <=> paddress=%x", vaddr, paddress);
             pgt[pte_index] = paddress | pte_flags_get(vm_flags);
         }
         else
         {
-            log_debug("mapping already exits: vaddress=%x <=> paddress=%x", vaddr, paddress);
+            log_debug(DEBUG_VM_APPLY, "mapping already exits: vaddress=%x <=> paddress=%x", vaddr, paddress);
         }
     }
 
     return 0;
 }
 
-int vm_remove(
-    vm_area_t* area,
-    pgd_t* pgd,
-    int remove_pte)
+int vm_remove(vm_area_t* vma, pgd_t* pgd, int remove_pte)
 {
-    uint32_t vaddress = area->virt_address;
-    size_t size = area->size;
+    uint32_t vaddress = vma->virt_address;
+    size_t size = vma->size;
 
     pgt_t* pgt;
     uint32_t pde_index = pde_index(vaddress);
     uint32_t pte_index;
 
-#if TRACE_VM
-    vm_print_single(area);
-#endif
+    vm_print_single(vma, DEBUG_VM);
 
     pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS);
 
-    if (!--area->pages->count)
+    if (!--vma->pages->count)
     {
-        if (!(area->vm_flags & VM_NONFREEABLE))
+        if (!(vma->vm_flags & VM_NONFREEABLE))
         {
-            page_range_free(&area->pages->head);
+            page_range_free(&vma->pages->head);
         }
-        delete(area->pages);
-        area->pages = NULL;
+        delete(vma->pages);
+        vma->pages = NULL;
     }
 
     if (remove_pte)
@@ -198,7 +190,7 @@ remove_table:
         pte_index = pte_index(vaddr);
         if (unlikely(!pgt[pte_index]))
         {
-            log_exception("unmapped area at pgt = %x; pgt[%u]", pgt, pgd);
+            log_error("unmapped vma at pgt = %x; pgt[%u]", pgt, pgd);
         }
         pgt[pte_index] = 0;
     }
@@ -206,8 +198,8 @@ remove_table:
 }
 
 int vm_copy(
-    vm_area_t* dest_area,
-    const vm_area_t* src_area,
+    vm_area_t* dest_vma,
+    const vm_area_t* src_vma,
     pgd_t* dest_pgd,
     const pgd_t* src_pgd)
 {
@@ -219,22 +211,21 @@ int vm_copy(
     int prev_pgt_index = -1;
 
     // Copy vm_area except for next
-    memcpy(dest_area, src_area, sizeof(vm_area_t) - sizeof(struct vm_area*));
-    dest_area->next = NULL;
-    dest_area->pages->count++;
+    memcpy(dest_vma, src_vma, sizeof(vm_area_t) - sizeof(struct vm_area*));
+    dest_vma->next = NULL;
+    dest_vma->pages->count++;
 
-    for (uint32_t vaddr = src_area->virt_address; vaddr < vm_virt_end(src_area); vaddr += PAGE_SIZE)
+    for (uint32_t vaddr = src_vma->virt_address; vaddr < vm_virt_end(src_vma); vaddr += PAGE_SIZE)
     {
         pde_index = pde_index(vaddr);
         pte_index = pte_index(vaddr);
 
-        // Get pge
         if ((int)pde_index > prev_pgt_index)
         {
             prev_pgt_index = pde_index;
             src_pgt = virt_ptr(src_pgd[pde_index] & PAGE_ADDRESS);
 
-            log_debug("pgd=%x pgd[%u]=%x", src_pgd, pde_index, src_pgd[pde_index]);
+            log_debug(DEBUG_VM_COPY, "pgd=%x pgd[%u]=%x", src_pgd, pde_index, src_pgd[pde_index]);
 
             // If there's no pge, we must allocate one
             if (!dest_pgd[pde_index])
@@ -257,7 +248,7 @@ int vm_copy(
 
         dest_pgt[pte_index] = src_pgt[pte_index] & ~PTE_WRITEABLE;
 
-        log_debug("pgt=%x pgt[%u]=%x", dest_pgt, pte_index, src_pgt[pte_index] & ~PTE_WRITEABLE);
+        log_debug(DEBUG_VM_COPY, "pgt=%x pgt[%u]=%x", dest_pgt, pte_index, src_pgt[pte_index] & ~PTE_WRITEABLE);
     }
 
     return 0;
@@ -266,9 +257,9 @@ cannot_allocate:
     return -ENOMEM;
 }
 
-static inline int address_within(uint32_t virt_address, vm_area_t* area)
+static inline int address_within(uint32_t virt_address, vm_area_t* vma)
 {
-    return virt_address >= area->virt_address && virt_address < vm_virt_end(area);
+    return virt_address >= vma->virt_address && virt_address < vm_virt_end(vma);
 }
 
 vm_area_t* vm_find(
@@ -286,58 +277,90 @@ vm_area_t* vm_find(
     return NULL;
 }
 
-void vm_print(const vm_area_t* area)
+void vm_print(const vm_area_t* vma)
 {
-    if (!area)
+    if (!vma)
     {
         return;
     }
-    for (const vm_area_t* temp = area; temp; temp = temp->next)
+    for (const vm_area_t* temp = vma; temp; temp = temp->next)
     {
-        vm_print_single(temp);
+        vm_print_single(temp, DEBUG_VM);
     }
 }
 
-int copy_on_write(vm_area_t* area)
+int vm_copy_on_write(vm_area_t* vma)
 {
     const pgd_t* pgd = ptr(process_current->mm->pgd);
-    uint32_t pde_index = pde_index(area->virt_address);
-    pgt_t* pgt_ptr = virt_ptr(pgd[pde_index] & ~PAGE_MASK);
+    uint32_t pde_index = pde_index(vma->virt_address);
+    pgt_t* pgt = virt_ptr(pgd[pde_index] & ~PAGE_MASK);
 
-    if (!--area->pages->count)
+    vm_print_single(vma, DEBUG_VM_COW);
+
+    if (!--vma->pages->count)
     {
         panic("cow on not shared pages!");
     }
 
-    page_t* page_range = page_alloc(area->size / PAGE_SIZE, PAGE_ALLOC_CONT);
+    page_t* page_range = page_alloc(vma->size / PAGE_SIZE, PAGE_ALLOC_CONT);
 
     if (unlikely(!page_range))
     {
-        return -1;
+        log_debug(DEBUG_VM_COW, "cannot allocate pages");
+        return -ENOMEM;
     }
 
-    area->pages = alloc(pages_t);
-    area->pages->count = 1;
-    list_init(&area->pages->head);
-    list_merge(&area->pages->head, &page_range->list_entry);
+    vma->pages = alloc(pages_t);
 
-    memcpy(page_virt_ptr(page_range), ptr(area->virt_address), area->size);
+    if (unlikely(!vma->pages))
+    {
+        log_debug(DEBUG_VM_COW, "cannot allocate vma->pages");
+        return -ENOMEM;
+    }
+
+    vma->pages->count = 1;
+    list_init(&vma->pages->head);
+    list_merge(&vma->pages->head, &page_range->list_entry);
+
+    memcpy(page_virt_ptr(page_range), ptr(vma->virt_address), vma->size);
 
     uint32_t new_phys_address = page_phys(page_range);
-    for (uint32_t old_vaddr = area->virt_address; old_vaddr < vm_virt_end(area); old_vaddr += PAGE_SIZE, new_phys_address += PAGE_SIZE)
+    for (uint32_t old_vaddr = vma->virt_address; old_vaddr < vm_virt_end(vma); old_vaddr += PAGE_SIZE, new_phys_address += PAGE_SIZE)
     {
         uint32_t pte_index = pte_index(old_vaddr);
-        uint32_t pg = pgt_ptr[pte_index];
+        uint32_t pg = pgt[pte_index];
         uint32_t pg_flags = (pg & PAGE_MASK) | PTE_WRITEABLE;
 
-        log_debug("setting pgt[%u] = %x", pte_index, new_phys_address | pg_flags);
+        log_debug(DEBUG_VM_COW, "setting pgt[%u] = %x", pte_index, new_phys_address | pg_flags);
 
-        pgt_ptr[pte_index] = new_phys_address | pg_flags;
+        pgt[pte_index] = new_phys_address | pg_flags;
     }
 
-    area->vm_flags &= ~VM_NONFREEABLE;
+    vma->vm_flags &= ~VM_NONFREEABLE;
 
     pgd_reload();
 
     return 0;
+}
+
+int __vm_verify(char verify, uint32_t vaddr, size_t size, vm_area_t* vma)
+{
+    for (; vma; vma = vma->next)
+    {
+        if (vaddr >= vma->virt_address && (vaddr + size) <= (vma->virt_address + vma->size))
+        {
+            if (verify == VERIFY_WRITE)
+            {
+                return vma->vm_flags & VM_WRITE
+                    ? 0
+                    : -EFAULT;
+            }
+
+            return vma->vm_flags & VM_READ
+                ? 0
+                : -EFAULT;
+        }
+    }
+
+    return -EFAULT;
 }

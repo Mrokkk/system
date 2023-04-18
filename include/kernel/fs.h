@@ -7,10 +7,7 @@
 #include <kernel/dentry.h>
 #include <kernel/dirent.h>
 #include <kernel/kernel.h>
-
-#define MAY_EXEC 1
-#define MAY_WRITE 2
-#define MAY_READ 4
+#include <kernel/compiler.h>
 
 #define O_RDONLY            0
 #define O_WRONLY            1
@@ -26,54 +23,17 @@
 struct inode;
 struct super_block;
 struct file_operations;
-
-struct inode_operations
-{
-    int (*create)(struct inode*, const char*, int, int, struct inode**);
-    int (*lookup)(struct inode*, const char*, int, struct inode**);
-    //int (*link)(struct inode*, struct inode*, const char*,int);
-    //int (*unlink)(struct inode*, const char*, int);
-    //int (*symlink)(struct inode*, const char*, int, const char*);
-    int (*mkdir)(struct inode*, const char*, int, int, struct inode**);
-    //int (*rmdir)(struct inode*, const char*, int);
-    //int (*mknod)(struct inode*, const char*, int, int, int);
-    //int (*rename)(struct inode*, const char*, int, struct inode*, const char*, int);
-    //int (*readlink)(struct inode*, char*, int);
-    //int (*follow_link)(struct inode*, struct inode*, int, int, struct inode**);
-    //int (*bmap)(struct inode*, int);
-    //void (*truncate)(struct inode*);
-    //int (*permission)(struct inode*, int);
-};
+struct inode_operations;
+struct super_operations;
 
 struct inode
 {
     MAGIC_NUMBER;
     dev_t dev;
-    unsigned int ino;
-    //unsigned short mode;
-    //unsigned int nlinks;
-    //unsigned int uid;
-    //unsigned int gid;
+    ino_t ino;
     size_t size;
-    //unsigned int atime;
-    //unsigned int mtime;
-    //unsigned int ctime;
     struct super_block* sb;
-    //struct inode* next;
-    //struct inode* prev;
-    //struct inode* hash_next;
-    //struct inode* hash_prev;
-    //struct inode* bound_to;
-    //struct inode* bound_by;
-    //struct inode* mount;
-    //struct socket* socket;
-    //unsigned short count;
-    //unsigned short flags;
-    //unsigned char lock;
-    //unsigned char dirt;
-    //unsigned char pipe;
-    //unsigned char seek;
-    //unsigned char update;
+    struct list_head list;
     struct file_operations* file_ops;
     struct inode_operations* ops;
     void* fs_data;
@@ -81,89 +41,88 @@ struct inode
 
 typedef struct inode inode_t;
 
-typedef struct file
+struct inode_operations
+{
+    int (*lookup)(inode_t* parent, const char* name, inode_t** result);
+    int (*create)(inode_t* parent, const char* name, int, int, inode_t** result);
+    int (*mkdir)(inode_t* parent, const char* name, int, int, inode_t** result);
+};
+
+struct file
 {
     MAGIC_NUMBER;
     unsigned short mode;
-    //dev_t rdev;
-    //k_off_t pos;
-    //unsigned short flags;
     unsigned short count;
-    //unsigned short reada;
     inode_t* inode;
     struct list_head files;
-    struct file_operations
-    {
-        //int (*lseek)(struct inode *, struct file *, k_off_t, int);
-        int (*read)(struct file*, char*, int);
-        int (*write)(struct file*, char*, int);
-        int (*readdir)(struct file*, struct dirent*, int);
-        //int (*select)(struct inode *, struct file *, int, select_table *);
-        //int (*ioctl)(struct inode *, struct file *, unsigned int, unsigned long);
-        int (*mmap)(struct file*, void** data); // FIXME: incorrect arguments
-        int (*open)(struct file*);
-        //void (*release)(struct inode *, struct file *);
-        //int (*fsync)(struct inode *, struct file *);
-    } *ops;
-} file_t;
+    struct file_operations* ops;
+};
 
-typedef struct super_block
+typedef struct file file_t;
+
+typedef int (*direntadd_t)(void* buf, const char* name, size_t name_len, ino_t ino, char type);
+
+struct file_operations
 {
-    MAGIC_NUMBER;
+    int (*read)(file_t* file, char* buf, int count);
+    int (*write)(file_t* file, const char* buf, int count);
+    int (*readdir)(file_t* file, void* buf, direntadd_t dirent_add);
+    int (*mmap)(file_t* file, void** data); // FIXME: incorrect arguments
+    int (*open)(file_t* file);
+};
+
+struct super_block
+{
     dev_t dev;
-    unsigned long blocksize;
-    unsigned char blocksize_bits;
-    unsigned char lock;
-    unsigned char rd_only;
-    unsigned char dirt;
-    unsigned long flags;
-    unsigned long time;
-    inode_t* covered;
     inode_t* mounted;
-    struct wait_queue* wait;
     void* data;
-    unsigned int module;
-    struct super_operations
-    {
-        void (*read_inode)(struct inode*);
-        //int (*notify_change)(int flags, struct inode*);
-        //void (*write_inode)(struct inode*);
-        //void (*put_inode)(struct inode*);
-        //void (*put_super)(struct super_block*);
-        //void (*write_super)(struct super_block*);
-        //void (*statfs)(struct super_block*, struct statfs*);
-        //int (*remount_fs)(struct super_block*, int*, char*);
-    } *ops;
     struct list_head super_blocks;
-} super_block_t;
 
-typedef struct file_system
+    // Those are filled by specific fs during mount() call
+    unsigned int module;
+    struct super_operations* ops;
+};
+
+typedef struct super_block super_block_t;
+
+struct super_operations
 {
-    struct super_block* (*read_super)(struct super_block*, void*, int);
-    char* name;
-    int requires_dev;
+};
+
+struct file_system
+{
+    const char* name;
     struct list_head file_systems;
     struct list_head super_blocks;
-} file_system_t;
 
-typedef struct mounted_system
+    // Fills missing params of super block (module, ops) and root inode;
+    // returns errno
+    int (*mount)(super_block_t* sb, inode_t* inode, void*, int);
+};
+
+struct mounted_system
 {
-    dev_t dev;
     char* dir;
+    dev_t dev;
     struct super_block* sb;
+    struct file_system* fs;
     struct list_head mounted_systems;
-} mounted_system_t;
+};
+
+typedef struct file_system file_system_t;
+typedef struct mounted_system mounted_system_t;
 
 extern struct list_head files;
 extern struct list_head mounted_inodes;
 extern inode_t* root;
 
-int vfs_init();
 int file_system_register(file_system_t* fs);
 dentry_t* lookup(const char* filename);
 int do_mount(file_system_t* fs, const char* mount_point);
 int do_open(file_t** new_file, const char* filename, int flags, int mode);
-file_t* file_create();
 
-void inode_init(inode_t* inode);
-void mountpoints_print(void);
+int inode_get(inode_t** inode);
+int inode_put(inode_t* inode);
+char* inode_print(const void* data, char* str);
+
+void file_systems_print(void);

@@ -1,5 +1,4 @@
 #include <arch/io.h>
-#include <arch/page.h>
 #include <arch/cpuid.h>
 #include <arch/segment.h>
 #include <arch/register.h>
@@ -7,6 +6,7 @@
 
 #include <kernel/cpu.h>
 #include <kernel/irq.h>
+#include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/memory.h>
 #include <kernel/module.h>
@@ -42,7 +42,7 @@ void delay_calibrate(void)
     irq_save(flags);
     sti();
 
-    log_debug("calibrating delay loop.. ");
+    log_info("calibrating delay loop.. ");
     while (loops_per_sec <<= 1)
     {
         // wait for "start of" clock tick
@@ -80,7 +80,7 @@ void delay_calibrate(void)
     loops_per_sec *= HZ;
     // Round the value and print it
 
-    log_debug("ok - %lu.%02lu BogoMIPS",
+    log_info("ok - %lu.%02lu BogoMIPS",
         (loops_per_sec + 2500) / 500000,
         ((loops_per_sec + 2500) / 5000) % 100);
 

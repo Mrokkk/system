@@ -1,6 +1,6 @@
 #include <arch/io.h>
-#include <arch/page.h>
 
+#include <kernel/page.h>
 #include <kernel/mutex.h>
 #include <kernel/string.h>
 #include <kernel/module.h>
@@ -31,6 +31,8 @@
 
 #define RESX 80
 #define RESY 25
+
+MUTEX_DECLARE(video_lock);
 
 static uint16_t* pointer[4] = {
     (uint16_t*)0xb8000,
@@ -100,8 +102,6 @@ static inline uint16_t current_offset_get()
 {
     return cursor_y_get() * RESX + cursor_x_get();
 }
-
-MUTEX_DECLARE(video_lock);
 
 void scroll(void)
 {
@@ -199,22 +199,7 @@ int display_write(struct file*, char* buffer, int size)
 
 int video_init()
 {
-#if 0
-    struct regs_struct param;
-
-    param.ax = 3;
-    param.bx = 0;
-    param.cx = 0;
-    param.dx = 0;
-    execute_in_real_mode((unsigned int)bios_int10h, &param);
-    param.ax = 0x1001;
-    param.bx = 100 << 8;
-    execute_in_real_mode((unsigned int)bios_int10h, &param);
-#endif
-
     pointer[0] = (uint16_t*)VIDEO_SEGMENT;
-
     cls();
-
     return 0;
 }

@@ -10,9 +10,7 @@ unsigned shutdown_in_progress;
 
 void prepare_to_shutdown()
 {
-    log_debug("");
-
-    mountpoints_print();
+    file_systems_print();
     page_stats_print();
     processes_stats_print();
     kmalloc_stats_print();
@@ -35,7 +33,7 @@ int sys_reboot(int magic, int magic2, int cmd)
     irq_save(flags);
 
     shutdown_in_progress = SHUTDOWN_IN_PROGRESS;
-    log_debug("magic=%x, magic2=%x, cmd=%u", magic, magic2, cmd);
+    log_info("magic=%x, magic2=%x, cmd=%u", magic, magic2, cmd);
 
     prepare_to_shutdown();
 
@@ -43,5 +41,5 @@ int sys_reboot(int magic, int magic2, int cmd)
 
     arch_reboot(cmd);
 
-    return -EERR;
+    return -EBUSY;
 }

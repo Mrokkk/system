@@ -1,6 +1,6 @@
+#include <kernel/page.h>
 #include <kernel/memory.h>
 
-#include <arch/page.h>
 #include <arch/multiboot.h>
 
 char* bootloader_name;
@@ -32,10 +32,10 @@ static inline void multiboot_mmap_read(struct multiboot_info* mb)
 
         switch (mm->type)
         {
-            case 1: mm_type = MMAP_TYPE_AVL; break;
-            case 2: mm_type = MMAP_TYPE_NA; break;
-            case 3: mm_type = MMAP_TYPE_DEV; break;
-            case 4: mm_type = MMAP_TYPE_DEV; break;
+            case MULTIBOOT_MEMORY_AVAILABLE: mm_type = MMAP_TYPE_AVL; break;
+            case MULTIBOOT_MEMORY_RESERVED: mm_type = MMAP_TYPE_RES; break;
+            case MULTIBOOT_MEMORY_ACPI_RECLAIMABLE: mm_type = MMAP_TYPE_DEV; break;
+            case MULTIBOOT_MEMORY_NVS: mm_type = MMAP_TYPE_DEV; break;
             default: mm_type = MMAP_TYPE_NDEF;
         }
 
@@ -52,7 +52,7 @@ static inline void multiboot_modules_read(struct multiboot_info* mb)
 
     for (size_t i = 0; i < modules_table.count; ++i)
     {
-        log_debug("%d: %s = %x : %x",
+        log_debug(DEBUG_MULTIBOOT, "%d: %s = %x : %x",
             i,
             (char*)virt(mod->string), // FIXME: why there was +1?
             virt(mod->mod_start),

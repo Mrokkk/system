@@ -12,7 +12,7 @@ static inline void process_space_free(struct process* proc)
     pgd_t* pgd = proc->mm->pgd;
     uint32_t* kernel_stack_end = ptr(addr(proc->mm->kernel_stack) - PAGE_SIZE);
 
-    log_debug("pid %u", proc->pid);
+    log_debug(DEBUG_PROCESS, "pid %u", proc->pid);
 
     if (unlikely(*kernel_stack_end != STACK_MAGIC))
     {
@@ -27,14 +27,14 @@ static inline void process_space_free(struct process* proc)
         vm_remove(area, pgd, 0);
 
         uint32_t pde_index = pde_index(area->virt_address);
-        log_debug("pde_index=%u, pgd[pde_index] = %x",
+        log_debug(DEBUG_PROCESS, "pde_index=%u, pgd[pde_index] = %x",
             pde_index,
             virt_ptr(pgd[pde_index] & PAGE_ADDRESS));
 
         if ((int)pde_index != last_pgt) // cast is fine, as pde_index will never be higher than 1023
         {
             void* virt_pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS);
-            log_debug("freeing PGT %x at pgd[%u]", virt_pgt, pde_index);
+            log_debug(DEBUG_PROCESS, "freeing PGT %x at pgd[%u]", virt_pgt, pde_index);
             page_free(virt_pgt);
             last_pgt = pde_index;
         }
@@ -47,16 +47,16 @@ static inline void process_space_free(struct process* proc)
         delete(prev);
     }
 
-    log_debug("freeing pgd");
+    log_debug(DEBUG_PROCESS, "freeing pgd");
     page_free(proc->mm->pgd);
-    log_debug("freeing kstack");
+    log_debug(DEBUG_PROCESS, "freeing kstack");
     page_free(kernel_stack_end);
     delete(proc->mm);
 }
 
 void process_delete(struct process* proc)
 {
-    log_debug("");
+    log_debug(DEBUG_PROCESS, "");
     list_del(&proc->siblings);
     list_del(&proc->children);
     list_del(&proc->processes);
@@ -73,7 +73,7 @@ int sys_waitpid(int pid, int* status, int)
     struct process* proc;
     flags_t flags;
 
-    log_debug("%u called for %u", process_current->pid, pid);
+    log_debug(DEBUG_PROCESS, "%u called for %u", process_current->pid, pid);
 
     if (process_find(pid, &proc))
     {
@@ -110,7 +110,7 @@ early_finish:
 
 int sys_exit(int return_value)
 {
-    log_debug("process pid=%u, %S exited with %d",
+    log_debug(DEBUG_PROCESS, "process pid=%u, %S exited with %d",
         process_current->pid,
         process_current->name,
         return_value);

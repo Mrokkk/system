@@ -13,7 +13,22 @@
 #define O_NONBLOCK      0x800
 #define O_DIRECTORY   0x10000
 
+#define STDIN_FILENO      0
+#define STDOUT_FILENO     1
+#define STDERR_FILENO     2
+
+struct libc_file
+{
+    int fd;
+};
+
+typedef struct libc_file FILE;
+
+extern FILE* stdin;
+extern FILE* stdout;
+extern FILE* stderr;
+
 int vsprintf(char *buf, const char *fmt, va_list args);
 int sprintf(char *buf, const char *fmt, ...);
-int fprintf(int fd, const char *fmt, ...);
+int fprintf(FILE* file, const char *fmt, ...);
 int printf(const char *fmt, ...);

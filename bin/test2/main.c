@@ -39,11 +39,14 @@ int main(int argc, char* argv[])
         printf("argv[%u] = \"%s\"\n", i, argv[i]);
     }
     framebuffer_data = sbrk(768 * 0x1000);
-    int fd = open("/dev/fb0", 2, 0);
+
+    int fd = open("/dev/fb0", O_RDWR, 0);
 
     vector2_t position = {100, 100};
     vector2_t size = {200, 200};
     draw_rectangle(position, size, 0xf5ce89);
+
+    printf("framebuffer_data = 0x%x\n", framebuffer_data);
 
     write(fd, (void*)framebuffer_data, 768 * 0x1000);
 

@@ -27,7 +27,7 @@ void process_wake_waiting(struct process* proc)
 
     while ((temp = wait_queue_pop(&proc->wait_child)))
     {
-        log_debug("waking %u", temp->pid);
+        log_debug(DEBUG_PROCESS, "waking %u", temp->pid);
         process_wake(temp);
     }
 }
@@ -52,7 +52,7 @@ int process_find_free_fd(struct process* proc, int* fd)
 
     *fd = i;
 
-    log_debug("found %d, %x", *fd, proc->files);
+    log_debug(DEBUG_PROCESS, "found %d, %x", *fd, proc->files);
 
     return 0;
 }

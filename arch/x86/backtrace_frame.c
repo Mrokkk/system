@@ -1,6 +1,6 @@
-#include <arch/page.h>
 #include <arch/register.h>
 
+#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/kernel.h>
 #include <kernel/backtrace.h>

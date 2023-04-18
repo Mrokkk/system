@@ -16,8 +16,8 @@ char* exception_messages[] = {
     #include <arch/exception.h>
 };
 
-static void page_fault_description_print(struct pt_regs* regs, uint32_t error_code, uint32_t cr2, uint32_t cr3);
-static void general_protection_description_print(struct pt_regs* regs, uint32_t error_code, uint32_t cr2, uint32_t cr3);
+static void page_fault_description_print(struct exception_frame* regs, uint32_t cr2, uint32_t cr3);
+static void general_protection_description_print(struct exception_frame* regs, uint32_t cr2, uint32_t cr3);
 
 typedef void (*printer_t)();
 
@@ -40,7 +40,7 @@ static inline void pf_reason_print(uint32_t error_code, uint32_t cr2, char* outp
         : "in kernel space");
 }
 
-static void page_fault_description_print(struct pt_regs* regs, uint32_t error_code, uint32_t cr2, uint32_t cr3)
+static void page_fault_description_print(struct exception_frame* regs, uint32_t cr2, uint32_t cr3)
 {
     char buffer[256];
     const pgd_t* pgd = virt_cptr(cr3);
@@ -48,7 +48,7 @@ static void page_fault_description_print(struct pt_regs* regs, uint32_t error_co
     uint32_t pte_index = pte_index(cr2);
 
     log_exception("####################### Reason #######################");
-    pf_reason_print(error_code, cr2, buffer);
+    pf_reason_print(regs->error_code, cr2, buffer);
     log_exception("%s", buffer);
     log_exception("####################### Details ######################");
     log_exception("pgd = cr3 = %08x", cr3);
@@ -74,17 +74,17 @@ static void page_fault_description_print(struct pt_regs* regs, uint32_t error_co
     log_exception("######################################################");
 }
 
-static void general_protection_description_print(struct pt_regs* regs, uint32_t error_code, uint32_t, uint32_t)
+static void general_protection_description_print(struct exception_frame* regs, uint32_t, uint32_t)
 {
     log_exception("####################### Reason #######################");
     log_exception("N/A");
     log_exception("####################### Details ######################");
-    log_exception("Error code = %x", error_code);
+    log_exception("Error code = %x", regs->error_code);
     regs_print(regs, log_exception);
     log_exception("######################################################");
 }
 
-static inline void do_backtrace(struct pt_regs* regs)
+static inline void do_backtrace(struct exception_frame* regs)
 {
     char buffer[128];
 #if FRAME_POINTER
@@ -128,49 +128,56 @@ static inline void do_backtrace(struct pt_regs* regs)
 #endif
 }
 
-void do_exception(
-    uint32_t nr,
-    uint32_t error_code,
-    struct pt_regs regs)
+void do_exception(uint32_t nr, struct exception_frame regs)
 {
     flags_t flags;
-    char string[80];
-    uint32_t cr0 = cr0_get();
     uint32_t cr2 = cr2_get();
     uint32_t cr3 = cr3_get();
-    uint32_t cr4 = cr4_get();
 
     irq_save(flags);
 
-    // If we are in user space and send SIGSEGV
-    if (regs.cs == USER_CS)
+    if (unlikely(regs.cs != USER_CS))
     {
-        if (nr == __NR_page_fault)
+        goto kernel_fault;
+    }
+
+    if (likely(nr == __NR_page_fault))
+    {
+        vm_area_t* area = vm_find(cr2, process_current->mm->vm_areas);
+        if (area && area->vm_flags & VM_WRITE)
         {
-            vm_area_t* area = vm_find(cr2, process_current->mm->vm_areas);
-            if (area && area->vm_flags & VM_WRITE)
+            log_debug(DEBUG_EXCEPTION, "COW in process %u at %x", process_current->pid, cr2);
+            if (!vm_copy_on_write(area))
             {
-                log_debug("COW in process %u at %x", process_current->pid, cr2);
-                if (!copy_on_write(area))
-                {
-                    irq_restore(flags);
-                    return;
-                }
+                irq_restore(flags);
+                return;
             }
         }
+    }
 
+    if (DEBUG_EXCEPTION && printers[nr])
+    {
         log_exception("%s #%x in process %d (%s) at %x",
             exception_messages[nr],
-            error_code,
+            regs.error_code,
             process_current->pid,
             process_current->name,
             regs.eip);
 
-        if (printers[nr]) printers[nr](&regs, error_code, cr2, cr3);
-
-        irq_restore(flags);
-        do_kill(process_current, SIGSEGV);
+        printers[nr](&regs, cr2, cr3);
     }
+
+    irq_restore(flags);
+
+    log_notice("sending SIGSEGV to %d:%s", process_current->pid, process_current->name);
+
+    do_kill(process_current, SIGSEGV);
+    return;
+
+kernel_fault:
+    char string[80];
+    uint32_t cr0 = cr0_get();
+    uint32_t cr4 = cr4_get();
 
     ensure_printk_will_print();
 
@@ -185,11 +192,14 @@ void do_exception(
 
     log_critical("%s #%x from %x in pid %u",
         exception_messages[nr],
-        error_code,
+        regs.error_code,
         regs.eip,
         process_current->pid);
 
-    if (printers[nr]) printers[nr](&regs, error_code, cr2, cr3);
+    if (printers[nr])
+    {
+        printers[nr](&regs, cr2, cr3);
+    }
 
     cr0_bits_string_get(cr0, string);
     log_critical("CR0=%x : %s", cr0, string);

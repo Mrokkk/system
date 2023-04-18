@@ -32,7 +32,7 @@ dentry_t* lookup(const char* filename)
     dentry_t* parent_dentry = NULL;
     dentry_t* dentry = NULL;
 
-    log_debug("called for filename=%S", filename);
+    log_debug(DEBUG_LOOKUP, "called for filename=%S", filename);
 
     // If filename is relative, get cwd
     if (!path_is_absolute(filename))
@@ -40,14 +40,14 @@ dentry_t* lookup(const char* filename)
         dentry = process_current->fs->cwd;
         parent_inode = dentry->inode;
         parent_dentry = dentry;
-        log_debug("relative; %O", dentry);
+        log_debug(DEBUG_LOOKUP, "relative; %O", dentry);
     }
 
     while (1)
     {
         get_next_dir(path, name);
 
-        log_debug("dirname=%S", name);
+        log_debug(DEBUG_LOOKUP, "dirname=%S", name);
 
         if (!strcmp(name, ".."))
         {
@@ -57,13 +57,17 @@ dentry_t* lookup(const char* filename)
 
         dentry = dentry_lookup(dentry, name);
 
-        log_debug("got dentry %O", dentry);
+        log_debug(DEBUG_LOOKUP, "got dentry %O", dentry);
 
-        if (!dentry)
+        if (unlikely(!dentry && !parent_inode))
+        {
+            return NULL;
+        }
+        else if (!dentry)
         {
             // There's an assumption that there is a dentry for root, so we may enter here only during second run
-            log_debug("calling ops->lookup with %O, %S", parent_inode, name);
-            if (parent_inode->ops->lookup(parent_inode, name, 0, &parent_inode))
+            log_debug(DEBUG_LOOKUP, "calling ops->lookup with %O, %S", parent_inode, name);
+            if (parent_inode->ops->lookup(parent_inode, name, &parent_inode))
             {
                 return NULL;
             }
@@ -77,18 +81,18 @@ dentry_t* lookup(const char* filename)
         }
 
 next:
-        log_debug("calling path_next with %S", path);
+        log_debug(DEBUG_LOOKUP, "calling path_next with %S", path);
         path = path_next(path);
 
         if (!path || strlen(path) == 1)
         {
             if (dentry)
             {
-                log_debug("returning %O for dentry: %O", dentry->inode, dentry);
+                log_debug(DEBUG_LOOKUP, "returning %O for dentry: %O", dentry->inode, dentry);
             }
             else
             {
-                log_debug("returning %O", dentry);
+                log_debug(DEBUG_LOOKUP, "returning %O", dentry);
             }
             return dentry;
         }

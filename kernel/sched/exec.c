@@ -1,4 +1,5 @@
 #include <kernel/elf.h>
+#include <kernel/path.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
 
@@ -7,34 +8,34 @@ static inline int binary_image_get(const char* pathname, void** data)
     int errno;
     file_t* file;
 
-    if ((errno = do_open(&file, pathname, 0, 0))) // FIXME: add flags
+    if ((errno = do_open(&file, pathname, O_RDONLY, 0)))
     {
-        log_debug("failed open");
         return errno;
     }
 
-    if (!file)
+    if (unlikely(!file))
     {
-        panic("file is %O", file);
+        log_warning("null file returned by open");
+        errno = -ENOENT;
+        goto finish;
     }
 
     if (!file->ops || !file->ops->mmap)
     {
-        log_debug("no ops");
-        errno = -ENOOPS;
+        errno = -ENOSYS;
         goto finish;
     }
 
     if ((errno = file->ops->mmap(file, data)))
     {
-        log_debug("mmap failed");
         goto finish;
     }
 
     if (unlikely(!*data))
     {
-        log_error("bug in mmap; returned data = null");
-        errno = -EERR;
+        struct kernel_module* mod = module_find(file->inode->sb->module);
+        log_error("bug in %s module; mmap returned data = null", mod ? mod->name : "<unknown>");
+        errno = -EFAULT;
         goto finish;
     }
 
@@ -45,21 +46,20 @@ finish:
     return errno;
 }
 
-// Memory layout in argv area (0 is also the top of the user stack):
+// Memory layout of args:
 // 0      4      8        12   8+argc*4     12+argc*4
 // |------|------|---------|-------|------------|
 // | argc | argv | argv[0] |  ...  | argv[argc] |
 // |------|------|---------|-------|------------|
-static inline void argv_copy(uint32_t* dest, int argc, const char* const argv[], uint32_t virt_addr)
+static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
 {
     char* temp;
-    uint32_t orig_dest = addr(dest);
 
     // Put argc
     *dest++ = argc;
 
     // Put argv address
-    *dest = virt_addr + addr(dest + 1) - orig_dest;
+    *dest = addr(dest + 1);
     dest++;
 
     // argv will always have size == argc + 1; argv[argc] must be 0
@@ -68,11 +68,46 @@ static inline void argv_copy(uint32_t* dest, int argc, const char* const argv[],
     for (int i = 0; i < argc; ++i)
     {
         // Put argv[i] address and copy content of argv[i]
-        *dest++ = virt_addr + addr(temp) - orig_dest;
+        *dest++ = addr(temp);
         temp = strcpy(temp, argv[i]);
     }
 
-    *dest++ = 0;
+    return temp;
+}
+
+static inline char** args_get(int* argc, const char* const argv[], size_t* args_size)
+{
+    size_t len;
+    char** copied_argv;
+
+    for (*argc = 0; argv[*argc]; ++*argc);
+
+    *args_size =  sizeof(int) + sizeof(char**) + (*argc + 1) * sizeof(char*) + sizeof(int);
+
+    copied_argv = fmalloc(sizeof(char*) * (*argc + 1));
+
+    for (int i = 0; i < *argc; ++i)
+    {
+        len = strlen(argv[i]) + 1;
+        copied_argv[i] = fmalloc(len);
+        strcpy(copied_argv[i], argv[i]);
+        *args_size += len;
+    }
+
+    copied_argv[*argc] = NULL;
+
+    return copied_argv;
+}
+
+static inline void args_put(int argc, char** copied_argv)
+{
+    for (int i = 0; i < argc; ++i)
+    {
+        size_t len = strlen(copied_argv[i]) + 1;
+        ffree(copied_argv[i], len);
+    }
+
+    ffree(copied_argv, sizeof(char*) * (argc + 1));
 }
 
 int do_exec(const char* pathname, const char* const argv[])
@@ -81,60 +116,40 @@ int do_exec(const char* pathname, const char* const argv[])
     int argc;
     void* data;
     void* entry;
-    vm_area_t* vm_areas = NULL;
-    vm_area_t* args_vma;
     vm_area_t* stack_vma;
+    vm_area_t* vm_areas = NULL;
     uint32_t brk;
     uint32_t user_stack;
     uint32_t* kernel_stack;
+    size_t args_size;
+    char** copied_argv;
 
-    for (argc = 0; argv[argc]; ++argc);
+    if ((errno = path_validate(pathname)))
+    {
+        return errno;
+    }
 
-    log_debug("%s, argc=%u, argv=%x", pathname, argc, argv);
+    if ((errno = vm_verify(VERIFY_READ, argv, 4, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
+    copied_argv = args_get(&argc, argv, &args_size);
+
+    log_debug(DEBUG_PROCESS, "%s, argc=%u, argv=%x", pathname, argc, argv);
 
     if ((errno = binary_image_get(pathname, &data)))
     {
         return errno;
     }
 
-    entry = read_elf(pathname, data, &vm_areas, &brk);
-
-    if (!entry)
+    if ((errno = read_elf(pathname, data, &vm_areas, &brk, &entry)))
     {
-        return -EACCES;
+        return errno;
     }
-
-    page_t* page = page_alloc1();
-
-    if (unlikely(!page))
-    {
-        return -ENOMEM;
-    }
-
-    memset(page_virt_ptr(page), 0, PAGE_SIZE);
-    void* new_argv = page_virt_ptr(page);
-
-    argv_copy(new_argv, argc, argv, USER_ARGV_VIRT_ADDRESS);
-
-    args_vma = vm_create(
-        page,
-        USER_ARGV_VIRT_ADDRESS,
-        PAGE_SIZE,
-        VM_READ);
-
-    if (unlikely(!args_vma))
-    {
-        page_free(new_argv);
-        return -ENOMEM;
-    }
-
-    vm_add(&vm_areas, args_vma);
-
-    process_current->mm->args_start = args_vma->virt_address;
-    process_current->mm->args_end = vm_virt_end(args_vma);
 
     pgd_t* pgd = ptr(process_current->mm->pgd);
-    log_debug("pgd=%x", pgd);
+    log_debug(DEBUG_PROCESS, "pgd=%x", pgd);
 
     strncpy(process_current->name, pathname, PROCESS_NAME_LEN);
 
@@ -169,8 +184,6 @@ int do_exec(const char* pathname, const char* const argv[])
         }
     }
 
-    process_current->mm->brk = brk;
-
     for (vm_area_t* temp = vm_areas; temp; temp = temp->next)
     {
         vm_apply(temp, pgd, VM_APPLY_REPLACE_PG);
@@ -180,12 +193,23 @@ int do_exec(const char* pathname, const char* const argv[])
 
     user_stack = vm_virt_end(stack_vma);
 
+    process_current->mm->brk = brk;
+    process_current->mm->args_start = user_stack - args_size;
+    process_current->mm->args_end = user_stack;
+
+    argv_copy(ptr(user_stack - args_size), argc, copied_argv);
+    user_stack -= args_size;
+
+    args_put(argc, copied_argv);
+
+    ASSERT(*(int*)user_stack == argc);
+
     vm_add(&vm_areas, stack_vma);
 
     process_current->mm->vm_areas = vm_areas;
     process_current->type = USER_PROCESS;
 
-    log_debug("proc %d areas:", process_current->pid);
+    log_debug(DEBUG_PROCESS, "proc %d areas:", process_current->pid);
     vm_print(process_current->mm->vm_areas);
 
     arch_exec(entry, kernel_stack, user_stack);

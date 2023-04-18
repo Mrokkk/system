@@ -24,7 +24,7 @@ char serial_status[4];
 
 void serial_send(char a, uint16_t port);
 int serial_open(struct file*);
-int serial_write(struct file* file, char* buffer, int size);
+int serial_write(struct file* file, const char* buffer, int size);
 int serial_read(struct file* file, char* buffer, int size);
 void serial_irs(void);
 
@@ -53,7 +53,7 @@ int serial_open(struct file* file)
 
     minor = MINOR(file->inode->dev);
 
-    log_debug("minor = %u", minor);
+    log_debug(DEBUG_SERIAL, "minor = %u", minor);
 
     if (!(port = minor_to_port(minor)))
     {
@@ -149,10 +149,7 @@ finish:
     irq_restore(flags);
 }
 
-int serial_write(
-    struct file* file,
-    char* buffer,
-    int size)
+int serial_write(struct file* file, const char* buffer, int size)
 {
     int old = size;
     int minor = MINOR(file->inode->dev);
@@ -163,10 +160,7 @@ int serial_write(
     return old;
 }
 
-int serial_read(
-    struct file*,
-    char* buffer,
-    int size)
+int serial_read(struct file*, char* buffer, int size)
 {
     int i;
     WAIT_QUEUE_DECLARE(temp, process_current);

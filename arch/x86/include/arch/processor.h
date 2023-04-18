@@ -61,6 +61,27 @@ struct pt_regs
     uint16_t ss, __ss;
 } __packed;
 
+struct exception_frame
+{
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t esi;
+    uint32_t edi;
+    uint32_t ebp;
+    uint32_t eax;
+    uint16_t ds, __ds;
+    uint16_t es, __es;
+    uint16_t fs, __fs;
+    uint16_t gs, __gs;
+    uint32_t error_code;
+    uint32_t eip;
+    uint16_t cs, __cs;
+    uint32_t eflags;
+    uint32_t esp;
+    uint16_t ss, __ss;
+} __packed;
+
 #define __regs_print(regs, print_function) \
     do { \
         char buffer[64]; \
@@ -107,6 +128,8 @@ struct pt_regs
 #define REGS_EFLAGS 52
 #define REGS_ESP    56
 #define REGS_SS     60
+
+#define CONTEXT_ESP2 20
 
 #define INIT_PROCESS_STACK_SIZE 512 // number of uint32_t's
 

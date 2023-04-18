@@ -1,4 +1,4 @@
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -nostdinc")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -nostdinc -include ${PROJECT_SOURCE_DIR}/lib/libc.h")
 set_property(SOURCE start.S PROPERTY LANGUAGE C)
 
 include_directories(

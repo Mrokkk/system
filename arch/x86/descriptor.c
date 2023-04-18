@@ -1,7 +1,7 @@
-#include <arch/page.h>
 #include <arch/segment.h>
 #include <arch/descriptor.h>
 
+#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>
 

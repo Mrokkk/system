@@ -339,10 +339,6 @@ cache_read:
     cache_info_fill(cpuid_regs.ecx);
     cache_info_fill(cpuid_regs.edx);
 
-    log_info("%x", cpuid_regs.ebx);
-    log_info("%x", cpuid_regs.ecx);
-    log_info("%x", cpuid_regs.edx);
-
     for (uint32_t i = 0; i < 3; ++i)
     {
         if (!cpu_info.cache[i].description)

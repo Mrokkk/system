@@ -1,5 +1,4 @@
 #include <arch/asm.h>
-#include <kernel/unistd.h>
 
 SECTION(.text)
 

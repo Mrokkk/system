@@ -1,9 +1,20 @@
 #include <ctype.h>
+#include <stdio.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+
+static FILE files[] = {
+    { STDIN_FILENO },
+    { STDOUT_FILENO },
+    { STDERR_FILENO }
+};
+
+FILE* stdin = &files[STDIN_FILENO];
+FILE* stdout = &files[STDOUT_FILENO];
+FILE* stderr = &files[STDERR_FILENO];
 
 static inline int skip_atoi(const char **s)
 {
@@ -27,8 +38,8 @@ static inline int skip_atoi(const char **s)
 #define __do_div(n, base) \
     ({ \
         int __res; \
-        __res = ((unsigned long) n) % (unsigned) base; \
-        n = ((unsigned long) n) / (unsigned) base; \
+        __res = ((unsigned long)n) % (unsigned)base; \
+        n = ((unsigned long)n) / (unsigned)base; \
         __res; \
     })
 
@@ -408,7 +419,7 @@ int printf(const char* fmt, ...)
     return printed;
 }
 
-int fprintf(int fd, const char* fmt, ...)
+int fprintf(FILE* file, const char* fmt, ...)
 {
     char printf_buf[512];
     va_list args;
@@ -418,7 +429,7 @@ int fprintf(int fd, const char* fmt, ...)
     printed = vsprintf(printf_buf, fmt, args);
     va_end(args);
 
-    write(fd, printf_buf, strlen(printf_buf));
+    write(file->fd, printf_buf, strlen(printf_buf));
 
     return printed;
 }

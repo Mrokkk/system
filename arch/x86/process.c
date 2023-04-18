@@ -1,6 +1,5 @@
 #include <arch/io.h>
 #include <arch/vm.h>
-#include <arch/page.h>
 #include <arch/string.h>
 #include <arch/segment.h>
 #include <arch/register.h>
@@ -8,6 +7,7 @@
 #include <arch/descriptor.h>
 
 #include <kernel/fs.h>
+#include <kernel/page.h>
 #include <kernel/debug.h>
 #include <kernel/process.h>
 
@@ -95,7 +95,7 @@ uint32_t kernel_process_setup_stack(
 
     fork_kernel_stack_frame(&dest_stack, temp, src_regs, ebp);
 
-    log_debug("stack=%x", dest_stack);
+    log_debug(DEBUG_PROCESS, "stack=%x", dest_stack);
 
     return addr(dest_stack);
 }
@@ -117,14 +117,14 @@ uint32_t user_process_setup_stack(
 
     dest->context.esp0 = addr(kernel_stack = dest->mm->kernel_stack);
 
-    log_debug("src_user_stack=%x size=%u", src_stack_start, size);
+    log_debug(DEBUG_PROCESS, "src_user_stack=%x size=%u", src_stack_start, size);
 
     stack_copy(
         ptr(dest_stack_start),
         src_stack_start,
         size);
 
-    log_debug("copied %u B; new dest esp=%x",
+    log_debug(DEBUG_PROCESS, "copied %u B; new dest esp=%x",
         size,
         dest_stack_vma->virt_address + dest_stack_vma->size - size);
 
@@ -270,8 +270,7 @@ int sys_exec(struct pt_regs regs)
 {
     const char* pathname = cptr(regs.ebx);
     const char* const* argv = (const char* const*)(regs.ecx);
-    do_exec(pathname, argv);
-    return 0;
+    return do_exec(pathname, argv);
 }
 
 #define set_context(stack, ip)  \
@@ -300,22 +299,15 @@ int arch_process_execute_sighan(struct process* proc, uint32_t eip)
     uint32_t* kernel_stack;
     uint32_t* sighan_stack;
     uint32_t flags;
-    vm_area_t* user_stack_area = NULL;
     vm_area_t* user_code_area = NULL;
     pgd_t* pgd = ptr(proc->mm->pgd);
     uint32_t sigret_addr = addr(&__sigreturn);
     uint32_t virt_sigret_addr = USER_SIGRET_VIRT_ADDRESS;
-    uint32_t virt_stack_addr = USER_SIGSTACK_VIRT_ADDRESS;
+    uint32_t virt_stack_addr = proc->context.esp2;
 
     irq_save(flags);
 
-    user_stack_area = user_space_create(virt_stack_addr, pgd, VM_APPLY_REPLACE_PG);
-
-    if (unlikely(!user_stack_area))
-    {
-        irq_restore(flags);
-        return -ENOMEM;
-    }
+    sighan_stack = virt_ptr(vm_paddr(virt_stack_addr, pgd));
 
     user_code_area = vm_create(
         page_range_get(sigret_addr, 1),
@@ -335,21 +327,20 @@ int arch_process_execute_sighan(struct process* proc, uint32_t eip)
         return errno;
     }
 
-    proc->signals->user_stack = user_stack_area;
+    proc->signals->user_stack = NULL;
     proc->signals->user_code = user_code_area;
 
-    sighan_stack = ptr(addr(page_virt_ptr(list_front(&user_stack_area->pages->head, page_t, list_entry))) + PAGE_SIZE);
     kernel_stack = ptr(addr(proc->context.esp) - 1024); // TODO:
 
     proc->signals->context.esp = proc->context.esp;
     proc->signals->context.esp0 = proc->context.esp0;
+    proc->signals->context.esp2 = proc->context.esp2;
     proc->signals->context.eip = proc->context.eip;
-    proc->signals->context.eax = vm_virt_end(user_stack_area);
 
     push(process_current->pid, sighan_stack);
     push(virt_sigret_addr, sighan_stack);
 
-    exec_kernel_stack_frame(&kernel_stack, vm_virt_end(user_stack_area) - 8, eip);
+    exec_kernel_stack_frame(&kernel_stack, virt_stack_addr - 8, eip);
 
     proc->context.eip = addr(&ret_from_syscall);
     proc->context.esp = addr(kernel_stack);
@@ -387,7 +378,7 @@ int arch_process_execute_sighan(struct process* proc, uint32_t eip)
 
 __noreturn int sys_sigreturn(struct pt_regs)
 {
-    log_debug("");
+    log_debug(DEBUG_PROCESS, "");
 
     vm_area_t* area;
 
@@ -403,7 +394,7 @@ __noreturn int sys_sigreturn(struct pt_regs)
         delete(area);
     }
 
-    log_debug("setting stack to %x and jumping to %x",
+    log_debug(DEBUG_PROCESS, "setting stack to %x and jumping to %x",
         process_current->signals->context.esp,
         process_current->signals->context.eip);
 
@@ -424,7 +415,7 @@ void* sys_sbrk(size_t incr)
     uint32_t previous_page = page_beginning(previous_brk);
     uint32_t next_page = page_align(current_brk);
 
-    log_debug("incr=%x previous_brk=%x", incr, previous_brk);
+    log_debug(DEBUG_PROCESS, "incr=%x previous_brk=%x", incr, previous_brk);
 
     brk_vma = process_brk_vm_area(process_current);
 
@@ -437,12 +428,12 @@ void* sys_sbrk(size_t incr)
     else if (brk_vma->pages->count > 1)
     {
         // Get own pages
-        copy_on_write(brk_vma);
+        vm_copy_on_write(brk_vma);
     }
 
     if (previous_page == next_page)
     {
-        log_debug("no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
+        log_debug(DEBUG_PROCESS, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
         process_current->mm->brk = current_brk;
         return ptr(previous_brk);
     }

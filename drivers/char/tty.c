@@ -10,6 +10,7 @@
 #include "keyboard.h"
 
 int tty_open();
+static int initialized = 0;
 
 static struct file_operations fops = {
     .open = &tty_open,
@@ -36,6 +37,10 @@ int tty_deinit()
 
 int tty_open(struct file*)
 {
-    console_init();
+    if (initialized != 2)
+    {
+        console_init();
+    }
+    initialized = 2;
     return 0;
 }

@@ -68,13 +68,12 @@ int do_kill(struct process* proc, int signum)
 
     if (proc->signals->trapped & (1 << signum))
     {
-        log_debug("calling handler");
-        process_wake(proc);
+        log_debug(DEBUG_SIGNAL, "calling custom handler");
         arch_process_execute_sighan(proc, addr(proc->signals->sighandler[signum]));
     }
     else
     {
-        log_debug("calling default handler");
+        log_debug(DEBUG_SIGNAL, "calling default handler");
         default_sighandler(proc, signum);
     }
 
@@ -87,8 +86,11 @@ int sys_kill(int pid, int signum)
 
     if (process_find(pid, &p))
     {
+        log_debug(DEBUG_SIGNAL, "no process with pid: %d", pid);
         return -ESRCH;
     }
+
+    log_debug(DEBUG_SIGNAL, "sending %d to pid %d", signum, pid);
 
     return do_kill(p, signum);
 }

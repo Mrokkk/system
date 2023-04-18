@@ -2,7 +2,7 @@
 
 typedef int (*syscall_t)();
 
-#define __syscall0(call) int sys_##call();
+#define __syscall0(call, ...) int sys_##call();
 #define __syscall1(call, ...) int sys_##call();
 #define __syscall2(call, ...) int sys_##call();
 #define __syscall3(call, ...) int sys_##call();
@@ -17,7 +17,7 @@ typedef int (*syscall_t)();
 #undef __syscall4
 #undef __syscall5
 #define __syscall(call) [__NR_##call] = &sys_##call,
-#define __syscall0(call)        __syscall(call)
+#define __syscall0(call, ...)   __syscall(call)
 #define __syscall1(call, ...)   __syscall(call)
 #define __syscall2(call, ...)   __syscall(call)
 #define __syscall3(call, ...)   __syscall(call)
