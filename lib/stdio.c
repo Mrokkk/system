@@ -341,7 +341,7 @@ int vsprintf(char* buf, const char* fmt, va_list args)
 
             case 'x':
                 flags |= SMALL;
-                [[fallthrough]];
+                fallthrough;
             case 'X':
                 base = 16;
                 break;

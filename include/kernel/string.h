@@ -3,10 +3,21 @@
 #include <arch/string.h>
 #include <kernel/types.h>
 
+#ifndef __HAVE_ARCH_STRLEN
 size_t strlen(const char* s);
+#endif
+
+#ifndef __HAVE_ARCH_STRNLEN
 size_t strnlen(const char* s, size_t count);
+#endif
+
+#ifndef __HAVE_ARCH_STRCPY
 char* strcpy(char* __restrict, const char* __restrict);
+#endif
+
+#ifndef __HAVE_ARCH_STRNCPY
 char* strncpy(char* __restrict, const char* __restrict, size_t count);
+#endif
 
 int strcmp(const char*, const char*);
 

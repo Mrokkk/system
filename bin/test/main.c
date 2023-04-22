@@ -11,7 +11,7 @@ int data;
 int data2 = 13;
 int data3[1028];
 
-volatile int sigreceived;
+int sigreceived;
 
 int sighan()
 {
@@ -146,11 +146,7 @@ TEST(signal)
     int status, pid = fork();
     if (pid > 0)
     {
-        int i = 10000000;
-        while (i--)
-        {
-            asm volatile("nop");
-        }
+        waitpid(pid, &status, WUNTRACED);
         kill(pid, SIGUSR1);
         kill(pid, SIGCONT);
         waitpid(pid, &status, 0);

@@ -22,6 +22,8 @@
 #define __optimize(x)           __attribute__ ((optimize(#x)))
 #define __section(x)            __attribute__ ((section(#x)))
 #define __aligned(x)            __attribute__ ((used, aligned(x)))
+#define __compile_error(msg)    __attribute__((__error__(msg)))
+#define fallthrough             __attribute__((__fallthrough__))
 
 #define __strong_alias(name)    __alias(name)
 #define __weak_alias(name)      __weak __alias(name)
@@ -29,8 +31,8 @@
 #define expand(x)               x
 #define paste(a, b)             a##b
 #define not_used(x)             (void)(x)
-#define likely(x)               __builtin_expect((long)(x), 1)
-#define unlikely(x)             __builtin_expect((long)(x), 0)
+#define likely(x)               __builtin_expect(!!(x), 1)
+#define unlikely(x)             __builtin_expect(!!(x), 0)
 #define unreachable()           do { } while (1)
 
 #define align_to_block_size(address, size) \

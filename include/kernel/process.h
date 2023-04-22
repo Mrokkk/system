@@ -20,7 +20,13 @@
 #define PROCESS_ZOMBIE      3
 
 #define PROCESS_STATE_STRING "rwsz"
-#define EXITCODE(ret, sig) ((ret) << 8 | (sig))
+
+#define EXITCODE(ret, sig)  ((ret) << 8 | (sig))
+#define WSTOPPED            0x7f
+
+#define WNOHANG             1
+#define WUNTRACED           2
+#define WCONTINUED          4
 
 #define USER_PROCESS        1
 #define KERNEL_PROCESS      2
@@ -57,10 +63,9 @@ struct signals
     unsigned short trapped;
     sighandler_t sighandler[NSIGNALS];
     struct context context;
-    vm_area_t* user_stack;
     vm_area_t* user_code;
 #define SIGNALS_INIT \
-    { 1, 0, { 0, }, { 0, }, 0, 0, }
+    { 1, 0, { 0, }, { 0, }, 0, }
 };
 
 struct fs
@@ -182,6 +187,11 @@ static inline int process_is_running(struct process* p)
     return p->stat == PROCESS_RUNNING;
 }
 
+static inline int process_is_stopped(struct process* p)
+{
+    return p->stat == PROCESS_STOPPED;
+}
+
 static inline int process_is_zombie(struct process* p)
 {
     return p->stat == PROCESS_ZOMBIE;
@@ -208,6 +218,7 @@ static inline void process_stop(struct process* p)
     irq_save(flags);
     list_del(&p->running);
     p->stat = PROCESS_STOPPED;
+    process_wake_waiting(p);
     irq_restore(flags);
     if (p == process_current)
     {

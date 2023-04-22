@@ -227,7 +227,7 @@ page_t* __page_range_get(uint32_t paddr, int count)
 
     if (!list_empty(&first_page->list_entry))
     {
-        log_info("paddr=%x vaddr=%x is used somewhere!", paddr, page_virt(first_page));
+        log_warning("paddr=%x vaddr=%x is used somewhere!", paddr, page_virt(first_page));
         list_init(&first_page->list_entry);
     }
 

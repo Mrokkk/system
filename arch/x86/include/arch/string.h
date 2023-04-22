@@ -5,6 +5,42 @@
 
 // Below functions are copied from Linux source
 
+#define __HAVE_ARCH_STRCPY
+static inline char* __strcpy(char* dest, const char* src)
+{
+    int d0, d1, d2;
+    asm volatile(
+        "1:"
+        "lodsb;"
+        "stosb;"
+        "testb %%al, %%al;"
+        "jne 1b;"
+        : "=&S" (d0), "=&D" (d1), "=&a" (d2)
+        : "0" (src), "1" (dest) : "memory");
+    return dest;
+}
+#define strcpy(d, s) (__builtin_constant_p(s) ? __builtin_strcpy(d, s) : __strcpy(d, s))
+
+#define __HAVE_ARCH_STRNCPY
+static inline char* strncpy(char* dest, const char* src, size_t count)
+{
+    int d0, d1, d2, d3;
+    asm volatile(
+        "1:"
+        "decl %2;"
+        "js 2f;"
+        "lodsb;"
+        "stosb;"
+        "testb %%al, %%al;"
+        "jne 1b;"
+        "rep;"
+        "stosb;"
+        "2:"
+        : "=&S" (d0), "=&D" (d1), "=&c" (d2), "=&a" (d3)
+        : "0" (src), "1" (dest), "2" (count) : "memory");
+    return (char*)d1; // FIXME: non-standard return value
+}
+
 #define __HAVE_ARCH_STRLEN
 static inline size_t strlen(const char* s)
 {

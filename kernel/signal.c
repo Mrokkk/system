@@ -73,6 +73,8 @@ int do_kill(struct process* proc, int signum)
     }
     else
     {
+        // FIXME: this is wrong, it should be done only when process is running; if process is suspended, then
+        // it should be scheduled
         log_debug(DEBUG_SIGNAL, "calling default handler");
         default_sighandler(proc, signum);
     }

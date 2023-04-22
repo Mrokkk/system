@@ -6,6 +6,7 @@
 #define KERN_WARN       "\3"
 #define KERN_ERR        "\4"
 #define KERN_CRIT       "\5"
+#define KERN_LEVEL_SIZE 1
 
 #define LOGLEVEL_DEBUG  0
 #define LOGLEVEL_INFO   1
@@ -25,7 +26,7 @@ struct printk_entry
 struct file;
 
 void printk_register(struct file* file);
-int __printk(struct printk_entry* entry, const char*, ...);
+void __printk(struct printk_entry* entry, const char*, ...);
 void panic(const char* fmt, ...);
 
 void ensure_printk_will_print(void);
@@ -35,10 +36,10 @@ void ensure_printk_will_print(void);
         struct printk_entry e = { \
             .log_level = *fmt, \
             .line = __LINE__, \
-            .file = __FILE__, \
+            .file = __builtin_strrchr(__FILE__, '/') + 1, \
             .function = __FUNCTION__, \
         }; \
-        __printk(&e, &fmt[1], ##__VA_ARGS__); \
+        __printk(&e, fmt + KERN_LEVEL_SIZE, ##__VA_ARGS__); \
     })
 
 #define log_debug(flag, ...) { if (flag) printk(KERN_DEBUG __VA_ARGS__); }

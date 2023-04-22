@@ -32,9 +32,13 @@
     push %ebx;          /* ebx */
 
 #define SAVE_USER_ESP \
+    mov REGS_CS(%esp), %edx; \
+    cmp $USER_CS, %edx; \
+    jne 1f; \
     mov SYMBOL_NAME(process_current), %ecx; \
     mov REGS_ESP(%esp), %edx; \
-    mov %edx, CONTEXT_ESP2(%ecx);
+    mov %edx, CONTEXT_ESP2(%ecx); \
+    1:
 
 #define RESTORE_ALL \
     pop %ebx; \

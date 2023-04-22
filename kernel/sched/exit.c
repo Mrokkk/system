@@ -68,12 +68,12 @@ void process_delete(struct process* proc)
     delete(proc);
 }
 
-int sys_waitpid(int pid, int* status, int)
+int sys_waitpid(int pid, int* status, int wait_flags)
 {
     struct process* proc;
     flags_t flags;
 
-    log_debug(DEBUG_PROCESS, "%u called for %u", process_current->pid, pid);
+    log_debug(DEBUG_PROCESS, "%u called for %u; flags = %d", process_current->pid, pid, wait_flags);
 
     if (process_find(pid, &proc))
     {
@@ -82,19 +82,34 @@ int sys_waitpid(int pid, int* status, int)
 
     irq_save(flags);
 
+    log_debug(DEBUG_PROCESS, "proc state = %d", proc->stat);
+
     if (process_is_zombie(proc))
     {
-        *status = proc->exit_code;
-        process_delete(proc);
-        goto early_finish;
+        log_debug(DEBUG_PROCESS, "proc %d is zombie", proc->pid);
+        goto dont_wait;
+    }
+    else if (process_is_stopped(proc) && wait_flags == WUNTRACED)
+    {
+        log_debug(DEBUG_PROCESS, "proc %d is already stopped", proc->pid);
+        goto dont_wait;
     }
 
     WAIT_QUEUE_DECLARE(temp, process_current);
 
+    temp.flags = wait_flags;
     wait_queue_push(&temp, &proc->wait_child);
     process_wait(process_current, flags);
 
-    *status = proc->exit_code;
+dont_wait:
+    if (proc->stat == PROCESS_STOPPED)
+    {
+        *status = WSTOPPED;
+    }
+    else
+    {
+        *status = proc->exit_code;
+    }
 
     if (process_is_zombie(proc))
     {
@@ -103,7 +118,6 @@ int sys_waitpid(int pid, int* status, int)
 
     return 0;
 
-early_finish:
     irq_restore(flags);
     return 0;
 }

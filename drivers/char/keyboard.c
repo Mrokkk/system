@@ -37,6 +37,7 @@
 static int shift = 0;
 static char ctrl = 0;
 static char alt = 0;
+static char special = 0;
 
 static void s_shift_up()
 {
@@ -82,7 +83,7 @@ saction_t special_scancodes[] = {
         [R_SHIFT] = &s_shift_up,
         [R_SHIFT+0x80] = &s_shift_down,
         [L_ALT] = &s_alt_up,
-        [L_ALT+0x80] = &s_alt_down
+        [L_ALT+0x80] = &s_alt_down,
 };
 
 // It's not the nicest looking thing, but does its job ...
@@ -178,10 +179,38 @@ void keyboard_irs()
 
     keyboard_disable();
 
+    log_debug(DEBUG_KEYBOARD, "%x", scan_code);
+
     // Check if we have a defined action for this scancode
     if (special_scancodes[scan_code] && scan_code <= L_ALT+0x80)
     {
         special_scancodes[scan_code]();
+        goto end;
+    }
+
+    if (scan_code == 0xe0)
+    {
+        special = 1;
+        goto end;
+    }
+    else if (special && scan_code == 0x49)
+    {
+        log_debug(DEBUG_KEYBOARD, "page up pressed");
+        console_putch('\e');
+        console_putch('[');
+        console_putch('5');
+        console_putch('~');
+        special = 0;
+        goto end;
+    }
+    else if (special && scan_code == 0x51)
+    {
+        log_debug(DEBUG_KEYBOARD, "page down pressed");
+        console_putch('\e');
+        console_putch('[');
+        console_putch('6');
+        console_putch('~');
+        special = 0;
         goto end;
     }
 

@@ -8,6 +8,7 @@ struct process;
 
 struct wait_queue
 {
+    int flags;
     struct process* data;
     struct list_head processes;
 };
@@ -27,7 +28,7 @@ struct wait_queue_head
 
 // Defines for wait_queue
 #define WAIT_QUEUE_INIT(name, process) \
-    { process, LIST_INIT((name).processes) }
+    { 0, process, LIST_INIT((name).processes) }
 
 #define WAIT_QUEUE_DECLARE(name, process) \
     struct wait_queue name = WAIT_QUEUE_INIT(name, process)

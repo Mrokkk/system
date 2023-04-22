@@ -21,8 +21,8 @@ ENTRY(multiboot_header)
     .long 0 // bss_end_addr
     .long 0 // entry_addr
     .long MULTIBOOT_VIDEO_MODE_LIN // mode_type
-    .long 1024 // width
-    .long 768 // height
+    .long 1280 // width
+    .long 720 // height
     .long 32 // depth
 END(multiboot_header)
 

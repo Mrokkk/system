@@ -1,6 +1,7 @@
 #include "ramfs.h"
 
 #include <kernel/fs.h>
+#include <kernel/page.h>
 #include <kernel/module.h>
 
 KERNEL_MODULE(ramfs);
@@ -102,10 +103,16 @@ int ramfs_read(file_t* file, char* buffer, int size)
 
 int ramfs_write(file_t* file, const char* buffer, int count)
 {
+    page_t* page;
     ram_node_t* node = file->inode->fs_data;
     if (!node->data)
     {
-        node->data = kmalloc(count * 10);
+        page = page_alloc1();
+        if (!page)
+        {
+            return -ENOMEM;
+        }
+        node->data = page_virt_ptr(page);
     }
     memcpy(node->data, buffer, count);
     return 0;

@@ -83,13 +83,14 @@ int shell_run()
     while (1);
 }
 
-#define RED         "\033[31m"
-#define GREEN       "\033[32m"
-#define YELLOW      "\033[33m"
-#define BLUE        "\033[34m"
-#define MAGENTA     "\033[35m"
-#define CYAN        "\033[36m"
-#define RESET       "\033[0m"
+#define RED         "\e[31m"
+#define GREEN       "\e[32m"
+#define YELLOW      "\e[33m"
+#define BLUE        "\e[34m"
+#define MAGENTA     "\e[35m"
+#define CYAN        "\e[36m"
+#define BG          "\e[30;44m"
+#define RESET       "\e[0m"
 
 int main(int argc, char* argv[])
 {
@@ -117,6 +118,8 @@ int main(int argc, char* argv[])
     }
 
     printf(RED "W" GREEN "e" YELLOW "l" BLUE "c" MAGENTA "o" CYAN "m" MAGENTA "e!\n" RESET);
+    printf(BG"Have fun..."RESET"\n");
+    printf("\e[38;2;35;135;39m...with colors :)"RESET"\n");
 
     if (shell_run())
     {

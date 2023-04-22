@@ -197,6 +197,7 @@ int kfree(void* ptr)
 
 void kmalloc_init(void)
 {
+#if !USE_SLAB_ALLOCATION
     page_t* page_range = page_alloc(1, PAGE_ALLOC_DISCONT);
 
     if (unlikely(!page_range))
@@ -206,6 +207,7 @@ void kmalloc_init(void)
 
     list_add_tail(&page_range->list_entry, &kmalloc_pages);
     heap = page_virt_ptr(page_range);
+#endif
 }
 
 void kmalloc_stats_print(void)

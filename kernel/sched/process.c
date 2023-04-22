@@ -23,13 +23,23 @@ int process_find(int pid, struct process** p)
 
 void process_wake_waiting(struct process* proc)
 {
-    struct process* temp;
+    struct process* parent = proc->parent;
 
-    while ((temp = wait_queue_pop(&proc->wait_child)))
+    if (wait_queue_empty(&proc->wait_child))
     {
-        log_debug(DEBUG_PROCESS, "waking %u", temp->pid);
-        process_wake(temp);
+        return;
     }
+
+    struct wait_queue* q = list_front(&proc->wait_child.queue, struct wait_queue, processes);
+    if (q->flags == WUNTRACED || proc->stat == PROCESS_ZOMBIE)
+    {
+        wait_queue_pop(&proc->wait_child);
+        log_debug(DEBUG_PROCESS, "waking %u", parent->pid);
+        process_wake(parent);
+        return;
+    }
+
+    log_debug(DEBUG_PROCESS, "not waking %u", parent->pid);
 }
 
 int process_find_free_fd(struct process* proc, int* fd)

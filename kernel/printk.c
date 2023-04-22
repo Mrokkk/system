@@ -9,10 +9,13 @@
 #include <kernel/backtrace.h>
 
 #define JIFFIES     "\e[32m"
-#define DEBUG       "\e[34m"
+#define INFO        "\e[34m"
+#define DEBUG       "\e[38;5;245m"
 #define EXCEPTION   "\e[31m"
 #define WARNING     "\e[33m"
 #define RESET       "\e[0m"
+
+#define EARLY_PRINTK_BUF_SIZE (4 * KiB)
 
 static void (*printk_fallback)(const char *string);
 static int (*printk_write)(struct file*, const char*, int);
@@ -20,8 +23,9 @@ static file_t* printk_file;
 
 #define PRINTK_INITIALIZED 0xFEED
 static int printk_initialized;
-static char printk_buffer[PAGE_SIZE * 4]; // FIXME: may cause random crashes
-static int printk_index = 0;
+static char printk_buffer[EARLY_PRINTK_BUF_SIZE];
+static int printk_index;
+static int printk_buffer_full;
 
 static inline void push_entry(
     char* buffer,
@@ -42,25 +46,35 @@ static inline void push_entry(
     }
     else
     {
+        if (printk_buffer_full)
+        {
+            return;
+        }
+        if (EARLY_PRINTK_BUF_SIZE - *index < 64)
+        {
+            *index += sprintf(logger_buffer + *index, WARNING"<buffer full; dropping further messages>\n"RESET);
+            printk_buffer_full = 1;
+            return;
+        }
         *index += sprintf(logger_buffer + *index, "%s", buffer);
     }
 }
 
-int __printk(struct printk_entry* entry, const char *fmt, ...)
+void __printk(struct printk_entry* entry, const char *fmt, ...)
 {
     // TODO: just have in mind that we have such buffer
     char buffer[768];
     va_list args;
     int printed;
     flags_t flags;
-    const char* filename = strrchr(entry->file, '/') + 1;
+    const char* filename = entry->file;
 
     if (
         0
-        /*|| entry->log_level < LOGLEVEL_NOTICE*/
+        //|| entry->log_level < LOGLEVEL_NOTICE
         )
     {
-        return 0;
+        return;
     }
 
     irq_save(flags);
@@ -79,8 +93,15 @@ int __printk(struct printk_entry* entry, const char *fmt, ...)
             printed = sprintf(buffer, JIFFIES"[%8u] "EXCEPTION,
                 jiffies);
             break;
-        default:
+        case LOGLEVEL_DEBUG:
             printed = sprintf(buffer, JIFFIES"[%8u] "DEBUG"%s:%u:%s: ",
+                jiffies,
+                filename,
+                entry->line,
+                entry->function);
+            break;
+        default:
+            printed = sprintf(buffer, JIFFIES"[%8u] "INFO"%s:%u:%s: ",
                 jiffies,
                 filename,
                 entry->line,
@@ -97,8 +118,6 @@ int __printk(struct printk_entry* entry, const char *fmt, ...)
     push_entry(buffer, printed, &printk_index, printk_buffer, printk_write);
 
     irq_restore(flags);
-
-    return printed;
 }
 
 void panic(const char *fmt, ...)

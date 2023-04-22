@@ -252,13 +252,9 @@ static inline void signals_init(struct signals* dest, struct signals* src)
 {
     copy_struct(dest, src);
     dest->count = 1;
-    dest->user_stack = NULL;
 }
 
-static inline int process_signals_copy(
-    struct process* child,
-    struct process* parent,
-    int clone_flags)
+static inline int process_signals_copy(struct process* child, struct process* parent, int clone_flags)
 {
     if (clone_flags & CLONE_SIGHAND)
     {
@@ -303,6 +299,9 @@ int process_clone(
     process_wake(child);
 
     irq_restore(flags);
+
+    scheduler();
+
     return child->pid;
 
 arch_error:

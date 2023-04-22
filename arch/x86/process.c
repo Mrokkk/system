@@ -309,6 +309,8 @@ int arch_process_execute_sighan(struct process* proc, uint32_t eip)
 
     sighan_stack = virt_ptr(vm_paddr(virt_stack_addr, pgd));
 
+    log_debug(DEBUG_PROCESS, "user stack = %x", virt_stack_addr);
+
     user_code_area = vm_create(
         page_range_get(sigret_addr, 1),
         virt_sigret_addr,
@@ -327,7 +329,6 @@ int arch_process_execute_sighan(struct process* proc, uint32_t eip)
         return errno;
     }
 
-    proc->signals->user_stack = NULL;
     proc->signals->user_code = user_code_area;
 
     kernel_stack = ptr(addr(proc->context.esp) - 1024); // TODO:
@@ -381,12 +382,6 @@ __noreturn int sys_sigreturn(struct pt_regs)
     log_debug(DEBUG_PROCESS, "");
 
     vm_area_t* area;
-
-    if ((area = process_current->signals->user_stack))
-    {
-        vm_remove(area, ptr(process_current->mm->pgd), 1);
-        delete(area);
-    }
 
     if ((area = process_current->signals->user_code))
     {

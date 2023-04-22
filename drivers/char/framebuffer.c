@@ -38,7 +38,7 @@ struct tga_header
 
 static inline void pixel_set(uint32_t x, uint32_t y, uint32_t color)
 {
-    uint32_t* pixel = (uint32_t*)(framebuffer.fb + y * 0x1000 + x * 4);
+    uint32_t* pixel = (uint32_t*)(framebuffer.fb + y * framebuffer.pitch + x * 4);
     *pixel = color;
 }
 
