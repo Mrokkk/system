@@ -11,13 +11,11 @@
     MULTIBOOT_HEADER_FLAGS_ALIGNED | MULTIBOOT_HEADER_FLAGS_MEMORY | \
     MULTIBOOT_HEADER_FLAGS_VIDEO
 
-// Magic number passed from Multiboot 1 compliant bootloader
-#define MULTIBOOT_BOOTLOADER_MAGIC  0x2BADB002
-
 #define MULTIBOOT_VIDEO_MODE_LIN    0
 #define MULTIBOOT_VIDEO_MODE_EGA    1
-#define MULTIBOOT_VIDEO_MODE_WIDTH  80
-#define MULTIBOOT_VIDEO_MODE_HEIGHT 25
+
+// Magic number passed from Multiboot 1 compliant bootloader
+#define MULTIBOOT_BOOTLOADER_MAGIC  0x2BADB002
 
 #ifndef __ASSEMBLER__
 

@@ -103,8 +103,14 @@ int framebuffer_init()
     framebuffer.width = width;
     framebuffer.height = height;
     framebuffer.bpp = bpp;
+    framebuffer.type = framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB
+        ? FB_TYPE_RGB
+        : FB_TYPE_TEXT;
 
-    display_tga(tux);
+    if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
+    {
+        display_tga(tux);
+    }
 
     return 0;
 }

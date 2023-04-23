@@ -34,15 +34,15 @@ int __char_device_register(
 
 int char_device_find(const char* name, device_t** dev);
 
-extern device_t* char_devices[CHAR_DEVICES_SIZE];
-
 static inline device_t* char_device_get(dev_t major)
 {
+    extern device_t* char_devices[CHAR_DEVICES_SIZE];
     return char_devices[major];
 }
 
 static inline struct file_operations* char_fops_get(dev_t major)
 {
+    extern device_t* char_devices[CHAR_DEVICES_SIZE];
     return char_devices[major]->fops;
 }
 

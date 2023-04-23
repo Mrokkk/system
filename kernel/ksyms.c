@@ -2,8 +2,8 @@
 #include <kernel/ctype.h>
 #include <kernel/ksyms.h>
 
-ksym_t* kernel_symbols;
-int kernel_symbols_size;
+static ksym_t* kernel_symbols;
+static int kernel_symbols_size;
 
 typedef struct
 {

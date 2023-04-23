@@ -282,7 +282,7 @@ int __page_range_free(struct list_head* head)
     return count;
 }
 
-pgd_t* pgd_alloc(pgd_t* old_pgd)
+pgd_t* pgd_alloc(void)
 {
     pgd_t* new_pgd = single_page();
 
@@ -291,14 +291,12 @@ pgd_t* pgd_alloc(pgd_t* old_pgd)
         return NULL;
     }
 
-    memset(new_pgd, 0, PAGE_SIZE);
-
-    log_debug(DEBUG_PAGE, "copying %u kernel pte from %u", PTE_IN_PDE - KERNEL_PDE_OFFSET, KERNEL_PDE_OFFSET);
+    log_debug(DEBUG_PAGE, "copying %u kernel pte", PTE_IN_PDE);
 
     memcpy(
-        new_pgd + KERNEL_PDE_OFFSET,
-        old_pgd + KERNEL_PDE_OFFSET,
-        sizeof(uint32_t) * (PTE_IN_PDE - KERNEL_PDE_OFFSET));
+        new_pgd,
+        kernel_page_dir,
+        sizeof(uint32_t) * PTE_IN_PDE);
 
     return new_pgd;
 }
@@ -446,12 +444,10 @@ uint32_t page_map_allocate(uint32_t virt_end)
     uint32_t needed_pages = last_frame;
     uint32_t offset = addr(page_map) - virt_end + page_align(needed_pages * sizeof(page_t));
 
-    log_info("additional %u kB for metadata (%u entries; %u B each); virt_end=%x; page_map=%x",
+    log_info("additional %u kB for metadata (%u entries; %u B each)",
         offset / 1024,
         needed_pages,
-        sizeof(page_t),
-        virt_end,
-        page_map);
+        sizeof(page_t));
 
     return offset;
 }

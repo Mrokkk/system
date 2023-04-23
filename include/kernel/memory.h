@@ -23,10 +23,10 @@ static inline const char* memory_area_type_string(int type)
 {
     switch (type)
     {
-        case MMAP_TYPE_AVL: return "AVAILABLE";
-        case MMAP_TYPE_DEV: return "DEVICE";
-        case MMAP_TYPE_RES: return "RESERVED";
-        default: return "UNDEFINED";
+        case MMAP_TYPE_AVL: return "available";
+        case MMAP_TYPE_DEV: return "device";
+        case MMAP_TYPE_RES: return "reserved";
+        default: return "undefined";
     }
 }
 
@@ -37,7 +37,7 @@ static inline const char* memory_area_type_string(int type)
         { \
             ma = &memory_areas[i]; \
             if (ma->size == 0) continue; \
-            log_info("area={%08x - %08x}: %s", \
+            log_info("[mem %08x - %08x] %s", \
                 ma->base, \
                 ma->base + ma->size - 1, \
                 memory_area_type_string(ma->type)); \

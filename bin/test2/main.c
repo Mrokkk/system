@@ -11,7 +11,7 @@ static inline uint32_t color_make(uint8_t red, uint8_t green, uint8_t blue)
 
 static inline void pixel_set(uint32_t x, uint32_t y, uint32_t color)
 {
-    uint32_t* pixel = (uint32_t*)(framebuffer_data + y * 0x1000 + x * 4);
+    uint32_t* pixel = (uint32_t*)(framebuffer_data + y * 0x1400 + x * 4);
     *pixel = color;
 }
 
@@ -38,7 +38,8 @@ int main(int argc, char* argv[])
     {
         printf("argv[%u] = \"%s\"\n", i, argv[i]);
     }
-    framebuffer_data = sbrk(768 * 0x1000);
+
+    framebuffer_data = sbrk(720 * 0x1400);
 
     int fd = open("/dev/fb0", O_RDWR, 0);
 
@@ -48,7 +49,7 @@ int main(int argc, char* argv[])
 
     printf("framebuffer_data = 0x%x\n", framebuffer_data);
 
-    write(fd, (void*)framebuffer_data, 768 * 0x1000);
+    write(fd, (void*)framebuffer_data, 720 * 0x1400);
 
     return 0;
 }

@@ -24,7 +24,7 @@ typedef struct slab_allocator
 #define SLAB_512    4
 #define SLABS_SIZE  5
 
-slab_allocator_t allocators[SLABS_SIZE];
+static slab_allocator_t allocators[SLABS_SIZE];
 
 static inline slab_allocator_t* slab_allocator_get(size_t size)
 {

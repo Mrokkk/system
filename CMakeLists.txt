@@ -79,17 +79,18 @@ add_custom_target(
            "--module" "${CMAKE_BINARY_DIR}/bin/reboot/reboot"
            "--module" "${CMAKE_BINARY_DIR}/bin/ls/ls"
            "--module" "${CMAKE_BINARY_DIR}/bin/init/init"
+           "--module" "${CMAKE_BINARY_DIR}/bin/colors/colors"
            "--module" "${CMAKE_BINARY_DIR}/kernel.map"
            "--module" "${CMAKE_SOURCE_DIR}/tux.tga"
            "--module" "${CMAKE_BINARY_DIR}/font.psf"
-   DEPENDS ${PROJECT_NAME} test test2 sh reboot ls init ksyms font
+   DEPENDS ${PROJECT_NAME} test test2 sh reboot ls colors init ksyms font
    COMMENT "Building ISO image"
 )
 
 add_custom_target(
     runqemu
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh runqemu
-    COMMAND ./runqemu
+    COMMAND ./runqemu -k
     DEPENDS iso
     COMMENT "Running qemu"
 )

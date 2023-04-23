@@ -62,6 +62,9 @@ ENDPROC(eip_get)
 ENTRY(syscall_handler) // INT 0x80 handler
     SAVE_ALL
     SAVE_USER_ESP
+    push %eax
+    call SYMBOL_NAME(timestamp_update)
+    pop %eax
     cmp $__NR_syscalls, %eax
     jg bad_syscall
     mov SYMBOL_NAME(syscalls)(, %eax, 4), %eax
@@ -87,6 +90,7 @@ ENTRY(timer_handler) // IRQ 0 handler
     SAVE_ALL
     SAVE_USER_ESP
     PIC_EOI(0)
+    call SYMBOL_NAME(timestamp_update)
     call SYMBOL_NAME(scheduler)
     RESTORE_ALL
     iret

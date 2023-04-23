@@ -2,7 +2,7 @@
 #include <kernel/module.h>
 #include <kernel/string.h>
 
-LIST_DECLARE(modules);
+static LIST_DECLARE(modules);
 
 int modules_init()
 {
@@ -12,25 +12,37 @@ int modules_init()
     {
         module_add(module);
 
-        if (module->init != NULL)
+        if (!module->init)
         {
-           if (module->init())
-           {
-               log_info("%s: FAIL", module->name);
-           }
-           else
-           {
-               log_info("%s: SUCCESS", module->name);
-           }
+            continue;
+        }
+
+        if (module->init())
+        {
+            log_error("%s: FAIL", module->name);
+        }
+        else
+        {
+            log_info("%s: SUCCESS", module->name);
         }
     }
 
     return 0;
 }
 
+void module_add(kmod_t* new)
+{
+    list_add_tail(&new->modules, &modules);
+}
+
+void module_remove(kmod_t* module)
+{
+    list_del(&module->modules);
+}
+
 kmod_t* module_find(unsigned int this_module)
 {
-    kmod_t* temp = NULL;
+    kmod_t* temp;
 
     list_for_each_entry(temp, &modules, modules)
     {
@@ -40,7 +52,7 @@ kmod_t* module_find(unsigned int this_module)
         }
     }
 
-    return temp;
+    return NULL;
 }
 
 void modules_shutdown()

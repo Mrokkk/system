@@ -64,6 +64,7 @@
     ENTRY(isr_##x) \
         SAVE_ALL; \
         SAVE_USER_ESP; \
+        call SYMBOL_NAME(timestamp_update); \
         push %esp; \
         push $x-0x20; \
         call SYMBOL_NAME(do_irq); \
@@ -80,6 +81,7 @@
         push $0; \
         SAVE_ALL; \
         SAVE_USER_ESP; \
+        call SYMBOL_NAME(timestamp_update); \
         push $__NR_##x; \
         call do_exception; \
         add $4, %esp; \
@@ -92,6 +94,7 @@
     ENTRY(exc_##x##_handler) \
         SAVE_ALL; \
         SAVE_USER_ESP; \
+        call SYMBOL_NAME(timestamp_update); \
         push $__NR_##x; \
         call do_exception; \
         add $4, %esp; \

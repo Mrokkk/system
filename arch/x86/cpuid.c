@@ -3,48 +3,54 @@
 #include <kernel/kernel.h>
 #include <kernel/string.h>
 
+#define FEATURE(id, name) \
+    [id] = name
+
 static char* feature_strings[] = {
-    "fpu",
-    "vme",
-    "de",
-    "pse",
-    "tsc",
-    "msr",
-    "pae",
-    "mce",
-    "cx8",
-    "apic",
-    "reserved1",
-    "sep",
-    "mtrr",
-    "pge",
-    "mca",
-    "cmov",
-    "pat",
-    "pse_36",
-    "psn",
-    "clfsh",
-    "reserved2",
-    "ds",
-    "acpi",
-    "mmx",
-    "fxsr",
-    "sse",
-    "sse2",
-    "ss",
-    "htt",
-    "tm",
-    "ia64",
-    "pbe",
+    FEATURE(INTEL_FPU, "fpu"),
+    FEATURE(INTEL_VME, "vme"),
+    FEATURE(INTEL_DE, "de"),
+    FEATURE(INTEL_PSE, "pse"),
+    FEATURE(INTEL_TSC, "tsc"),
+    FEATURE(INTEL_MSR, "msr"),
+    FEATURE(INTEL_PAE, "pae"),
+    FEATURE(INTEL_MCE, "mce"),
+    FEATURE(INTEL_CX8, "cx8"),
+    FEATURE(INTEL_APIC, "apic"),
+    FEATURE(INTEL_RESERVED1, "reserved1"),
+    FEATURE(INTEL_SEP, "sep"),
+    FEATURE(INTEL_MTRR, "mtrr"),
+    FEATURE(INTEL_PGE, "pge"),
+    FEATURE(INTEL_MCA, "mca"),
+    FEATURE(INTEL_CMOV, "cmov"),
+    FEATURE(INTEL_PAT, "pat"),
+    FEATURE(INTEL_PSE_36, "pse_36"),
+    FEATURE(INTEL_PSN, "psn"),
+    FEATURE(INTEL_CLFSH, "clfsh"),
+    FEATURE(INTEL_RESERVED2, "reserved2"),
+    FEATURE(INTEL_DS, "ds"),
+    FEATURE(INTEL_ACPI, "acpi"),
+    FEATURE(INTEL_MMX, "mmx"),
+    FEATURE(INTEL_FXSR, "fxsr"),
+    FEATURE(INTEL_SSE, "sse"),
+    FEATURE(INTEL_SSE2, "sse2"),
+    FEATURE(INTEL_SS, "ss"),
+    FEATURE(INTEL_HTT, "htt"),
+    FEATURE(INTEL_TM, "tm"),
+    FEATURE(INTEL_IA64, "ia64"),
+    FEATURE(INTEL_PBE, "pbe"),
+    FEATURE(INTEL_SSE3, "sse3"),
+    FEATURE(INTEL_PREFETCHW, "prefetchw"),
+    FEATURE(INTEL_SYSCALL, "syscall"),
+    FEATURE(INTEL_RDTSCP, "rdtscp"),
+    FEATURE(INTEL_INVTSC, "invtsc"),
 };
 
 size_t cpu_features_string_get(char* buffer)
 {
-    uint32_t mask = 1;
-    uint32_t features = cpu_info.features;
-    for (uint32_t i = 0; i < 32; ++i, mask <<= 1)
+    for (uint32_t i = 0; i < NR_FEATURES * 32; ++i)
     {
-        if (features & mask)
+        if (cpu_has(i) && feature_strings[i])
         {
             buffer += sprintf(buffer, "%s ", feature_strings[i]);
         }
@@ -292,59 +298,58 @@ static void cache_info_fill(uint32_t reg)
 static void cpu_intel()
 {
     struct cpuid_regs cpuid_regs;
+    uint32_t max_function;
 
     sprintf(cpu_info.producer, "Intel");
 
-    cpuid_read(1, &cpuid_regs);
-    cpu_info.features = cpuid_regs.edx;
-
     // Check how many extended functions we have
     cpuid_read(0x80000000, &cpuid_regs);
-    if (cpuid_regs.eax < 0x80000004)
+    max_function = cpuid_regs.eax;
+
+    if (max_function >= 0x80000001)
+    {
+        cpuid_read(0x80000001, &cpuid_regs);
+        cpu_features_save(CPUID_80000001, cpuid_regs.edx);
+    }
+
+    if (max_function >= 0x80000004)
+    {
+        cpuid_read(0x80000002, &cpuid_regs);
+        memcpy(cpu_info.name, &cpuid_regs.eax, 4);
+        memcpy(&cpu_info.name[4], &cpuid_regs.ebx, 4);
+        memcpy(&cpu_info.name[8], &cpuid_regs.ecx, 4);
+        memcpy(&cpu_info.name[12], &cpuid_regs.edx, 4);
+
+        cpuid_read(0x80000003, &cpuid_regs);
+        memcpy(&cpu_info.name[16], &cpuid_regs.eax, 4);
+        memcpy(&cpu_info.name[20], &cpuid_regs.ebx, 4);
+        memcpy(&cpu_info.name[24], &cpuid_regs.ecx, 4);
+        memcpy(&cpu_info.name[28], &cpuid_regs.edx, 4);
+
+        cpuid_read(0x80000004, &cpuid_regs);
+        memcpy(&cpu_info.name[32], &cpuid_regs.eax, 4);
+        memcpy(&cpu_info.name[36], &cpuid_regs.ebx, 4);
+        memcpy(&cpu_info.name[40], &cpuid_regs.ecx, 4);
+        memcpy(&cpu_info.name[44], &cpuid_regs.edx, 4);
+
+        cpu_info.name[45] = 0;
+    }
+    else
     {
         strcpy(cpu_info.name, "unknown");
-        goto cache_read;
     }
 
-    cpuid_read(0x80000002, &cpuid_regs);
-    memcpy(cpu_info.name, &cpuid_regs.eax, 4);
-    memcpy(&cpu_info.name[4], &cpuid_regs.ebx, 4);
-    memcpy(&cpu_info.name[8], &cpuid_regs.ecx, 4);
-    memcpy(&cpu_info.name[12], &cpuid_regs.edx, 4);
-
-    cpuid_read(0x80000003, &cpuid_regs);
-    memcpy(&cpu_info.name[16], &cpuid_regs.eax, 4);
-    memcpy(&cpu_info.name[20], &cpuid_regs.ebx, 4);
-    memcpy(&cpu_info.name[24], &cpuid_regs.ecx, 4);
-    memcpy(&cpu_info.name[28], &cpuid_regs.edx, 4);
-
-    cpuid_read(0x80000004, &cpuid_regs);
-    memcpy(&cpu_info.name[32], &cpuid_regs.eax, 4);
-    memcpy(&cpu_info.name[36], &cpuid_regs.ebx, 4);
-    memcpy(&cpu_info.name[40], &cpuid_regs.ecx, 4);
-    memcpy(&cpu_info.name[44], &cpuid_regs.edx, 4);
-
-    cpu_info.name[45] = 0;
-
-cache_read:
-    cpuid_read(2, &cpuid_regs);
-
-    if (cpuid_regs.eax & 0xff000000)
+    if (max_function >= 0x80000006)
     {
-        log_warning("no valid data");
-        return;
+        cpuid_read(0x80000006, &cpuid_regs);
+        cpu_info.cacheline_size = cpuid_regs.ecx & 0xff;
+        cpu_info.cache_size = (cpuid_regs.ecx >> 16) * KiB;
     }
 
-    cache_info_fill(cpuid_regs.ebx);
-    cache_info_fill(cpuid_regs.ecx);
-    cache_info_fill(cpuid_regs.edx);
-
-    for (uint32_t i = 0; i < 3; ++i)
+    if (max_function >= 0x80000007)
     {
-        if (!cpu_info.cache[i].description)
-        {
-            cpu_info.cache[i].description = "not available";
-        }
+        cpuid_read(0x80000007, &cpuid_regs);
+        cpu_features_save(CPUID_80000007, cpuid_regs.edx);
     }
 }
 
@@ -352,23 +357,50 @@ int cpu_info_get()
 {
     struct cpuid_regs cpuid_regs;
 
-    // Call CPUID function #0
+    cpuid_read(1, &cpuid_regs);
+    cpu_info.stepping = (cpuid_regs.eax) && 0xf;
+    cpu_info.model = (cpuid_regs.eax >>= 4) && 0xf;
+    cpu_info.family = (cpuid_regs.eax >>= 4) && 0xf;
+    cpu_features_save(CPUID_1_ECX, cpuid_regs.ecx);
+    cpu_features_save(CPUID_1_EDX, cpuid_regs.edx);
+
+    cpuid_read(2, &cpuid_regs);
+
+    if (cpuid_regs.eax & 0xff000000)
+    {
+        log_warning("no valid cache data!");
+        goto cont;
+    }
+
+    cache_info_fill(cpuid_regs.ebx);
+    cache_info_fill(cpuid_regs.ecx);
+    cache_info_fill(cpuid_regs.edx);
+
+cont:
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        if (!cpu_info.cache[i].description)
+        {
+            cpu_info.cache[i].description = "not available";
+        }
+    }
+
     cpuid_read(0, &cpuid_regs);
 
     // Vendor is found in EBX, EDX, ECX in extact order
-    memcpy(cpu_info.vendor, &cpuid_regs.ebx, 5);
-    memcpy(&cpu_info.vendor[4], &cpuid_regs.edx, 5);
-    memcpy(&cpu_info.vendor[8], &cpuid_regs.ecx, 5);
+    memcpy(cpu_info.vendor, &cpuid_regs.ebx, 4);
+    memcpy(&cpu_info.vendor[4], &cpuid_regs.edx, 4);
+    memcpy(&cpu_info.vendor[8], &cpuid_regs.ecx, 4);
     cpu_info.vendor[12] = 0;
 
     switch (cpuid_regs.ebx)
     {
-        // Intel CPU
+        // Intel CPU - "Genu"
         case 0x756e6547: cpu_intel(); break;
         // AMD CPU
         case 0x68747541:
         // Unknown CPU
-        default: break;
+        default:
     }
 
     return 0;

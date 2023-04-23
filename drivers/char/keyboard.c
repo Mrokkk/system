@@ -9,7 +9,7 @@
 #include <kernel/process.h>
 #include <kernel/spinlock.h>
 
-#include "console.h"
+#include "tty.h"
 
 #define CMD_PORT                        0x64
 #define DATA_PORT                       0x60
@@ -69,35 +69,30 @@ static void s_alt_down()
     alt =  0;
 }
 
-typedef void (*saction_t)();
+typedef void (*action_t)();
 
 #define scancode_action(code, action) \
     [code] = action##_up, \
-    [code + 0x80] = action##_down,
+    [code + 0x80] = action##_down
 
-saction_t special_scancodes[] = {
-        [L_CTRL] = &s_ctrl_up,
-        [L_CTRL+0x80] = &s_ctrl_down,
-        [L_SHIFT] = &s_shift_up,
-        [L_SHIFT+0x80] = &s_shift_down,
-        [R_SHIFT] = &s_shift_up,
-        [R_SHIFT+0x80] = &s_shift_down,
-        [L_ALT] = &s_alt_up,
-        [L_ALT+0x80] = &s_alt_down,
+static action_t special_scancodes[] = {
+    scancode_action(L_CTRL, s_ctrl),
+    scancode_action(L_SHIFT, s_shift),
+    scancode_action(R_SHIFT, s_shift),
+    scancode_action(L_ALT, s_alt),
 };
 
-// It's not the nicest looking thing, but does its job ...
-char *scancodes[] = {
-        "\0\0", "\0\0",
-        "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "-_", "=+", "\b\b",
-        "\t\t", "qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "[{", "]}",
-        "\n\n", "\0\0",
-        "aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", ";:", "'\"",
-        "`~", "\0\0",
-        "\\|",
-        "zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",<", ".>", "/?", "\0\0",
-        "**",
-        "\0\0", "  ", "\0\0"
+static char* scancodes[] = {
+    "\0\0", "\0\0",
+    "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "-_", "=+", "\b\b",
+    "\t\t", "qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "[{", "]}",
+    "\n\n", "\0\0",
+    "aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", ";:", "'\"",
+    "`~", "\0\0",
+    "\\|",
+    "zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",<", ".>", "/?", "\0\0",
+    "**",
+    "\0\0", "  ", "\0\0"
 };
 
 BUFFER_DECLARE(keyboard_buffer, 32);
@@ -126,52 +121,6 @@ static uint8_t keyboard_receive(void)
     return inb(DATA_PORT);
 }
 
-int keyboard_read(
-    struct file*,
-    char* buffer,
-    int size)
-{
-    int i;
-    WAIT_QUEUE_DECLARE(kb, process_current);
-
-    flags_t flags;
-    irq_save(flags);
-
-    for (i = 0; i < size; i++)
-    {
-        while (buffer_get(&keyboard_buffer, &buffer[i]))
-        {
-            wait_queue_push(&kb, &keyboard_wq);
-            process_wait(process_current, flags);
-        }
-        if (buffer[i] == '\n')
-        {
-            ++i;
-            goto finish;
-        }
-        else if (buffer[i] == 4)
-        {
-            i = 0;
-            goto finish;
-        }
-        else if (buffer[i] == 3)
-        {
-            do_kill(process_current, SIGINT);
-            i = 1;
-            buffer[0] = 0;
-            goto finish;
-        }
-        else if (buffer[i] == '\b' && i > 0)
-        {
-            buffer[i--] = 0;
-            buffer[i--] = 0;
-        }
-    }
-
-finish:
-    return i;
-}
-
 void keyboard_irs()
 {
     uint8_t scan_code = keyboard_receive();
@@ -195,21 +144,19 @@ void keyboard_irs()
     }
     else if (special && scan_code == 0x49)
     {
-        log_debug(DEBUG_KEYBOARD, "page up pressed");
-        console_putch('\e');
-        console_putch('[');
-        console_putch('5');
-        console_putch('~');
+        tty_char_insert('\e', TTY_DONT_PUT_TO_USER);
+        tty_char_insert('[', TTY_DONT_PUT_TO_USER);
+        tty_char_insert('5', TTY_DONT_PUT_TO_USER);
+        tty_char_insert('~', TTY_DONT_PUT_TO_USER);
         special = 0;
         goto end;
     }
     else if (special && scan_code == 0x51)
     {
-        log_debug(DEBUG_KEYBOARD, "page down pressed");
-        console_putch('\e');
-        console_putch('[');
-        console_putch('6');
-        console_putch('~');
+        tty_char_insert('\e', TTY_DONT_PUT_TO_USER);
+        tty_char_insert('[', TTY_DONT_PUT_TO_USER);
+        tty_char_insert('6', TTY_DONT_PUT_TO_USER);
+        tty_char_insert('~', TTY_DONT_PUT_TO_USER);
         special = 0;
         goto end;
     }
@@ -221,31 +168,25 @@ void keyboard_irs()
     }
 
     character = scancodes[scan_code][shift];
+    if (!character)
+    {
+        goto end;
+    }
+
     if (ctrl && character)
     {
         if (character == 'c')
         {
-            buffer_put(&keyboard_buffer, 3);
-            goto wake;
+            tty_char_insert(3, 0);
         }
         else if (character == 'd')
         {
-            buffer_put(&keyboard_buffer, 4);
-            goto wake;
+            tty_char_insert(4, 0);
         }
     }
     else
     {
-        buffer_put(&keyboard_buffer, character);
-        //  FIXME: printing shouldn't be here; bug: if I press key on early startup, it crashes kernel
-        console_putch(character);
-
-wake:
-        if (!wait_queue_empty(&keyboard_wq))
-        {
-            struct process *proc = wait_queue_pop(&keyboard_wq);
-            process_wake(proc);
-        }
+        tty_char_insert(character, 0);
     }
 
 end:

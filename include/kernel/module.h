@@ -33,18 +33,9 @@ typedef struct kernel_module kmod_t;
 #define module_exit(exit) \
     static int kmodule_deinit() __alias(exit)
 
-extern struct list_head modules;
-
-static inline void module_add(kmod_t* new)
-{
-    list_add_tail(&new->modules, &modules);
-}
-
-static inline void module_remove(kmod_t* module)
-{
-    list_del(&module->modules);
-}
-
 int modules_init();
 void modules_shutdown();
+
+void module_add(kmod_t* new);
+void module_remove(kmod_t* module);
 kmod_t* module_find(unsigned int this_module);

@@ -131,7 +131,7 @@ struct exception_frame
 
 #define CONTEXT_ESP2 20
 
-#define INIT_PROCESS_STACK_SIZE 512 // number of uint32_t's
+#define INIT_PROCESS_STACK_SIZE 1024 // number of uint32_t's
 
 #define INIT_PROCESS_CONTEXT(name) \
     { \

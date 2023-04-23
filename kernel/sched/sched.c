@@ -1,4 +1,5 @@
 #include <kernel/process.h>
+#include <arch/context_switch.h>
 
 struct process* process_current = &init_process;
 unsigned int context_switches;
@@ -23,13 +24,24 @@ void scheduler()
     else
     {
         struct list_head* temp = process_current->running.next;
-        // I don't like it, but it works...
         if (temp == &running)
         {
             temp = temp->next;
         }
         process_current = list_entry(temp, struct process, running);
     }
+
+#if PARANOIA_SCHED
+    if (unlikely(process_current->stat != PROCESS_RUNNING))
+    {
+        panic("bug: process %u:%x stat is %u; expected %u; addr=%x",
+            process_current->pid,
+            process_current,
+            process_current->stat,
+            PROCESS_RUNNING,
+            &process_current->stat);
+    }
+#endif
 
 end:
     if (last == process_current)
@@ -38,7 +50,7 @@ end:
     }
 
     context_switches++;
-    process_current->context_switches++;
+    last->context_switches++;
 
     process_switch(last, process_current);
 }

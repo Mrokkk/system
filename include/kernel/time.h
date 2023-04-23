@@ -4,14 +4,19 @@
 
 #define HZ 100
 
-void do_delay();
-void delay(uint32_t);
-void delay_calibrate(void);
+#define UNIT_MHZ 1000000
 
-extern uint32_t loops_per_sec;
-
-static inline void udelay(uint32_t usecs)
+typedef struct timestamp
 {
-    usecs *= loops_per_sec / 1000000;
-    do_delay(usecs);
+    uint32_t seconds;
+    uint32_t useconds;
+} ts_t;
+
+void delay_calibrate(void);
+void timestamp_get(ts_t* ts);
+
+static inline void ts_align(ts_t* ts)
+{
+    ts->seconds += ts->useconds / UNIT_MHZ;
+    ts->useconds = ts->useconds % UNIT_MHZ;
 }

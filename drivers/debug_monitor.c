@@ -1,6 +1,7 @@
 #include <stdarg.h>
 
 #include <kernel/fs.h>
+#include <kernel/cpu.h>
 #include <kernel/irq.h>
 #include <kernel/sys.h>
 #include <kernel/time.h>
@@ -60,16 +61,43 @@ static int c_ps()
     return 0;
 }
 
+#define print_string(data) \
+    printf(#data"=%s\n", data);
+
+#define print_ul(data) \
+    printf(#data"=%u\n", data);
+
+static int c_cpu()
+{
+    print_string(cpu_info.vendor);
+    print_string(cpu_info.producer);
+    print_string(cpu_info.name);
+    print_ul(cpu_info.family);
+    print_ul(cpu_info.model);
+    print_ul(cpu_info.stepping);
+    print_ul(cpu_info.mhz);
+    print_ul(cpu_info.cacheline_size);
+    print_ul(cpu_info.cache_size);
+    print_ul(cpu_info.bogomips);
+    print_string(cpu_info.features_string);
+    print_string(cpu_info.cache[0].description);
+    print_string(cpu_info.cache[1].description);
+    print_string(cpu_info.cache[2].description);
+    return 0;
+}
+
 static int c_kstat()
 {
-#define print_data(data) \
-    printf(#data"=%d\n", data);
 
+    ts_t ts;
+    timestamp_get(&ts);
     int uptime = jiffies/HZ;
-    print_data(jiffies);
-    print_data(uptime);
-    print_data(context_switches);
-    print_data(total_forks);
+    print_ul(jiffies);
+    print_ul(ts.seconds);
+    print_ul(ts.useconds);
+    print_ul(uptime);
+    print_ul(context_switches);
+    print_ul(total_forks);
 
     return 0;
 }
@@ -81,6 +109,7 @@ static struct command {
     int (*function)();
 } commands[] = {
     COMMAND(ps),
+    COMMAND(cpu),
     COMMAND(kstat),
     COMMAND(running),
     {0, 0}
@@ -213,7 +242,7 @@ int debug_monitor()
             }
             else
             {
-                printf("cannot flags %x, address not mapped\n", *ptr);
+                printf("cannot read %x, address not mapped\n", *ptr);
             }
         }
         else

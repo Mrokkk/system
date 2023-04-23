@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <arch/segment.h>
+#include <kernel/trace.h>
 #include <kernel/compiler.h>
 
 typedef uint32_t flags_t;
@@ -31,33 +32,13 @@ typedef uint32_t flags_t;
     asm volatile("nop")
 
 #define halt() \
-    ({ asm volatile("hlt"); 0; })
+    ({ asm volatile("hlt"); 1; })
 
-// Context switching
-#define process_switch(prev, next) \
-    do {                                \
-        asm volatile(                   \
-            "push %%gs;"                \
-            "pushl %%ebx;"              \
-            "pushl %%ecx;"              \
-            "pushl %%esi;"              \
-            "pushl %%edi;"              \
-            "pushl %%ebp;"              \
-            "movl %%esp, %0;"           \
-            "movl %2, %%esp;"           \
-            "movl $1f, %1;"             \
-            "pushl %3;"                 \
-            "jmp __process_switch;"     \
-            "1: "                       \
-            "popl %%ebp;"               \
-            "popl %%edi;"               \
-            "popl %%esi;"               \
-            "popl %%ecx;"               \
-            "popl %%ebx;"               \
-            "pop %%gs;"                 \
-            : "=m" (prev->context.esp), \
-              "=m" (prev->context.eip)  \
-            : "m" (next->context.esp),  \
-              "m" (next->context.eip),  \
-              "a" (prev), "d" (next));  \
-    } while (0)
+#define rdtsc(low, high) \
+     asm volatile("rdtsc" : "=a" (low), "=d" (high))
+
+#define rdtscl(val) \
+     asm volatile("rdtsc" : "=a" (val))
+
+#define rdtscll(val) \
+     asm volatile("rdtsc" : "=A" (val))

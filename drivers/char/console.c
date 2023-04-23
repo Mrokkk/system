@@ -21,53 +21,27 @@ typedef enum
 static command_t control(char c);
 static int allocate();
 
-static inline void char_print(
-    size_t row,
-    size_t col,
-    int c,
-    uint32_t fg_color,
-    uint32_t bg_color)
-{
-    uint32_t line, mask;
-    uint8_t* glyph = font.glyphs[c].bytes;
-    uint32_t offset = console->font_height_offset * row + console->font_width_offset * col;
-
-    for (uint32_t y = 0; y < font.bytes_per_glyph; y++, ++glyph, offset += console->pitch)
-    {
-        line = offset;
-        mask = 1 << 7;
-        for (uint32_t x = 0; x < font.bytes_per_glyph; x++)
-        {
-            uint32_t value = *glyph & mask ? fg_color : bg_color;
-            uint32_t* pixel = (uint32_t*)(console->fb + line);
-            *pixel = value;
-            mask >>= 1;
-            line += 4;
-        }
-    }
-}
-
 static inline void redraw_lines(size_t prev_line_len)
 {
-    char* pos;
+    uint8_t* pos;
     line_t* temp;
     size_t x, y, line_index, temp_len;
 
-    for (y = 0, temp = console->visible_line; y < console->size.y; ++y)
+    for (y = 0, temp = console->visible_line; y < console->resy; ++y)
     {
         pos = temp->line;
         for (x = 0, line_index = 0; pos < temp->pos; ++line_index, ++pos)
         {
             if (!control(*pos))
             {
-                char_print(y, x, *pos, console->fg_color, console->bg_color);
+                console->driver->putch(console->driver, y, x, *pos);
                 ++x;
             }
         }
         temp_len = x;
         for (; x < prev_line_len; ++line_index, ++x)
         {
-            char_print(y, x, ' ', console->fg_color, console->bg_color);
+            console->driver->putch(console->driver, y, x, ' ');
         }
         prev_line_len = temp_len;
         temp = temp->next;
@@ -76,24 +50,24 @@ static inline void redraw_lines(size_t prev_line_len)
 
 static inline void redraw_lines_full()
 {
-    char* pos;
+    uint8_t* pos;
     line_t* temp;
     size_t x, y, line_index;
 
-    for (y = 0, temp = console->visible_line; y < console->size.y; ++y)
+    for (y = 0, temp = console->visible_line; y < console->resy; ++y)
     {
         pos = temp->line;
         for (x = 0, line_index = 0; pos < temp->pos; ++line_index, ++pos)
         {
             if (!control(*pos))
             {
-                char_print(y, x, *pos, console->fg_color, console->bg_color);
+                console->driver->putch(console->driver, y, x, *pos);
                 ++x;
             }
         }
-        for (; x < console->size.x - 1; ++line_index, ++x)
+        for (; x < console->resx - 1; ++line_index, ++x)
         {
-            char_print(y, x, ' ', console->fg_color, console->bg_color);
+            console->driver->putch(console->driver, y, x, ' ');
         }
         temp = temp->next;
     }
@@ -101,23 +75,27 @@ static inline void redraw_lines_full()
 
 static inline void position_next()
 {
-    if (console->position.x >= console->size.x)
+    if (console->x >= console->resx)
     {
-        console->position.x = 0;
-        ++console->position.y;
+        console->x = 0;
+        ++console->y;
     }
     else
     {
-        ++console->position.x;
+        ++console->x;
     }
 }
 
 static inline void position_newline()
 {
+    if (console->scrolling)
+    {
+        return;
+    }
     size_t previous = console->lines->pos - console->lines->line;
     console->current_line = console->current_line->next;
     console->current_line->pos = console->current_line->line;
-    console->position.x = 0;
+    console->x = 0;
 
     if (console->current_index == console->capacity - 2)
     {
@@ -129,11 +107,11 @@ static inline void position_newline()
     }
 
     ++console->current_index;
-    if (console->position.y < console->size.y - 1)
+    if (console->y < console->resy - 1)
     {
-        ++console->position.y;
+        ++console->y;
     }
-    else if (console->position.y == console->size.y - 1)
+    else if (console->y == console->resy - 1)
     {
         console->visible_line = console->visible_line->next;
         console->current_line->pos = console->current_line->line;
@@ -143,75 +121,23 @@ static inline void position_newline()
 
 static inline void position_prev()
 {
-    if (!console->position.x)
+    if (!console->x)
     {
         return;
     }
     --console->current_line->pos;
-    --console->position.x;
+    --console->x;
 }
 
 static inline void backspace()
 {
     position_prev();
-    char_print(console->position.y, console->position.x, ' ', console->fg_color, console->bg_color);
+    console->driver->putch(console->driver, console->y, console->x, ' ');
 }
-
-typedef enum
-{
-    NORMAL,
-    COLOR256,
-    RGB,
-} color_mode_t;
 
 static inline void colors_set()
 {
-    color_mode_t mode = NORMAL;
-    uint32_t color = 0;
-    for (size_t i = 0; i < console->params_nr; ++i)
-    {
-        uint32_t param = console->params[i];
-        log_debug(DEBUG_CONSOLE, "param %d = %d", i, param);
-
-        if (mode == RGB)
-        {
-            log_debug(DEBUG_CONSOLE, "color = %d", param);
-            color = (color << 8) | param;
-            continue;
-        }
-
-        switch (param)
-        {
-            case 0:
-                console->fg_color = COLOR_WHITE;
-                console->bg_color = COLOR_BLACK;
-                break;
-            case 30: console->fg_color = COLOR_BLACK; break;
-            case 31: console->fg_color = COLOR_RED; break;
-            case 32: console->fg_color = COLOR_GREEN; break;
-            case 33: console->fg_color = COLOR_YELLOW; break;
-            case 34: console->fg_color = COLOR_BLUE; break;
-            case 35: console->fg_color = COLOR_MAGENTA; break;
-            case 36: console->fg_color = COLOR_CYAN; break;
-            case 38:
-                if (console->params[++i] == 2)
-                {
-                    mode = RGB;
-                }
-                break;
-            case 40: console->bg_color = COLOR_BLACK; break;
-            case 41: console->bg_color = COLOR_RED; break;
-            case 42: console->bg_color = COLOR_GREEN; break;
-            case 43: console->bg_color = COLOR_YELLOW; break;
-            case 44: console->bg_color = COLOR_BLUE; break;
-            case 45: console->bg_color = COLOR_MAGENTA; break;
-            case 46: console->bg_color = COLOR_CYAN; break;
-        }
-    }
-    if (color)
-    {
-        console->fg_color = color;
-    }
+    console->driver->setsgr(console->driver, console->params, console->params_nr);
 }
 
 static inline void line_nr_print(size_t nr)
@@ -219,23 +145,23 @@ static inline void line_nr_print(size_t nr)
     char buf[32];
     size_t pos;
     sprintf(buf, "[%d/%d]", nr, console->current_index);
-    pos = console->size.x - 1 - strlen(buf);
+    pos = console->resx - 1 - strlen(buf);
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {
-        char_print(0, pos, buf[i], COLOR_BLACK, 0xeab676);
+        console->driver->putch(console->driver, 0, pos, buf[i]);
     }
 }
 
 static inline void scroll_up()
 {
     line_t* line;
-    size_t count = console->size.y;
+    size_t count = console->resy;
 
     log_debug(DEBUG_CON_SCROLL, "scrolling up by %d lines", count);
 
     for (line = console->visible_line; count && line != console->lines; line = line->prev, --count);
 
-    if (count == console->size.y)
+    if (count == console->resy)
     {
         return;
     }
@@ -255,7 +181,7 @@ static inline void scroll_up()
 static inline void scroll_down()
 {
     line_t* line;
-    size_t count = console->size.y;
+    size_t count = console->resy;
 
     if (!console->scrolling)
     {
@@ -289,7 +215,9 @@ static command_t control(char c)
 {
     switch (c)
     {
-        case '\0':
+        case 0:
+        case 3:
+        case 4:
             return C_DROP;
         case '\b':
             backspace();
@@ -299,10 +227,7 @@ static command_t control(char c)
             console->state = ES_ESC;
             return C_SAVE;
         case '\n':
-            if (!console->scrolling)
-            {
-                position_newline();
-            }
+            position_newline();
             return C_DROP;
     }
     switch (console->state)
@@ -335,14 +260,7 @@ static command_t control(char c)
                 console->params[console->params_nr] += c - '0';
                 return C_SAVE;
             }
-            else
-            {
-                log_debug(DEBUG_CONSOLE, "switch to GOTPARAM");
-                console->state = ES_GOTPARAM;
-                ++console->params_nr;
-            }
-            fallthrough;
-        case ES_GOTPARAM:
+            ++console->params_nr;
             log_debug(DEBUG_CONSOLE, "switch to NORMAL");
             console->state = ES_NORMAL;
             switch (c)
@@ -360,7 +278,7 @@ static command_t control(char c)
     return C_PRINT;
 }
 
-void console_putch(char c)
+void console_putch(uint8_t c)
 {
     switch (control(c))
     {
@@ -373,12 +291,12 @@ void console_putch(char c)
                 redraw_lines_full();
             }
             *console->current_line->pos++ = c;
-            char_print(console->position.y, console->position.x, c, console->fg_color, console->bg_color);
+            console->driver->putch(console->driver, console->y, console->x, c);
             position_next();
             break;
         case C_SAVE:
             *console->current_line->pos++ = c;
-            fallthrough;
+            break;
         case C_DROP:
     }
 }
@@ -395,15 +313,15 @@ int console_write(struct file*, const char* buffer, int size)
 static int allocate()
 {
     size_t i;
-    char* strings;
+    uint8_t* strings;
     line_t* lines;
     page_t* pages;
-    size_t line_len = console->size.x * 2;
+    size_t line_len = console->resx * 2;
     size_t new_lines = console->capacity * 2;
     size_t size = line_len * new_lines + new_lines * sizeof(line_t);
     size_t needed_pages = page_align(size) / PAGE_SIZE;
 
-    log_debug(DEBUG_CONSOLE, "allocating %x B (%u pages) for lines %d", size, needed_pages, INITIAL_CAPACITY);
+    log_debug(DEBUG_CONSOLE, "allocating %u B (%u pages) for %u more lines", size, needed_pages, new_lines);
 
     pages = page_alloc(needed_pages, PAGE_ALLOC_CONT);
 
@@ -418,7 +336,7 @@ static int allocate()
 
     for (i = 0; i < new_lines; ++i)
     {
-        lines[i].index = i;
+        lines[i].index = i + console->capacity;
         lines[i].line = strings + i * line_len;
         lines[i].pos = lines[i].line;
         lines[i].next = lines + i + 1;
@@ -433,20 +351,27 @@ static int allocate()
     return 0;
 }
 
-int console_init()
-{
-    size_t i;
-    line_t* lines;
-    char* strings;
-    page_t* pages;
+#define INITIAL_CAPACITY 128
 
-    size_t row = framebuffer.height / font.height;
-    size_t col = framebuffer.width / font.width;
+int console_init(console_driver_t* driver)
+{
+    int errno;
+    line_t* lines;
+    uint8_t* strings;
+    page_t* pages;
+    size_t i, row, col;
+
+    if ((errno = driver->init(driver, &row, &col)))
+    {
+        log_error("driver initialization failed with %d", errno);
+        return errno;
+    }
+
     size_t line_len = col * 2;
     size_t size = sizeof(console_t) + line_len * INITIAL_CAPACITY + INITIAL_CAPACITY * sizeof(line_t);
     size_t needed_pages = page_align(size) / PAGE_SIZE;
 
-    log_notice("size: %u x %u; need %x B (%u pages) for lines", col, row, size, needed_pages);
+    log_notice("size: %u x %u; need %u B (%u pages) for %u lines", col, row, size, needed_pages, INITIAL_CAPACITY);
 
     pages = page_alloc(needed_pages, PAGE_ALLOC_CONT);
 
@@ -472,23 +397,18 @@ int console_init()
     lines[0].prev = lines + i - 1;
     lines[i - 1].next = lines;
 
-    console->position.x = 0;
-    console->position.y = 0;
-    console->size.x = col;
-    console->size.y = row;
+    console->x = 0;
+    console->y = 0;
+    console->resx = col;
+    console->resy = row;
     console->lines = lines;
     console->current_line = lines;
     console->visible_line = lines;
     console->orig_visible_line = NULL;
     console->scrolling = 0;
     console->current_index = 0;
-    console->fg_color = COLOR_WHITE;
-    console->bg_color = COLOR_BLACK;
-    console->pitch = framebuffer.pitch;
-    console->font_height_offset = framebuffer.pitch * font.height;
-    console->font_width_offset =  (framebuffer.bpp / 8) * font.width;
-    console->fb = framebuffer.fb;
     console->capacity = INITIAL_CAPACITY;
+    console->driver = driver;
 
     return 0;
 }

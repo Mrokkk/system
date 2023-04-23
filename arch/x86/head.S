@@ -20,10 +20,17 @@ ENTRY(multiboot_header)
     .long 0 // load_end_addr
     .long 0 // bss_end_addr
     .long 0 // entry_addr
+#if 1
     .long MULTIBOOT_VIDEO_MODE_LIN // mode_type
     .long 1280 // width
     .long 720 // height
     .long 32 // depth
+#else
+    .long MULTIBOOT_VIDEO_MODE_EGA
+    .long 0
+    .long 0
+    .long 0
+#endif
 END(multiboot_header)
 
 SECTION(.text.boot)

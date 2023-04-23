@@ -6,7 +6,7 @@
 #include <kernel/process.h>
 
 unsigned int total_forks;
-static pid_t last_pid;
+pid_t last_pid;
 
 static inline pid_t find_free_pid()
 {
@@ -94,7 +94,7 @@ static inline int process_space_copy(struct process* dest, struct process* src, 
     kernel_stack_end = page_virt_ptr(kernel_stack_page);
     *kernel_stack_end = STACK_MAGIC;
 
-    pgd = pgd_alloc(src->mm->pgd);
+    pgd = pgd_alloc();
 
     if (unlikely(!pgd))
     {
@@ -282,7 +282,6 @@ int process_clone(
 
     log_debug(DEBUG_PROCESS, "parent: pid %d name \"%s\"", parent->pid, parent->name);
 
-    // FIXME: remove this, I don't need blocking everything during fork
     irq_save(flags);
 
     if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
@@ -298,8 +297,7 @@ int process_clone(
 
     process_wake(child);
 
-    irq_restore(flags);
-
+    irq_restore(flags); // FIXME: don't enable irq?
     scheduler();
 
     return child->pid;

@@ -20,7 +20,9 @@
 
 volatile unsigned int jiffies;
 struct cpu_info cpu_info;
-uint32_t loops_per_sec = (1 << 12);
+static uint32_t mhz;
+static uint64_t tsc_prev;
+static ts_t timestamp;
 
 static inline void nmi_enable(void)
 {
@@ -32,80 +34,139 @@ static inline void nmi_disable(void)
     outb(0x70, inb(0x70) | 0x80);
 }
 
+void timestamp_update()
+{
+    uint64_t tsc;
+    uint32_t diff;
+
+    if (!mhz)
+    {
+        return;
+    }
+
+    rdtscll(tsc);
+    diff = (uint32_t)(tsc - tsc_prev);
+    tsc_prev = tsc;
+
+    // TODO: avoid div
+    timestamp.useconds += diff / mhz;
+    ts_align(&timestamp);
+}
+
+void timestamp_get(ts_t* ts)
+{
+    memcpy(ts, &timestamp, sizeof(*ts));
+}
+
+#define TSC_MEAS_LOOPS 8
+
 void delay_calibrate(void)
 {
+    extern void do_delay();
+    unsigned int tsc_meas_prec = TSC_MEAS_LOOPS;
     unsigned int ticks;
-    int loopbit;
-    int lps_precision = LPS_PREC;
-    int flags;
+    flags_t flags;
+    uint64_t tsc_start, tsc_end;
+
+    /*irq_save(flags);*/
+    /*sti();*/
+
+    /*static uint32_t loops_per_sec = (1 << 12);*/
+    /*int loopbit;*/
+    /*int lps_precision = LPS_PREC;*/
+
+    /*log_info("calibrating delay loop...");*/
+    /*while (loops_per_sec <<= 1)*/
+    /*{*/
+        /*// wait for "start of" clock tick*/
+        /*ticks = jiffies;*/
+        /*while (ticks == jiffies);*/
+        /*// Go*/
+        /*ticks = jiffies;*/
+        /*do_delay(loops_per_sec);*/
+        /*ticks = jiffies - ticks;*/
+        /*if (ticks)*/
+        /*{*/
+            /*break;*/
+        /*}*/
+    /*}*/
+
+    /*// Do a binary approximation to get loops_per_second set to equal one clock*/
+    /*// (up to lps_precision bits)*/
+    /*loops_per_sec >>= 1;*/
+    /*loopbit = loops_per_sec;*/
+
+    /*while (lps_precision-- && (loopbit >>= 1) )*/
+    /*{*/
+        /*loops_per_sec |= loopbit;*/
+        /*ticks = jiffies;*/
+        /*while (ticks == jiffies);*/
+        /*ticks = jiffies;*/
+        /*do_delay(loops_per_sec);*/
+        /*if (jiffies != ticks) // longer than 1 tick*/
+        /*{*/
+            /*loops_per_sec &= ~loopbit;*/
+        /*}*/
+    /*}*/
+
+    /*// finally, adjust loops per second in terms of seconds instead of clocks*/
+    /*loops_per_sec *= HZ;*/
+    /*// Round the value and print it*/
+
+    /*log_info("ok - %lu.%02lu BogoMIPS",*/
+        /*(loops_per_sec + 2500) / 500000,*/
+        /*((loops_per_sec + 2500) / 5000) % 100);*/
+
+    /*cpu_info.bogomips = loops_per_sec;*/
+
+    if (!cpu_has(INTEL_TSC))
+    {
+        log_warning("tsc not available!");
+        return;
+    }
+
+    log_info("detecting tsc...");
 
     irq_save(flags);
     sti();
 
-    log_info("calibrating delay loop.. ");
-    while (loops_per_sec <<= 1)
+    ticks = jiffies;
+    while (tsc_meas_prec--)
     {
-        // wait for "start of" clock tick
+        while (ticks == jiffies);
+        rdtscll(tsc_start);
         ticks = jiffies;
         while (ticks == jiffies);
-        // Go
+        rdtscll(tsc_end);
         ticks = jiffies;
-        do_delay(loops_per_sec);
-        ticks = jiffies - ticks;
-        if (ticks)
-        {
-            break;
-        }
+        mhz += tsc_end - tsc_start;
     }
 
-    // Do a binary approximation to get loops_per_second set to equal one clock
-    // (up to lps_precision bits)
-    loops_per_sec >>= 1;
-    loopbit = loops_per_sec;
-
-    while (lps_precision-- && (loopbit >>= 1) )
-    {
-        loops_per_sec |= loopbit;
-        ticks = jiffies;
-        while (ticks == jiffies);
-        ticks = jiffies;
-        do_delay(loops_per_sec);
-        if (jiffies != ticks) // longer than 1 tick
-        {
-            loops_per_sec &= ~loopbit;
-        }
-    }
-
-    // finally, adjust loops per second in terms of seconds instead of clocks
-    loops_per_sec *= HZ;
-    // Round the value and print it
-
-    log_info("ok - %lu.%02lu BogoMIPS",
-        (loops_per_sec + 2500) / 500000,
-        ((loops_per_sec + 2500) / 5000) % 100);
-
-    cpu_info.bogomips = loops_per_sec;
+    tsc_prev = tsc_end;
 
     irq_restore(flags);
-}
 
-void delay(uint32_t msec)
-{
-    uint32_t current = jiffies;
+    mhz /= TSC_MEAS_LOOPS * (UNIT_MHZ / HZ);
 
-    // FIXME: it's not accurate
-    if (msec < 50)
+    log_info("detected %u MHz TSC", mhz);
+
+    cpu_info.mhz = mhz;
+
+    if (cpu_has(INTEL_RDTSCP))
     {
-        for (int i = 0; i < 950; i++)
-        {
-            udelay(msec);
-        }
-        return;
+        log_info("aligning time using RDTSCP...");
+        register uint32_t low, hi, dummy;
+        asm volatile("rdtscp" : "=a" (low), "=c" (dummy), "=d" (hi));
+
+        low /= mhz;
+        timestamp.seconds = low / UNIT_MHZ;
+        timestamp.useconds = low % UNIT_MHZ;
+
+        timestamp.seconds += hi * 4294 / mhz;
+        timestamp.useconds += 967296 / mhz;
+
+        ts_align(&timestamp);
     }
-
-    msec = msec / 10;
-
-    while (jiffies < (current + msec));
 }
 
 void arch_reboot(int cmd)
@@ -145,15 +206,14 @@ void arch_setup()
 
     for (uint32_t i = 0; i < 3; ++i)
     {
-        log_info("L%u cache: %s", i, cpu_info.cache[i].description);
+        log_info("L%u cache: %s", i + 1, cpu_info.cache[i].description);
     }
 
-    char buffer[150];
-    cpu_features_string_get(buffer);
+    cpu_features_string_get(cpu_info.features_string);
 
-    log_info("features: %s", buffer);
+    log_info("features: %s", cpu_info.features_string);
 
-    if (cpu_info.features & INTEL_SSE)
+    if (cpu_has(INTEL_SSE))
     {
         extern void sse_enable(void);
         sse_enable();

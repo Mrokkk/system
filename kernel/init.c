@@ -22,15 +22,17 @@ typedef struct options
 
 __noreturn static void idle()
 {
-    process_stop(process_current);
     for (;; halt());
 }
 
 __noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloader_magic)
 {
+    ts_t ts;
+    const char* cmdline;
+
     memset(_sbss, 0, addr(_ebss) - addr(_sbss));
 
-    const char* cmdline = multiboot_read(
+    cmdline = multiboot_read(
         bootloader_data,
         bootloader_magic);
 
@@ -46,16 +48,23 @@ __noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloade
     irqs_configure();
     processes_init();
     modules_init();
-
-    ASSERT(init_in_progress == INIT_IN_PROGRESS);
-
-    sti();
     delay_calibrate();
 
+    ASSERT(init_in_progress == INIT_IN_PROGRESS);
     init_in_progress = 0;
 
+    timestamp_get(&ts);
+
+    if (ts.seconds || ts.useconds)
+    {
+        log_info("Boot finished in %u.%06u s", ts.seconds, ts.useconds);
+    }
+
+    sti();
     // Create another process called 'init' and change itself into the idle process
     kernel_process(init, ptr(cmdline), 0);
+    process_stop(process_current);
+    scheduler();
     idle();
 }
 
@@ -115,13 +124,17 @@ static inline const char* parse_key_value(
     const char* src,
     const char* key)
 {
+    size_t len;
+    char* string;
+    const char* next;
+
     if (!strncmp(key, src, strlen(key)))
     {
         src = strchr(src, '=') + 1;
-        const char* next = strchr(src, ' ');
-        size_t len = strlen(src);
+        next = strchr(src, ' ');
+        len = strlen(src);
 
-        char* string = strncpy(
+        string = strncpy(
             dest,
             src,
             next ? (size_t)(next - src) : len);

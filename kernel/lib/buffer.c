@@ -1,15 +1,18 @@
 #include <kernel/buffer.h>
 
-void buffer_put(struct buffer* buffer, char c)
+#define buffer_empty(buffer) \
+    ((buffer)->in == (buffer)->out)
+
+void __buffer_put(struct buffer* buffer, char c)
 {
     buffer->data[buffer->in++] = c;
-    if (buffer->in == buffer->buffer_size)
+    if (buffer->in == buffer->size)
     {
         buffer->in = 0;
     }
 }
 
-int buffer_get(struct buffer* buffer, char* c)
+int __buffer_get(struct buffer* buffer, char* c)
 {
     int ret = 1;
     if (buffer_empty(buffer))
@@ -18,7 +21,7 @@ int buffer_get(struct buffer* buffer, char* c)
     }
 
     *c = buffer->data[buffer->out++];
-    if (buffer->out == buffer->buffer_size)
+    if (buffer->out == buffer->size)
     {
         buffer->out = 0;
     }

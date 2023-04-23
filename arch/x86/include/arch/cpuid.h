@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <kernel/bitset.h>
 #include <kernel/compiler.h>
 
 struct cpuid_regs
@@ -9,94 +10,68 @@ struct cpuid_regs
     uint32_t ebx;
     uint32_t ecx;
     uint32_t edx;
-    uint32_t null;
 } __packed;
 
-struct cpuid
-{
-    char vendor[13];
-    char brand[46];
-    uint8_t brand_id;
-    uint16_t model;
-    uint16_t family;
-    uint8_t type;
-    uint16_t ext_model;
-    uint16_t ext_family;
-    uint16_t stepping;
-    union {
-        uint32_t intel_ext;
-        uint32_t amd_ext;
-    };
-};
+#define CPUID_1_EDX_INDEX   0
+#define CPUID_1_EDX_OFFSET  0
+#define CPUID_1_EDX_MASK    (~0UL)
+#define INTEL_FPU       (CPUID_1_EDX_INDEX * 32 + 0)
+#define INTEL_VME       (CPUID_1_EDX_INDEX * 32 + 1)
+#define INTEL_DE        (CPUID_1_EDX_INDEX * 32 + 2)
+#define INTEL_PSE       (CPUID_1_EDX_INDEX * 32 + 3)
+#define INTEL_TSC       (CPUID_1_EDX_INDEX * 32 + 4)
+#define INTEL_MSR       (CPUID_1_EDX_INDEX * 32 + 5)
+#define INTEL_PAE       (CPUID_1_EDX_INDEX * 32 + 6)
+#define INTEL_MCE       (CPUID_1_EDX_INDEX * 32 + 7)
+#define INTEL_CX8       (CPUID_1_EDX_INDEX * 32 + 8)
+#define INTEL_APIC      (CPUID_1_EDX_INDEX * 32 + 9)
+#define INTEL_RESERVED1 (CPUID_1_EDX_INDEX * 32 + 10)
+#define INTEL_SEP       (CPUID_1_EDX_INDEX * 32 + 11)
+#define INTEL_MTRR      (CPUID_1_EDX_INDEX * 32 + 12)
+#define INTEL_PGE       (CPUID_1_EDX_INDEX * 32 + 13)
+#define INTEL_MCA       (CPUID_1_EDX_INDEX * 32 + 14)
+#define INTEL_CMOV      (CPUID_1_EDX_INDEX * 32 + 15)
+#define INTEL_PAT       (CPUID_1_EDX_INDEX * 32 + 16)
+#define INTEL_PSE_36    (CPUID_1_EDX_INDEX * 32 + 17)
+#define INTEL_PSN       (CPUID_1_EDX_INDEX * 32 + 18)
+#define INTEL_CLFSH     (CPUID_1_EDX_INDEX * 32 + 19)
+#define INTEL_RESERVED2 (CPUID_1_EDX_INDEX * 32 + 20)
+#define INTEL_DS        (CPUID_1_EDX_INDEX * 32 + 21)
+#define INTEL_ACPI      (CPUID_1_EDX_INDEX * 32 + 22)
+#define INTEL_MMX       (CPUID_1_EDX_INDEX * 32 + 23)
+#define INTEL_FXSR      (CPUID_1_EDX_INDEX * 32 + 24)
+#define INTEL_SSE       (CPUID_1_EDX_INDEX * 32 + 25)
+#define INTEL_SSE2      (CPUID_1_EDX_INDEX * 32 + 26)
+#define INTEL_SS        (CPUID_1_EDX_INDEX * 32 + 27)
+#define INTEL_HTT       (CPUID_1_EDX_INDEX * 32 + 28)
+#define INTEL_TM        (CPUID_1_EDX_INDEX * 32 + 29)
+#define INTEL_IA64      (CPUID_1_EDX_INDEX * 32 + 30)
+#define INTEL_PBE       (CPUID_1_EDX_INDEX * 32 + 31)
 
-#define INTEL_FPU       (1)
-#define INTEL_VME       (1 << 1)
-#define INTEL_DE        (1 << 2)
-#define INTEL_PSE       (1 << 3)
-#define INTEL_TSC       (1 << 4)
-#define INTEL_MSR       (1 << 5)
-#define INTEL_PAE       (1 << 6)
-#define INTEL_MCE       (1 << 7)
-#define INTEL_CX8       (1 << 8)
-#define INTEL_APIC      (1 << 9)
-#define INTEL_RESERVED1 (1 << 10)
-#define INTEL_SEP       (1 << 11)
-#define INTEL_MTRR      (1 << 12)
-#define INTEL_PGE       (1 << 13)
-#define INTEL_MCA       (1 << 14)
-#define INTEL_CMOV      (1 << 15)
-#define INTEL_PAT       (1 << 16)
-#define INTEL_PSE_36    (1 << 17)
-#define INTEL_PSN       (1 << 18)
-#define INTEL_CLFSH     (1 << 19)
-#define INTEL_RESERVED2 (1 << 20)
-#define INTEL_DS        (1 << 21)
-#define INTEL_ACPI      (1 << 22)
-#define INTEL_MMX       (1 << 23)
-#define INTEL_FXSR      (1 << 24)
-#define INTEL_SSE       (1 << 25)
-#define INTEL_SSE2      (1 << 26)
-#define INTEL_SS        (1 << 27)
-#define INTEL_HTT       (1 << 28)
-#define INTEL_TM        (1 << 29)
-#define INTEL_IA64      (1 << 30)
-#define INTEL_PBE       (1 << 31)
+#define CPUID_1_ECX_INDEX   1
+#define CPUID_1_ECX_OFFSET  0
+#define CPUID_1_ECX_MASK    (1 << 3 | 1 << 0)
+#define INTEL_SSE3      (CPUID_1_ECX_INDEX * 32 + 0)
 
-#define INTEL_FPU_STRING    "FPU on chip"
-#define INTEL_VME_STRING    "Virtual Mode Extension"
-#define INTEL_DE_STRING     "Debugging Extension"
-#define INTEL_PSE_STRING    "Page Size Extension"
-#define INTEL_TSC_STRING    "Time Stamp Counter"
-#define INTEL_MSR_STRING    "Model Specific Registers"
-#define INTEL_PAE_STRING    "Physical Address Extension"
-#define INTEL_MCE_STRING    "Machine Check Exception"
-#define INTEL_CX8_STRING    "CMPXCHG8 Instruction Supported"
-#define INTEL_APIC_STRING   "On-chip APIC"
-#define INTEL_RESERVED1_STRING    "Reserved"
-#define INTEL_SEP_STRING    "Fast System Call"
-#define INTEL_MTRR_STRING   "Memory Type Range Registers"
-#define INTEL_PGE_STRING    "Page Global Enable"
-#define INTEL_MCA_STRING    "Machine Check Architecture"
-#define INTEL_CMOV_STRING   "Conditional Move Instruction Supported"
-#define INTEL_PAT_STRING    "Page Attribute Table"
-#define INTEL_PSE_36_STRING "36-bit Page Size Extension"
-#define INTEL_PSN_STRING    "Processor serial number is present and enabled"
-#define INTEL_CLFSH_STRING  "CLFLUSH Instruction supported"
-#define INTEL_RESERVED2_STRING "Reserved"
-#define INTEL_DS_STRING     "Debug Store"
-#define INTEL_ACPI_STRING   "ACPI supported"
-#define INTEL_MMX_STRING    "Intel Architecture MMX technology supported"
-#define INTEL_FXSR_STRING   "Fast floating point save and restore"
-#define INTEL_SSE_STRING    "Streaming SIMD Extensions supported"
-#define INTEL_SSE2_STRING   "Streaming SIMD Extensions 2"
-#define INTEL_SS_STRING     "Self-Snoop"
-#define INTEL_HTT_STRING    "Hyper-Threading Technology"
-#define INTEL_TM_STRING     "Thermal Monitor supported"
-#define INTEL_IA64_STRING   "IA64 processor emulating x86"
-#define INTEL_PBE_STRING    "Pending Break Enable"
+#define CPUID_80000001_INDEX    1
+#define CPUID_80000001_OFFSET   4
+#define CPUID_80000001_MASK     (1 << 11 | 1 << 27 | 1 << 8)
+#define INTEL_PREFETCHW (CPUID_80000001_INDEX * 32 + CPUID_80000001_OFFSET + 8)
+#define INTEL_SYSCALL   (CPUID_80000001_INDEX * 32 + CPUID_80000001_OFFSET + 11)
+#define INTEL_RDTSCP    (CPUID_80000001_INDEX * 32 + CPUID_80000001_OFFSET + 27)
 
-#define cpuid_ext_avl(flags, ext) \
-    (((flags) & (ext)) && 1)
+#define CPUID_80000007_INDEX    1
+#define CPUID_80000007_OFFSET   0
+#define CPUID_80000007_MASK     (1 << 8)
+#define INTEL_INVTSC    (CPUID_80000007_INDEX * 32 + CPUID_80000007_OFFSET + 8)
+
+#define NR_FEATURES 2
+
+#define cpu_features_save(name, val) \
+    cpu_info.features[name##_INDEX] |= ((val) & name##_MASK) << name##_OFFSET
+
+#define cpu_has(feature) \
+    bitset_test(cpu_info.features, feature)
 
 static inline void cpuid_read(uint32_t function, struct cpuid_regs* regs)
 {
@@ -108,5 +83,4 @@ static inline void cpuid_read(uint32_t function, struct cpuid_regs* regs)
     );
 }
 
-void cpuid_extensions_print(uint32_t ext);
 int cpu_info_get(void);

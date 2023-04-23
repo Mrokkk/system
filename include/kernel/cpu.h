@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <arch/cpuid.h>
 
 struct cpu_cache
 {
@@ -18,7 +19,10 @@ struct cpu_info
     int stepping;
     unsigned int mhz;
     unsigned int bogomips;
-    unsigned int features;
+    unsigned int features[NR_FEATURES];
+    unsigned int cacheline_size;
+    unsigned int cache_size;
+    char features_string[256];
     struct cpu_cache cache[3];
     struct cpu_cache instruction_cache;
 };

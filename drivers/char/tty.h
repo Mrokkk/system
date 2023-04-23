@@ -1,17 +1,18 @@
 #pragma once
 
+#include <stdint.h>
+#include <kernel/wait.h>
 #include <kernel/types.h>
-
-struct tty;
-
-typedef struct tty_driver
-{
-    unsigned short major;
-    int (*read)(struct tty*, char*, int);
-    int (*write)(struct tty*, char*, int);
-} tty_driver_t;
+#include <kernel/buffer.h>
 
 typedef struct tty
 {
-    tty_driver_t driver;
+    struct wait_queue_head wq;
+    BUFFER_MEMBER_DECLARE(buf, 256);
+    void (*tty_putchar)(uint8_t c);
+    int initialized;
 } tty_t;
+
+#define TTY_DONT_PUT_TO_USER 1
+
+void tty_char_insert(char c, int flag);

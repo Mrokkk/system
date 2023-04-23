@@ -52,7 +52,7 @@ int __page_free(void* address);
 page_t* __page_range_get(uint32_t paddr, int count);
 int __page_range_free(struct list_head* head);
 
-pgd_t* pgd_alloc(pgd_t* old_pgd);
+pgd_t* pgd_alloc(void);
 pgt_t* pgt_alloc(void);
 pgd_t* init_pgd_get(void);
 

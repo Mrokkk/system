@@ -47,17 +47,19 @@ static inline void devices_read(super_block_t* sb)
     int errno;
     dev_t minor;
     inode_t* new_inode;
+    device_t* chdev;
     dev_node_t* new_node;
     dev_node_t* node = &dev_root;
 
     for (int major = 0; major < CHAR_DEVICES_SIZE; ++major)
     {
-        if (!char_devices[major])
+        chdev = char_device_get(major);
+        if (!chdev)
         {
             continue;
         }
 
-        for (minor = 0; minor <= char_devices[major]->max_minor; minor++)
+        for (minor = 0; minor <= chdev->max_minor; minor++)
         {
             if (unlikely(errno = inode_get(&new_inode)))
             {
@@ -66,7 +68,7 @@ static inline void devices_read(super_block_t* sb)
             }
 
             new_inode->ops = &devfs_inode_ops;
-            new_inode->file_ops = char_devices[major]->fops;
+            new_inode->file_ops = chdev->fops;
             new_inode->dev = MKDEV(major, minor);
             new_inode->ino = ++ino;
             new_inode->sb = sb;
@@ -75,17 +77,17 @@ static inline void devices_read(super_block_t* sb)
 
             if (unlikely(!new_node))
             {
-                log_error("cannot allocate node for dev %u, %s", new_inode->dev, char_devices[major]->name);
+                log_error("cannot allocate node for dev %u, %s", new_inode->dev, chdev->name);
                 inode_put(new_inode);
                 break;
             }
 
             new_node->next = NULL;
             new_node->inode = new_inode;
-            new_node->device = char_devices[major];
-            new_node->name = slab_alloc(strlen(char_devices[major]->name) + 4); // FIXME: set size properly
+            new_node->device = chdev;
+            new_node->name = slab_alloc(strlen(chdev->name) + 4); // FIXME: set size properly
 
-            sprintf(new_node->name, "%s%u", char_devices[major]->name, minor);
+            sprintf(new_node->name, "%s%u", chdev->name, minor);
 
             node->next = new_node;
 
