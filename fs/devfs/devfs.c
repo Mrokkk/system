@@ -33,7 +33,6 @@ static struct super_operations devfs_sb_ops = {
 };
 
 static struct file_operations devfs_fops = {
-    .read = &devfs_read,
     .open = &devfs_open,
     .readdir = &devfs_readdir,
 };
@@ -169,12 +168,6 @@ int devfs_lookup(inode_t* dir, const char* name, inode_t** result)
 
     log_debug(DEBUG_DEVFS, "finished succesfully %O", *result);
 
-    return 0;
-}
-
-int devfs_read(file_t* file, char* buffer, int size)
-{
-    (void)file; (void)buffer; (void)size;
     return 0;
 }
 

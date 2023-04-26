@@ -13,7 +13,7 @@
 #include "framebuffer.h"
 
 int tty_open(struct file* file);
-int tty_read(struct file* file, char* buffer, int size);
+int tty_read(struct file* file, char* buffer, size_t size);
 
 #define TTY_INITIALIZED 0x4215
 
@@ -91,9 +91,9 @@ int tty_open(struct file*)
 int tty_read(
     struct file*,
     char* buffer,
-    int size)
+    size_t size)
 {
-    int i;
+    size_t i;
     flags_t flags;
     tty_t* tty = ttys;
     WAIT_QUEUE_DECLARE(q, process_current);

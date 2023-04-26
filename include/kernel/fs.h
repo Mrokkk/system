@@ -1,7 +1,10 @@
 #pragma once
 
+#include <stddef.h>
+#include <arch/vm.h>
 #include <kernel/dev.h>
 #include <kernel/list.h>
+#include <kernel/stat.h>
 #include <kernel/wait.h>
 #include <kernel/magic.h>
 #include <kernel/dentry.h>
@@ -31,6 +34,11 @@ struct inode
     MAGIC_NUMBER;
     dev_t dev;
     ino_t ino;
+    umode_t mode;
+    uid_t uid;
+    gid_t gid;
+    time_t ctime;
+    time_t mtime;
     size_t size;
     struct super_block* sb;
     struct list_head list;
@@ -54,6 +62,7 @@ struct file
     unsigned short mode;
     unsigned short count;
     inode_t* inode;
+    size_t offset;
     struct list_head files;
     struct file_operations* ops;
 };
@@ -64,10 +73,11 @@ typedef int (*direntadd_t)(void* buf, const char* name, size_t name_len, ino_t i
 
 struct file_operations
 {
-    int (*read)(file_t* file, char* buf, int count);
-    int (*write)(file_t* file, const char* buf, int count);
+    int (*read)(file_t* file, char* buf, size_t count);
+    int (*write)(file_t* file, const char* buf, size_t count);
     int (*readdir)(file_t* file, void* buf, direntadd_t dirent_add);
     int (*mmap)(file_t* file, void** data); // FIXME: incorrect arguments
+    int (*mmap2)(file_t* file, vm_area_t* vma, size_t offset);
     int (*open)(file_t* file);
 };
 
@@ -80,6 +90,7 @@ struct super_block
 
     // Those are filled by specific fs during mount() call
     unsigned int module;
+    void* fs_data;
     struct super_operations* ops;
 };
 

@@ -138,7 +138,7 @@ struct memory_map
     uint32_t type;
 };
 
-struct multiboot_drives_struct
+struct drive
 {
     uint32_t size;
     uint8_t drive_number;
@@ -189,5 +189,7 @@ extern uint32_t module_end;
 extern struct framebuffer* framebuffer_ptr;
 extern void* tux;
 extern uint32_t tux_size;
+extern char* bootloader_name;
+extern void* disk_img;
 
 #endif // __ASSEMBLER__

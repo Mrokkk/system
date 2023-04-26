@@ -20,12 +20,15 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+[[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,if=virtio,id=disk0"
+
 echo "Additional args for qemu: ${args}"
 
 exec $(which qemu-system-i386 || which qemu-system-x86_64) \
     -cdrom system.iso \
+    -boot once=d \
     -no-reboot \
-    -cpu qemu32,rdtscp,invtsc \
+    -cpu host,rdtscp,invtsc \
     -vga std \
     -chardev stdio,id=char0,signal=off,mux=on \
     -chardev file,id=char1,path=logs \

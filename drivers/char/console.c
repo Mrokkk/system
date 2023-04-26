@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <kernel/font.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
 
@@ -65,24 +64,11 @@ static inline void redraw_lines_full()
                 ++x;
             }
         }
-        for (; x < console->resx - 1; ++line_index, ++x)
+        for (; x < console->resx; ++line_index, ++x)
         {
             console->driver->putch(console->driver, y, x, ' ');
         }
         temp = temp->next;
-    }
-}
-
-static inline void position_next()
-{
-    if (console->x >= console->resx)
-    {
-        console->x = 0;
-        ++console->y;
-    }
-    else
-    {
-        ++console->x;
     }
 }
 
@@ -92,7 +78,8 @@ static inline void position_newline()
     {
         return;
     }
-    size_t previous = console->lines->pos - console->lines->line;
+
+    size_t previous = console->visible_line->pos - console->visible_line->line;
     console->current_line = console->current_line->next;
     console->current_line->pos = console->current_line->line;
     console->x = 0;
@@ -116,6 +103,18 @@ static inline void position_newline()
         console->visible_line = console->visible_line->next;
         console->current_line->pos = console->current_line->line;
         redraw_lines(previous);
+    }
+}
+
+static inline void position_next()
+{
+    if (console->x >= console->resx)
+    {
+        position_newline();
+    }
+    else
+    {
+        ++console->x;
     }
 }
 
@@ -145,7 +144,7 @@ static inline void line_nr_print(size_t nr)
     char buf[32];
     size_t pos;
     sprintf(buf, "[%d/%d]", nr, console->current_index);
-    pos = console->resx - 1 - strlen(buf);
+    pos = console->resx - strlen(buf);
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {
         console->driver->putch(console->driver, 0, pos, buf[i]);
@@ -301,9 +300,9 @@ void console_putch(uint8_t c)
     }
 }
 
-int console_write(struct file*, const char* buffer, int size)
+int console_write(struct file*, const char* buffer, size_t size)
 {
-    for (int i = 0; i < size; ++i)
+    for (size_t i = 0; i < size; ++i)
     {
         console_putch(buffer[i]);
     }

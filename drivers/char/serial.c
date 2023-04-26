@@ -24,8 +24,8 @@ char serial_status[4];
 
 void serial_send(char a, uint16_t port);
 int serial_open(struct file*);
-int serial_write(struct file* file, const char* buffer, int size);
-int serial_read(struct file* file, char* buffer, int size);
+int serial_write(struct file* file, const char* buffer, size_t size);
+int serial_read(struct file* file, char* buffer, size_t size);
 void serial_irs(void);
 
 static struct file_operations fops = {
@@ -62,7 +62,7 @@ int serial_open(struct file* file)
 
     outb(0x00, port + 1);    // Disable all interrupts
     outb(0x80, port + 3);    // Enable DLAB (set baud rate divisor)
-    outb(0x01, port + 0);    // Set divisor to 3 (lo byte) 38400 baud
+    outb(0x00, port + 0);    // Set divisor to 0 (lo byte) 115200 baud
     outb(0x00, port + 1);    //                  (hi byte)
     outb(0x03, port + 3);    // 8 bits, no parity, one stop bit
     outb(0xc7, port + 2);    // Enable FIFO, clear them, with 14-byte threshold
@@ -149,9 +149,9 @@ finish:
     irq_restore(flags);
 }
 
-int serial_write(struct file* file, const char* buffer, int size)
+int serial_write(struct file* file, const char* buffer, size_t size)
 {
-    int old = size;
+    size_t old = size;
     int minor = MINOR(file->inode->dev);
     while (size--)
     {
@@ -160,9 +160,9 @@ int serial_write(struct file* file, const char* buffer, int size)
     return old;
 }
 
-int serial_read(struct file*, char* buffer, int size)
+int serial_read(struct file*, char* buffer, size_t size)
 {
-    int i;
+    size_t i;
     WAIT_QUEUE_DECLARE(temp, process_current);
 
     flags_t flags;

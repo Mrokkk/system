@@ -10,4 +10,6 @@
 #define __syscall2(call, ...) int sys_##call();
 #define __syscall3(call, ...) int sys_##call();
 #define __syscall4(call, ...) int sys_##call();
+#define __syscall5(call, ...) int sys_##call();
+#define __syscall6(call, ...) int sys_##call();
 #include <kernel/unistd.h>

@@ -164,7 +164,7 @@ static inline int process_space_copy(struct process* dest, struct process* src, 
     vm_add(&dest->mm->vm_areas, dest_stack_vma);
 
     log_debug(DEBUG_PROCESS, "new areas:", dest->pid);
-    vm_print(dest->mm->vm_areas);
+    vm_print(dest->mm->vm_areas, DEBUG_PROCESS);
 
     return 0;
 

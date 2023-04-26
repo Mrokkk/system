@@ -1,5 +1,4 @@
 #include <kernel/fs.h>
-#include <kernel/font.h>
 #include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/ksyms.h>
@@ -75,6 +74,7 @@ static inline void nodes_read(super_block_t* sb)
         }
         else if (!strcmp(name, "font.psf"))
         {
+            extern int font_load(void* ptr, size_t size);
             font_load(virt_ptr(mod->mod_start), mod->mod_end - mod->mod_start);
             ++mod;
             continue;

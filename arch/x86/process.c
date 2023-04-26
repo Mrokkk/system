@@ -39,7 +39,7 @@ static inline void fork_kernel_stack_frame(
         ebp = regs->ebp;
     }
 
-    uint32_t eflags = regs->eflags | 0x200;
+    uint32_t eflags = regs->eflags | EFL_IF;
     if (regs->cs == USER_CS)
     {
         pushk(USER_DS);     // ss
@@ -209,7 +209,7 @@ static inline void exec_kernel_stack_frame(
 #define pushk(v) push((v), *kernel_stack)
     pushk(USER_DS); // ss
     pushk(esp);     // esp
-    pushk(0x200);   // eflags
+    pushk(EFL_IF);  // eflags
     pushk(USER_CS); // cs
     pushk(eip);     // eip
     pushk(USER_DS); // gs
@@ -400,60 +400,4 @@ __noreturn int sys_sigreturn(struct pt_regs)
         process_current->signals->context.eip);
 
     ASSERT_NOT_REACHED();
-}
-
-void* sys_sbrk(size_t incr)
-{
-    vm_area_t* brk_vma;
-    uint32_t previous_brk = process_current->mm->brk;
-    uint32_t current_brk = previous_brk + incr;
-    uint32_t previous_page = page_beginning(previous_brk);
-    uint32_t next_page = page_align(current_brk);
-
-    log_debug(DEBUG_PROCESS, "incr=%x previous_brk=%x", incr, previous_brk);
-
-    brk_vma = process_brk_vm_area(process_current);
-
-    if (unlikely(!brk_vma))
-    {
-        vm_print(process_current->mm->vm_areas);
-        panic("no brk vma; brk = %x", previous_brk, brk_vma);
-        ASSERT_NOT_REACHED();
-    }
-    else if (brk_vma->pages->count > 1)
-    {
-        // Get own pages
-        vm_copy_on_write(brk_vma);
-    }
-
-    if (previous_page == next_page)
-    {
-        log_debug(DEBUG_PROCESS, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
-        process_current->mm->brk = current_brk;
-        return ptr(previous_brk);
-    }
-
-    uint32_t needed_pages = (next_page - previous_page) / PAGE_SIZE;
-
-    page_t* new_page = page_alloc(needed_pages, PAGE_ALLOC_DISCONT);
-
-    if (unlikely(!new_page))
-    {
-        return ptr(-ENOMEM);
-    }
-
-    vm_extend(
-        brk_vma,
-        new_page,
-        0,
-        needed_pages);
-
-    vm_apply(
-        brk_vma,
-        ptr(process_current->mm->pgd),
-        VM_APPLY_DONT_REPLACE);
-
-    process_current->mm->brk = current_brk;
-
-    return ptr(previous_brk);
 }

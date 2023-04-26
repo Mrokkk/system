@@ -15,19 +15,27 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     const char* basename;
     char parent[256];
 
-    dirname(filename, parent);
-
-    log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
-    parent_dentry = lookup(parent);
-
-    if (!parent_dentry)
+    if (path_is_absolute(filename))
     {
-        log_debug(DEBUG_OPEN, "no dentry for parent", filename);
-        return -ENOENT;
+        dirname(filename, parent);
+
+        log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
+        parent_dentry = lookup(parent);
+
+        if (!parent_dentry)
+        {
+            log_debug(DEBUG_OPEN, "no dentry for parent", filename);
+            return -ENOENT;
+        }
+        basename = find_last_slash(filename) + 1;
+    }
+    else
+    {
+        parent_dentry = process_current->fs->cwd;
+        basename = filename;
     }
 
     parent_inode = parent_dentry->inode;
-    basename = find_last_slash(filename) + 1;
 
     // Hack for opening root
     if (!strcmp(filename, parent))
@@ -36,6 +44,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
         goto set_file;
     }
 
+    log_debug(DEBUG_OPEN, "calling lookup for %S", basename);
     errno = parent_inode->ops->lookup(parent_inode, basename, &inode);
 
     if (errno)
@@ -79,8 +88,18 @@ set_file:
     (*new_file)->inode = inode;
     (*new_file)->ops = inode->file_ops;
     (*new_file)->mode = mode;
+    (*new_file)->offset = 0;
+    (*new_file)->count = 1;
 
-    return (*new_file)->ops->open(*new_file);
+    if ((errno = (*new_file)->ops->open(*new_file)))
+    {
+        list_del(&(*new_file)->files);
+        delete(*new_file);
+        *new_file = NULL;
+        return errno;
+    }
+
+    return errno;
 }
 
 int sys_open(const char* filename, int flags, int mode)
@@ -279,6 +298,9 @@ int sys_stat(const char* pathname, struct stat* statbuf)
     statbuf->st_ino = dentry->inode->ino;
     statbuf->st_dev = dentry->inode->dev;
     statbuf->st_size = dentry->inode->size;
+    statbuf->st_mode = dentry->inode->mode;
+    statbuf->st_uid = dentry->inode->uid;
+    statbuf->st_gid = dentry->inode->gid;
 
     return 0;
 }

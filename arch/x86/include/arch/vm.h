@@ -26,6 +26,7 @@ typedef struct vm_area
     uint32_t size;
     int vm_flags;
     struct vm_area* next;
+    struct vm_area* prev;
 } vm_area_t;
 
 #define VM_AREA_INIT() {NULL, 0, 0, 0, NULL}
@@ -114,19 +115,33 @@ static inline int vm_verify(char verify, const void* ptr, size_t size, vm_area_t
 }
 
 #define vm_print_single(vma, flag) \
-    do { \
-        page_t* p; \
-        int safety = 0; \
-        log_debug(flag, "vm_area={%x, vaddr={%x-%x}, size=%x, pages={count=%u", \
-            vma, \
-            vma->virt_address, \
-            vma->virt_address + vma->size - 1, \
-            vma->size, \
-            vma->pages->count); \
-        list_for_each_entry(p, &vma->pages->head, list_entry) \
+    if (flag) \
+    { \
+        do { \
+            page_t* p; \
+            int safety = 0; \
+            log_debug(flag, "vm_area={%x, vaddr={%x-%x}, size=%x, pages={count=%u", \
+                vma, \
+                vma->virt_address, \
+                vma->virt_address + vma->size - 1, \
+                vma->size, \
+                vma->pages->count); \
+            list_for_each_entry(p, &vma->pages->head, list_entry) \
+            { \
+                log_debug(flag, "\t\tpage: %x", page_phys(p)); \
+                if (++safety > 1024 * 1024) { panic("infinite loop detection"); } \
+            } \
+            log_debug(flag, "}"); \
+        } while(0); \
+    }
+
+#define vm_print(vma, flag) \
+    { \
+        if (flag && vma) \
         { \
-            log_debug(flag, "\t\tpage: %x", page_phys(p)); \
-            if (++safety > 100) { panic("infinite loop detection"); } \
+            for (const vm_area_t* temp = vma; temp; temp = temp->next) \
+            { \
+                vm_print_single(temp, flag); \
+            } \
         } \
-        log_debug(flag, "}"); \
-    } while(0)
+    }

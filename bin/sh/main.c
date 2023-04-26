@@ -5,7 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
+
+#include <arch/mmap.h>
 
 #define LINE_LEN        256
 #define ARGV_MAX_SIZE   16
@@ -127,7 +130,9 @@ static inline void cmd_args_read(char* command, int* argc, char* argv[], char* b
 
 static inline int execute(const char* command, int argc, char* argv[], int* status)
 {
-    int pid;
+    int pid, err;
+    char buffer[128];
+    struct stat s;
     (void)argc;
 
     for (int i = 0; commands[i].name; ++i)
@@ -144,9 +149,15 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
 
     if (command[0] != '/')
     {
-        printf("No such command: %s\n", command);
-        *status = 1;
-        return 0;
+        sprintf(buffer, "/bin/%s", command);
+        err = stat(buffer, &s);
+        if (err)
+        {
+            perror(command);
+            *status = 1;
+            return 0;
+        }
+        command = buffer;
     }
 
     if ((pid = fork()) == 0)

@@ -43,8 +43,8 @@ int main(int argc, char* argv[])
 
     int fd = open("/dev/fb0", O_RDWR, 0);
 
-    vector2_t position = {100, 100};
-    vector2_t size = {200, 200};
+    vector2_t position = {0, 0};
+    vector2_t size = {1280, 720};
     draw_rectangle(position, size, 0xf5ce89);
 
     printf("framebuffer_data = 0x%x\n", framebuffer_data);

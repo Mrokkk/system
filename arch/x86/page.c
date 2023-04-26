@@ -2,6 +2,7 @@
 #include <kernel/ksyms.h>
 #include <kernel/mutex.h>
 #include <kernel/memory.h>
+#include <kernel/minmax.h>
 
 #include <arch/segment.h>
 #include <arch/multiboot.h>
@@ -10,13 +11,13 @@
 extern pgd_t page_dir[];
 extern pgt_t page0[];
 
-MUTEX_DECLARE(page_mutex);
-LIST_DECLARE(free_pages);
+static MUTEX_DECLARE(page_mutex);
+static LIST_DECLARE(free_pages);
 
 page_t* page_map;
 static pgt_t* page_table;
 static pgd_t* kernel_page_dir;
-static uint32_t last_frame;
+static uint32_t last_pfn;
 
 static struct page_stats
 {
@@ -24,14 +25,14 @@ static struct page_stats
     size_t page_free_calls;
 } page_stats;
 
-static inline void pte_set(int nr, uint32_t val)
+static inline void pte_set(int pte_index, uint32_t val)
 {
-    page_table[nr] = val;
+    page_table[pte_index] = val;
 }
 
-static inline void pge_set(int nr, uint32_t val)
+static inline void pde_set(int pde_index, uint32_t val)
 {
-    kernel_page_dir[nr] = val;
+    kernel_page_dir[pde_index] = val;
 }
 
 static inline page_t* free_page_find()
@@ -53,6 +54,7 @@ static inline page_t* free_page_range_find_discont(const int count)
 {
     page_t* temp_page;
     page_t* first_page = NULL;
+
     for (int i = 0; i < count; ++i)
     {
         temp_page = free_page_find();
@@ -75,7 +77,9 @@ static inline page_t* free_page_range_find_discont(const int count)
             list_add_tail(&temp_page->list_entry, &first_page->list_entry);
         }
     }
+
     return first_page;
+
 no_pages:
     // TODO: free pages
     return NULL;
@@ -85,7 +89,8 @@ static inline page_t* free_page_range_find(const int count)
 {
     int temp_count = count;
     page_t* first_page = NULL;
-    for (uint32_t i = 0; i < last_frame; ++i)
+
+    for (uint32_t i = 0; i < last_pfn; ++i)
     {
         if (!page_map[i].count)
         {
@@ -202,10 +207,12 @@ page_t* __page_alloc(int count, int flags)
 
 int __page_free(void* ptr)
 {
+    uint32_t frame;
+
     mutex_lock(&page_mutex);
 
     ++page_stats.page_free_calls;
-    uint32_t frame = phys_addr(ptr) / PAGE_SIZE;
+    frame = phys_addr(ptr) / PAGE_SIZE;
 
     if (frame_free(phys_addr(ptr)) == 0)
     {
@@ -321,12 +328,16 @@ pgd_t* init_pgd_get(void)
 
 void page_kernel_identity_map(uint32_t paddr, uint32_t size)
 {
+    pgt_t* pgt;
+    uint32_t pde_index;
+    uint32_t pte_index;
+
     log_debug(DEBUG_PAGE, "mapping %x size=%x", paddr, size);
+
     for (uint32_t temp = paddr; temp < paddr + size; temp += PAGE_SIZE)
     {
-        uint32_t pde_index = pde_index(temp);
-        uint32_t pte_index = pte_index(temp);
-        pgt_t* pgt;
+        pde_index = pde_index(temp);
+        pte_index = pte_index(temp);
 
         if (!kernel_page_dir[pde_index])
         {
@@ -337,7 +348,7 @@ void page_kernel_identity_map(uint32_t paddr, uint32_t size)
                 return;
             }
 
-            kernel_page_dir[pde_index] = phys_addr(pgt) | PAGE_KERNEL_FLAGS;
+            pde_set(pde_index, phys_addr(pgt) | PAGE_KERNEL_FLAGS);
         }
         else
         {
@@ -383,7 +394,7 @@ void page_stats_print()
         }
     }
 
-    log_info("last_frame=%x", last_frame);
+    log_info("last_pfn=%x", last_pfn);
     log_info("module_start=%x", module_start);
     log_info("frames_used=%u (%u kB)", frames_used, frames_used * 4);
     log_info("frames_free=%u (%u kB)", frames_free, frames_free * 4);
@@ -395,7 +406,7 @@ void page_stats_print()
 #if DEBUG_PAGE_DETAILED
     char symbol[80];
     log_info("count paddr      symbol");
-    for (uint32_t i = 0; i < last_frame; ++i)
+    for (uint32_t i = 0; i < last_pfn; ++i)
     {
         if (page_map[i].caller && page_map[i].count)
         {
@@ -438,110 +449,151 @@ void pte_print(const uint32_t pte, char* output)
         : "kernel)}");
 }
 
-uint32_t page_map_allocate(uint32_t virt_end)
+static inline void page_map_init(uint32_t virt_end)
 {
-    page_map = ptr(page_align(virt_end));
-    uint32_t needed_pages = last_frame;
-    uint32_t offset = addr(page_map) - virt_end + page_align(needed_pages * sizeof(page_t));
+    uint32_t pfn;
+    uint32_t pfn_end = phys_addr(virt_end) / PAGE_SIZE;
 
-    log_info("additional %u kB for metadata (%u entries; %u B each)",
-        offset / 1024,
-        needed_pages,
-        sizeof(page_t));
-
-    return offset;
-}
-
-static inline uint32_t min(uint32_t a, uint32_t b)
-{
-    return a < b ? a : b;
-}
-
-static inline uint32_t pgt_init(pgt_t* prev_pgt, const uint32_t virt_end)
-{
-    page_table = ptr(virt_end);
-
-    uint32_t address = phys(virt_end);;
-    uint32_t frame_nr = address / PAGE_SIZE;
-    uint32_t pages_for_pgt = min(1024 * 1024 * 1024, page_align(ram)) / PAGE_SIZE / 1024 + 1;
-
-    log_info("%u pages needed for kernel page tables", pages_for_pgt);
-
-    prev_pgt[frame_nr] = address | PTE_PRESENT | PTE_WRITEABLE;
-
-    for (uint32_t i = phys_addr(_end) / PAGE_SIZE; i < phys_addr(virt_end) / PAGE_SIZE + pages_for_pgt; ++i)
+    // Mark pages as used
+    for (pfn = 0; pfn < pfn_end; ++pfn)
     {
-        prev_pgt[i] = (i * PAGE_SIZE) | PAGE_KERNEL_FLAGS;
-    }
-
-    memcpy(page_table, prev_pgt, PAGE_SIZE);
-
-    for (uint32_t i = KERNEL_PDE_OFFSET, j = 0; i < KERNEL_PDE_OFFSET + pages_for_pgt; i++, j += PTE_IN_PDE)
-    {
-        pge_set(i, phys_addr(&page_table[j]) | PDE_PRESENT | PDE_WRITEABLE);
-    }
-
-    for (uint32_t i = KERNEL_PDE_OFFSET + pages_for_pgt; i < PTE_IN_PDE; ++i)
-    {
-        pge_set(i, 0);
-    }
-
-    for (frame_nr = 0; frame_nr < phys_addr(virt_end + pages_for_pgt * PAGE_SIZE) / PAGE_SIZE; ++frame_nr)
-    {
-        page_map[frame_nr].count = 1;
-        page_map[frame_nr].virtual = virt_ptr(frame_nr * PAGE_SIZE);
-        list_init(&page_map[frame_nr].list_entry);
+        page_map[pfn].count = 1;
+        page_map[pfn].virtual = virt_ptr(pfn * PAGE_SIZE);
+        list_init(&page_map[pfn].list_entry);
     }
 
     // Mark rest of pages as free
-    for (; frame_nr < last_frame; ++frame_nr)
+    for (; pfn < last_pfn; ++pfn)
     {
-        page_map[frame_nr].count = 0;
-        page_map[frame_nr].virtual = NULL;
-        list_add_tail(&page_map[frame_nr].list_entry, &free_pages);
+        page_map[pfn].count = 0;
+        page_map[pfn].virtual = NULL;
+        list_add_tail(&page_map[pfn].list_entry, &free_pages);
     }
-
-    return pages_for_pgt * PAGE_SIZE;
 }
 
-static inline uint32_t virt_end_init()
+static inline void pgt_init(pgt_t* prev_pgt, uint32_t virt_end)
+{
+    uint32_t pte_index, pde_index;
+    uint32_t pfn_end = phys_addr(virt_end) / PAGE_SIZE;
+
+    // Set up currently used page tables so it will cover required space to setup pages for 4G
+    for (pte_index = phys_addr(_end) / PAGE_SIZE; pte_index < min(4 * PAGES_IN_PTE, pfn_end); ++pte_index)
+    {
+        prev_pgt[pte_index] = (pte_index * PAGE_SIZE) | PAGE_KERNEL_FLAGS;
+    }
+
+    // Set up new page tables; continguous page tables covering up to 1GiB of kernel space
+    for (pte_index = 0; pte_index < pfn_end; ++pte_index)
+    {
+        pte_set(pte_index, pte_index * PAGE_SIZE | PAGE_KERNEL_FLAGS);
+    }
+
+    // Set up page directory
+    for (pde_index = KERNEL_PDE_OFFSET, pte_index = 0;
+        pde_index < ram / PAGE_SIZE / PAGES_IN_PTE + KERNEL_PDE_OFFSET;
+        pde_index++, pte_index += PTE_IN_PDE)
+    {
+        pde_set(pde_index, phys_addr(&page_table[pte_index]) | PAGE_KERNEL_FLAGS);
+    }
+
+    // Zero rest of pdes
+    for (; pde_index < PTE_IN_PDE; ++pde_index)
+    {
+        pde_set(pde_index, 0);
+    }
+}
+
+static inline uint32_t virt_end_get(uint32_t* gap_start, uint32_t* gap_end)
 {
     if (module_end > addr(_end))
     {
         // FIXME: Grub leaves a blank space between kernel end and first module;
         // mark frames as used only for selected region
-        log_info("changing end ptr to %x from %x (gap %u kB)", module_end, _end, (module_start - addr(_end)) / 1024);
-        return module_end;
+        *gap_start = page_align(addr(_end));
+        *gap_end = page_beginning(module_start);
+
+        log_info("changing end ptr to %x from %x (gap %u kB)",
+            page_align(module_end),
+            _end,
+            *gap_end - *gap_start);
+
+        return page_align(module_end);
     }
     else
     {
-        return addr(_end);
+        *gap_start = 0;
+        *gap_end = 0;
+
+        return page_align(addr(_end));
     }
 }
 
 int paging_init()
 {
-    uint32_t virt_end;
+    pgt_t* temp_pgt;
+    uint32_t virt_end, pgt_size, page_map_size, gap_start, gap_end, temp, gap_size;
 
-    last_frame = ram / PAGE_SIZE;
-    pgt_t* temp_pgt = virt_ptr(page0);
+    last_pfn = ram / PAGE_SIZE;
+    temp_pgt = virt_ptr(page0);
     kernel_page_dir = virt_ptr(page_dir);
 
-    virt_end = virt_end_init();
-    virt_end += page_map_allocate(virt_end);
-    virt_end += pgt_init(temp_pgt, virt_end);
+    page_map_size = page_align(last_pfn * sizeof(page_t));
+    pgt_size = page_align(min(GiB, page_align(ram)) / PAGES_IN_PTE);
 
-    log_debug(DEBUG_PAGE, "virt_end=%x, need %u frames", virt_end, phys_addr(virt_end) / PAGE_SIZE);
+    virt_end = virt_end_get(&gap_start, &gap_end);
 
-    page_dir[0] = 0;
+    // page_table will be allocated at the virt_end; it will cover up to 256 continguous tables for mapping
+    // min of {1GiB, available RAM} kernel space
+    page_table = ptr(virt_end);
+
+    // page_map is allocated just after page tables; it will cover each available physical page frame
+    page_map = ptr(virt_end + pgt_size);
+
+    log_info("kernel page tables size = %u B (%u KiB; %u pages)",
+        pgt_size,
+        pgt_size / KiB,
+        pgt_size / PAGE_SIZE);
+
+    log_info("page map size = %u B (%u kiB, %u pages; %u entries, %u B each)",
+        page_map_size,
+        page_map_size / KiB,
+        page_map_size / PAGE_SIZE,
+        last_pfn,
+        sizeof(page_t));
+
+    virt_end += page_map_size + pgt_size;
+
+    pgt_init(temp_pgt, virt_end);
+    page_map_init(virt_end);
+
+    kernel_page_dir[0] = 0;
 
     ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].count);
     ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].count);
     ASSERT(page_map[(phys_addr(virt_end) - PAGE_SIZE) / PAGE_SIZE].count);
     ASSERT(page_table[phys_addr(virt_end) / PAGE_SIZE - 1]);
     ASSERT(!page_table[phys_addr(virt_end) / PAGE_SIZE]);
+    ASSERT(kernel_page_dir[ram / PAGE_SIZE / PTE_IN_PDE + KERNEL_PDE_OFFSET - 1]);
+    ASSERT(!kernel_page_dir[ram / PAGE_SIZE / PTE_IN_PDE + KERNEL_PDE_OFFSET]);
 
     pgd_load(phys_ptr(kernel_page_dir));
+
+    gap_size = gap_end - gap_start;
+
+    log_info("freeing %u B (%u KiB; %u pages)",
+        gap_size + 4 * PAGE_SIZE,
+        (gap_size + 4 * PAGE_SIZE) / KiB,
+        gap_size / PAGE_SIZE + 4);
+
+    for (temp = gap_start; temp < gap_end; temp += PAGE_SIZE)
+    {
+        page_free(ptr(temp));
+    }
+
+    for (temp = virt_addr(page0); temp < virt_addr(page0) + 4 * PAGE_SIZE; temp += PAGE_SIZE)
+    {
+        page_free(ptr(temp));
+    }
 
     return 0;
 }

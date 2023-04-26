@@ -1,8 +1,7 @@
 #include "fbcon.h"
 
-#include <kernel/font.h>
-
 #include "tty.h"
+#include "font.h"
 #include "console.h"
 #include "framebuffer.h"
 
@@ -55,7 +54,7 @@ int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
     data.fg_color = COLOR_WHITE;
     data.bg_color = COLOR_BLACK;
     *resy = framebuffer.height / font.height;
-    *resx = framebuffer.width / font.width;
+    *resx = framebuffer.width / font.width - 1; // FIXME: it crashes
     return 0;
 }
 

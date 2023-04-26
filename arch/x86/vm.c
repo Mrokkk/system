@@ -28,6 +28,7 @@ vm_area_t* vm_create(page_t* page_range, uint32_t virt_address, uint32_t size, i
     vma->size = size;
     vma->vm_flags = vm_flags;
     vma->next = NULL;
+    vma->prev = NULL;
 
     return vma;
 }
@@ -40,12 +41,14 @@ int vm_add(vm_area_t** head, vm_area_t* new_vma)
     if (!*head)
     {
         *head = new_vma;
+        new_vma->prev = NULL;
         return 0;
     }
 
     if ((*head)->virt_address >= new_end)
     {
         new_vma->next = *head;
+        (*head)->prev = new_vma;
         *head = new_vma;
         return 0;
     }
@@ -65,6 +68,7 @@ int vm_add(vm_area_t** head, vm_area_t* new_vma)
     }
 
     prev->next = new_vma;
+    new_vma->prev = prev;
     new_vma->next = NULL;
 
     return 0;
@@ -275,18 +279,6 @@ vm_area_t* vm_find(
         }
     }
     return NULL;
-}
-
-void vm_print(const vm_area_t* vma)
-{
-    if (!vma)
-    {
-        return;
-    }
-    for (const vm_area_t* temp = vma; temp; temp = temp->next)
-    {
-        vm_print_single(temp, DEBUG_VM);
-    }
 }
 
 int vm_copy_on_write(vm_area_t* vma)

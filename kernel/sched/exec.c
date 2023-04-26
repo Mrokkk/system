@@ -54,6 +54,7 @@ finish:
 static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
 {
     char* temp;
+    size_t len;
 
     // Put argc
     *dest++ = argc;
@@ -69,7 +70,9 @@ static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
     {
         // Put argv[i] address and copy content of argv[i]
         *dest++ = addr(temp);
-        temp = strcpy(temp, argv[i]);
+        len = strlen(argv[i]);
+        strcpy(temp, argv[i]);
+        temp += len;
     }
 
     return temp;
@@ -210,7 +213,7 @@ int do_exec(const char* pathname, const char* const argv[])
     process_current->type = USER_PROCESS;
 
     log_debug(DEBUG_PROCESS, "proc %d areas:", process_current->pid);
-    vm_print(process_current->mm->vm_areas);
+    vm_print(process_current->mm->vm_areas, DEBUG_PROCESS);
 
     arch_exec(entry, kernel_stack, user_stack);
 

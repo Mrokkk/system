@@ -9,11 +9,11 @@ module_init(ramfs_init);
 module_exit(ramfs_deinit);
 
 int ramfs_lookup(inode_t* parent, const char* name, inode_t** result);
-int ramfs_read(file_t* file, char* buffer, int size);
-int ramfs_write(file_t* file, const char* buffer, int count);
+int ramfs_read(file_t* file, char* buffer, size_t count);
+int ramfs_write(file_t* file, const char* buffer, size_t count);
 int ramfs_open(file_t* file);
-int ramfs_mkdir(struct inode* parent, const char* name, int, int, inode_t** result);
-int ramfs_create(struct inode* parent, const char* name, int, int, struct inode** result);
+int ramfs_mkdir(inode_t* parent, const char* name, int, int, inode_t** result);
+int ramfs_create(inode_t* parent, const char* name, int, int, inode_t** result);
 int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int);
 
@@ -94,14 +94,14 @@ int ramfs_lookup(inode_t* parent, const char* name, inode_t** result)
     return 0;
 }
 
-int ramfs_read(file_t* file, char* buffer, int size)
+int ramfs_read(file_t* file, char* buffer, size_t count)
 {
     ram_node_t* node = file->inode->fs_data;
-    memcpy(buffer, node->data, size);
+    memcpy(buffer, node->data, count);
     return 0;
 }
 
-int ramfs_write(file_t* file, const char* buffer, int count)
+int ramfs_write(file_t* file, const char* buffer, size_t count)
 {
     page_t* page;
     ram_node_t* node = file->inode->fs_data;

@@ -5,7 +5,9 @@
 
 int syscall(int nr, ...)
 {
+    int res;
     va_list args;
+
     va_start(args, nr);
     unsigned long a1 = va_arg(args, unsigned long);
     unsigned long a2 = va_arg(args, unsigned long);
@@ -13,8 +15,6 @@ int syscall(int nr, ...)
     unsigned long a4 = va_arg(args, unsigned long);
     unsigned long a5 = va_arg(args, unsigned long);
     va_end(args);
-
-    int res;
 
     asm volatile(
         "push %%ebx;"
@@ -40,7 +40,7 @@ int syscall(int nr, ...)
           "m" (a5)
         : "memory");
 
-    if (unlikely(res < 0))
+    if (unlikely(res < 0 && res > -134))
     {
         errno = res;
         res = -1;
@@ -83,6 +83,12 @@ int syscall(int nr, ...)
     ret name(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3, typeof(t4) a4, typeof(t5) a5) \
     { \
         return (ret)syscall(__NR_##name, a1, a2, a3, a4, a5); \
+    }
+
+#define __syscall6(name, ret, t1, t2, t3, t4, t5, t6) \
+    ret name(typeof(t1) a1, typeof(t2), typeof(t3), typeof(t4), typeof(t5), typeof(t6)) \
+    { \
+        return (ret)syscall(__NR_##name, &a1); \
     }
 
 #include <kernel/unistd.h>

@@ -78,12 +78,13 @@ add_custom_target(
            "--module" "${CMAKE_BINARY_DIR}/bin/test2/test2"
            "--module" "${CMAKE_BINARY_DIR}/bin/reboot/reboot"
            "--module" "${CMAKE_BINARY_DIR}/bin/ls/ls"
+           "--module" "${CMAKE_BINARY_DIR}/bin/cat/cat"
            "--module" "${CMAKE_BINARY_DIR}/bin/init/init"
            "--module" "${CMAKE_BINARY_DIR}/bin/colors/colors"
            "--module" "${CMAKE_BINARY_DIR}/kernel.map"
            "--module" "${CMAKE_SOURCE_DIR}/tux.tga"
            "--module" "${CMAKE_BINARY_DIR}/font.psf"
-   DEPENDS ${PROJECT_NAME} test test2 sh reboot ls colors init ksyms font
+   DEPENDS ${PROJECT_NAME} test test2 sh cat reboot ls colors init ksyms font
    COMMENT "Building ISO image"
 )
 

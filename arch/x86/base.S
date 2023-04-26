@@ -89,9 +89,9 @@ ENTRY(timer_handler) // IRQ 0 handler
     incl jiffies
     SAVE_ALL
     SAVE_USER_ESP
-    PIC_EOI(0)
     call SYMBOL_NAME(timestamp_update)
     call SYMBOL_NAME(scheduler)
+    PIC_EOI(0)
     RESTORE_ALL
     iret
 ENDPROC(timer_handler)

@@ -17,6 +17,7 @@ add_library(common OBJECT ${bin_common_src} "${PROJECT_SOURCE_DIR}/../kernel/lib
 
 add_subdirectory(ls)
 add_subdirectory(sh)
+add_subdirectory(cat)
 add_subdirectory(init)
 add_subdirectory(test)
 add_subdirectory(test2)

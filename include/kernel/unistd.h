@@ -53,6 +53,7 @@
 #define __NR_dup2 50
 #define __NR_sbrk 51
 #define __NR_getppid 64
+#define __NR_mmap 65
 #define __NR_sigreturn 119
 #define __NR_clone 120
 
@@ -111,6 +112,10 @@ void* sbrk(size_t incr);
 #define __syscall5(...)
 #endif
 
+#ifndef __syscall6
+#define __syscall6(...)
+#endif
+
 __syscall1(exit, int, int)
 __syscall0(fork, int)
 __syscall3(read, int, int, char*, size_t)
@@ -136,3 +141,4 @@ __syscall2(getcwd, int, char*, size_t)
 __syscall2(dup2, int, int, int)
 __syscall1(sbrk, void*, size_t)
 __syscall2(stat, int, const char*, struct stat*)
+__syscall6(mmap, void*, void*, size_t, int, int, int , size_t)

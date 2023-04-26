@@ -6,6 +6,7 @@
 #include <kernel/fs.h>
 #include <kernel/page.h>
 #include <kernel/time.h>
+#include <kernel/minmax.h>
 #include <kernel/printk.h>
 #include <kernel/backtrace.h>
 
@@ -18,8 +19,10 @@
 
 #define EARLY_PRINTK_BUF_SIZE (8 * KiB)
 
+#define BUFFER_FULL_MESSAGE WARNING"<buffer full; dropping further messages>\n"RESET
+
 static void (*printk_fallback)(const char *string);
-static int (*printk_write)(struct file*, const char*, int);
+static int (*printk_write)(struct file*, const char*, size_t);
 static file_t* printk_file;
 
 #define PRINTK_INITIALIZED 0xFEED
@@ -33,7 +36,7 @@ static inline void push_entry(
     int len,
     int* index,
     char* logger_buffer,
-    int (*write)(struct file*, const char*, int))
+    int (*write)(struct file*, const char*, size_t))
 {
     // If console print function is registered just print text using function,
     // else save text to given logger_buffer
@@ -51,9 +54,9 @@ static inline void push_entry(
         {
             return;
         }
-        if (EARLY_PRINTK_BUF_SIZE - *index <= (size_t)len)
+        if (EARLY_PRINTK_BUF_SIZE - *index - strlen(BUFFER_FULL_MESSAGE) <= (size_t)len)
         {
-            *index += sprintf(logger_buffer + *index, WARNING"<buffer full; dropping further messages>\n"RESET);
+            *index += sprintf(logger_buffer + *index, BUFFER_FULL_MESSAGE);
             printk_buffer_full = 1;
             return;
         }

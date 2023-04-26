@@ -62,7 +62,7 @@ ENTRY(_start)
 
         // Enable paging
         mov %cr0, %eax
-        or $0x80000000, %eax
+        or $CR0_PE | CR0_PG, %eax
         mov %eax, %cr0
         mov $1f, %eax
         jmp *%eax
@@ -91,8 +91,7 @@ ENTRY(_start)
         call SYMBOL_NAME(kmain)
 
     // Not reachable
-    2:
-        jmp 2b
+    2:  jmp 2b
 
 ENDPROC(_start)
 
@@ -127,12 +126,16 @@ ENTRY(__gdt_entries)
 ALIGN(PAGE_SIZE)
 ENTRY(page_dir)
     // First entry will be zeroed in paging_init; we need it available at boot
+    // as kernel is running on unpaged memory
     .long page_table0
     .fill KERNEL_PAGE_OFFSET / (PAGE_SIZE * 1024) - 1, 4, 0
     .long page_table0
+    .long page_table0 + PAGE_SIZE
+    .long page_table0 + 2 * PAGE_SIZE
+    .long page_table0 + 3 * PAGE_SIZE
 
 ALIGN(PAGE_SIZE)
 ENTRY(page0)
     .skip PAGE_KERNEL_FLAGS
 page_table0:
-    .skip 0x1000 - PAGE_KERNEL_FLAGS
+    .skip 0x4000 - PAGE_KERNEL_FLAGS

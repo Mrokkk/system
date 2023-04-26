@@ -49,4 +49,3 @@ void ensure_printk_will_print(void);
 #define log_error(...) printk(KERN_ERR __VA_ARGS__)
 #define log_exception(...) printk(KERN_ERR __VA_ARGS__)
 #define log_critical(...) printk(KERN_CRIT __VA_ARGS__)
-#define log_trace(flag, ...) { if (flag) log_debug(__VA_ARGS__); }

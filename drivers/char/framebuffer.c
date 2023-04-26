@@ -1,7 +1,6 @@
 #include "framebuffer.h"
 
 #include <kernel/fs.h>
-#include <kernel/font.h>
 #include <kernel/page.h>
 #include <kernel/device.h>
 
@@ -83,10 +82,13 @@ int framebuffer_init()
     uint32_t bpp = framebuffer_ptr->bpp;
     uint32_t size = pitch * height;
 
-    char_device_register(MAJOR_CHR_FB, "fb", &fops, 0, NULL);
+    if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
+    {
+        char_device_register(MAJOR_CHR_FB, "fb", &fops, 0, NULL);
+        // Map framebuffer memory in kernel
+        page_kernel_identity_map(framebuffer_ptr->addr, pitch * height);
+    }
 
-    // Map framebuffer memory in kernel
-    page_kernel_identity_map(framebuffer_ptr->addr, pitch * height);
     uint8_t* fb = ptr((uint32_t)framebuffer_ptr->addr);
 
     log_notice("vaddr = paddr = %x", fb);
@@ -109,7 +111,7 @@ int framebuffer_init()
 
     if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
     {
-        display_tga(tux);
+        /*display_tga(tux);*/
     }
 
     return 0;

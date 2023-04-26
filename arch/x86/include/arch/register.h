@@ -3,57 +3,53 @@
 #include <arch/processor.h>
 #include <kernel/compiler.h>
 
-#define eflags_cf_pos       0
-#define eflags_pf_pos       2
-#define eflags_af_pos       4
-#define eflags_zf_pos       6
-#define eflags_sf_pos       7
-#define eflags_tf_pos       8
-#define eflags_if_pos       9
-#define eflags_df_pos       10
-#define eflags_of_pos       11
-#define eflags_iopl_pos     12
-#define eflags_nt_pos       14
-#define eflags_rf_pos       16
-#define eflags_vm_pos       17
-#define eflags_ac_pos       18
-#define eflags_vif_pos      19
-#define eflags_vip_pos      20
-#define eflags_id_pos       21
+#define EFL_CF          1 << 0
+#define EFL_PF          1 << 2
+#define EFL_AF          1 << 4
+#define EFL_ZF          1 << 6
+#define EFL_SF          1 << 7
+#define EFL_TF          1 << 8
+#define EFL_IF          1 << 9
+#define EFL_DF          1 << 10
+#define EFL_OF          1 << 11
+#define EFL_IOPL        1 << 12
+#define EFL_NT          1 << 14
+#define EFL_RF          1 << 16
+#define EFL_VM          1 << 17
+#define EFL_AC          1 << 18
+#define EFL_VIF         1 << 19
+#define EFL_VIP         1 << 20
+#define EFL_ID          1 << 21
 
-#define cr0_pe_pos          0
-#define cr0_mp_pos          1
-#define cr0_em_pos          2
-#define cr0_ts_pos          3
-#define cr0_et_pos          4
-#define cr0_ne_pos          5
-#define cr0_wp_pos          16
-#define cr0_am_pos          18
-#define cr0_nw_pos          29
-#define cr0_cd_pos          30
-#define cr0_pg_pos          31
+#define CR0_PE          1 << 0
+#define CR0_MP          1 << 1
+#define CR0_EM          1 << 2
+#define CR0_TS          1 << 3
+#define CR0_ET          1 << 4
+#define CR0_NE          1 << 5
+#define CR0_WP          1 << 16
+#define CR0_AM          1 << 18
+#define CR0_NW          1 << 29
+#define CR0_CD          1 << 30
+#define CR0_PG          1 << 31
 
-#define cr4_vme_pos         0
-#define cr4_pvi_pos         1
-#define cr4_tsd_pos         2
-#define cr4_de_pos          3
-#define cr4_pse_pos         4
-#define cr4_pae_pos         5
-#define cr4_mce_pos         6
-#define cr4_pge_pos         7
-#define cr4_pce_pos         8
-#define cr4_osfxsr_pos      9
-#define cr4_osxmmexcpt_pos  10
-#define cr4_vmxe_pos        13
-#define cr4_smxe_pos        14
-#define cr4_pcide_pos       17
-#define cr4_osxsave_pos     18
-#define cr4_smep_pos        20
-#define cr4_smap_pos        21
-
-#define register_bit_mask(reg_bit) (1 << reg_bit##_pos)
-#define register_bit_pos(reg_bit) reg_bit##_pos
-#define register_name(reg) #reg
+#define CR4_VME         1 << 0
+#define CR4_PVI         1 << 1
+#define CR4_TSD         1 << 2
+#define CR4_DE          1 << 3
+#define CR4_PSE         1 << 4
+#define CR4_PAE         1 << 5
+#define CR4_MCE         1 << 6
+#define CR4_PGE         1 << 7
+#define CR4_PCE         1 << 8
+#define CR4_OSFXSR      1 << 9
+#define CR4_OSXMMEXCPT  1 << 10
+#define CR4_VMXE        1 << 13
+#define CR4_SMXE        1 << 14
+#define CR4_PCIDE       1 << 17
+#define CR4_OSXSAVE     1 << 18
+#define CR4_SMEP        1 << 20
+#define CR4_SMAP        1 << 21
 
 #ifndef __ASSEMBLER__
 

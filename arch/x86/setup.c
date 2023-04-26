@@ -13,11 +13,6 @@
 #include <kernel/reboot.h>
 #include <kernel/process.h>
 
-// This is the number of bits of precision for the loops_per_second.  Each
-// bit takes on average 1.5/HZ seconds.  This (like the original) is a little
-// better than 1%
-#define LPS_PREC 8
-
 volatile unsigned int jiffies;
 struct cpu_info cpu_info;
 static uint32_t mhz;
@@ -62,62 +57,10 @@ void timestamp_get(ts_t* ts)
 
 void delay_calibrate(void)
 {
-    extern void do_delay();
     unsigned int tsc_meas_prec = TSC_MEAS_LOOPS;
     unsigned int ticks;
     flags_t flags;
     uint64_t tsc_start, tsc_end;
-
-    /*irq_save(flags);*/
-    /*sti();*/
-
-    /*static uint32_t loops_per_sec = (1 << 12);*/
-    /*int loopbit;*/
-    /*int lps_precision = LPS_PREC;*/
-
-    /*log_info("calibrating delay loop...");*/
-    /*while (loops_per_sec <<= 1)*/
-    /*{*/
-        /*// wait for "start of" clock tick*/
-        /*ticks = jiffies;*/
-        /*while (ticks == jiffies);*/
-        /*// Go*/
-        /*ticks = jiffies;*/
-        /*do_delay(loops_per_sec);*/
-        /*ticks = jiffies - ticks;*/
-        /*if (ticks)*/
-        /*{*/
-            /*break;*/
-        /*}*/
-    /*}*/
-
-    /*// Do a binary approximation to get loops_per_second set to equal one clock*/
-    /*// (up to lps_precision bits)*/
-    /*loops_per_sec >>= 1;*/
-    /*loopbit = loops_per_sec;*/
-
-    /*while (lps_precision-- && (loopbit >>= 1) )*/
-    /*{*/
-        /*loops_per_sec |= loopbit;*/
-        /*ticks = jiffies;*/
-        /*while (ticks == jiffies);*/
-        /*ticks = jiffies;*/
-        /*do_delay(loops_per_sec);*/
-        /*if (jiffies != ticks) // longer than 1 tick*/
-        /*{*/
-            /*loops_per_sec &= ~loopbit;*/
-        /*}*/
-    /*}*/
-
-    /*// finally, adjust loops per second in terms of seconds instead of clocks*/
-    /*loops_per_sec *= HZ;*/
-    /*// Round the value and print it*/
-
-    /*log_info("ok - %lu.%02lu BogoMIPS",*/
-        /*(loops_per_sec + 2500) / 500000,*/
-        /*((loops_per_sec + 2500) / 5000) % 100);*/
-
-    /*cpu_info.bogomips = loops_per_sec;*/
 
     if (!cpu_has(INTEL_TSC))
     {
@@ -125,7 +68,7 @@ void delay_calibrate(void)
         return;
     }
 
-    log_info("detecting tsc...");
+    log_info("detecting TSC...");
 
     irq_save(flags);
     sti();

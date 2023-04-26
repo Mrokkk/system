@@ -36,6 +36,7 @@ __noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloade
         bootloader_data,
         bootloader_magic);
 
+    log_info("bootloader: %s", bootloader_name);
     log_info("cmdline: %s", cmdline);
     log_info("RAM: %u MiB (%u B)", ram / 1024 / 1024, ram);
     memory_areas_print();
@@ -101,7 +102,14 @@ static inline void rootfs_prepare()
     mkdir("/test/test1", 0);
     mkdir("/test/test1/test2", 0);
     mkdir("/tmp", 0);
+    mkdir("/ext2", 0);
     mount("none", "/tmp", "ramfs", 0, 0);
+    errno = mount("none", "/ext2", "ext2", 0, 0);
+
+    if (errno)
+    {
+        log_error("mounting ext2 failed with %d", errno);
+    }
 
     if (mkdir("/dev", 0) || mkdir("/bin", 0))
     {
@@ -171,6 +179,11 @@ static inline void syslog_configure(const char* device)
     file_t* file;
 
     log_info("device = %s", device);
+
+    if (!strcmp(device, "none"))
+    {
+        return;
+    }
 
     if ((errno = do_open(&file, device, O_RDWR, 0)))
     {

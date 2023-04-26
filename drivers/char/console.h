@@ -4,7 +4,7 @@
 #include <kernel/fs.h>
 #include "console_driver.h"
 
-int console_write(struct file*, const char* buffer, int size);
+int console_write(struct file*, const char* buffer, size_t size);
 void console_putch(uint8_t c);
 int console_init(console_driver_t* driver);
 

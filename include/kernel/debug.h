@@ -10,7 +10,7 @@
         int a = (int)(cond); (void)a; \
         if (!a) \
         { \
-            log_error("assertion "#cond" failed"); \
+            log_error("%s:%u: assertion "#cond" failed", __builtin_strrchr(__FILE__, '/') + 1, __LINE__); \
             backtrace_dump(); \
         } \
     } while (0)

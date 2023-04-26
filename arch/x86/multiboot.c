@@ -7,6 +7,7 @@ char* bootloader_name;
 uint32_t module_start;
 uint32_t module_end;
 
+void* disk_img;
 void* tux;
 uint32_t tux_size;
 
@@ -43,6 +44,16 @@ static inline void multiboot_mmap_read(struct multiboot_info* mb)
     }
 }
 
+static inline void multiboot_drives_read(struct multiboot_info* mb)
+{
+    struct drive* drive = ptr(mb->drives_addr);
+    for (; addr(drive) < mb->drives_addr + mb->drives_length;)
+    {
+        log_info("drive %u; mode %x", drive->drive_number, drive->drive_mode);
+        drive = ptr(addr(drive) + drive->size);
+    }
+}
+
 static inline void multiboot_modules_read(struct multiboot_info* mb)
 {
     modules_table.count = mb->mods_count;
@@ -62,6 +73,10 @@ static inline void multiboot_modules_read(struct multiboot_info* mb)
         {
             tux = virt_ptr(mod->mod_start);
             tux_size = mod->mod_end - mod->mod_start;
+        }
+        if (!strcmp((char*)virt(mod->string), "disk.img"))
+        {
+            disk_img = virt_ptr(mod->mod_start);
         }
 
         if (!module_start)
@@ -91,6 +106,10 @@ char* multiboot_read(struct multiboot_info* mb, uint32_t magic)
     if (mb->flags & MULTIBOOT_FLAGS_MMAP_BIT)
     {
         multiboot_mmap_read(mb);
+    }
+    if (mb->flags & MULTIBOOT_FLAGS_DRIVES_BIT)
+    {
+        multiboot_drives_read(mb);
     }
     if (mb->flags & MULTIBOOT_FLAGS_BOOTDEV_BIT)
     {

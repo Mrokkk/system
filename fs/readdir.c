@@ -26,11 +26,13 @@ int dirent_add(void* buf, const char* name, size_t len, ino_t ino, char type)
     dirent->ino = ino;
     dirent->len = dirent_size;
     dirent->type = type;
-    strcpy(dirent->name, name);
+    strncpy(dirent->name, name, len + 1);
 
     data->count -= dirent_size;
     data->previous = data->current;
     data->current = ptr(addr(data->current) + dirent_size);
+
+    log_debug(DEBUG_READDIR, "added %S, len=%u", name, len);
 
     return 0;
 }
