@@ -9,40 +9,27 @@ int syscall(int nr, ...)
     va_list args;
 
     va_start(args, nr);
-    unsigned long a1 = va_arg(args, unsigned long);
-    unsigned long a2 = va_arg(args, unsigned long);
-    unsigned long a3 = va_arg(args, unsigned long);
-    unsigned long a4 = va_arg(args, unsigned long);
-    unsigned long a5 = va_arg(args, unsigned long);
+    u32 a1 = va_arg(args, u32);
+    u32 a2 = va_arg(args, u32);
+    u32 a3 = va_arg(args, u32);
+    u32 a4 = va_arg(args, u32);
+    u32 a5 = va_arg(args, u32);
     va_end(args);
 
     asm volatile(
-        "push %%ebx;"
-        "push %%esi;"
-        "push %%edi;"
-        "mov %1, %%eax;"
-        "mov %2, %%ebx;"
-        "mov %3, %%ecx;"
-        "mov %4, %%edx;"
-        "mov %5, %%esi;"
-        "mov %6, %%edi;"
-        "int $0x80;"
-        "mov %%eax, %0;"
-        "pop %%edi;"
-        "pop %%esi;"
-        "pop %%ebx;"
-        : "=m" (res)
-        : "m" (nr),
-          "m" (a1),
-          "m" (a2),
-          "m" (a3),
-          "m" (a4),
-          "m" (a5)
+        "int $0x80"
+        : "=a" (res)
+        : "a" (nr),
+          "b" (a1),
+          "c" (a2),
+          "d" (a3),
+          "S" (a4),
+          "D" (a5)
         : "memory");
 
-    if (unlikely(res < 0 && res > -134))
+    if (unlikely(res < 0 && res >= -ERRNO_MAX))
     {
-        errno = res;
+        errno = -res;
         res = -1;
     }
 

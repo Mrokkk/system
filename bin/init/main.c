@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <kernel/reboot.h>
@@ -60,7 +61,7 @@ int shell_run()
     if ((child_pid = fork()) < 0)
     {
         printf("fork error in init!\n");
-        return -1;
+        return EXIT_FAILURE;
     }
     else if (child_pid == 0)
     {
@@ -69,7 +70,7 @@ int shell_run()
         if (exec(pathname, argv))
         {
             printf("exec error in init!\n");
-            return -1;
+            return EXIT_FAILURE;
         }
         while (1);
     }
@@ -108,13 +109,7 @@ int main(int argc, char* argv[])
     if (fd != 0 || dup(0) || dup(0))
     {
         printf("cannot open console, fd = %d\n", fd);
-        return -1;
-    }
-
-    if (options.cmdline)
-    {
-        printf("cmdline: %s\n", options.cmdline);
-        printf("console=%s\n", options.console_device);
+        return EXIT_FAILURE;
     }
 
     printf(RED "W" GREEN "e" YELLOW "l" BLUE "c" MAGENTA "o" CYAN "m" MAGENTA "e!\n" RESET);
@@ -124,7 +119,7 @@ int main(int argc, char* argv[])
     if (shell_run())
     {
         printf("cannot run shell\n");
-        return -1;
+        return EXIT_FAILURE;
     }
 
     return 0;

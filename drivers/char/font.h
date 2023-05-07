@@ -19,4 +19,4 @@ typedef struct
 
 extern font_t font;
 
-int font_load(void* ptr, size_t size);
+int font_load(void);

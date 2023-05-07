@@ -13,13 +13,17 @@ struct gdt_entry
     uint8_t access;
     uint8_t granularity;
     uint8_t base_high;
-} __packed;
+} PACKED;
+
+typedef struct gdt_entry gdt_entry_t;
 
 struct gdt
 {
     uint16_t limit;
     uint32_t base;
-} __packed;
+} PACKED;
+
+typedef struct gdt gdt_t;
 
 struct idt_entry
 {
@@ -28,17 +32,21 @@ struct idt_entry
    uint8_t always0;
    uint8_t flags;
    uint16_t base_hi;
-} __packed;
+} PACKED;
+
+typedef struct idt_entry idt_entry_t;
 
 struct idt
 {
    uint16_t limit;
    uint32_t base;
-} __packed;
+} PACKED;
 
-extern struct gdt_entry* gdt_entries;
+typedef struct idt idt_t;
 
-static inline void idt_load(struct idt* idt)
+extern gdt_entry_t* gdt_entries;
+
+static inline void idt_load(idt_t* idt)
 {
     asm volatile(
         "lidt (%%eax);"
@@ -46,7 +54,7 @@ static inline void idt_load(struct idt* idt)
     );
 }
 
-static inline void idt_store(struct idt* idt)
+static inline void idt_store(idt_t* idt)
 {
     asm volatile(
         "sidt (%%eax);"
@@ -70,7 +78,7 @@ static inline void tss_store(uint16_t* sel)
     );
 }
 
-static inline void gdt_load(struct gdt* gdt)
+static inline void gdt_load(gdt_t* gdt)
 {
     asm volatile(
         "lgdt (%%eax);"
@@ -80,7 +88,7 @@ static inline void gdt_load(struct gdt* gdt)
     );
 }
 
-static inline void gdt_store(struct gdt* gdt)
+static inline void gdt_store(gdt_t* gdt)
 {
     asm volatile(
         "sgdt (%%eax);"
@@ -90,14 +98,19 @@ static inline void gdt_store(struct gdt* gdt)
 
 void tss_init(void);
 void idt_init(void);
+void idt_set(int nr, uint32_t addr);
+uint32_t idt_get(int nr);
 
 #endif // !__ASSEMBLER__
 
-#define FIRST_TSS_ENTRY 5
-#define FIRST_APM_ENTRY 6
+#define TSS_ENTRY 5
+#define APM_CODE_ENTRY  6
+#define APM_CODE_16_ENTRY  7
+#define APM_DATA_ENTRY  8
+#define TIMER_IDT_ENTRY 32
 
 #define descriptor_selector(num, ring) ((num << 3) | ring)
-#define tss_selector(num) ((num+FIRST_TSS_ENTRY) << 3)
+#define tss_selector(num) ((num + TSS_ENTRY) << 3)
 
 #define GDT_LOW_LIMIT(limit) \
     ((limit) & 0xFFFF)

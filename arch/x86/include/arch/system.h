@@ -11,10 +11,10 @@ typedef uint32_t flags_t;
     asm volatile("" : : : "memory")
 
 #define flags_save(x) \
-    asm volatile("pushfl; popl %0" : "=r" (x) : /*  */ : "memory")
+    asm volatile("pushfl; popl %0" : "=r" (x) :: "memory")
 
 #define flags_restore(x) \
-    asm volatile("pushl %0; popfl" : /*  */ : "r" (x) : "memory")
+    asm volatile("pushl %0; popfl" :: "r" (x) : "memory")
 
 #define sti() \
     asm volatile("sti" : : : "memory")
@@ -42,3 +42,27 @@ typedef uint32_t flags_t;
 
 #define rdtscll(val) \
      asm volatile("rdtsc" : "=A" (val))
+
+#define rdtscp(hi, low, c) \
+    asm volatile("rdtscp" : "=a" (low), "=c" (c), "=d" (hi))
+
+#define rdmsr(msr, low, high) \
+   asm volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr))
+
+#define wrmsr(msr, low, high) \
+   asm volatile("wrmsr" :: "a" (low), "d" (high), "c" (msr))
+
+static inline void __flags_restore(flags_t* flags)
+{
+    flags_restore(*flags);
+}
+
+#define __flags_save()      ({ flags_t f; irq_save(f); f; })
+#define scoped_flags_t      CLEANUP(__flags_restore) flags_t
+#define scoped_irq_lock()   scoped_flags_t __flags = __flags_save()
+
+extern void exit_kernel(void);
+extern void context_restore(void);
+
+void panic_mode_enter(void);
+void panic_mode_die(void);

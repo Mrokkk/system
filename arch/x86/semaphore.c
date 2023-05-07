@@ -13,7 +13,7 @@ void __down_failed(semaphore_t* sem)
     wait_queue_push(&__sem, &sem->queue);
     sem->waiting++;
 
-    process_wait(process_current, flags);
+    process_wait2(process_current, flags);
 }
 
 void __up(semaphore_t* sem)

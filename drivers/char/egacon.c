@@ -37,69 +37,67 @@ enum palette
 
 typedef struct
 {
-    uint16_t* fb;
+    uint16_t* videomem;
     size_t resx, resy;
     uint8_t default_attribute;
-    uint8_t fg_color;
-    uint8_t bg_color;
-} driver_data_t;
+} data_t;
 
-static driver_data_t data;
-
-static inline void video_mem_write(uint16_t* video_mem, uint16_t data, uint16_t offset)
+static inline void videomem_write(uint16_t* video_mem, uint16_t data, uint16_t offset)
 {
     video_mem[offset] = data;
 }
 
-static inline uint16_t make_video_char(char c, char a)
+static inline uint16_t video_char_make(char c, char a)
 {
     return ((a << 8) | c);
 }
 
 static inline void csr_move(uint16_t off)
 {
-    outb(14, 0x3D4);
-    outb(off >> 8, 0x3D5);
-    outb(15, 0x3D4);
-    outb(off, 0x3D5);
+    outb(14, 0x3d4);
+    outb(off >> 8, 0x3d5);
+    outb(15, 0x3d4);
+    outb(off, 0x3d5);
 }
 
-static inline void cls(uint16_t* video_mem)
+static inline void cls(data_t* data)
 {
-    uint16_t blank = 0x20 | (data.default_attribute << 8);
-
-    memsetw(video_mem, blank, data.resx * data.resy);
+    memsetw(data->videomem, video_char_make(' ', data->default_attribute), data->resx * data->resy);
     csr_move(0);
 }
 
-int egacon_init(struct console_driver* driver, size_t* row, size_t* col)
+int egacon_init(console_driver_t* driver, size_t* row, size_t* col)
 {
-    driver->data = &data;
-    data.fb = virt_ptr(framebuffer.fb);
-    data.default_attribute = forecolor(COLOR_GRAY) | backcolor(COLOR_BLACK);
-    data.fg_color = COLOR_GRAY;
-    data.bg_color = COLOR_BLACK;
-    data.resx = framebuffer.width;
-    data.resy = framebuffer.height;
-    cls(data.fb);
+    data_t* data = alloc(data_t);
+
+    if (!data)
+    {
+        log_warning("cannot allocate memory for egacon data");
+        return -ENOMEM;
+    }
+
+    data->videomem = ptr(framebuffer.fb);
+    data->default_attribute = forecolor(COLOR_GRAY) | backcolor(COLOR_BLACK);
+    data->resx = framebuffer.width;
+    data->resy = framebuffer.height;
+    driver->data = data;
+    cls(data);
+
     *row = framebuffer.height;
     *col = framebuffer.width;
+
     return 0;
 }
 
-void egacon_char_print(
-    struct console_driver*,
-    size_t row,
-    size_t col,
-    unsigned int c)
+void egacon_char_print(console_driver_t* drv, size_t row, size_t col, uint8_t c, uint32_t fgcolor, uint32_t bgcolor)
 {
-    uint16_t off = row * data.resx + col;
-    uint16_t* video_mem = data.fb;
-    video_mem_write(video_mem, make_video_char(c, forecolor(data.fg_color) | backcolor(data.bg_color)), off);
+    data_t* data = drv->data;
+    uint16_t off = row * data->resx + col;
+    videomem_write(data->videomem, video_char_make(c, forecolor(fgcolor) | backcolor(bgcolor)), off);
     csr_move(off + 1);
 }
 
-void egacon_setsgr(console_driver_t*, uint32_t params[], size_t count)
+void egacon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
 {
     for (size_t i = 0; i < count; ++i)
     {
@@ -107,16 +105,16 @@ void egacon_setsgr(console_driver_t*, uint32_t params[], size_t count)
         switch (param)
         {
             case 0:
-                data.fg_color = COLOR_GRAY;
-                data.bg_color = COLOR_BLACK;
+                *fgcolor = COLOR_GRAY;
+                *bgcolor = COLOR_BLACK;
                 break;
-            case 30: data.fg_color = COLOR_BLACK; break;
-            case 31: data.fg_color = COLOR_RED; break;
-            case 32: data.fg_color = COLOR_GREEN; break;
-            case 33: data.fg_color = COLOR_YELLOW; break;
-            case 34: data.fg_color = COLOR_BLUE; break;
-            case 35: data.fg_color = COLOR_MAGENTA; break;
-            case 36: data.fg_color = COLOR_CYAN; break;
+            case 30: *fgcolor = COLOR_BLACK; break;
+            case 31: *fgcolor = COLOR_RED; break;
+            case 32: *fgcolor = COLOR_GREEN; break;
+            case 33: *fgcolor = COLOR_YELLOW; break;
+            case 34: *fgcolor = COLOR_BLUE; break;
+            case 35: *fgcolor = COLOR_MAGENTA; break;
+            case 36: *fgcolor = COLOR_CYAN; break;
             case 38:
                 if (params[++i] == 2)
                 {
@@ -124,21 +122,27 @@ void egacon_setsgr(console_driver_t*, uint32_t params[], size_t count)
                     return;
                 }
                 break;
-            case 40: data.bg_color = COLOR_BLACK; break;
-            case 41: data.bg_color = COLOR_RED; break;
-            case 42: data.bg_color = COLOR_GREEN; break;
-            case 43: data.bg_color = COLOR_YELLOW; break;
-            case 44: data.bg_color = COLOR_BLUE; break;
-            case 45: data.bg_color = COLOR_MAGENTA; break;
-            case 46: data.bg_color = COLOR_CYAN; break;
-            case 90: data.fg_color = COLOR_GRAY; break;
-            case 91: data.fg_color = COLOR_BRIGHTRED; break;
-            case 92: data.fg_color = COLOR_BRIGHTGREEN; break;
-            case 93: data.fg_color = COLOR_BRIGHTYELLOW; break;
-            case 94: data.fg_color = COLOR_BRIGHTBLUE; break;
-            case 95: data.fg_color = COLOR_BRIGHTMAGENTA; break;
-            case 96: data.fg_color = COLOR_BRIGHTCYAN; break;
-            case 97: data.fg_color = COLOR_BRIGHTWHITE; break;
+            case 40: *bgcolor = COLOR_BLACK; break;
+            case 41: *bgcolor = COLOR_RED; break;
+            case 42: *bgcolor = COLOR_GREEN; break;
+            case 43: *bgcolor = COLOR_YELLOW; break;
+            case 44: *bgcolor = COLOR_BLUE; break;
+            case 45: *bgcolor = COLOR_MAGENTA; break;
+            case 46: *bgcolor = COLOR_CYAN; break;
+            case 90: *fgcolor = COLOR_GRAY; break;
+            case 91: *fgcolor = COLOR_BRIGHTRED; break;
+            case 92: *fgcolor = COLOR_BRIGHTGREEN; break;
+            case 93: *fgcolor = COLOR_BRIGHTYELLOW; break;
+            case 94: *fgcolor = COLOR_BRIGHTBLUE; break;
+            case 95: *fgcolor = COLOR_BRIGHTMAGENTA; break;
+            case 96: *fgcolor = COLOR_BRIGHTCYAN; break;
+            case 97: *fgcolor = COLOR_BRIGHTWHITE; break;
         }
     }
+}
+
+void egacon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
+{
+    *fgcolor = forecolor(COLOR_GRAY);
+    *bgcolor = backcolor(COLOR_BLACK);
 }

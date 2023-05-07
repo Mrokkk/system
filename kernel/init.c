@@ -1,18 +1,29 @@
+#define log_fmt(fmt) "init: " fmt
+#include <stdarg.h>
 #include <kernel/cpu.h>
 #include <kernel/init.h>
 #include <kernel/time.h>
+#include <kernel/devfs.h>
+#include <kernel/ksyms.h>
 #include <kernel/kernel.h>
 #include <kernel/memory.h>
 #include <kernel/module.h>
+#include <kernel/procfs.h>
 #include <kernel/unistd.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
+#include <kernel/backtrace.h>
 
+#include <arch/pci.h>
+#include <arch/vbe.h>
+#include <arch/earlycon.h>
 #include <arch/multiboot.h>
 
+void ide_dma(void);
 static int init(const char* cmdline);
 
 unsigned init_in_progress = INIT_IN_PROGRESS;
+char cmdline[128];
 
 typedef struct options
 {
@@ -20,53 +31,75 @@ typedef struct options
     char init[64];
 } options_t;
 
-__noreturn static void idle()
+static options_t options = {
+    .syslog = "/dev/tty0",
+    .init = "/bin/init",
+};
+
+NOINLINE static void NORETURN(run_init_and_go_idle())
 {
+    sti();
+    kernel_process_spawn(&init, cmdline, NULL, SPAWN_KERNEL);
+    process_stop(process_current);
+    scheduler();
     for (;; halt());
 }
 
-__noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloader_magic)
+UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 {
-    ts_t ts;
-    const char* cmdline;
+    bss_zero();
 
-    memset(_sbss, 0, addr(_ebss) - addr(_sbss));
+    va_list args;
+    va_start(args, data);
+    const char* temp_cmdline = multiboot_read(args);
+    va_end(args);
 
-    cmdline = multiboot_read(
-        bootloader_data,
-        bootloader_magic);
+    strcpy(cmdline, temp_cmdline);
 
-    log_info("bootloader: %s", bootloader_name);
-    log_info("cmdline: %s", cmdline);
-    log_info("RAM: %u MiB (%u B)", ram / 1024 / 1024, ram);
-    memory_areas_print();
+    log_notice("bootloader: %s", bootloader_name);
+    log_notice("cmdline: %s", cmdline);
+
+    if (strstr(cmdline, "earlycon"))
+    {
+        earlycon_init();
+    }
 
     arch_setup();
+
+    uint32_t ram_hi = addr(full_ram >> 32);
+    uint32_t ram_low = addr(full_ram & ~0UL);
+    uint32_t mib = 4096 * ram_hi + ram_low / MiB;
+    log_notice("RAM: %u MiB", mib);
+    log_notice("RAM end: %u MiB (%u B)", ram / MiB, ram);
+    memory_areas_print();
+    sections_print();
+
     paging_init();
-    kmalloc_init();
+    ksyms_load(ksyms_start, ksyms_end);
     fmalloc_init();
     slab_allocator_init();
-    irqs_configure();
+    devfs_init();
+    procfs_init();
     processes_init();
+
+    arch_late_setup();
+
     modules_init();
-    delay_calibrate();
 
     ASSERT(init_in_progress == INIT_IN_PROGRESS);
     init_in_progress = 0;
 
+    ts_t ts;
     timestamp_get(&ts);
 
     if (ts.seconds || ts.useconds)
     {
-        log_info("Boot finished in %u.%06u s", ts.seconds, ts.useconds);
+        log_notice("boot finished in %u.%06u s", ts.seconds, ts.useconds);
     }
 
-    sti();
-    // Create another process called 'init' and change itself into the idle process
-    kernel_process(init, ptr(cmdline), 0);
-    process_stop(process_current);
-    scheduler();
-    idle();
+    run_init_and_go_idle();
+
+    ASSERT_NOT_REACHED();
 }
 
 // I left this comment even though this issue no longer exists (as init is doing exec("/bin/init")).
@@ -87,10 +120,29 @@ __noreturn void kmain(struct multiboot_info* bootloader_data, uint32_t bootloade
 static inline void rootfs_prepare()
 {
     int errno;
+    char* sources[] = {"/dev/hda0", "/dev/img0"};
 
-    if ((errno = mount("none", "/", "ramfs", 0, 0)))
+    for (size_t i = 0; i < array_size(sources); ++i)
     {
-        panic("cannot mount root; errno = %d", errno);
+        log_info("mounting root on %s", sources[i]);
+        if ((errno = mount(sources[i], "/", "ext2", 0, 0)))
+        {
+            log_info("mounting ext2 on %s failed with %d", sources[i], errno);
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (unlikely(errno))
+    {
+        panic("cannot mount root: %d", errno);
+    }
+
+    if ((errno = chroot("/")))
+    {
+        panic("cannot set root; errno = %d", errno);
     }
 
     if ((errno = chdir("/")))
@@ -98,39 +150,23 @@ static inline void rootfs_prepare()
         panic("failed to chdir; errno = %d", errno);
     }
 
-    mkdir("/test", 0);
-    mkdir("/test/test1", 0);
-    mkdir("/test/test1/test2", 0);
-    mkdir("/tmp", 0);
-    mkdir("/ext2", 0);
-    mount("none", "/tmp", "ramfs", 0, 0);
-    errno = mount("none", "/ext2", "ext2", 0, 0);
-
-    if (errno)
-    {
-        log_error("mounting ext2 failed with %d", errno);
-    }
-
-    if (mkdir("/dev", 0) || mkdir("/bin", 0))
-    {
-        panic("cannot create required directories");
-    }
-
     if ((errno = mount("none", "/dev", "devfs", 0, 0)))
     {
         panic("cannot mount devfs; errno = %d", errno);
     }
 
-    if ((errno = mount("none", "/bin", "mbfs", 0, 0)))
+    if ((errno = mount("none", "/proc", "proc", 0, 0)))
     {
-        panic("cannot mount mbfs; errno = %d", errno);
+        panic("cannot mount proc; errno = %d", errno);
+    }
+
+    if ((errno = mount("none", "/tmp", "ramfs", 0, 0)))
+    {
+        log_warning("cannot mount ramfs on /tmp");
     }
 }
 
-static inline const char* parse_key_value(
-    char* dest,
-    const char* src,
-    const char* key)
+static const char* parse_key_value(char* dest, const char* src, const char* key)
 {
     size_t len;
     char* string;
@@ -161,24 +197,25 @@ static inline const char* parse_key_value(
     return src;
 }
 
-static inline void cmdline_parse(options_t* options, const char* cmdline)
+static inline void cmdline_parse(const char* cmdline)
 {
     const char* temp = cmdline;
 
     while (*temp)
     {
-        temp = parse_key_value(options->syslog, temp, "syslog=");
-        temp = parse_key_value(options->init, temp, "init=");
+        temp = parse_key_value(options.syslog, temp, "syslog=");
+        temp = parse_key_value(options.init, temp, "init=");
         ++temp;
     }
 }
 
-static inline void syslog_configure(const char* device)
+static inline void syslog_configure()
 {
     int errno;
     file_t* file;
+    const char* device = options.syslog;
 
-    log_info("device = %s", device);
+    log_notice("syslog output: %s", device);
 
     if (!strcmp(device, "none"))
     {
@@ -193,20 +230,58 @@ static inline void syslog_configure(const char* device)
     printk_register(file);
 }
 
-__noreturn static int init(const char* cmdline)
+static inline void unmap_sections()
 {
-    options_t options = {
-        .syslog = "/dev/tty0",
-        .init = "/bin/init",
-    };
+    for (section_t* section = sections; section->name; ++section)
+    {
+        if (!(section->flags & SECTION_UNMAP_AFTER_INIT))
+        {
+            continue;
+        }
 
-    cmdline_parse(&options, cmdline);
+        section_free(section);
+    }
+}
+
+static int NORETURN(init(const char* cmdline))
+{
+    cmdline_parse(cmdline);
     rootfs_prepare();
-    syslog_configure(options.syslog);
+    syslog_configure();
 
+    {
+        int errno;
+        scoped_file_t* file = NULL;
+        char* buf = single_page();
+
+        memset(buf, 0, PAGE_SIZE);
+
+        if ((errno = do_open(&file, "/dev/hda", O_RDONLY, 0)))
+        {
+            log_info("cannot open /dev/hda");
+        }
+        else
+        {
+            log_info("reading data");
+            do_read(file, 0, buf, PAGE_SIZE);
+            memory_dump(log_info, buf + 508, 1);
+        }
+
+        page_free(buf);
+    }
+
+    unmap_sections();
+
+#if 0
+    pci_devices_list();
+#endif
+
+#if 0
+    video_modes_print();
+#endif
 #if 1
     extern int debug_monitor();
-    kernel_process(&debug_monitor, 0, 0);
+    kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
 #endif
 
     const char* const argv[] = {options.init, ptr(cmdline), NULL, };

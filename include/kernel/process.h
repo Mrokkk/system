@@ -1,11 +1,12 @@
 #pragma once
 
-#include <arch/vm.h>
-
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/wait.h>
 #include <kernel/mutex.h>
+#include <kernel/usyms.h>
+#include <kernel/binary.h>
 #include <kernel/dentry.h>
 #include <kernel/kernel.h>
 #include <kernel/signal.h>
@@ -14,38 +15,44 @@
 #define PROCESS_FILES       32
 #define PROCESS_NAME_LEN    32
 
-#define PROCESS_RUNNING     0
-#define PROCESS_WAITING     1
-#define PROCESS_STOPPED     2
-#define PROCESS_ZOMBIE      3
+typedef enum a
+{
+    PROCESS_RUNNING = 0,
+    PROCESS_WAITING = 1,
+    PROCESS_STOPPED = 2,
+    PROCESS_ZOMBIE  = 3,
+} stat_t;
 
-#define PROCESS_STATE_STRING "rwsz"
+#define PROCESS_STATE_STRING "RWSZ"
 
 #define EXITCODE(ret, sig)  ((ret) << 8 | (sig))
 #define WSTOPPED            0x7f
-
 #define WNOHANG             1
 #define WUNTRACED           2
 #define WCONTINUED          4
 
-#define USER_PROCESS        1
-#define KERNEL_PROCESS      2
+typedef enum
+{
+    USER_PROCESS        = 1,
+    KERNEL_PROCESS      = 2,
+} task_type_t;
 
 #define CLONE_FS            (1 << 0)
 #define CLONE_FILES         (1 << 1)
 #define CLONE_SIGHAND       (1 << 2)
 #define CLONE_MM            (1 << 3)
 
-// TODO: those shouldn't be hardcoded
-#define USER_SIGRET_VIRT_ADDRESS    (KERNEL_PAGE_OFFSET - 3 * PAGE_SIZE)
-#define USER_STACK_VIRT_ADDRESS     (KERNEL_PAGE_OFFSET - 2 * PAGE_SIZE)
-#define USER_STACK_SIZE             (2 * PAGE_SIZE)
+#define SPAWN_KERNEL        0
+#define SPAWN_USER          (1 << 1)
+#define SPAWN_VM86          (1 << 2)
 
-// Every process has its own kernel stack, user stack (in first
-// vm_area; of course not for kernel process) and PGD
+#define USER_STACK_SIZE             (2 * PAGE_SIZE)
+#define USER_STACK_VIRT_ADDRESS     (KERNEL_PAGE_OFFSET - USER_STACK_SIZE)
+
 struct mm
 {
     mutex_t lock;
+    uint32_t code_start, code_end;
     uint32_t stack_start, stack_end;
     uint32_t args_start, args_end;
     uint32_t env_start, env_end;
@@ -54,32 +61,33 @@ struct mm
     pgd_t* pgd;
     vm_area_t* vm_areas;
 #define MM_INIT(mm) \
-    { MUTEX_INIT(mm.lock), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    { MUTEX_INIT(mm.lock), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 struct signals
 {
     int count;
-    unsigned short trapped;
+    uint32_t trapped;
     sighandler_t sighandler[NSIGNALS];
-    struct context context;
-    vm_area_t* user_code;
+    sigrestorer_t sigrestorer;
+    struct signal_context context;
 #define SIGNALS_INIT \
-    { 1, 0, { 0, }, { 0, }, 0, }
+    { 1, 0, { 0, }, 0, { 0, }, }
 };
 
 struct fs
 {
     int count;
     dentry_t* cwd;
+    dentry_t* root;
 #define FS_INIT \
-    { 1, 0 }
+    { 1, NULL, NULL }
 };
 
 struct files
 {
     int count;
-    struct file* files[PROCESS_FILES];
+    file_t* files[PROCESS_FILES];
 #define FILES_INIT \
     { 1, { 0, } }
 };
@@ -88,23 +96,27 @@ struct process
 {
     struct context context;
     stat_t stat;
-    struct list_head running;
+    list_head_t running;
+    unsigned need_resched;
     pid_t pid, ppid;
     int exit_code;
-    char type;
-    unsigned context_switches;
-    unsigned forks;
+    uid_t uid;
+    gid_t gid;
+    int sid;
+    task_type_t type;
+    unsigned context_switches, forks;
     char name[PROCESS_NAME_LEN];
     struct mm* mm;
     struct fs* fs;
     struct files* files;
     struct signals* signals;
     struct process* parent;
-    struct wait_queue_head wait_child;
-    struct list_head children;
-    // It's not safe to use this list directly, yet; TODO: why?
-    struct list_head siblings;
-    struct list_head processes;
+    binary_t* bin;
+    wait_queue_head_t wait_child;
+    list_head_t children;
+    // Don't iterate over those lists
+    list_head_t siblings;
+    list_head_t processes;
 };
 
 #define PROCESS_STACK_DECLARE(name) \
@@ -147,19 +159,20 @@ struct process
     PROCESS_SIGNALS_DECLARE(name); \
     struct process name = PROCESS_INIT(name)
 
+extern unsigned* need_resched;
 extern struct process init_process;
 extern struct process* process_current;
 
-extern struct list_head process_list;
-extern struct list_head running;
+extern list_head_t running;
 
+extern pid_t last_pid;
 extern unsigned int total_forks;
 extern unsigned int context_switches;
 
 int processes_init();
 int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags);
 void process_delete(struct process* p);
-int kernel_process(int (*start)(), void* args, unsigned int flags);
+int kernel_process_spawn(int (*entry)(), void* args, void* stack, int flags);
 int process_find(int pid, struct process** p);
 void process_wake_waiting(struct process* p);
 int process_find_free_fd(struct process* p, int* fd);
@@ -170,11 +183,13 @@ void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[]);
 vm_area_t* stack_create(uint32_t address, pgd_t* pgd);
 char* process_print(const struct process* p, char* str);
+vm_area_t* exec_prepare_initial_vma();
 
 // Arch-dependent functions
 int arch_process_copy(struct process* dest, struct process* src, struct pt_regs* old_regs);
+int arch_process_spawn(struct process* child, int (*entry)(), void* args, int flags);
 void arch_process_free(struct process* p);
-int arch_process_execute_sighan(struct process* p, uint32_t ip);
+int arch_process_execute_sighan(struct process* p, uint32_t ip, uint32_t restorer);
 int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
 
 static inline char process_state_char(int s)
@@ -204,12 +219,8 @@ static inline void process_exit(struct process* p)
     list_del(&p->running);
     p->stat = PROCESS_ZOMBIE;
     process_wake_waiting(p);
+    p->need_resched = true;
     irq_restore(flags);
-    if (p == process_current)
-    {
-        scheduler();
-        ASSERT_NOT_REACHED();
-    }
 }
 
 static inline void process_stop(struct process* p)
@@ -222,7 +233,7 @@ static inline void process_stop(struct process* p)
     irq_restore(flags);
     if (p == process_current)
     {
-        scheduler();
+        *need_resched = true;
     }
 }
 
@@ -239,6 +250,21 @@ static inline void process_wake(struct process* p)
 }
 
 static inline void process_wait(struct process* p, flags_t flags)
+{
+    list_del(&p->running);
+    p->stat = PROCESS_WAITING;
+    if (p == process_current)
+    {
+        *need_resched = true;
+        irq_restore(flags);
+    }
+    else
+    {
+        irq_restore(flags);
+    }
+}
+
+static inline void process_wait2(struct process* p, flags_t flags)
 {
     list_del(&p->running);
     p->stat = PROCESS_WAITING;
@@ -268,11 +294,6 @@ static inline int fd_check_bounds(int fd)
     return (fd >= PROCESS_FILES) || (fd < 0);
 }
 
-static inline int process_type(struct process* p)
-{
-    return p->type;
-}
-
 static inline int process_is_kernel(struct process* p)
 {
     return p->type == KERNEL_PROCESS;
@@ -290,7 +311,17 @@ static inline void process_signals_exit(struct process* p)
 
 static inline void process_files_exit(struct process* p)
 {
-    if (!--p->files->count) delete(p->files);
+    if (!--p->files->count)
+    {
+        for (int i = 0; i < PROCESS_FILES; ++i)
+        {
+            if (p->files->files[i])
+            {
+                do_close(p->files->files[i]);
+            }
+        }
+        delete(p->files);
+    }
 }
 
 static inline void process_fs_exit(struct process* p)
@@ -298,19 +329,50 @@ static inline void process_fs_exit(struct process* p)
     if (!--p->fs->count) delete(p->fs);
 }
 
+static inline void process_bin_exit(struct process* p)
+{
+    binary_t* bin = p->bin;
+    if (!bin)
+    {
+        return;
+    }
+
+    if (!--bin->count)
+    {
+        if (bin->symbols_pages)
+        {
+            pages_free(bin->symbols_pages);
+        }
+        delete(bin);
+    }
+}
+
 static inline int current_can_kill(struct process* p)
 {
     return p->pid != 0;
 }
 
+static inline vm_area_t* process_code_vm_area(struct process* p)
+{
+    uint32_t code_start = p->mm->code_start;
+    for (vm_area_t* temp = p->mm->vm_areas; temp; temp = temp->next)
+    {
+        if (temp->start == code_start)
+        {
+            return temp;
+        }
+    }
+    return NULL;
+}
+
 static inline vm_area_t* process_stack_vm_area(struct process* p)
 {
     uint32_t stack_start = p->mm->stack_start;
-    for (vm_area_t* temp = p->mm->vm_areas; temp; temp = temp->next)
+    for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)
     {
-        if (temp->virt_address == stack_start)
+        if (vma->start == stack_start)
         {
-            return temp;
+            return vma;
         }
     }
     return NULL;
@@ -319,11 +381,11 @@ static inline vm_area_t* process_stack_vm_area(struct process* p)
 static inline vm_area_t* process_brk_vm_area(struct process* p)
 {
     uint32_t brk = p->mm->brk;
-    for (vm_area_t* temp = p->mm->vm_areas; temp; temp = temp->next)
+    for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)
     {
-        if (temp->virt_address < brk && temp->virt_address + temp->size >= brk)
+        if (vma->start < brk && vma->end >= brk)
         {
-            return temp;
+            return vma;
         }
     }
     return NULL;

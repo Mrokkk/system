@@ -1,18 +1,17 @@
 #pragma once
 
-#include <kernel/linkage.h>
 #include <arch/segment.h>
+#include <kernel/linkage.h>
 
-#define EIP_PUSHED      0
-#define CS_PUSHED       4
-#define EFLAGS_PUSHED   8
-#define ESP_PUSHED      12
-#define SS_PUSHED       16
+#ifdef __ASSEMBLER__
 
 #define SECTION(sect) \
     .section sect
 
-#define SAVE_ALL \
+#define SAVE_ALL(has_error_code) \
+    .if has_error_code == 0; \
+        sub $4, %esp; \
+    .endif; \
     pushl %gs;          /* gs */  \
     pushl %fs;          /* fs */  \
     pushl %es;          /* es */  \
@@ -29,16 +28,14 @@
     push %esi;          /* esi */ \
     push %edx;          /* edx */ \
     push %ecx;          /* ecx */ \
-    push %ebx;          /* ebx */
+    push %ebx;          /* ebx */ \
+    SAVE_USER_ESP;                \
 
 #define SAVE_USER_ESP \
     mov REGS_CS(%esp), %edx; \
-    cmp $USER_CS, %edx; \
-    jne 1f; \
     mov SYMBOL_NAME(process_current), %ecx; \
     mov REGS_ESP(%esp), %edx; \
     mov %edx, CONTEXT_ESP2(%ecx); \
-    1:
 
 #define RESTORE_ALL \
     pop %ebx; \
@@ -51,70 +48,56 @@
     popl %ds; \
     popl %es; \
     popl %fs; \
-    popl %gs;
+    popl %gs; \
+    add $4, %esp;
 
-#define PIC_EOI(nr) \
-    mov $0x20, %al; \
-    .if nr > 7; \
-        outb %al, $0xa0; \
-    .endif; \
-    outb %al, $0x20
-
-#define __pic_isr(x) \
-    ENTRY(isr_##x) \
-        SAVE_ALL; \
-        SAVE_USER_ESP; \
+#define __pic_isr(nr) \
+    ENTRY(isr_##nr) \
+        cli; \
+        SAVE_ALL(0); \
         call SYMBOL_NAME(timestamp_update); \
         push %esp; \
-        push $x-0x20; \
+        push $nr - 32; \
         call SYMBOL_NAME(do_irq); \
-        PIC_EOI(x); \
         add $8, %esp; \
-        RESTORE_ALL; \
-        iret; \
-    ENDPROC(isr_##x)
+        sti; \
+        jmp exit_kernel; \
+    ENDPROC(isr_##nr)
 
-#define __timer_isr __pic_isr
+#define __timer_isr(nr)
 
-#define __exception_noerrno(x) \
-    ENTRY(exc_##x##_handler) \
-        push $0; \
-        SAVE_ALL; \
-        SAVE_USER_ESP; \
+#define __apic_isr(nr) \
+    ENTRY(isr_##nr) \
+        cli; \
+        SAVE_ALL(0); \
         call SYMBOL_NAME(timestamp_update); \
-        push $__NR_##x; \
+        push %esp; \
+        push $nr - 48; \
+        call SYMBOL_NAME(do_irq); \
+        add $8, %esp; \
+        sti; \
+        jmp exit_kernel; \
+    ENDPROC(isr_##nr)
+
+#define __exception(x, nr, has_error_code, ...) \
+    ENTRY(exc_##x##_handler) \
+        SAVE_ALL(has_error_code); \
+        call SYMBOL_NAME(timestamp_update); \
+        push $nr; \
         call do_exception; \
         add $4, %esp; \
-        RESTORE_ALL; \
-        add $4, %esp; \
-        iret; \
+        jmp exit_kernel; \
     ENDPROC(exc_##x##_handler)
 
-#define __exception_errno(x) \
+#define __exception_debug(x, nr, ...) \
     ENTRY(exc_##x##_handler) \
-        SAVE_ALL; \
-        SAVE_USER_ESP; \
-        call SYMBOL_NAME(timestamp_update); \
-        push $__NR_##x; \
-        call do_exception; \
-        add $4, %esp; \
-        RESTORE_ALL; \
-        add $4, %esp; \
-        iret; \
-    ENDPROC(exc_##x##_handler)
-
-#define __exception_debug(x) \
-    ENTRY(exc_##x##_handler) \
-        push $0; \
-        SAVE_ALL; \
-        SAVE_USER_ESP; \
-        push $__NR_##x; \
+        SAVE_ALL(0); \
+        push $nr; \
         call do_exception; \
         movl $0, %eax; \
         mov %eax, %dr6; \
         add $4, %esp; \
-        RESTORE_ALL; \
-        add $4, %esp; \
+        jmp exit_kernel; \
         iret; \
     ENDPROC(exc_##x##_handler)
 
@@ -191,67 +174,4 @@
         ret; \
     ENDPROC(name)
 
-#define __breakpoint xchgw %bx, %bx
-
-#define printd(p1, p2, p3) \
-    push p3; \
-    push p2; \
-    push p1; \
-    call printk; \
-    add $12, %esp;
-
-#define __debugpoint \
-    pusha; \
-    push %esi; \
-    push %edi; \
-    push %ebp; \
-    push %edx; \
-    push %ecx; \
-    push %ebx; \
-    printd($1f, $2f, %eax); \
-    pop %ebx; \
-    printd($1f, $3f, %ebx); \
-    pop %ecx; \
-    printd($1f, $4f, %ecx); \
-    pop %edx; \
-    printd($1f, $5f, %edx); \
-    push $14f; \
-    call printk; \
-    add $4, %esp; \
-    pop %ebp; \
-    printd($1f, $6f, %ebp); \
-    pop %edi; \
-    printd($1f, $7f, %edi); \
-    pop %esi; \
-    printd($1f, $8f, %esi); \
-    printd($1f, $9f, %esp); \
-    push $14f; \
-    call printk; \
-    add $4, %esp; \
-    pushf; \
-    pop %eax; \
-    printd($1f, $10f, %eax); \
-    mov %cr0, %eax; \
-    printd($1f, $11f, %eax); \
-    mov %cr3, %eax; \
-    printd($1f, $13f, %eax); \
-    push $14f; \
-    call printk; \
-    add $4, %esp; \
-    popa; \
-    jmp 15f; \
-    1: .asciz "%s = %x; "; \
-    2: .asciz "EAX"; \
-    3: .asciz "EBX"; \
-    4: .asciz "ECX"; \
-    5: .asciz "EDX"; \
-    6: .asciz "EBP"; \
-    7: .asciz "EDI"; \
-    8: .asciz "ESI"; \
-    9: .asciz "ESP"; \
-    10: .asciz "EFLAGS"; \
-    11: .asciz "CR0"; \
-    12: .asciz "CR1"; \
-    13: .asciz "CR3"; \
-    14: .asciz "\n"; \
-    15:
+#endif

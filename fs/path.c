@@ -1,4 +1,4 @@
-#include <arch/vm.h>
+#include <kernel/vm.h>
 #include <kernel/path.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>

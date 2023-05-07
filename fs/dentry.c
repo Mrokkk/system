@@ -16,10 +16,7 @@ void dentry_init(dentry_t* dentry)
 #endif
 }
 
-dentry_t* dentry_create(
-    struct inode* inode,
-    dentry_t* parent_dentry,
-    const char* name)
+dentry_t* dentry_create(inode_t* inode, dentry_t* parent_dentry, const char* name)
 {
     size_t len;
     dentry_t* new_dentry = alloc(dentry_t, dentry_init(this));

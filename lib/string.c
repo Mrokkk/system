@@ -139,9 +139,6 @@ void* memset(void* ptr, int c, size_t size)
 
 void* memsetw(uint16_t* dest, uint16_t val, size_t count)
 {
-    for (uint16_t* temp = (uint16_t*)dest;
-         count != 0;
-         count--, *temp++ = val);
-
+    for (uint16_t* temp = dest; count; count--, *temp++ = val);
     return dest;
 }

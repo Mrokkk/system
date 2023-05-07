@@ -8,8 +8,6 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include <arch/mmap.h>
-
 #define LINE_LEN        256
 #define ARGV_MAX_SIZE   16
 #define HISTORY_SIZE    32
@@ -35,9 +33,15 @@ static struct {
     {0, 0}
 };
 
-int sighan(int)
+int sigint(int)
 {
     printf("^C\n");
+    return 0;
+}
+
+int sigtstp(int)
+{
+    printf("^Z\n");
     return 0;
 }
 
@@ -172,9 +176,14 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
         *status = 1;
         return 1;
     }
-    waitpid(pid, status, 0);
 
-    if (WIFSIGNALED(*status) && WTERMSIG(*status) == SIGSEGV)
+    waitpid(pid, status, WUNTRACED);
+
+    if (WIFSTOPPED(*status))
+    {
+        printf("Stopped\n");
+    }
+    else if (WIFSIGNALED(*status) && WTERMSIG(*status) == SIGSEGV)
     {
         printf("Segmentation fault\n");
     }
@@ -190,7 +199,13 @@ int main()
     char* arguments[ARGV_MAX_SIZE];
     char* argv[ARGV_MAX_SIZE];
 
-    signal(SIGINT, sighan);
+    if (setsid())
+    {
+        return EXIT_FAILURE;
+    }
+
+    signal(SIGINT, sigint);
+    signal(SIGTSTP, sigtstp);
 
     for (int i = 0; i < HISTORY_SIZE; history[i++] = malloc(32));
 

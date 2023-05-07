@@ -6,14 +6,15 @@
 #include <kernel/backtrace.h>
 
 #define ASSERT(cond) \
-    do { \
+    ({ \
         int a = (int)(cond); (void)a; \
-        if (!a) \
+        if (unlikely(!a)) \
         { \
             log_error("%s:%u: assertion "#cond" failed", __builtin_strrchr(__FILE__, '/') + 1, __LINE__); \
-            backtrace_dump(); \
+            backtrace_dump(log_error); \
         } \
-    } while (0)
+        1; \
+    })
 
 #define ASSERT_NOT_REACHED() \
     do { \

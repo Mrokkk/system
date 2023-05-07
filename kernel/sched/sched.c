@@ -3,6 +3,7 @@
 
 struct process* process_current = &init_process;
 unsigned int context_switches;
+unsigned* need_resched;
 
 // Simple RR scheduler
 void scheduler()
@@ -23,7 +24,7 @@ void scheduler()
     }
     else
     {
-        struct list_head* temp = process_current->running.next;
+        list_head_t* temp = process_current->running.next;
         if (temp == &running)
         {
             temp = temp->next;
@@ -51,6 +52,7 @@ end:
 
     context_switches++;
     last->context_switches++;
+    need_resched = &process_current->need_resched;
 
     process_switch(last, process_current);
 }

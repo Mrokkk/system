@@ -3,24 +3,21 @@
 #include <kernel/dentry.h>
 #include <kernel/process.h>
 
-static inline void get_next_dir(const char* path, char* output)
+static inline void get_next_dir(char** path, char* output)
 {
-    char* first_slash = strchr(path, '/');
+    char* next_slash = strchr(*path, '/');
 
-    if (first_slash == path)
+    if (!next_slash)
     {
-        strcpy(output, "/");
-        return;
-    }
-
-    if (!first_slash)
-    {
-        strcpy(output, path);
+        strcpy(output, *path);
+        *path += strlen(*path);
     }
     else
     {
-        memcpy(output, path, first_slash - path);
-        output[first_slash - path] = 0;
+        memcpy(output, *path, next_slash - *path);
+        output[next_slash - *path] = 0;
+        *path = next_slash;
+        ++*path;
     }
 }
 
@@ -28,13 +25,12 @@ dentry_t* lookup(const char* filename)
 {
     char name[256];
     char* path = (char*)filename;
-    struct inode* parent_inode = NULL;
+    inode_t* parent_inode = NULL;
     dentry_t* parent_dentry = NULL;
     dentry_t* dentry = NULL;
 
     log_debug(DEBUG_LOOKUP, "called for filename=%S", filename);
 
-    // If filename is relative, get cwd
     if (!path_is_absolute(filename))
     {
         dentry = process_current->fs->cwd;
@@ -42,49 +38,64 @@ dentry_t* lookup(const char* filename)
         parent_dentry = dentry;
         log_debug(DEBUG_LOOKUP, "relative; %O", dentry);
     }
+    else if (process_current->fs->root)
+    {
+        dentry = process_current->fs->root;
+        parent_inode = dentry->inode;
+        parent_dentry = dentry;
+        log_debug(DEBUG_LOOKUP, "absolute; %O", dentry);
+        ++path;
+    }
+    else if (*filename == '/')
+    {
+        ++path;
+    }
 
     while (1)
     {
-        get_next_dir(path, name);
+        get_next_dir(&path, name);
 
         log_debug(DEBUG_LOOKUP, "dirname=%S", name);
 
-        if (!strcmp(name, ".."))
+        if (!strcmp(name, "."))
         {
-            dentry = dentry->parent;
-            goto next;
         }
-
-        dentry = dentry_lookup(dentry, name);
-
-        log_debug(DEBUG_LOOKUP, "got dentry %O", dentry);
-
-        if (unlikely(!dentry && !parent_inode))
+        else if (!strcmp(name, ".."))
         {
-            return NULL;
+            dentry = dentry->parent
+                ? dentry->parent
+                : dentry;
         }
-        else if (!dentry)
+        else if (!strlen(name) && parent_dentry)
         {
-            // There's an assumption that there is a dentry for root, so we may enter here only during second run
-            log_debug(DEBUG_LOOKUP, "calling ops->lookup with %O, %S", parent_inode, name);
-            if (parent_inode->ops->lookup(parent_inode, name, &parent_inode))
-            {
-                return NULL;
-            }
-            dentry = dentry_create(parent_inode, parent_dentry, name);
-            parent_dentry = dentry;
+            return parent_dentry;
         }
         else
         {
-            parent_dentry = dentry;
-            parent_inode = parent_dentry->inode;
+            dentry = dentry_lookup(dentry, name);
+
+            if (unlikely(!dentry && !parent_inode))
+            {
+                return NULL;
+            }
+            else if (!dentry)
+            {
+                log_debug(DEBUG_LOOKUP, "calling ops->lookup with %O, %S", parent_inode, name);
+                if (parent_inode->ops->lookup(parent_inode, name, &parent_inode))
+                {
+                    return NULL;
+                }
+                dentry = dentry_create(parent_inode, parent_dentry, name);
+                parent_dentry = dentry;
+            }
+            else
+            {
+                parent_dentry = dentry;
+                parent_inode = parent_dentry->inode;
+            }
         }
 
-next:
-        log_debug(DEBUG_LOOKUP, "calling path_next with %S", path);
-        path = path_next(path);
-
-        if (!path || strlen(path) == 1)
+        if (!path || strlen(path) == 0)
         {
             if (dentry)
             {
@@ -96,7 +107,6 @@ next:
             }
             return dentry;
         }
-        path++;
     }
 
     return dentry;

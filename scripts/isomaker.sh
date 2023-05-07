@@ -46,11 +46,6 @@ for mod in "${modules[@]}"; do
     "
 done
 
-if [[ -f disk.img ]]; then
-    modules_load+="module /disk.img disk.img
-"
-fi
-
 # For debug: set debug=all
 menu_entry="set timeout=0
 serial --unit=0 --speed=9600
@@ -70,10 +65,6 @@ echo "${menu_entry}" >${name}.d/boot/grub/grub.cfg
 for mod in "${modules[@]}"; do
     cp ${mod} ${name}.d
 done
-
-if [[ -f disk.img ]]; then
-    cp disk.img ${name}.d/disk.img
-fi
 
 cp ${binary} ${name}.d/kernel
 grub-mkrescue -o ${name}.iso ${name}.d

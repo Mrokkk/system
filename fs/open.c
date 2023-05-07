@@ -15,55 +15,47 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     const char* basename;
     char parent[256];
 
-    if (path_is_absolute(filename))
+    dentry_t* dentry = lookup(filename);
+
+    if (dentry)
     {
-        dirname(filename, parent);
-
-        log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
-        parent_dentry = lookup(parent);
-
-        if (!parent_dentry)
-        {
-            log_debug(DEBUG_OPEN, "no dentry for parent", filename);
-            return -ENOENT;
-        }
-        basename = find_last_slash(filename) + 1;
+        inode = dentry->inode;
+        goto set_file;
+    }
+    else if (!dentry && !(flags & O_CREAT))
+    {
+        log_debug(DEBUG_OPEN, "invalid mode");
+        return -ENOENT;
     }
     else
     {
-        parent_dentry = process_current->fs->cwd;
-        basename = filename;
+        if (path_is_absolute(filename))
+        {
+            dirname(filename, parent);
+
+            log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
+            parent_dentry = lookup(parent);
+
+            if (!parent_dentry)
+            {
+                log_debug(DEBUG_OPEN, "no dentry for parent", filename);
+                return -ENOENT;
+            }
+            basename = find_last_slash(filename) + 1;
+        }
+        else
+        {
+            parent_dentry = process_current->fs->cwd;
+            basename = filename;
+        }
     }
 
     parent_inode = parent_dentry->inode;
 
-    // Hack for opening root
-    if (!strcmp(filename, parent))
+    if ((errno = parent_inode->ops->create(parent_inode, basename, flags, mode, &inode)))
     {
-        inode = parent_inode;
-        goto set_file;
-    }
-
-    log_debug(DEBUG_OPEN, "calling lookup for %S", basename);
-    errno = parent_inode->ops->lookup(parent_inode, basename, &inode);
-
-    if (errno)
-    {
-        log_debug(DEBUG_OPEN, "failed lookup; calling ops->create");
-
-        if (!(flags & O_CREAT))
-        {
-            log_debug(DEBUG_OPEN, "invalid mode");
-            return -ENOENT;
-        }
-
-        errno = parent_inode->ops->create(parent_inode, basename, flags, mode, &inode);
-
-        if (errno)
-        {
-            log_debug(DEBUG_OPEN, "create failed");
-            return errno;
-        }
+        log_debug(DEBUG_OPEN, "create failed");
+        return errno;
     }
 
     if (unlikely(!inode))
@@ -78,18 +70,26 @@ set_file:
         return -ENOSYS;
     }
 
+    if (S_ISDIR(inode->mode) && !(flags & O_DIRECTORY))
+    {
+        return -EISDIR;
+    }
+
+    // TODO: check permissions
+
     if (!(*new_file = alloc(file_t, list_add_tail(&this->files, &files))))
     {
         return -ENOMEM;
     }
 
-    log_debug(DEBUG_OPEN, "parent=%S, file=%O, inode=%O", parent, *new_file, inode);
+    log_debug(DEBUG_OPEN, "file=%O, inode=%O", *new_file, inode);
 
     (*new_file)->inode = inode;
     (*new_file)->ops = inode->file_ops;
-    (*new_file)->mode = mode;
+    (*new_file)->mode = flags;
     (*new_file)->offset = 0;
     (*new_file)->count = 1;
+    (*new_file)->private = NULL;
 
     if ((errno = (*new_file)->ops->open(*new_file)))
     {
@@ -102,7 +102,7 @@ set_file:
     return errno;
 }
 
-int sys_open(const char* filename, int flags, int mode)
+int sys_open(const char* __user filename, int flags, int mode)
 {
     int fd, errno;
     struct file *file;
@@ -147,6 +147,10 @@ int do_close(file_t* file)
 {
     if (!--file->count)
     {
+        if (file->ops->close)
+        {
+            file->ops->close(file);
+        }
         delete(file, list_del(&file->files));
     }
     return 0;
@@ -184,7 +188,7 @@ int sys_close(int fd)
     return do_close(file);
 }
 
-int sys_mkdir(const char* path, int mode)
+int sys_mkdir(const char* __user path, int mode)
 {
     int errno;
     inode_t* inode;
@@ -246,15 +250,23 @@ int sys_mkdir(const char* path, int mode)
 
 int sys_creat(const char* pathname, int mode)
 {
+    int errno;
+
+    if ((errno = path_validate(pathname)))
+    {
+        return errno;
+    }
+
     log_debug(DEBUG_OPEN, "called with %S, %d", pathname, mode);
-    // TODO: add address checking
+
     return sys_open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
 
-int sys_chdir(const char* path)
+int sys_chdir(const char* __user path)
 {
     int errno;
     dentry_t* dentry;
+    umode_t mode;
 
     if ((errno = path_validate(path)))
     {
@@ -265,11 +277,24 @@ int sys_chdir(const char* path)
     {
         return -ENOENT;
     }
+
+    mode = dentry->inode->mode;
+
+    if (!S_ISDIR(mode))
+    {
+        return -ENOTDIR;
+    }
+
+    if (!(mode & S_IXUSR) && !(mode & S_IXGRP) && !(mode & S_IXOTH))
+    {
+        return -EACCES;
+    }
+
     process_current->fs->cwd = dentry;
     return 0;
 }
 
-int sys_getcwd(char* buf, size_t size)
+int sys_getcwd(char* __user buf, size_t size)
 {
     int errno;
 
@@ -286,7 +311,7 @@ int sys_getcwd(char* buf, size_t size)
     return path_construct(process_current->fs->cwd, buf, size);
 }
 
-int sys_stat(const char* pathname, struct stat* statbuf)
+int sys_stat(const char* __user pathname, struct stat* __user statbuf)
 {
     dentry_t* dentry;
 

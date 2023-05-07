@@ -246,8 +246,12 @@ int vsprintf(char* buf, const char* fmt, va_list args)
         qualifier = -1;
         if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L')
         {
-            qualifier = *fmt;
-            ++fmt;
+            qualifier = *fmt++;
+            if (*fmt == 'l')
+            {
+                qualifier = qualifier << 8 | 'l';
+                ++fmt;
+            }
         }
 
         // default base
@@ -324,11 +328,17 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 continue;
 
             case 'b':
-            case 'B':
                 *str++ = '0';
                 *str++ = 'b';
                 base = 2;
                 break;
+
+            case 'B':
+            {
+                int b = va_arg(args, int);
+                str += sprintf(str, b ? "true" : "false");
+                continue;
+            }
 
                 // integer number formats - set up the flags and "break"
             case 'o':
@@ -336,9 +346,10 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 break;
 
             case 'x':
-            case 'X':
                 *str++ = '0';
                 *str++ = 'x';
+                fallthrough;
+            case 'X':
                 base = 16;
                 flags |= SMALL;
                 break;
@@ -365,22 +376,8 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 }
                 else
                 {
-                    switch (*magic)
-                    {
-#if 0
-                        case DENTRY_MAGIC:
-                            extern char* dentry_print();
-                            str = dentry_print(magic, str);
-                            continue;
-                        case INODE_MAGIC:
-                            extern char* inode_print();
-                            str = inode_print(magic, str);
-                            continue;
-#endif
-                        default:
-                            str += sprintf(str, "<ptr:%x>", (uint32_t)magic);
-                            continue;
-                    }
+                    str += sprintf(str, "<%x>", (uint32_t)magic);
+                    continue;
                 }
             }
 
@@ -413,11 +410,20 @@ int vsprintf(char* buf, const char* fmt, va_list args)
         {
             num = va_arg(args, int);
         }
+        else if (qualifier == ('l' | 'l' << 8))
+        {
+            uint64_t num = va_arg(args, uint64_t);
+            str = number(str, (uint32_t)(num >> 32), base, field_width, precision, flags);
+            str = number(str, (uint32_t)(num & ~0UL), base, field_width, precision, flags);
+            goto next;
+        }
         else
         {
             num = va_arg(args, unsigned int);
         }
+
         str = number(str, num, base, field_width, precision, flags);
+next:
     }
 
     *str = '\0';
@@ -434,4 +440,24 @@ int sprintf(char* buf, const char* fmt, ...)
     va_end(args);
 
     return i;
+}
+
+int strtoi(const char* str)
+{
+    int res = 0;
+
+    while (*str)
+    {
+        if (*str < '0' || *str > '9')
+        {
+            goto next;
+        }
+
+        res *= 10;
+        res += *str - '0';
+next:
+        ++str;
+    }
+
+    return res;
 }

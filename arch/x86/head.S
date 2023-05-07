@@ -5,32 +5,16 @@
 #include <arch/multiboot.h>
 #include <arch/descriptor.h>
 
-#define FLAGS       MULTIBOOT_HEADER_FLAGS_ALIGNED | MULTIBOOT_HEADER_FLAGS_MEMORY | MULTIBOOT_HEADER_FLAGS_VIDEO
+#define FLAGS       MULTIBOOT_HEADER_FLAGS_ALIGNED
 #define MAGIC       MULTIBOOT_HEADER_MAGIC
 #define CHECKSUM    -(MAGIC + FLAGS)
 
-SECTION(.multiboot)
+SECTION(.data.multiboot)
 
 ENTRY(multiboot_header)
     .long MAGIC
     .long FLAGS
     .long CHECKSUM
-    .long 0 // header_addr
-    .long 0 // load_addr
-    .long 0 // load_end_addr
-    .long 0 // bss_end_addr
-    .long 0 // entry_addr
-#if 1
-    .long MULTIBOOT_VIDEO_MODE_LIN // mode_type
-    .long 1280 // width
-    .long 720 // height
-    .long 32 // depth
-#else
-    .long MULTIBOOT_VIDEO_MODE_EGA
-    .long 0
-    .long 0
-    .long 0
-#endif
 END(multiboot_header)
 
 SECTION(.text.boot)
@@ -62,7 +46,7 @@ ENTRY(_start)
 
         // Enable paging
         mov %cr0, %eax
-        or $CR0_PE | CR0_PG, %eax
+        or $CR0_PE | CR0_PG | CR0_WP, %eax
         mov %eax, %cr0
         mov $1f, %eax
         jmp *%eax
@@ -87,43 +71,64 @@ ENTRY(_start)
         // Push multiboot data on stack
         push %edx
         push %ebx
+        push $0
 
         call SYMBOL_NAME(kmain)
 
     // Not reachable
-    2:  jmp 2b
+    1:  jmp 1b
 
 ENDPROC(_start)
 
-ENTRY(gdt)
-    .word 4096 * 8 - 1
-    .long __gdt_entries + KERNEL_PAGE_OFFSET
+SECTION(.data.gdt)
 
-ENTRY(__gdt_entries)
+ALIGN(32)
+ENTRY(unpaged_gdt_entries)
 
     // Null segment
     descriptor_entry(0, 0, 0)
 
     // Kernel code segment
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | \
-                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
     // Kernel data segment
-    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
-                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
     // User code segment
-    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | \
-                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
     // User data segment
-    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | \
-                     GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
     // TSS
     descriptor_entry(GDT_FLAGS_TYPE_32TSS, 0, 0)
 
+    // APM BIOS 32bit code
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_1B | GDT_FLAGS_32BIT, 0x0, 0xffff)
+
+    // APM BIOS 16bit code
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_1B | GDT_FLAGS_16BIT, 0x0, 0xffff)
+
+    // APM BIOS data
+    descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_1B | GDT_FLAGS_32BIT, 0x0, 0xffff)
+
+END(unpaged_gdt_entries)
+
+ALIGN(32)
+ENTRY(gdt)
+    .word . - unpaged_gdt_entries - 1
+    .long unpaged_gdt_entries + KERNEL_PAGE_OFFSET
+END(gdt)
+
 ALIGN(PAGE_SIZE)
+SECTION(.data.pagetable)
+ENTRY(page0)
+    .fill PAGE_KERNEL_FLAGS, 1, 0
+page_table0:
+    .fill 0x4000 - PAGE_KERNEL_FLAGS, 1, 0
+ALIGN(PAGE_SIZE)
+
+SECTION(.data.pagedir)
 ENTRY(page_dir)
     // First entry will be zeroed in paging_init; we need it available at boot
     // as kernel is running on unpaged memory
@@ -133,9 +138,5 @@ ENTRY(page_dir)
     .long page_table0 + PAGE_SIZE
     .long page_table0 + 2 * PAGE_SIZE
     .long page_table0 + 3 * PAGE_SIZE
-
+    .fill 1024 - KERNEL_PAGE_OFFSET / (PAGE_SIZE * 1024) - 5, 4, 0
 ALIGN(PAGE_SIZE)
-ENTRY(page0)
-    .skip PAGE_KERNEL_FLAGS
-page_table0:
-    .skip 0x4000 - PAGE_KERNEL_FLAGS

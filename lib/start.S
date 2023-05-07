@@ -5,6 +5,7 @@ SECTION(.text)
 ENTRY(_start)
 
     call bss_init
+    call signals_init
 
     call main
 

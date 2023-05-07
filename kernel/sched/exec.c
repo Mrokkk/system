@@ -3,10 +3,11 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 
-static inline int binary_image_get(const char* pathname, void** data)
+static inline int binary_image_load(const char* pathname, binary_t* bin)
 {
     int errno;
-    file_t* file;
+    char buffer[4];
+    scoped_file_t* file = NULL;
 
     if ((errno = do_open(&file, pathname, O_RDONLY, 0)))
     {
@@ -15,34 +16,32 @@ static inline int binary_image_get(const char* pathname, void** data)
 
     if (unlikely(!file))
     {
-        log_warning("null file returned by open");
-        errno = -ENOENT;
-        goto finish;
+        log_error("null file returned by open; pathname = %s", pathname);
+        return -ENOENT;
     }
 
-    if (!file->ops || !file->ops->mmap)
+    if (unlikely(!file->ops || !file->ops->mmap || !file->ops->read))
     {
-        errno = -ENOSYS;
-        goto finish;
+        return -ENOSYS;
     }
 
-    if ((errno = file->ops->mmap(file, data)))
+    if (unlikely(errno = do_read(file, 0, buffer, 4)))
     {
-        goto finish;
+        return errno;
     }
 
-    if (unlikely(!*data))
+    switch (*buffer)
     {
-        struct kernel_module* mod = module_find(file->inode->sb->module);
-        log_error("bug in %s module; mmap returned data = null", mod ? mod->name : "<unknown>");
-        errno = -EFAULT;
-        goto finish;
+        case ELFMAG0:
+            errno = elf_load(pathname, file, bin);
+            break;
+        default:
+            log_debug(DEBUG_PROCESS, "invalid file");
+            return -ENOEXEC;
     }
 
-    errno = 0;
+    bin->inode = file->inode;
 
-finish:
-    delete(file, list_del(&file->files));
     return errno;
 }
 
@@ -72,7 +71,7 @@ static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
         *dest++ = addr(temp);
         len = strlen(argv[i]);
         strcpy(temp, argv[i]);
-        temp += len;
+        temp += len + 1;
     }
 
     return temp;
@@ -115,67 +114,88 @@ static inline void args_put(int argc, char** copied_argv)
 
 int do_exec(const char* pathname, const char* const argv[])
 {
-    int errno;
-    int argc;
-    void* data;
-    void* entry;
-    vm_area_t* stack_vma;
-    vm_area_t* vm_areas = NULL;
-    uint32_t brk;
+    binary_t* bin;
+    char copied_path[256];
+    int errno, argc;
     uint32_t user_stack;
     uint32_t* kernel_stack;
     size_t args_size;
     char** copied_argv;
+    struct process* p = process_current;
+    pgd_t* pgd = ptr(p->mm->pgd);
 
     if ((errno = path_validate(pathname)))
     {
         return errno;
     }
 
-    if ((errno = vm_verify(VERIFY_READ, argv, 4, process_current->mm->vm_areas)))
+    if ((errno = vm_verify(VERIFY_READ, argv, 4, p->mm->vm_areas)))
     {
         return errno;
     }
 
+    if (!(bin = alloc(binary_t)))
+    {
+        return -ENOMEM;
+    }
+
+    strcpy(copied_path, pathname);
     copied_argv = args_get(&argc, argv, &args_size);
 
-    log_debug(DEBUG_PROCESS, "%s, argc=%u, argv=%x", pathname, argc, argv);
+    log_debug(DEBUG_PROCESS, "%s, argc=%u, argv=%x, pgd=%x", pathname, argc, argv, pgd);
 
-    if ((errno = binary_image_get(pathname, &data)))
+    kernel_stack = p->mm->kernel_stack; // FIXME: maybe I should alloc a new stack?
+
+    if ((errno = binary_image_load(pathname, bin)))
     {
         return errno;
     }
 
-    if ((errno = read_elf(pathname, data, &vm_areas, &brk, &entry)))
+    strncpy(p->name, copied_path, PROCESS_NAME_LEN);
+    process_bin_exit(p);
+    p->bin = bin;
+    bin->count = 1;
+
+    pgd_reload();
+
+    user_stack = bin->stack_vma->end;
+
+    p->mm->brk = bin->brk;
+    p->mm->args_start = user_stack - args_size;
+    p->mm->args_end = user_stack;
+    p->signals->trapped = 0;
+
+    argv_copy(ptr(user_stack - args_size), argc, copied_argv);
+    user_stack -= args_size;
+
+    args_put(argc, copied_argv);
+
+    ASSERT(*(int*)user_stack == argc);
+
+    p->type = USER_PROCESS;
+
+    log_debug(DEBUG_PROCESS, "%s[%u] vma:", p->name, p->pid);
+    vm_print(p->mm->vm_areas, DEBUG_PROCESS);
+
+    arch_exec(bin->entry, kernel_stack, user_stack);
+
+    return 0;
+}
+
+vm_area_t* exec_prepare_initial_vma()
+{
+    vm_area_t* prev;
+    vm_area_t* temp;
+    vm_area_t* stack_vma = process_stack_vm_area(process_current);
+
+    if (likely(stack_vma))
     {
-        return errno;
-    }
-
-    pgd_t* pgd = ptr(process_current->mm->pgd);
-    log_debug(DEBUG_PROCESS, "pgd=%x", pgd);
-
-    strncpy(process_current->name, pathname, PROCESS_NAME_LEN);
-
-    kernel_stack = process_current->mm->kernel_stack; // FIXME: maybe I should alloc a new stack?
-
-    if (process_is_kernel(process_current))
-    {
-        stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, pgd);
-        process_current->context.esp0 = addr(kernel_stack);
-        process_current->mm->stack_start = stack_vma->virt_address;
-        process_current->mm->stack_end = stack_vma->virt_address + stack_vma->size;
-    }
-    else
-    {
-        // Remove previous areas except for stack
-        stack_vma = process_stack_vm_area(process_current);
-        vm_area_t* prev;
-        for (vm_area_t* temp = process_current->mm->vm_areas; temp;)
+        for (temp = process_current->mm->vm_areas; temp;)
         {
             prev = temp;
             if (temp != stack_vma)
             {
-                vm_remove(temp, pgd, 1);
+                vm_unmap(temp, process_current->mm->pgd);
                 temp = temp->next;
                 delete(prev);
             }
@@ -185,37 +205,24 @@ int do_exec(const char* pathname, const char* const argv[])
                 prev->next = NULL;
             }
         }
-    }
 
-    for (vm_area_t* temp = vm_areas; temp; temp = temp->next)
+        stack_vma->next = NULL;
+        stack_vma->prev = NULL;
+        process_current->mm->vm_areas = NULL;
+    }
+    else if (process_is_kernel(process_current))
     {
-        vm_apply(temp, pgd, VM_APPLY_REPLACE_PG);
+        stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, process_current->mm->pgd);
+        process_current->mm->stack_start = stack_vma->start;
+        process_current->mm->stack_end = stack_vma->end;
+    }
+    else
+    {
+        log_warning("process %u:%x without a stack; sending SIGSEGV", process_current->pid, process_current);
+        do_kill(process_current, SIGSEGV);
     }
 
-    pgd_reload();
+    vm_add(&process_current->mm->vm_areas, stack_vma);
 
-    user_stack = vm_virt_end(stack_vma);
-
-    process_current->mm->brk = brk;
-    process_current->mm->args_start = user_stack - args_size;
-    process_current->mm->args_end = user_stack;
-
-    argv_copy(ptr(user_stack - args_size), argc, copied_argv);
-    user_stack -= args_size;
-
-    args_put(argc, copied_argv);
-
-    ASSERT(*(int*)user_stack == argc);
-
-    vm_add(&vm_areas, stack_vma);
-
-    process_current->mm->vm_areas = vm_areas;
-    process_current->type = USER_PROCESS;
-
-    log_debug(DEBUG_PROCESS, "proc %d areas:", process_current->pid);
-    vm_print(process_current->mm->vm_areas, DEBUG_PROCESS);
-
-    arch_exec(entry, kernel_stack, user_stack);
-
-    return 0;
+    return stack_vma;
 }

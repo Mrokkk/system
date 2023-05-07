@@ -1,5 +1,7 @@
+#include <errno.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -13,6 +15,22 @@
 
 static inline void permissions_fill(char* buffer, umode_t mode)
 {
+    if (S_ISDIR(mode))
+    {
+        *buffer++ = 'd';
+    }
+    else if (S_ISBLK(mode))
+    {
+        *buffer++ = 'b';
+    }
+    else if (S_ISCHR(mode))
+    {
+        *buffer++ = 'c';
+    }
+    else
+    {
+        *buffer++ = '-';
+    }
     *buffer++ = S_ISDIR(mode) ? 'd' : '-';
     *buffer++ = mode & S_IRUSR ? 'r' : '-';
     *buffer++ = mode & S_IWUSR ? 'w' : '-';
@@ -23,6 +41,7 @@ static inline void permissions_fill(char* buffer, umode_t mode)
     *buffer++ = mode & S_IROTH ? 'r' : '-';
     *buffer++ = mode & S_IWOTH ? 'w' : '-';
     *buffer++ = mode & S_IXOTH ? 'x' : '-';
+    *buffer++ = 0;
 }
 
 void dirent_print(struct dirent* dirent, struct stat* s)
@@ -33,11 +52,15 @@ void dirent_print(struct dirent* dirent, struct stat* s)
 
     if (errno)
     {
-        printf("error in stat for %s\n", dirent->name);
+        perror(dirent->name);
         return;
     }
 
     if (dirent->type == DT_CHR)
+    {
+        type = DEVICE;
+    }
+    else if (dirent->type == DT_BLK)
     {
         type = DEVICE;
     }
@@ -71,15 +94,16 @@ int main()
 
     if (dirfd < 0)
     {
-        printf("failed open %d\n", dirfd);
+        perror(buf);
+        return EXIT_FAILURE;
     }
 
     count = getdents(dirfd, buf, BUFFER_SIZE);
 
     if (count < 0)
     {
-        printf("getdents failed %d\n", count);
-        return -1;
+        perror(buf);
+        return EXIT_FAILURE;
     }
 
     dirent = (struct dirent*)buf;

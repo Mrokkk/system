@@ -6,7 +6,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 2048
 
 int main(int argc, char* argv[])
 {
@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 
     if (!filename)
     {
-        printf("no file name!\n");
+        printf("cat: no file name given\n");
         return EXIT_FAILURE;
     }
 
@@ -67,6 +67,11 @@ int main(int argc, char* argv[])
         do
         {
             size = read(fd, buf, BUFFER_SIZE);
+            if (size < 0)
+            {
+                perror(filename);
+                return EXIT_FAILURE;
+            }
             write(STDOUT_FILENO, buf, size);
         } while (size == BUFFER_SIZE);
     }

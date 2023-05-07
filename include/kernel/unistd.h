@@ -17,7 +17,7 @@
 #define __NR_mknod 14
 #define __NR_chmod 15
 #define __NR_lchown 16
-#define __NR_break 17
+#define __NR_setsid 17
 #define __NR_stat 18
 #define __NR_lseek 19
 #define __NR_getpid 20
@@ -38,13 +38,13 @@
 #define __NR_sleep 35
 #define __NR_sync 36
 #define __NR_kill 37
-#define __NR_switch 38
+#define __NR_chroot 38
 #define __NR_reboot 39
 #define __NR_getcwd 40
 #define __NR_dup 41
 #define __NR_pipe 42
 #define __NR_times 43
-#define __NR_prof 44
+#define __NR_sigaction 44
 #define __NR_getdents 45
 #define __NR_setgid 46
 #define __NR_getgid 47
@@ -83,6 +83,10 @@ int reboot(int magic, int magic2, int cmd);
 int chdir(const char* buf);
 int getcwd(char* buf, size_t size);
 void* sbrk(size_t incr);
+int chroot(const char* path);
+int setsid(void);
+
+struct sigaction;
 
 #endif // __ASSEMBLER__
 
@@ -142,3 +146,7 @@ __syscall2(dup2, int, int, int)
 __syscall1(sbrk, void*, size_t)
 __syscall2(stat, int, const char*, struct stat*)
 __syscall6(mmap, void*, void*, size_t, int, int, int , size_t)
+__syscall1(chroot, int, const char*)
+__syscall0(setsid, int)
+__syscall3(sigaction, int, int, const struct sigaction*, struct sigaction*)
+__syscall1(time, time_t, void*)

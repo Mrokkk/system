@@ -14,6 +14,7 @@
 #define PAGE_KERNEL_FLAGS   0x3
 #define KERNEL_PAGE_OFFSET  0xc0000000
 #define ADDRESS_SPACE       0xffffffff
+#define INIT_PGT_SIZE       4
 #define KERNEL_PDE_OFFSET   (KERNEL_PAGE_OFFSET / (PAGE_SIZE * PTE_IN_PDE))
 
 #define PDE_PRESENT     (1 << 0)
@@ -83,5 +84,21 @@ static inline void invlpg(void* address)
         : "memory"
     );
 }
+
+#define pte_flags(vaddr, pgd) \
+    ({ \
+        uint32_t flags = 0; \
+        uint32_t pde_index = pde_index(addr(vaddr)); \
+        uint32_t pte_index = pte_index(addr(vaddr)); \
+        if (pgd[pde_index]) \
+        { \
+            pgt_t* pgt = virt_ptr(pgd[pde_index] & ~PAGE_MASK); \
+            flags = pgt[pte_index] & PAGE_MASK; \
+        } \
+        flags; \
+    })
+
+void clear_first_pde(void);
+void page_map_panic(uint32_t start, uint32_t end);
 
 #endif // __ASSEMBLER__

@@ -10,9 +10,9 @@ struct dentry
     MAGIC_NUMBER;
     struct inode* inode;
     char* name;
-    struct list_head cache;
-    struct list_head child;
-    struct list_head subdirs;
+    list_head_t cache;
+    list_head_t child;
+    list_head_t subdirs;
     struct dentry* parent;
 };
 

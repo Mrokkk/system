@@ -39,29 +39,11 @@ struct context
    uint16_t trap;
    uint16_t iomap_offset;
    uint8_t io_bitmap[IO_BITMAP_SIZE];
-} __packed;
+} PACKED;
+
+typedef struct context context_t;
 
 struct pt_regs
-{
-    uint32_t ebx;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t esi;
-    uint32_t edi;
-    uint32_t ebp;
-    uint32_t eax;
-    uint16_t ds, __ds;
-    uint16_t es, __es;
-    uint16_t fs, __fs;
-    uint16_t gs, __gs;
-    uint32_t eip;
-    uint16_t cs, __cs;
-    uint32_t eflags;
-    uint32_t esp;
-    uint16_t ss, __ss;
-} __packed;
-
-struct exception_frame
 {
     uint32_t ebx;
     uint32_t ecx;
@@ -80,35 +62,64 @@ struct exception_frame
     uint32_t eflags;
     uint32_t esp;
     uint16_t ss, __ss;
-} __packed;
+} PACKED;
 
-#define __regs_print(regs, print_function) \
+typedef struct pt_regs pt_regs_t;
+
+struct context_switch_frame
+{
+    uint16_t gs, __gs;
+    uint32_t ebp;
+    uint32_t edi;
+    uint32_t esi;
+    uint32_t ecx;
+    uint32_t ebx;
+} PACKED;
+
+typedef struct context_switch_frame context_switch_frame_t;
+
+struct signal_context
+{
+    uint32_t esp, esp0, esp2, eip;
+};
+
+typedef struct signal_context signal_context_t;
+
+typedef struct { uint16_t off, seg; } farptr_t;
+
+#define farptr(v) ptr((v).seg * 0x10 + (v).off)
+
+#define __regs_print(regs, print_function, header) \
     do { \
         char buffer[64]; \
-        print_function("eax = %08x", (regs)->eax); \
-        print_function("ebx = %08x", (regs)->ebx); \
-        print_function("ecx = %08x", (regs)->ecx); \
-        print_function("edx = %08x", (regs)->edx); \
-        print_function("esp = %04x:%08x", (regs)->ss, (regs)->esp); \
-        print_function("ebp = %08x", (regs)->ebp); \
-        print_function("eip = %04x:%08x", (regs)->cs, (regs)->eip); \
-        print_function("ds = %04x; es = %04x; fs = %04x; gs = %04x", \
+        print_function("%s: eax = %08x", header, (regs)->eax); \
+        print_function("%s: ebx = %08x", header, (regs)->ebx); \
+        print_function("%s: ecx = %08x", header, (regs)->ecx); \
+        print_function("%s: edx = %08x", header, (regs)->edx); \
+        print_function("%s: esi = %08x", header, (regs)->esi); \
+        print_function("%s: edi = %08x", header, (regs)->edi); \
+        print_function("%s: esp = %04x:%08x", header, (regs)->ss, (regs)->esp); \
+        print_function("%s: ebp = %08x", header, (regs)->ebp); \
+        print_function("%s: eip = %04x:%08x", header, (regs)->cs, (regs)->eip); \
+        print_function("%s: ds = %04x; es = %04x; fs = %04x; gs = %04x", \
+            header, \
             (regs)->ds, \
             (regs)->es, \
             (regs)->fs, \
             (regs)->gs); \
         eflags_bits_string_get((regs)->eflags, buffer); \
-        print_function("eflags = %08x = (iopl=%d %s)", \
+        print_function("%s: eflags = %08x = (iopl=%d %s)", \
+            header, \
             (regs)->eflags, \
             ((uint32_t)(regs)->eflags >> 12) & 0x3, \
             buffer); \
     } while (0)
 
-#define PRINT_REGS_1(regs)                  __regs_print((regs), log_debug)
-#define PRINT_REGS_2(regs, print_function)  __regs_print((regs), print_function)
+#define PRINT_REGS_1(header, regs)                  __regs_print((regs), log_debug, header)
+#define PRINT_REGS_2(header, regs, print_function)  __regs_print((regs), print_function, header)
 
 #define regs_print(...) \
-    REAL_VAR_MACRO_2(PRINT_REGS_1, PRINT_REGS_2, __VA_ARGS__)
+    REAL_VAR_MACRO_3(PRINT_REGS_1, PRINT_REGS_1, PRINT_REGS_2, __VA_ARGS__)
 
 #endif // __ASSEMBLER__
 
@@ -123,11 +134,12 @@ struct exception_frame
 #define REGS_ES     32
 #define REGS_FS     36
 #define REGS_GS     40
-#define REGS_EIP    44
-#define REGS_CS     48
-#define REGS_EFLAGS 52
-#define REGS_ESP    56
-#define REGS_SS     60
+#define REGS_EC     44
+#define REGS_EIP    48
+#define REGS_CS     52
+#define REGS_EFLAGS 56
+#define REGS_ESP    60
+#define REGS_SS     64
 
 #define CONTEXT_ESP2 20
 

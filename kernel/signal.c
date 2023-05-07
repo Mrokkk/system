@@ -22,6 +22,11 @@ int sys_signal(int signum, sighandler_t handler)
         process_current->signals->trapped |= (1 << signum);
     }
 
+    log_debug(DEBUG_SIGNAL, "%u:%x set handler for %u",
+        process_current->pid,
+        process_current,
+        signum);
+
     process_current->signals->sighandler[signum] = handler;
 
     return 0;
@@ -69,7 +74,10 @@ int do_kill(struct process* proc, int signum)
     if (proc->signals->trapped & (1 << signum))
     {
         log_debug(DEBUG_SIGNAL, "calling custom handler");
-        arch_process_execute_sighan(proc, addr(proc->signals->sighandler[signum]));
+        arch_process_execute_sighan(
+            proc,
+            addr(proc->signals->sighandler[signum]),
+            addr(proc->signals->sigrestorer));
     }
     else
     {
@@ -95,4 +103,14 @@ int sys_kill(int pid, int signum)
     log_debug(DEBUG_SIGNAL, "sending %d to pid %d", signum, pid);
 
     return do_kill(p, signum);
+}
+
+int sys_sigaction(int, const struct sigaction* act, struct sigaction*)
+{
+    if (!act->sa_restorer)
+    {
+        return -EINVAL;
+    }
+    process_current->signals->sigrestorer = act->sa_restorer;
+    return 0;
 }

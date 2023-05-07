@@ -110,7 +110,7 @@ TEST(getdents_bad_ptr1)
         count = getdents(dirfd, (void*)0xc0000000, 0x1000);
 
         EXPECT_EQ(count, -1);
-        EXPECT_EQ(errno, -EFAULT);
+        EXPECT_EQ(errno, EFAULT);
 
         exit(*assert_failed);
     }
@@ -135,7 +135,7 @@ TEST(getdents_bad_ptr2)
         count = getdents(dirfd, (void*)0xcfffff00, 0x1000);
 
         EXPECT_EQ(count, -1);
-        EXPECT_EQ(errno, -EFAULT);
+        EXPECT_EQ(errno, EFAULT);
 
         exit(*assert_failed);
     }
@@ -214,8 +214,6 @@ TEST(sbrk2)
     }
 }
 
-// FIXME: hangs up kernel due to shared pages issue (see elf.c)
-#if 0
 TEST(own_copy_of_program)
 {
     EXPECT_EQ(data2, 13);
@@ -223,12 +221,14 @@ TEST(own_copy_of_program)
     FORK_TEST_CASE_EQ(0)
     {
         char* argv[] = {"--test=modify_data", 0};
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
         exec("/bin/test", argv);
+        exit(1);
     }
     EXPECT_EQ(data, 34);
     EXPECT_EQ(data2, 13);
 }
-#endif
 
 TEST(modify_data)
 {
@@ -250,6 +250,13 @@ TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_1, 0xc0000000)
 TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_2, 0xc0010000)
 TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_3, 0xc0020000)
 TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_4, 0xc011759c)
+
+TEST(bad_syscall)
+{
+    int ret = syscall(999, 0, 0);
+    EXPECT_EQ(ret, -1);
+    EXPECT_EQ(errno, ENOSYS);
+}
 
 TEST_SUITE_END();
 

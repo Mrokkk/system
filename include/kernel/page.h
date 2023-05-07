@@ -4,22 +4,42 @@
 #include <stddef.h>
 #include <kernel/list.h>
 #include <kernel/trace.h>
+#include <kernel/memory.h>
 #include <kernel/compiler.h>
 
 #define __KERNEL_PAGE_INCLUDED
 #include <arch/page.h>
 
-typedef struct page
+struct page;
+struct inode;
+struct buffer;
+struct vm_region;
+
+typedef struct page page_t;
+typedef struct vm_region vm_region_t;
+
+struct page
 {
-    size_t count;
+    uint16_t count;
+    size_t pages_count;
     void* virtual;
 #if DEBUG_PAGE_DETAILED
     void* caller;
 #endif
-    struct list_head list_entry;
-} page_t;
+    struct inode* inode;
+    list_head_t list_entry;
+};
 
 extern page_t* page_map;
+
+struct vm_region
+{
+    const char* name;
+    memory_area_t* area;
+    uint32_t start;
+    uint32_t end;
+    uint32_t paddr;
+};
 
 #define page(phys)              (page_map + ((phys) / PAGE_SIZE))
 #define pfn(p)                  ((p) - page_map)
@@ -35,28 +55,32 @@ extern page_t* page_map;
 #define phys_ptr(vaddr)         (phys(ptr(vaddr)))
 #define phys_cptr(vaddr)        (phys(cptr(vaddr)))
 #define phys_addr(vaddr)        (phys(addr(vaddr)))
-#define page_align(address)     (((address) + PAGE_MASK) & ~PAGE_MASK)
+#define page_align(address)     align(address, PAGE_SIZE)
 #define page_beginning(address) ((address) & ~PAGE_MASK)
 #define kernel_address(address) ((address) >= KERNEL_PAGE_OFFSET)
 
-#define PAGE_ALLOC_DISCONT  0x0
-#define PAGE_ALLOC_CONT     0x1
+typedef enum
+{
+    PAGE_ALLOC_DISCONT,
+    PAGE_ALLOC_CONT,
+} alloc_flag_t;
 
 // Allocate a page(s) and map it/them in kernel; allocation of
 // multiple pages is done according to PAGE_ALLOC_* flags.
 // Returned pages are linked together through list_entry (first
 // page is list's head)
-page_t* __page_alloc(int count, int flags);
+MUST_CHECK(page_t*) __page_alloc(int count, alloc_flag_t flag);
 int __page_free(void* address);
+int __pages_free(page_t* pages);
 
-page_t* __page_range_get(uint32_t paddr, int count);
-int __page_range_free(struct list_head* head);
+MUST_CHECK(page_t*) __page_range_get(uint32_t paddr, int count);
+int __page_range_free(list_head_t* head);
 
-pgd_t* pgd_alloc(void);
-pgt_t* pgt_alloc(void);
-pgd_t* init_pgd_get(void);
+MUST_CHECK(pgd_t*) pgd_alloc(void);
+MUST_CHECK(pgt_t*) pgt_alloc(void);
+MUST_CHECK(pgd_t*) init_pgd_get(void);
 
-void page_kernel_identity_map(uint32_t paddr, uint32_t size);
+void* region_map(uint32_t paddr, uint32_t size, const char* name);
 
 void page_stats_print(void);
 
@@ -64,15 +88,21 @@ void page_stats_print(void);
     list_entry(p->list_entry.prev, page_t, list_entry)
 
 #define single_page() \
-    ({ page_t* res = page_alloc(1, PAGE_ALLOC_CONT); res ? res->virtual : NULL; })
-
-#define page_range_for_each(p)
+    ({ page_t* res = page_alloc(1, PAGE_ALLOC_DISCONT); res ? res->virtual : NULL; })
 
 #if DEBUG_PAGE
 
 #define page_free(ptr) \
     ({ typecheck_ptr(ptr); \
        int errno = __page_free(ptr); if (likely(!errno)) { log_debug(DEBUG_PAGE, "[FREE] %x", ptr); } errno; })
+
+#define pages_free(h) \
+    ({ \
+       typecheck(page_t*, h); \
+       int c = __pages_free(h); \
+       if (likely(c)) { log_debug(DEBUG_PAGE, "[PFREE] count=%u", c); } \
+       c; \
+    })
 
 #define page_alloc(c, f) \
     ({ page_t* res = __page_alloc(c, f); \
@@ -88,21 +118,20 @@ void page_stats_print(void);
 
 #define page_range_free(h) \
     ({ \
-       typecheck(struct list_head*, h); \
+       typecheck(list_head_t*, h); \
        int c = __page_range_free(h); \
        if (likely(c)) { log_debug(DEBUG_PAGE, "[PFREE] count=%u", c); } \
        c; \
     })
 
-#define page_alloc1() \
-    ({ __page_alloc(1, PAGE_ALLOC_DISCONT); })
-
 #else
 
-#define page_free(ptr) __page_free(ptr)
-#define page_alloc(c, f) __page_alloc(c, f)
-#define page_range_free(h) __page_range_free(h)
-#define page_range_get(p, c) __page_range_get(p, c)
-#define page_alloc1() __page_alloc(1, PAGE_ALLOC_DISCONT)
+#define page_free(ptr)          __page_free(ptr)
+#define pages_free(ptr)         __pages_free(ptr)
+#define page_alloc(c, f)        __page_alloc(c, f)
+#define page_range_free(h)      __page_range_free(h)
+#define page_range_get(p, c)    __page_range_get(p, c)
 
 #endif // DEBUG_PAGE
+
+#define page_alloc1()           page_alloc(1, PAGE_ALLOC_DISCONT)

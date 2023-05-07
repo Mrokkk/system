@@ -1,160 +1,139 @@
-#include <arch/io.h>
-#include <arch/pit.h>
+#define log_fmt(fmt) "irq: " fmt
+#include <arch/irq.h>
+#include <arch/descriptor.h>
 
 #include <kernel/irq.h>
 #include <kernel/time.h>
 #include <kernel/kernel.h>
 
-static struct irq irq_list[16];
-
-static uint16_t mask = 0xffff;
-
-#define PIC1 0x20
-#define PIC2 0xA0
-
-#define ICW2_PIC1   0x20
-#define ICW2_PIC2   0x28
-
-#define CLOCK_TICK_RATE 1193182U
-#define LATCH  ((CLOCK_TICK_RATE) / HZ) // TODO: Why is it so inaccurate?
-
-void pic_disable();
-static void empty_isr() {};
-
-void irq_enable(uint32_t);
-
-int irq_register(unsigned int nr, void (*handler)(), const char* name)
+typedef struct
 {
-    if (irq_list[nr].handler)
+    void (*handler)();
+    const char* name;
+    int flags;
+} irq_t;
+
+static irq_chip_t* chips[IRQ_CHIPS_COUNT];
+static irq_chip_t* used_chip;
+static irq_t irq_list[16];
+
+int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags)
+{
+    if (unlikely(irq_list[nr].handler))
     {
         return -EBUSY;
     }
 
     irq_list[nr].handler = handler;
     irq_list[nr].name = name;
+    irq_list[nr].flags = flags;
 
-    irq_enable(nr);
+    if (flags & IRQ_NAKED)
+    {
+        idt_set(nr + used_chip->vector_offset, addr(handler));
+    }
+
+    if (flags & IRQ_ENABLE)
+    {
+        used_chip->irq_enable(nr, flags);
+    }
 
     return 0;
 }
 
-void do_irq(unsigned int nr, struct pt_regs* regs)
+void do_irq(uint32_t nr, struct pt_regs* regs)
 {
-    if (irq_list[nr].handler)
+    if (unlikely(!irq_list[nr].handler))
     {
-        irq_list[nr].handler(nr, regs);
+        log_error("not handled IRQ %u", nr);
         return;
     }
 
-    printk("Not handled INT %x", nr);
+    irq_list[nr].handler(nr, regs);
+    used_chip->eoi(nr);
 }
 
-void pit_configure()
+void irq_eoi(uint32_t irq)
 {
-    outb(PIT_CHANNEL0 | PIT_MODE_2 | PIT_ACCES_LOHI | PIT_16BIN, PIT_PORT_COMMAND);
-    outb(LATCH & 0xff, PIT_PORT_CHANNEL0);
-    outb(LATCH >> 8, PIT_PORT_CHANNEL0);
-
-    irq_enable(0);
+    used_chip->eoi(irq);
 }
 
-void irq_enable(unsigned int irq)
+int irq_enable(uint32_t irq)
 {
-    flags_t flags;
+    used_chip->irq_enable(irq, irq_list[irq].flags);
+    return 0;
+}
 
-    mask &= ~(1 << irq);
-
-    irq_save(flags);
-
-    if (irq < 8)
+int irq_disable(uint32_t irq)
+{
+    if (unlikely(!irq_list[irq].handler))
     {
-        outb(mask & 0xff, PIC1 + 1);
-    }
-    else
-    {
-        outb(mask >> 8, PIC2 + 1);
+        return -EINVAL;
     }
 
-    irq_restore(flags);
-}
-
-void irq_disable(int irq)
-{
-    flags_t flags;
-
-    mask |= (1 << irq);
-
-    irq_save(flags);
-
-    if (irq < 8)
+    if (used_chip->irq_disable)
     {
-        outb(mask & 0xFF, PIC1 + 1);
+        used_chip->irq_disable(irq, irq_list[irq].flags);
     }
-    else
+    return 0;
+}
+
+int irq_chip_disable(void)
+{
+    if (used_chip && used_chip->disable)
     {
-        outb(mask >> 8, PIC2 + 1);
+        used_chip->disable();
+    }
+    return 0;
+}
+
+UNMAP_AFTER_INIT int irq_chip_register(irq_chip_t* chip)
+{
+    for (int i = 0; i < IRQ_CHIPS_COUNT; ++i)
+    {
+        if (!chips[i])
+        {
+            chips[i] = chip;
+            return 0;
+        }
     }
 
-    irq_restore(flags);
+    return -EBUSY;
 }
 
-void pic_disable()
+UNMAP_AFTER_INIT int irqs_initialize(void)
 {
-    flags_t flags;
+    log_info("available chips:");
+    for (int i = 0; i < IRQ_CHIPS_COUNT; ++i)
+    {
+        if (!chips[i])
+        {
+            continue;
+        }
 
-    irq_save(flags);
+        if (!strcmp(chips[i]->name, "ioapic"))
+        {
+            used_chip = chips[i];
+        }
+        else
+        {
+            used_chip = used_chip ? used_chip : chips[i];
+        }
 
-    outb(0xff, PIC1 + 1);
-    outb(0xff, PIC2 + 1);
+        log_continue(" %s", chips[i]->name);
+    }
 
-    irq_restore(flags);
-}
+    if (!used_chip)
+    {
+        panic("no chip!");
+    }
 
-void pic_enable()
-{
-    flags_t flags;
+    log_continue("; selected: %s", used_chip->name);
 
-    irq_save(flags);
+    if (used_chip->initialize)
+    {
+        used_chip->initialize();
+    }
 
-    outb(mask & 0xff, PIC1 + 1);
-    outb((mask >> 8) & 0xff, PIC2 + 1);
-
-    irq_restore(flags);
-}
-
-static inline void icw1_send()
-{
-    outb(0x11, PIC1);
-    outb(0x11, PIC2);
-}
-
-static inline void icw2_send()
-{
-    outb(ICW2_PIC1, PIC1 + 1);
-    outb(ICW2_PIC2, PIC2 + 1);
-}
-
-static inline void icw3_send()
-{
-    outb(4, PIC1 + 1);
-    outb(2, PIC2 + 1);
-}
-
-static inline void icw4_send()
-{
-    outb(1, PIC1 + 1);
-    outb(1, PIC2 + 1);
-}
-
-void irqs_configure()
-{
-    icw1_send();
-    icw2_send();
-    icw3_send();
-    icw4_send();
-    pic_disable();
-    pit_configure();
-    irq_register(0, &empty_isr, "timer");
-    irq_register(2, &empty_isr, "cascade");
-    irq_register(13, &empty_isr, "fpu");
+    return 0;
 }

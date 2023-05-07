@@ -1,30 +1,49 @@
+#include <kernel/vm.h>
 #include <kernel/init.h>
 #include <kernel/ksyms.h>
+#include <kernel/usyms.h>
 #include <kernel/reboot.h>
-#include <kernel/string.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
 
-#include <arch/vm.h>
+#include <arch/io.h>
+#include <arch/irq.h>
+#include <arch/earlycon.h>
 #include <arch/register.h>
 #include <arch/descriptor.h>
 
-char* exception_messages[] = {
-    #define __exception_noerrno(x) [__NR_##x] = __STRING_##x,
-    #define __exception_errno(x) [__NR_##x] = __STRING_##x,
-    #define __exception_debug(x) [__NR_##x] = __STRING_##x,
+struct exception;
+typedef struct exception exception_t;
+
+static void kernel_fault(const exception_t* exception, struct pt_regs* regs);
+static void page_fault_description_print(struct pt_regs* regs, uint32_t cr2, uint32_t cr3, const char* header);
+static void general_protection_description_print(struct pt_regs* regs, uint32_t, uint32_t, const char* header);
+
+typedef void (*printer_t)(struct pt_regs* regs, uint32_t cr2, uint32_t cr3, const char* header);
+
+struct exception
+{
+    const char* name;
+    const unsigned nr;
+    int has_error_code;
+    int signal;
+};
+
+#define __exception(EXC, NR, EC, NAME, SIG) \
+    [NR] = { \
+        .name = NAME, \
+        .nr = NR, \
+        .has_error_code = EC, \
+        .signal = SIG, \
+    },
+
+#define __exception_debug __exception
+
+const exception_t exceptions[] = {
     #include <arch/exception.h>
 };
 
-static void page_fault_description_print(struct exception_frame* regs, uint32_t cr2, uint32_t cr3);
-static void general_protection_description_print(struct exception_frame* regs, uint32_t cr2, uint32_t cr3);
-
-typedef void (*printer_t)();
-
-printer_t printers[15] = {
-    [__NR_page_fault] = page_fault_description_print,
-    [__NR_general_protection] = general_protection_description_print,
-};
+static int exception_ongoing;
 
 static inline void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output)
 {
@@ -40,174 +59,183 @@ static inline void pf_reason_print(uint32_t error_code, uint32_t cr2, char* outp
         : "in kernel space");
 }
 
-static void page_fault_description_print(struct exception_frame* regs, uint32_t cr2, uint32_t cr3)
+static void page_fault_description_print(struct pt_regs* regs, uint32_t cr2, uint32_t cr3, const char* header)
 {
     char buffer[256];
     const pgd_t* pgd = virt_cptr(cr3);
-    uint32_t pde_index = pde_index(cr2);
-    uint32_t pte_index = pte_index(cr2);
+    const uint32_t pde_index = pde_index(cr2);
+    const uint32_t pte_index = pte_index(cr2);
 
-    log_exception("####################### Reason #######################");
     pf_reason_print(regs->error_code, cr2, buffer);
-    log_exception("%s", buffer);
-    log_exception("####################### Details ######################");
-    log_exception("pgd = cr3 = %08x", cr3);
+    log_exception("%s: %s", header, buffer);
+    log_exception("%s: pgd = cr3 = %08x", header, cr3);
 
-    uint32_t pgt = pgd[pde_index];
+    const uint32_t pgt = pgd[pde_index];
     pde_print(pgt, buffer);
 
-    log_exception("pgd[%u] = %s", pde_index, buffer);
+    log_exception("%s: pgd[%u] = %s", header, pde_index, buffer);
 
     const pgt_t* pgt_ptr = virt_cptr(pgt & PAGE_ADDRESS);
 
     if (!vm_paddr(addr(pgt_ptr), pgd))
     {
-        log_exception("pgt=%x not mapped", pgt_ptr);
+        log_exception("%s: pgt not mapped", header);
     }
     else
     {
-        uint32_t pg = pgt_ptr[pte_index];
+        const uint32_t pg = pgt_ptr[pte_index];
         pte_print(pg, buffer);
-        log_exception("pgt[%u] = %s", pte_index, buffer);
+        log_exception("%s: pgt[%u] = %s", header, pte_index, buffer);
     }
-    regs_print(regs, log_exception);
-    log_exception("######################################################");
 }
 
-static void general_protection_description_print(struct exception_frame* regs, uint32_t, uint32_t)
+static void general_protection_description_print(struct pt_regs* regs, uint32_t, uint32_t, const char* header)
 {
-    log_exception("####################### Reason #######################");
-    log_exception("N/A");
-    log_exception("####################### Details ######################");
-    log_exception("Error code = %x", regs->error_code);
-    regs_print(regs, log_exception);
-    log_exception("######################################################");
+    log_exception("%s: error code = %x", header, regs->error_code);
 }
 
-static inline void do_backtrace(struct exception_frame* regs)
+static inline printer_t printer_get(int nr)
+{
+    switch (nr)
+    {
+        case PAGE_FAULT: return &page_fault_description_print;
+        case GENERAL_PROTECTION: return &general_protection_description_print;
+        default: return NULL;
+    }
+}
+
+static inline void do_backtrace(struct pt_regs* regs)
 {
     char buffer[128];
-#if FRAME_POINTER
-    struct stack_frame
-    {
-        struct stack_frame* next;
-        uint32_t ret;
-    };
-
-    struct stack_frame last = {.next = ptr(regs->ebp), .ret = regs->eip};
-    struct stack_frame* frame = &last;
-
-    log_critical("Backtrace:");
-    for (int i = 0; frame && i < 10; ++i)
-    {
-        if (!kernel_address(addr(frame)) || !is_kernel_text(frame->ret))
-        {
-            break;
-        }
-        ksym_string(buffer, frame->ret);
-        log_critical("%s", buffer);
-        frame = frame->next;
-    }
-#else
     uint32_t* esp_ptr;
     uint32_t esp_addr = addr(&regs->esp);
     uint32_t* stack_start = process_current->mm->kernel_stack;
 
-    log_critical("Backtrace (guessed):");
+    log_exception("backtrace (guessed):");
 
     ksym_string(buffer, regs->eip);
-    log_critical("%s", buffer);
+    log_exception("%s", buffer);
     for (esp_ptr = ptr(esp_addr); esp_ptr < stack_start; ++esp_ptr)
     {
         if (is_kernel_text(*esp_ptr))
         {
             ksym_string(buffer, *esp_ptr);
-            log_critical("%s", buffer);
+            log_exception("%s", buffer);
         }
     }
-#endif
 }
 
-void do_exception(uint32_t nr, struct exception_frame regs)
+void do_exception(uint32_t nr, struct pt_regs regs)
 {
-    flags_t flags;
-    uint32_t cr2 = cr2_get();
-    uint32_t cr3 = cr3_get();
+    scoped_irq_lock();
 
-    irq_save(flags);
+    const exception_t* exception = &exceptions[nr];
+    printer_t printer = printer_get(nr);
 
     if (unlikely(regs.cs != USER_CS))
     {
-        goto kernel_fault;
+        kernel_fault(exception, &regs);
+        return;
     }
 
-    if (likely(nr == __NR_page_fault))
+    uint32_t cr2 = cr2_get();
+    uint32_t cr3 = cr3_get();
+    char header[48];
+    sprintf(header, "%s[%u]", process_current->name, process_current->pid);
+
+    if (likely(nr == PAGE_FAULT))
     {
         vm_area_t* area = vm_find(cr2, process_current->mm->vm_areas);
         if (area && area->vm_flags & VM_WRITE)
         {
-            log_debug(DEBUG_EXCEPTION, "COW in process %u at %x", process_current->pid, cr2);
-            if (!vm_copy_on_write(area))
+            log_debug(DEBUG_EXCEPTION, "%s: COW at %x caused by %x",
+                header,
+                regs.eip,
+                cr2);
+
+            if (!vm_copy_on_write(area, process_current->mm->pgd))
             {
-                irq_restore(flags);
                 return;
             }
         }
     }
 
-    if (DEBUG_EXCEPTION && printers[nr])
-    {
-        log_exception("%s #%x in process %d (%s) at %x",
-            exception_messages[nr],
-            regs.error_code,
-            process_current->pid,
-            process_current->name,
-            regs.eip);
+    log_notice("%s: %s #%x at %x",
+        header,
+        exception->name,
+        regs.error_code,
+        regs.eip);
 
-        printers[nr](&regs, cr2, cr3);
+    if (DEBUG_EXCEPTION && printer)
+    {
+        printer(&regs, cr2, cr3, header);
+        regs_print(header, &regs, log_exception);
     }
 
-    irq_restore(flags);
+    if (DEBUG_BTUSER)
+    {
+        backtrace_user(log_notice, &regs, page_virt_ptr(process_current->bin->symbols_pages));
+    }
 
-    log_notice("sending SIGSEGV to %d:%s", process_current->pid, process_current->name);
+    do_kill(process_current, exception->signal);
+}
 
-    do_kill(process_current, SIGSEGV);
-    return;
-
-kernel_fault:
+static void kernel_fault(const exception_t* exception, struct pt_regs* regs)
+{
+    const char* header = "kernel";
     char string[80];
     uint32_t cr0 = cr0_get();
+    uint32_t cr2 = cr2_get();
+    uint32_t cr3 = cr3_get();
     uint32_t cr4 = cr4_get();
+    printer_t printer = printer_get(exception->nr);
 
-    ensure_printk_will_print();
+    ++exception_ongoing;
+
+    panic_mode_enter();
+
+    if (exception_ongoing > 1)
+    {
+        log_critical("%s: %s #%x during another exception handling at %x...",
+            header, exception->name, regs->error_code, regs->eip);
+        regs_print("kernel", regs, log_critical);
+        for (;; halt());
+    }
 
     if (shutdown_in_progress == SHUTDOWN_IN_PROGRESS)
     {
-        log_critical("Exception during shutdown...");
+        log_critical("%s: exception during shutdown...", header);
     }
+
     if (init_in_progress == INIT_IN_PROGRESS)
     {
-        log_critical("Exception during early init...");
+        log_critical("%s: exception during early init...", header);
     }
 
-    log_critical("%s #%x from %x in pid %u",
-        exception_messages[nr],
-        regs.error_code,
-        regs.eip,
+    log_critical("%s: %s #%x from %x in pid %u",
+        header,
+        exception->name,
+        regs->error_code,
+        regs->eip,
         process_current->pid);
 
-    if (printers[nr])
+    if (printer)
     {
-        printers[nr](&regs, cr2, cr3);
+        printer(regs, cr2, cr3, header);
     }
 
-    cr0_bits_string_get(cr0, string);
-    log_critical("CR0=%x : %s", cr0, string);
-    log_critical("CR2=%x", cr2);
-    log_critical("CR3=%x", cr3);
-    log_critical("CR4=%x", cr4);
+    regs_print(header, regs, log_critical);
 
-    do_backtrace(&regs);
+    cr0_bits_string_get(cr0, string);
+    log_critical("%s: CR0 = %08x = (%s)", header, cr0, string);
+    log_critical("%s: CR2 = %08x", header, cr2, string);
+    log_critical("%s: CR3 = %08x", header, cr3);
+    cr4_bits_string_get(cr4, string);
+    log_critical("%s: CR4 = %08x = (%s)", header, cr4, string);
+
+    backtrace_exception(regs);
+
+    panic_mode_die();
 
     for (;; halt());
 }

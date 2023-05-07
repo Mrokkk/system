@@ -48,3 +48,41 @@ static inline char* word_read(char* string, char* output)
 
     return string;
 }
+
+static inline int memcmp(const void* cs, const void* ct, size_t count)
+{
+    const unsigned char* su1;
+    const unsigned char* su2;
+    int res = 0;
+
+    for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
+    {
+        if ((res = *su1 - *su2) != 0)
+        {
+            break;
+        }
+    }
+    return res;
+}
+
+static inline char* strstr(const char* s1, const char* s2)
+{
+    size_t l1, l2;
+
+    l2 = strlen(s2);
+    if (!l2)
+    {
+        return (char*)s1;
+    }
+    l1 = strlen(s1);
+    while (l1 >= l2)
+    {
+        l1--;
+        if (!memcmp(s1, s2, l2))
+        {
+            return (char*)s1;
+        }
+        s1++;
+    }
+    return 0;
+}

@@ -2,12 +2,15 @@
 
 #include <kernel/fs.h>
 #include <kernel/irq.h>
-#include <kernel/buffer.h>
 #include <kernel/device.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>
 
+#include "tty.h"
+#include "tty_driver.h"
+
+#define SERIAL_MINORS 4
 #define COM1 0x3f8
 #define COM2 0x2f8
 #define COM3 0x3e8
@@ -17,24 +20,29 @@ KERNEL_MODULE(serial);
 module_init(serial_init);
 module_exit(serial_deinit);
 
-BUFFER_DECLARE(serial_buffer, 32);
-WAIT_QUEUE_HEAD_DECLARE(serial_wq);
-
-char serial_status[4];
-
 void serial_send(char a, uint16_t port);
-int serial_open(struct file*);
-int serial_write(struct file* file, const char* buffer, size_t size);
-int serial_read(struct file* file, char* buffer, size_t size);
-void serial_irs(void);
+static int serial_open(tty_t* tty, file_t* file);
+static int serial_close(tty_t* tty, file_t* file);
+static int serial_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
+static void serial_putch(tty_t* tty, uint8_t c);
+static void serial_irs(void);
 
-static struct file_operations fops = {
+static tty_driver_t serial_driver = {
+    .name = "ttyS",
+    .major = MAJOR_CHR_SERIAL,
+    .minor_start = 0,
+    .num = SERIAL_MINORS,
+    .driver_data = NULL,
+    .initialized = 0,
     .open = &serial_open,
-    .read = &serial_read,
+    .close = &serial_close,
     .write = &serial_write,
+    .putch = &serial_putch,
 };
 
-uint16_t minor_to_port(int minor)
+tty_t* serial_tty[SERIAL_MINORS];
+
+static inline uint16_t minor_to_port(int minor)
 {
     switch (minor)
     {
@@ -46,7 +54,32 @@ uint16_t minor_to_port(int minor)
     }
 }
 
-int serial_open(struct file* file)
+static inline int port_to_minor(uint16_t port)
+{
+    switch (port)
+    {
+        case COM1: return 0;
+        case COM2: return 1;
+        case COM3: return 2;
+        case COM4: return 3;
+        default: return 0;
+    }
+}
+
+UNMAP_AFTER_INIT int serial_init()
+{
+    tty_driver_register(&serial_driver);
+    irq_register(0x4, &serial_irs, "com1", IRQ_DEFAULT);
+    irq_register(0x3, &serial_irs, "com2", IRQ_DEFAULT);
+    return 0;
+}
+
+int serial_deinit()
+{
+    return 0;
+}
+
+static int serial_open(tty_t* tty, file_t* file)
 {
     uint16_t port;
     int minor;
@@ -67,11 +100,18 @@ int serial_open(struct file* file)
     outb(0x03, port + 3);    // 8 bits, no parity, one stop bit
     outb(0xc7, port + 2);    // Enable FIFO, clear them, with 14-byte threshold
     outb(0x0b, port + 4);    // IRQs enabled, RTS/DSR set
-    serial_status[minor] = 1;
 
     // Enable interrupt for receiving
     outb(0x01, port + 1);
 
+    ASSERT(!serial_tty[minor]);
+    serial_tty[minor] = tty;
+
+    return 0;
+}
+
+static int serial_close(tty_t*, file_t*)
+{
     return 0;
 }
 
@@ -102,54 +142,48 @@ void serial_print(const char* string)
     for (; *string; serial_send(*string++, COM1));
 }
 
-void serial_irs()
+void serial_irs(void)
 {
-    flags_t flags;
-    char c = serial_receive(COM1);
+    char c;
+    tty_t* tty = serial_tty[0];
 
-    irq_save(flags);
+    scoped_irq_lock();
+
+    c = serial_receive(COM1);
 
     if (c == '\r')
     {
-        c = '\n';
+        tty_char_insert(tty, '\n', 0);
     }
     else if (c < 32)
     {
         if (c == 4) // ctrl+d
         {
-            buffer_put(&serial_buffer, 4);
-            goto wake_process;
+            tty_char_insert(tty, c, 0);
         }
         else if (c == 3)
         {
-            buffer_put(&serial_buffer, 3);
-            goto wake_process;
+            tty_char_insert(tty, c, 0);
+        }
+        else if (c == '\n')
+        {
+            tty_char_insert(tty, c, 0);
         }
         // TODO: handle other chars
-        goto finish;
     }
     else if (c == 0x7f) // backspace
     {
-        buffer_put(&serial_buffer, '\b');
-        serial_send(8, COM1);
-        serial_send(' ', COM1);
-        serial_send(8, COM1);
-        goto wake_process;
+        tty_char_insert(tty, '\b', 0);
+        tty_char_insert(tty, ' ', TTY_DONT_PUT_TO_USER);
+        tty_char_insert(tty,'\b', TTY_DONT_PUT_TO_USER);
     }
-
-    buffer_put(&serial_buffer, c);
-    serial_send(c, COM1);
-wake_process:
-    if (!wait_queue_empty(&serial_wq))
+    else
     {
-        struct process* proc = wait_queue_pop(&serial_wq);
-        process_wake(proc);
+        tty_char_insert(tty, c, 0);
     }
-finish:
-    irq_restore(flags);
 }
 
-int serial_write(struct file* file, const char* buffer, size_t size)
+static int serial_write(tty_t*, file_t* file, const char* buffer, size_t size)
 {
     size_t old = size;
     int minor = MINOR(file->inode->dev);
@@ -160,59 +194,7 @@ int serial_write(struct file* file, const char* buffer, size_t size)
     return old;
 }
 
-int serial_read(struct file*, char* buffer, size_t size)
+static void serial_putch(tty_t*, uint8_t c)
 {
-    size_t i;
-    WAIT_QUEUE_DECLARE(temp, process_current);
-
-    flags_t flags;
-    irq_save(flags);
-
-    for (i = 0; i < size; i++)
-    {
-        // FIXME: we put process to sleep after every char; this is bad
-        while (buffer_get(&serial_buffer, &buffer[i]))
-        {
-            wait_queue_push(&temp, &serial_wq);
-            process_wait(process_current, flags);
-        }
-        if (buffer[i] == 4)
-        {
-            i = 0;
-            goto finish;
-        }
-        else if (buffer[i] == 3)
-        {
-            do_kill(process_current, SIGINT);
-            i = 1;
-            buffer[0] = 0;
-            goto finish;
-        }
-        if (buffer[i] == '\n')
-        {
-            ++i;
-            goto finish;
-        }
-        if (buffer[i] == '\b' && i > 0)
-        {
-            buffer[i--] = 0;
-            buffer[i--] = 0;
-        }
-    }
-
-finish:
-    return i;
-}
-
-int serial_init()
-{
-    char_device_register(MAJOR_CHR_SERIAL, "ttyS", &fops, 3, NULL);
-    irq_register(0x4, &serial_irs, "com1");
-    irq_register(0x3, &serial_irs, "com2");
-    return 0;
-}
-
-int serial_deinit()
-{
-    return 0;
+    serial_send(c, COM1);
 }

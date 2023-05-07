@@ -1,82 +1,39 @@
 #include <kernel/page.h>
+#include <kernel/ksyms.h>
 #include <kernel/memory.h>
+#include <kernel/sections.h>
 
 #include <arch/multiboot.h>
 
 char* bootloader_name;
-uint32_t module_start;
-uint32_t module_end;
-
-void* disk_img;
-void* tux;
-uint32_t tux_size;
-
-static modules_table_t modules_table;
 struct framebuffer* framebuffer_ptr;
+void* disk_img;
+void* ksyms_start;
+void* ksyms_end;
 
-modules_table_t* modules_table_get(void)
+static inline void multiboot_modules_read(multiboot_info_t* mb)
 {
-    return &modules_table;
-}
+    char* name;
+    uint32_t module_start = 0, module_end = 0;
+    multiboot_module_t* mod = ptr(mb->mods_addr);
 
-static inline void multiboot_mmap_read(struct multiboot_info* mb)
-{
-    struct memory_map* mm;
-    int mm_type;
-    int i;
-
-    for (mm = ptr(mb->mmap_addr), i = 0;
-         mm->base_addr_low + (mm->length_low - 1) != 0xffffffff;
-         ++i)
+    for (size_t i = 0; i < mb->mods_count; ++i)
     {
-        mm = ptr((uint32_t)mm + mm->size + 4);
-
-        switch (mm->type)
-        {
-            case MULTIBOOT_MEMORY_AVAILABLE: mm_type = MMAP_TYPE_AVL; break;
-            case MULTIBOOT_MEMORY_RESERVED: mm_type = MMAP_TYPE_RES; break;
-            case MULTIBOOT_MEMORY_ACPI_RECLAIMABLE: mm_type = MMAP_TYPE_DEV; break;
-            case MULTIBOOT_MEMORY_NVS: mm_type = MMAP_TYPE_DEV; break;
-            default: mm_type = MMAP_TYPE_NDEF;
-        }
-
-        memory_area_add(mm->base_addr_low, mm->length_low, mm_type);
-    }
-}
-
-static inline void multiboot_drives_read(struct multiboot_info* mb)
-{
-    struct drive* drive = ptr(mb->drives_addr);
-    for (; addr(drive) < mb->drives_addr + mb->drives_length;)
-    {
-        log_info("drive %u; mode %x", drive->drive_number, drive->drive_mode);
-        drive = ptr(addr(drive) + drive->size);
-    }
-}
-
-static inline void multiboot_modules_read(struct multiboot_info* mb)
-{
-    modules_table.count = mb->mods_count;
-    modules_table.modules = virt_ptr(mb->mods_addr);
-
-    struct module* mod = ptr(mb->mods_addr);
-
-    for (size_t i = 0; i < modules_table.count; ++i)
-    {
+        name = virt_ptr(mod->string);
         log_debug(DEBUG_MULTIBOOT, "%d: %s = %x : %x",
             i,
-            (char*)virt(mod->string), // FIXME: why there was +1?
+            name,
             virt(mod->mod_start),
             virt(mod->mod_end));
 
-        if (!strcmp((char*)virt(mod->string), "tux.tga"))
-        {
-            tux = virt_ptr(mod->mod_start);
-            tux_size = mod->mod_end - mod->mod_start;
-        }
-        if (!strcmp((char*)virt(mod->string), "disk.img"))
+        if (!strcmp(name, "disk.img"))
         {
             disk_img = virt_ptr(mod->mod_start);
+        }
+        else if (!strcmp(name, "kernel.map"))
+        {
+            ksyms_start = virt_ptr(mod->mod_start);
+            ksyms_end = virt_ptr(mod->mod_end);
         }
 
         if (!module_start)
@@ -87,34 +44,25 @@ static inline void multiboot_modules_read(struct multiboot_info* mb)
         module_end = virt(mod->mod_end);
         mod++;
     }
+
+    if (module_start && module_end)
+    {
+        section_add("modules", ptr(module_start), ptr(module_end), SECTION_READ);
+    }
 }
 
-static inline void multiboot_fb_read(struct multiboot_info* mb)
+UNMAP_AFTER_INIT char* multiboot_read(va_list args)
 {
-    struct framebuffer* framebuffer = &mb->framebuffer;
-    framebuffer_ptr = virt_ptr(framebuffer);
-}
+    multiboot_info_t* mb = va_arg(args, void*);
+    uint32_t magic = va_arg(args, uint32_t);
 
-char* multiboot_read(struct multiboot_info* mb, uint32_t magic)
-{
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC)
     {
         log_warning("not Multiboot v1 compilant bootloader!");
-        return 0;
+        bootloader_name = "unknown";
+        return "";
     }
 
-    if (mb->flags & MULTIBOOT_FLAGS_MMAP_BIT)
-    {
-        multiboot_mmap_read(mb);
-    }
-    if (mb->flags & MULTIBOOT_FLAGS_DRIVES_BIT)
-    {
-        multiboot_drives_read(mb);
-    }
-    if (mb->flags & MULTIBOOT_FLAGS_BOOTDEV_BIT)
-    {
-        // TODO
-    }
     if (mb->flags & MULTIBOOT_FLAGS_BL_NAME_BIT)
     {
         bootloader_name = virt_ptr(mb->bootloader_name);
@@ -122,10 +70,6 @@ char* multiboot_read(struct multiboot_info* mb, uint32_t magic)
     if (mb->flags & MULTIBOOT_FLAGS_MODS_BIT)
     {
         multiboot_modules_read(mb);
-    }
-    if (mb->flags & MULTIBOOT_FLAGS_FB_BIT)
-    {
-        multiboot_fb_read(mb);
     }
 
     return virt_ptr(mb->cmdline);

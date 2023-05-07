@@ -31,40 +31,13 @@ ENTRY(__semaphore_sleep)
     ret
 ENDPROC(__semaphore_sleep)
 
-ENTRY(sse_enable)
-    mov %cr0, %eax
-    and $0xfffb, %ax
-    or $0x2, %ax
-    mov %eax, %cr0
-    mov %cr4, %eax
-    or $(3 << 9), %ax
-    mov %eax, %cr4
-    movb $1, (%eax)
-    ret
-ENDPROC(sse_enable)
-
-ENTRY(do_delay)
-        mov 4(%esp), %eax
-        jmp 1f
-    .align 16
-    1:  jmp 2f
-    .align 16
-    2:  decl %eax
-        jns 2b
-        ret
-ENDPROC(do_delay)
-
 ENTRY(eip_get)
     pop %eax
     jmp *%eax
 ENDPROC(eip_get)
 
-ENTRY(syscall_handler) // INT 0x80 handler
-    SAVE_ALL
-    SAVE_USER_ESP
-    push %eax
-    call SYMBOL_NAME(timestamp_update)
-    pop %eax
+ENTRY(syscall_handler)
+    SAVE_ALL(0)
     cmp $__NR_syscalls, %eax
     jg bad_syscall
     mov SYMBOL_NAME(syscalls)(, %eax, 4), %eax
@@ -73,31 +46,39 @@ ENTRY(syscall_handler) // INT 0x80 handler
     call *%eax
     mov %eax, REGS_EAX(%esp) // Put value returned by syscall in pt_regs
     call syscall_regs_check
+    jmp exit_kernel
 ENDPROC(syscall_handler)
 
-ENTRY(ret_from_syscall)
+ENTRY(timer_handler)
+    cli
+    incl jiffies
+    SAVE_ALL(0)
+    call SYMBOL_NAME(timestamp_update)
+    push $0
+    call SYMBOL_NAME(irq_eoi)
+    sti
+    call SYMBOL_NAME(scheduler)
+    add $4, %esp
+ENDPROC(timer_handler)
+
+ENTRY(exit_kernel)
+    cli
+    mov SYMBOL_NAME(need_resched), %eax
+    mov (%eax), %edx
+    test %edx, %edx
+    jne 1f
+    RESTORE_ALL
+    sti
+    iret
+1:
+    movl $0, (%eax)
+    sti
+    call SYMBOL_NAME(scheduler)
     RESTORE_ALL
     iret
-ENDPROC(ret_from_syscall)
+ENDPROC(exit_kernel)
 
 ENTRY(bad_syscall)
     movl $-ENOSYS, REGS_EAX(%esp)
-    jmp ret_from_syscall
+    jmp exit_kernel
 ENDPROC(bad_syscall)
-
-ENTRY(timer_handler) // IRQ 0 handler
-    incl jiffies
-    SAVE_ALL
-    SAVE_USER_ESP
-    call SYMBOL_NAME(timestamp_update)
-    call SYMBOL_NAME(scheduler)
-    PIC_EOI(0)
-    RESTORE_ALL
-    iret
-ENDPROC(timer_handler)
-
-SECTION(.user)
-ENTRY(__sigreturn)
-    mov $__NR_sigreturn, %eax
-    int $0x80
-ENDPROC(__sigreturn)

@@ -1,8 +1,9 @@
+#define log_fmt(fmt) "kbd: " fmt
 #include <arch/io.h>
+#include <arch/i8042.h>
 
 #include <kernel/irq.h>
 #include <kernel/wait.h>
-#include <kernel/buffer.h>
 #include <kernel/device.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
@@ -11,33 +12,23 @@
 
 #include "tty.h"
 
-#define CMD_PORT                        0x64
-#define DATA_PORT                       0x60
-#define STATUS_PORT                     0x64
+#define KBD_EKI     0x01
+#define KBD_SYS     0x04
+#define KBD_DMS     0x20
+#define KBD_KCC     0x40
 
-#define CMD_ENABLE_FIRST                0xae
-#define CMD_DISABLE_FIRST               0xad
-#define CMD_DISABLE_SECOND              0xa7
-#define CMD_TEST_CONTROLLER             0xaa
-#define CMD_TEST_FIRST_PS2_PORT         0xab
-#define CMD_READ_CONFIGURATION_BYTE     0x20
-#define CMD_WRITE_CONFIGURATION_BYTE    0x60
+#define KBD_RATE_SET        0xf3
+#define KBD_HIGHEST_RATE    0x00
 
-#define keyboard_disable() \
-    do { keyboard_send_command(CMD_DISABLE_FIRST); keyboard_wait(); } while (0)
-
-#define keyboard_enable() \
-    keyboard_send_command(CMD_ENABLE_FIRST)
-
-#define L_CTRL  0x1d
-#define L_ALT   0x38
-#define L_SHIFT 0x2a
-#define R_SHIFT 0x36
+#define L_CTRL      0x1d
+#define L_ALT       0x38
+#define L_SHIFT     0x2a
+#define R_SHIFT     0x36
 
 static int shift = 0;
 static char ctrl = 0;
 static char alt = 0;
-static char special = 0;
+static char e0 = 0;
 
 static void s_shift_up()
 {
@@ -69,6 +60,8 @@ static void s_alt_down()
     alt =  0;
 }
 
+static tty_t* kb_tty;
+
 typedef void (*action_t)();
 
 #define scancode_action(code, action) \
@@ -82,11 +75,12 @@ static action_t special_scancodes[] = {
     scancode_action(L_ALT, s_alt),
 };
 
-static char* scancodes[] = {
-    "\0\0", "\0\0",
+static const char* scancodes[] = {
+    "\0\0",
+    "\e\0",
     "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "-_", "=+", "\b\b",
     "\t\t", "qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "[{", "]}",
-    "\n\n", "\0\0",
+    "\r\r", "\0\0",
     "aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", ";:", "'\"",
     "`~", "\0\0",
     "\\|",
@@ -95,154 +89,126 @@ static char* scancodes[] = {
     "\0\0", "  ", "\0\0"
 };
 
-BUFFER_DECLARE(keyboard_buffer, 32);
-WAIT_QUEUE_HEAD_DECLARE(keyboard_wq);
-
-static void keyboard_wait(void)
+static inline void keyboard_enable(void)
 {
-    for (int i = 0; i < 10000; i++)
-    {
-        if (!(inb(STATUS_PORT) & 0x2)) return;
-    }
-
-    log_warning("keyboard waiting timeout");
+    i8042_send_cmd(PS2_1ST_PORT_ENABLE);
 }
 
-static void keyboard_send_command(uint8_t byte)
+static inline void keyboard_disable(void)
 {
-    keyboard_wait();
-    outb(byte, CMD_PORT);
-    io_wait();
+    i8042_send_cmd(PS2_1ST_PORT_DISABLE);
 }
 
-static uint8_t keyboard_receive(void)
+static inline void keyboard_scancode_handle(uint8_t scan_code)
 {
-    while ((inb(STATUS_PORT) & 0x1) != 1);
-    return inb(DATA_PORT);
-}
+    char c = 0;
 
-void keyboard_irs()
-{
-    uint8_t scan_code = keyboard_receive();
-    char character = 0;
-
-    keyboard_disable();
-
-    log_debug(DEBUG_KEYBOARD, "%x", scan_code);
-
-    // Check if we have a defined action for this scancode
     if (special_scancodes[scan_code] && scan_code <= L_ALT+0x80)
     {
         special_scancodes[scan_code]();
-        goto end;
+        return;
     }
 
     if (scan_code == 0xe0)
     {
-        special = 1;
-        goto end;
+        e0 = 1;
+        return;
     }
-    else if (special && scan_code == 0x49)
+    else if (e0 && scan_code == 0x49)
     {
-        tty_char_insert('\e', TTY_DONT_PUT_TO_USER);
-        tty_char_insert('[', TTY_DONT_PUT_TO_USER);
-        tty_char_insert('5', TTY_DONT_PUT_TO_USER);
-        tty_char_insert('~', TTY_DONT_PUT_TO_USER);
-        special = 0;
-        goto end;
+        log_debug(DEBUG_KEYBOARD, "tty insert: \\e[5~");
+        tty_string_insert(kb_tty, "\e[5~", TTY_DONT_PUT_TO_USER);
+        e0 = 0;
+        return;
     }
-    else if (special && scan_code == 0x51)
+    else if (e0 && scan_code == 0x51)
     {
-        tty_char_insert('\e', TTY_DONT_PUT_TO_USER);
-        tty_char_insert('[', TTY_DONT_PUT_TO_USER);
-        tty_char_insert('6', TTY_DONT_PUT_TO_USER);
-        tty_char_insert('~', TTY_DONT_PUT_TO_USER);
-        special = 0;
-        goto end;
+        log_debug(DEBUG_KEYBOARD, "tty insert: \\e[6~");
+        tty_string_insert(kb_tty, "\e[6~", TTY_DONT_PUT_TO_USER);
+        e0 = 0;
+        return;
     }
 
-    // TODO: Number of implemented scancodes
+    // TODO: Support more scancodes
     if (scan_code > 0x39)
     {
-        goto end;
+        return;
     }
 
-    character = scancodes[scan_code][shift];
-    if (!character)
+    c = scancodes[scan_code][shift];
+    if (!c)
     {
-        goto end;
+        return;
     }
 
-    if (ctrl && character)
+    char buffer[3];
+
+    if (c == '\n')
     {
-        if (character == 'c')
-        {
-            tty_char_insert(3, 0);
-        }
-        else if (character == 'd')
-        {
-            tty_char_insert(4, 0);
-        }
+        strcpy(buffer, "\n");
     }
     else
     {
-        tty_char_insert(character, 0);
+        buffer[0] = c;
+        buffer[1] = 0;
     }
 
-end:
+    log_debug(DEBUG_KEYBOARD, "tty insert: \"%s\"", buffer);
+    tty_char_insert(kb_tty, ctrl && c ? c & 0x1f : c, 0);
+}
+
+void keyboard_irs()
+{
+    uint8_t scancode;
+
+    keyboard_disable();
+
+    scancode = i8042_receive();
+
+    log_debug(DEBUG_KEYBOARD, "%x", scancode);
+    keyboard_scancode_handle(scancode);
+
     keyboard_enable();
 }
 
-int keyboard_init(void)
+int keyboard_init(tty_t* tty)
 {
     uint8_t byte;
 
-    keyboard_disable();
-    keyboard_send_command(CMD_DISABLE_SECOND);
-
-    while (inb(STATUS_PORT) & 1)
+    if (!i8042_is_detected(KEYBOARD))
     {
-        inb(DATA_PORT);
+        log_warning("no keyboard detected");
+        return -ENODEV;
     }
 
-    io_wait();
+    scoped_irq_lock();
 
-    keyboard_send_command(CMD_TEST_CONTROLLER);
-    byte = keyboard_receive();
-    if (byte != 0x55)
+    i8042_flush();
+
+    i8042_send_cmd(PS2_CONFIG_WRITE);
+    i8042_send_data(KBD_EKI | KBD_SYS | KBD_KCC, PS2_1ST_PORT);
+
+    i8042_send_cmd(PS2_CONFIG_READ);
+    if (!(i8042_receive() & KBD_DMS))
     {
-        return -1;
+        log_info("supports dual channel");
     }
 
-    keyboard_send_command(CMD_READ_CONFIGURATION_BYTE);
-    byte = keyboard_receive();
-
-    // If translation is disabled, try to enable it
-    if (!(byte & (1 << 6)))
+    if ((byte = i8042_send_and_receive(KBD_RATE_SET, PS2_1ST_PORT)) != I8042_RESP_ACK)
     {
-        byte |= (1 << 6);
-        keyboard_send_command(CMD_WRITE_CONFIGURATION_BYTE);
-        outb(byte, DATA_PORT);
-        keyboard_wait();
-        keyboard_send_command(CMD_READ_CONFIGURATION_BYTE);
-        if (!(keyboard_receive() & (1 << 6)))
-        {
-            return -1;
-        }
+        log_warning("1: setting rate failed: %x", byte);
     }
 
-    // Enable interrupt
-    if (!(byte & 0x1))
+    if ((byte = i8042_send_and_receive(KBD_HIGHEST_RATE, PS2_1ST_PORT)) != I8042_RESP_ACK)
     {
-        byte |= 0x1;
-        keyboard_send_command(CMD_WRITE_CONFIGURATION_BYTE);
-        outb(byte, DATA_PORT);
-        keyboard_wait();
+        log_warning("2: setting rate failed: %x", byte);
     }
 
     keyboard_enable();
 
-    irq_register(0x01, keyboard_irs, "keyboard");
+    kb_tty = tty;
+
+    irq_register(0x01, keyboard_irs, "keyboard", IRQ_DEFAULT);
 
     return 0;
 }

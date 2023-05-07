@@ -1,50 +1,43 @@
 #pragma once
 
+struct termios;
+typedef struct termios  termios_t;
 typedef unsigned char   cc_t;
 typedef unsigned int    speed_t;
 typedef unsigned int    tcflag_t;
 
-#define NCCS 19
+#define NCCS 17
+
 struct termios
 {
-    tcflag_t c_iflag;       /* input mode flags */
-    tcflag_t c_oflag;       /* output mode flags */
-    tcflag_t c_cflag;       /* control mode flags */
-    tcflag_t c_lflag;       /* local mode flags */
-    cc_t c_line;            /* line discipline */
-    cc_t c_cc[NCCS];        /* control characters */
+    tcflag_t c_iflag;   // input mode flags
+    tcflag_t c_oflag;   // output mode flags
+    tcflag_t c_cflag;   // control mode flags
+    tcflag_t c_lflag;   // local mode flags
+    cc_t c_line;        // line discipline
+    cc_t c_cc[NCCS];    // control characters
 };
 
-/* c_cc characters */
-#define VINTR 0
-#define VQUIT 1
-#define VERASE 2
-#define VKILL 3
-#define VEOF 4
-#define VTIME 5
-#define VMIN 6
-#define VSWTC 7
-#define VSTART 8
-#define VSTOP 9
-#define VSUSP 10
-#define VEOL 11
-#define VREPRINT 12
-#define VDISCARD 13
-#define VWERASE 14
-#define VLNEXT 15
-#define VEOL2 16
+// c_cc characters
+#define VINTR       0
+#define VQUIT       1
+#define VERASE      2
+#define VKILL       3
+#define VEOF        4
+#define VTIME       5
+#define VMIN        6
+#define VSWTC       7
+#define VSTART      8
+#define VSTOP       9
+#define VSUSP       10
+#define VEOL        11
+#define VREPRINT    12
+#define VDISCARD    13
+#define VWERASE     14
+#define VLNEXT      15
+#define VEOL2       16
 
-#ifdef __KERNEL__
-/*  intr=^C     quit=^\     erase=del   kill=^U
-    eof=^D      vtime=\0    vmin=\1     sxtc=\0
-    start=^Q    stop=^S     susp=^Z     eol=\0
-    reprint=^R  discard=^U  werase=^W   lnext=^V
-    eol2=\0
-*/
-#define INIT_C_CC "\003\034\177\025\004\0\1\0\021\023\032\0\022\017\027\026\0"
-#endif
-
-/* c_iflag bits */
+// c_iflag bits
 #define IGNBRK  0000001
 #define BRKINT  0000002
 #define IGNPAR  0000004
@@ -60,7 +53,7 @@ struct termios
 #define IXOFF   0010000
 #define IMAXBEL 0020000
 
-/* c_oflag bits */
+// c_oflag bits
 #define OPOST   0000001
 #define OLCUC   0000002
 #define ONLCR   0000004
@@ -93,9 +86,9 @@ struct termios
 #define   FF0   0000000
 #define   FF1   0100000
 
-/* c_cflag bit meaning */
+// c_cflag bit meaning
 #define CBAUD   0010017
-#define  B0 0000000     /* hang up */
+#define  B0     0000000 // hang up
 #define  B50    0000001
 #define  B75    0000002
 #define  B110   0000003
@@ -111,8 +104,8 @@ struct termios
 #define  B9600  0000015
 #define  B19200 0000016
 #define  B38400 0000017
-#define EXTA B19200
-#define EXTB B38400
+#define EXTA    B19200
+#define EXTB    B38400
 #define CSIZE   0000060
 #define   CS5   0000000
 #define   CS6   0000020
@@ -129,10 +122,10 @@ struct termios
 #define  B115200 0010002
 #define  B230400 0010003
 #define  B460800 0010004
-#define CIBAUD    002003600000  /* input baud rate (not used) */
-#define CRTSCTS   020000000000      /* flow control */
+#define CIBAUD    002003600000  // input baud rate (not used)
+#define CRTSCTS   020000000000  // flow control
 
-/* c_lflag bits */
+// c_lflag bits
 #define ISIG    0000001
 #define ICANON  0000002
 #define XCASE   0000004
@@ -149,18 +142,18 @@ struct termios
 #define PENDIN  0040000
 #define IEXTEN  0100000
 
-/* tcflow() and TCXONC use these */
+// tcflow() and TCXONC use these
 #define TCOOFF      0
 #define TCOON       1
 #define TCIOFF      2
 #define TCION       3
 
-/* tcflush() and TCFLSH use these */
+// tcflush() and TCFLSH use these
 #define TCIFLUSH    0
 #define TCOFLUSH    1
 #define TCIOFLUSH   2
 
-/* tcsetattr uses these */
+// tcsetattr uses these
 #define TCSANOW     0
 #define TCSADRAIN   1
 #define TCSAFLUSH   2

@@ -1,8 +1,6 @@
-#include <arch/vm.h>
-#include <arch/register.h>
-
+#include <kernel/vm.h>
 #include <kernel/sys.h>
-#include <kernel/magic.h>
+#include <kernel/procfs.h>
 #include <kernel/process.h>
 
 unsigned int total_forks;
@@ -32,7 +30,6 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
     }
 
     stack_vma = vm_create(
-        pages,
         address,
         USER_STACK_SIZE,
         VM_WRITE | VM_READ);
@@ -42,7 +39,7 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
         goto error;
     }
 
-    errno = vm_apply(stack_vma, pgd, VM_APPLY_REPLACE_PG);
+    errno = vm_map(stack_vma, pages, pgd, 0);
 
     if (unlikely(errno))
     {
@@ -52,13 +49,13 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
     return stack_vma;
 
 error:
-    struct list_head head = LIST_INIT(head);
+    list_head_t head = LIST_INIT(head);
     list_merge(&head, &pages->list_entry);
     page_range_free(&head);
     return NULL;
 }
 
-static inline int process_space_copy(struct process* dest, struct process* src, int clone_flags)
+static int process_space_copy(struct process* dest, struct process* src, int clone_flags)
 {
     int errno = -ENOMEM;
     void* pgd;
@@ -107,6 +104,8 @@ static inline int process_space_copy(struct process* dest, struct process* src, 
     mutex_init(&dest->mm->lock);
     dest->mm->pgd = pgd;
     dest->mm->kernel_stack = ptr(addr(kernel_stack_end) + PAGE_SIZE);
+    dest->mm->code_start = src->mm->code_start;
+    dest->mm->code_end = src->mm->code_end;
     dest->mm->brk = src->mm->brk;
     dest->mm->args_start = src->mm->args_start;
     dest->mm->args_end = src->mm->args_end;
@@ -173,7 +172,7 @@ free_areas:
 free_pgd:
     page_free(pgd);
 free_kstack:
-    page_free(page_virt_ptr(kernel_stack_page));
+    pages_free(kernel_stack_page);
 free_mm:
     delete(dest->mm);
 error:
@@ -189,6 +188,8 @@ static inline void process_init(struct process* child, struct process* parent)
     child->type = parent->type;
     child->context_switches = 0;
     child->forks = 0;
+    child->sid = parent->sid;
+    child->need_resched = false;
     strcpy(child->name, parent->name);
     wait_queue_head_init(&child->wait_child);
     list_init(&child->children);
@@ -228,6 +229,13 @@ static inline int process_fs_copy(struct process* child, struct process* parent,
 static inline void files_init(struct files* dest, struct files* src)
 {
     copy_array(dest->files, src->files, PROCESS_FILES);
+    for (int i = 0; i < PROCESS_FILES; ++i)
+    {
+        if (src->files[i])
+        {
+            ++src->files[i]->count;
+        }
+    }
     dest->count = 1;
 }
 
@@ -271,24 +279,31 @@ static inline int process_signals_copy(struct process* child, struct process* pa
     return 0;
 }
 
-int process_clone(
-    struct process* parent,
-    struct pt_regs* regs,
-    int clone_flags)
+static inline int process_bin_clone(struct process* child, struct process* parent)
 {
-    flags_t flags;
-    struct process* child;
+    if (parent->bin)
+    {
+        ++parent->bin->count;
+    }
+    child->bin = parent->bin;
+    return 0;
+}
+
+int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
+{
     int errno = -ENOMEM;
+    struct process* child;
 
-    log_debug(DEBUG_PROCESS, "parent: pid %d name \"%s\"", parent->pid, parent->name);
+    log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
 
-    irq_save(flags);
+    cli();
 
     if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, clone_flags)) goto cannot_allocate;
     if (process_fs_copy(child, parent, clone_flags)) goto fs_error;
     if (process_files_copy(child, parent, clone_flags)) goto files_error;
     if (process_signals_copy(child, parent, clone_flags)) goto signals_error;
+    if (process_bin_clone(child, parent)) goto arch_error;
     if (arch_process_copy(child, parent, regs)) goto arch_error;
 
     list_add_tail(&child->processes, &init_process.processes);
@@ -297,7 +312,50 @@ int process_clone(
 
     process_wake(child);
 
-    irq_restore(flags); // FIXME: don't enable irq?
+    parent->need_resched = true;
+
+    sti();
+
+    return child->pid;
+
+arch_error:
+    process_signals_exit(child);
+signals_error:
+    process_files_exit(child);
+files_error:
+    process_fs_exit(child);
+fs_error:
+cannot_allocate:
+    delete(child);
+cannot_create_process:
+    sti();
+    return errno;
+}
+
+int kernel_process_spawn(int (*entry)(), void* args, void*, int flags)
+{
+    int errno = -ENOMEM;
+    struct process* child;
+    struct process* parent = process_current;
+
+    cli();
+
+    if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
+    child->type = KERNEL_PROCESS;
+    if (process_space_copy(child, parent, 0)) goto cannot_allocate;
+    if (process_fs_copy(child, parent, 0)) goto fs_error;
+    if (process_files_copy(child, parent, 0)) goto files_error;
+    if (process_signals_copy(child, parent, 0)) goto signals_error;
+    if (process_bin_clone(child, parent)) goto arch_error;
+    if (arch_process_spawn(child, entry, args, flags)) goto arch_error;
+
+    list_add_tail(&child->processes, &init_process.processes);
+    process_parent_child_link(parent, child);
+    process_forked(parent);
+
+    process_wake(child);
+
+    sti();
     scheduler();
 
     return child->pid;
@@ -312,20 +370,8 @@ fs_error:
 cannot_allocate:
     delete(child);
 cannot_create_process:
-    irq_restore(flags);
+    sti();
     return errno;
-}
-
-int kernel_process(int (*start)(), void* args, unsigned int)
-{
-    int pid;
-
-    if ((pid = clone(0, 0)) == 0)
-    {
-        exit(start(args));
-    }
-
-    return pid;
 }
 
 int sys_fork(struct pt_regs regs)

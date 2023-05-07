@@ -1,4 +1,5 @@
 #include <kernel/trace.h>
+#include <kernel/procfs.h>
 #include <kernel/process.h>
 
 PROCESS_DECLARE(init_process);
@@ -30,7 +31,7 @@ void process_wake_waiting(struct process* proc)
         return;
     }
 
-    struct wait_queue* q = list_front(&proc->wait_child.queue, struct wait_queue, processes);
+    wait_queue_t* q = list_front(&proc->wait_child.queue, struct wait_queue, processes);
     if (q->flags == WUNTRACED || proc->stat == PROCESS_ZOMBIE)
     {
         wait_queue_pop(&proc->wait_child);
@@ -136,6 +137,7 @@ int processes_init()
     init_process.mm->pgd = init_pgd_get();
     init_process.mm->kernel_stack = ptr(&init_process_stack[INIT_PROCESS_STACK_SIZE]);
     init_process.mm->vm_areas = NULL;
+    need_resched = &init_process.need_resched;
     mutex_init(&init_process.mm->lock);
     list_add_tail(&init_process.running, &running);
     return 0;

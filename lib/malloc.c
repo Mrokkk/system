@@ -9,12 +9,6 @@ BITSET_DECLARE(bitset, MALLOC_AREA / MALLOC_BLOCK_SIZE);
 
 static void* data;
 
-void bss_init()
-{
-    extern char _sbss[], _ebss[];
-    __builtin_memset(_sbss, 0, _ebss - _sbss);
-}
-
 #define addr(a) ((unsigned int)(a))
 #define ptr(a) ((void*)(a))
 

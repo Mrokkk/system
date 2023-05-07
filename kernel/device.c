@@ -6,7 +6,6 @@ int __char_device_register(
     unsigned int major,
     const char* name,
     struct file_operations* fops,
-    dev_t max_minor,
     void* private,
     unsigned int this_module)
 {
@@ -21,7 +20,6 @@ int __char_device_register(
     dev->fops = fops;
     dev->owner = 0;
     dev->major = major;
-    dev->max_minor = max_minor;
     dev->private = private;
     strcpy(dev->name, name);
 
@@ -44,7 +42,7 @@ int char_device_find(const char* name, device_t** dev)
         {
             continue;
         }
-        if (!strncmp(char_devices[i]->name, name, CHAR_DEVICE_NAME_SIZE))
+        if (!strncmp(char_devices[i]->name, name, DEVICE_NAME_SIZE))
         {
             *dev = char_devices[i];
             return i;

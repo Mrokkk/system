@@ -1,5 +1,5 @@
-#include <arch/vm.h>
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/malloc.h>
 #include <kernel/module.h>
 #include <kernel/reboot.h>
@@ -13,7 +13,6 @@ void prepare_to_shutdown()
     file_systems_print();
     page_stats_print();
     processes_stats_print();
-    kmalloc_stats_print();
     fmalloc_stats_print();
 
     modules_shutdown();
@@ -39,7 +38,17 @@ int sys_reboot(int magic, int magic2, int cmd)
 
     log_info("goodbye!");
 
-    arch_reboot(cmd);
+    switch (cmd)
+    {
+        case REBOOT_CMD_POWER_OFF:
+            machine_shutdown();
+            break;
+        case REBOOT_CMD_RESTART:
+            machine_reboot();
+            break;
+    }
+
+    irq_restore(flags);
 
     return -EBUSY;
 }

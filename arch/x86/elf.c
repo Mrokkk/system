@@ -1,7 +1,13 @@
+#include <kernel/vm.h>
 #include <kernel/elf.h>
+#include <kernel/usyms.h>
 #include <kernel/kernel.h>
+#include <kernel/process.h>
+#include <kernel/backtrace.h>
 
-#include <arch/vm.h>
+#include <arch/mmap.h>
+
+static int elf_symbols_read(const elf32_header_t* header, file_t* file, page_t** pages);
 
 static inline char* elf_get_architecture(uint8_t v)
 {
@@ -52,41 +58,6 @@ static inline void elf_header_print(const char* name, const elf32_header_t* head
         elf_get_machine(header->e_machine));
 }
 
-static inline void elf_shdr_flags_get(elf32_shdr_t* section, char* buffer)
-{
-    size_t i = 0;
-#define ELF_FLAG_STR(flag, str) \
-    if (section->sh_flags & flag) i += sprintf(buffer + i, str)
-    i = sprintf(buffer, "{");
-    ELF_FLAG_STR(SHF_WRITE, "write ");
-    ELF_FLAG_STR(SHF_ALLOC, "alloc ");
-    ELF_FLAG_STR(SHF_EXECINSTR, "exec ");
-    ELF_FLAG_STR(SHF_MERGE, "merge ");
-    ELF_FLAG_STR(SHF_STRINGS, "strings ");
-    ELF_FLAG_STR(SHF_INFO_LINK, "index ");
-    i += sprintf(buffer + i, "}");
-}
-
-static inline void elf_shdr_print(elf32_shdr_t* section, const char* strings)
-{
-    char buffer[64];
-    elf_shdr_flags_get(section, buffer);
-    log_debug(DEBUG_ELF, "name=%s sh_flags=%s sh_addr=%x sh_offset=%x sh_size=%x",
-        &strings[section->sh_name],
-        buffer,
-        section->sh_addr,
-        section->sh_offset,
-        section->sh_size);
-}
-
-static inline int vm_flags_get(elf32_shdr_t* s)
-{
-    int vm_flags = VM_READ;
-    if (s->sh_flags & SHF_WRITE) vm_flags |= VM_WRITE;
-    if (s->sh_flags & SHF_EXECINSTR) vm_flags |= VM_EXECUTABLE;
-    return vm_flags;
-}
-
 static inline int elf_validate(const char* name, const elf32_header_t* header)
 {
     int is_valid =
@@ -104,122 +75,241 @@ static inline int elf_validate(const char* name, const elf32_header_t* header)
     return 0;
 }
 
-// TODO: this need a refactoring and also proper cleanup after failures
-
-// FIXME: big issue - if process did exec a binary and this binary forks, and execs the same binary,
-// page_range_get causes pages's assigned to different list, thus breaking original list
-
-int read_elf(const char* name, void* data, vm_area_t** result_area, uint32_t* brk, void** entry)
+char* elf_phdr_type_get(uint32_t type)
 {
-    elf32_shdr_t* sections;
-    elf32_shdr_t* string_table;
-    elf32_header_t* header = data;
-    const char* strings;
-
-    if (elf_validate(name, header))
+    switch (type)
     {
-        log_debug(DEBUG_ELF, "not an ELF: %x", data);
+        case PT_NULL: return "NULL";
+        case PT_LOAD: return "LOAD";
+        case PT_DYNAMIC: return "DYNAMIC";
+        case PT_INTERP: return "INTERP";
+        case PT_NOTE: return "NOTE";
+        case PT_SHLIB: return "SHLIB";
+        case PT_PHDR: return "PHDR";
+        default: return "UNKNOWN";
+    }
+}
+
+static inline int mmap_flags_get(elf32_phdr_t* p)
+{
+    int mmap_flags = PROT_READ;
+    if (p->p_flags & PF_W) mmap_flags |= PROT_WRITE;
+    if (p->p_flags & PF_X) mmap_flags |= PROT_EXEC;
+    return mmap_flags;
+}
+
+int elf_load(const char* name, file_t* file, binary_t* bin)
+{
+    int errno;
+    page_t* page;
+    elf32_phdr_t* phdr;
+    elf32_header_t header;
+
+    if ((errno = do_read(file, 0, &header, sizeof(elf32_header_t))))
+    {
+        log_debug(DEBUG_ELF, "%s: cannot read header: %d", name, errno);
+        return errno;
+    }
+
+    if (elf_validate(name, &header))
+    {
+        log_debug(DEBUG_ELF, "%s: not an ELF", name);
         return -ENOEXEC;
     }
 
-    sections = ptr(addr(header) + header->e_shoff);
-    string_table = ptr(&sections[header->e_shstrndx]);
-    strings = ptr(addr(header) + string_table->sh_offset);
-
-    vm_area_t* new_area = NULL;
-    *brk = 0;
-
-    for (int i = 0; i < header->e_shnum; ++i)
+    if (unlikely(!(page = page_alloc1())))
     {
-        if (!sections[i].sh_addr)
+        log_debug(DEBUG_ELF, "%s: cannot allocate page for phdr", name);
+        return -ENOMEM;
+    }
+
+    phdr = page_virt_ptr(page);
+
+    if ((errno = do_read(file, header.e_phoff, phdr, header.e_phentsize * header.e_phnum)))
+    {
+        log_debug(DEBUG_ELF, "%s: cannot read phdr: %d", name, errno);
+        return errno;
+    }
+
+    bin->stack_vma = exec_prepare_initial_vma();
+
+    for (uint32_t i = 0; i < header.e_phnum; ++i)
+    {
+        log_debug(DEBUG_ELF, "%8s %08x %08x %08x %08x %08x %x %x", elf_phdr_type_get(phdr[i].p_type),
+            phdr[i].p_offset,
+            phdr[i].p_vaddr,
+            phdr[i].p_paddr,
+            phdr[i].p_filesz,
+            phdr[i].p_memsz,
+            phdr[i].p_flags,
+            phdr[i].p_align);
+
+        if (phdr[i].p_type != PT_LOAD)
         {
             continue;
         }
 
-        elf_shdr_print(&sections[i], strings);
+        void* ptr = do_mmap(
+            ptr(phdr[i].p_vaddr),
+            phdr[i].p_memsz,
+            mmap_flags_get(phdr + i),
+            MAP_PRIVATE | MAP_FIXED,
+            file,
+            phdr[i].p_offset);
 
-        // Check if address of section is within already existing vm_area
-        if (new_area && sections[i].sh_addr < new_area->virt_address + new_area->size)
+        if ((errno = errno_get(ptr)))
         {
-            uint32_t new_size = page_align(sections[i].sh_addr + sections[i].sh_size - new_area->virt_address);
-            uint32_t prev_size = new_area->size;
-
-            // If exiting vm_area has lower size, extend it
-            if (new_size > prev_size)
-            {
-                uint32_t needed_pages = (new_size - prev_size) / PAGE_SIZE;
-
-                log_debug(DEBUG_ELF, "extending size from %x to %x", prev_size, new_size);
-
-                page_t* page_range;
-
-                if (sections[i].sh_flags & SHF_WRITE)
-                {
-                    *brk += new_size - prev_size;
-                    page_range = page_alloc(needed_pages, PAGE_ALLOC_CONT);
-                }
-                else
-                {
-                    page_range = page_range_get(phys(page_align(addr(header) + sections[i].sh_addr)), needed_pages);
-                }
-
-                if (unlikely(!page_range))
-                {
-                    return -ENOMEM;
-                }
-
-                vm_extend(new_area, page_range, vm_flags_get(&sections[i]), needed_pages);
-            }
-            // Apply additional flags
-            new_area->vm_flags |= vm_flags_get(&sections[i]); // FIXME: do it via vm_extend
-            continue;
+            log_debug(DEBUG_ELF, "failed mmap: %d", ptr);
+            page_free(phdr);
+            return errno;
         }
 
-        if (sections[i].sh_flags & SHF_WRITE)
+        bin->brk = page_align(phdr[i].p_vaddr + phdr[i].p_memsz);
+    }
+
+    bin->entry = ptr(header.e_entry);
+    pages_free(page);
+
+    if (DEBUG_BTUSER)
+    {
+        elf_symbols_read(&header, file, &bin->symbols_pages);
+    }
+    else
+    {
+        bin->symbols_pages = NULL;
+    }
+
+    return 0;
+}
+
+static int elf_section_read(const elf32_shdr_t* shdr, file_t* file, page_t** pages)
+{
+    int errno;
+    size_t page_count = page_align(shdr->sh_size) / PAGE_SIZE;
+
+    *pages = page_alloc(page_count, page_count == 1 ? PAGE_ALLOC_DISCONT : PAGE_ALLOC_CONT);
+
+    if (unlikely(!*pages))
+    {
+        return -ENOMEM;
+    }
+
+    if (unlikely(errno = do_read(file, shdr->sh_offset, page_virt_ptr(*pages), shdr->sh_size)))
+    {
+        return errno;
+    }
+
+    return 0;
+}
+
+static void elf_symbols_fill(page_t* pages, const elf32_sym* sym, const size_t sym_count, const char* strings)
+{
+    size_t i;
+    usym_t* usym = page_virt_ptr(pages);
+
+    for (i = 0; i < sym_count; ++i)
+    {
+        const char* name = strings + sym[i].st_name;
+        size_t len = strlen(name);
+
+        usym->name = ptr(addr(usym) + sizeof(usym_t));
+        usym->start = sym[i].st_value;
+        usym->end = usym->start + sym[i].st_size;
+        usym->next = i == sym_count - 1
+            ? 0
+            : ptr(align(addr(usym) + sizeof(usym_t) + len + 1, 4));
+
+        strcpy(usym->name, name);
+
+        usym = usym->next;
+    }
+
+    log_debug(DEBUG_ELF, "read %u symbols", i);
+}
+
+static int elf_symbols_read(const elf32_header_t* header, file_t* file, page_t** pages)
+{
+    int errno = -ENOMEM;
+    page_t* sht_pages = NULL;
+    page_t* syms_pages = NULL;
+    page_t* str_pages = NULL;
+    page_t* usyms_pages;
+    elf32_sym* sym = NULL;
+    char* strings = NULL;
+    size_t sym_count = 0, strings_len = 0;
+
+    sht_pages = page_alloc(page_align(header->e_shentsize * header->e_shnum) / PAGE_SIZE, PAGE_ALLOC_CONT);
+
+    if (unlikely(!sht_pages))
+    {
+        return errno;
+    }
+
+    elf32_shdr_t* shdrt = page_virt_ptr(sht_pages);
+
+    if (unlikely(errno = do_read(file, header->e_shoff, shdrt, header->e_shentsize * header->e_shnum)))
+    {
+        goto free_sht;
+    }
+
+    for (size_t i = 0; i < header->e_shnum; ++i)
+    {
+        elf32_shdr_t* shdr = &shdrt[i];
+
+        switch (shdr->sh_type)
         {
-            void* dest_vaddr;
-            void* src_vaddr;
-            uint32_t size = page_align(sections[i].sh_size);
-            page_t* first_page = page_alloc(size / PAGE_SIZE, PAGE_ALLOC_CONT);
-
-            if (unlikely(!first_page))
-            {
-                log_debug(DEBUG_ELF, "cannot allocate page");
-                return -ENOMEM;
-            }
-
-            src_vaddr = ptr(page_beginning(addr(header) + sections[i].sh_addr));
-            dest_vaddr = page_virt_ptr(first_page);
-
-            log_debug(DEBUG_ELF, "copying %u B from %x to %x", size, src_vaddr, dest_vaddr);
-            memcpy(dest_vaddr, src_vaddr, size);
-
-            new_area = vm_create(
-                first_page,
-                sections[i].sh_addr,
-                size,
-                vm_flags_get(&sections[i]));
-
-            vm_add(result_area, new_area);
-
-            *brk = sections[i].sh_addr + size;
-        }
-        else
-        {
-            uint32_t paddr = phys(page_beginning(addr(header) + sections[i].sh_addr));
-            uint32_t pages = page_align(sections[i].sh_size) / PAGE_SIZE;
-
-            new_area = vm_create(
-                page_range_get(paddr, pages),
-                sections[i].sh_addr,
-                page_align(sections[i].sh_size),
-                vm_flags_get(&sections[i]) | VM_NONFREEABLE);
-
-            vm_add(result_area, new_area);
+            case SHT_SYMTAB:
+                if (unlikely(errno = elf_section_read(shdr, file, &syms_pages)))
+                {
+                    goto free;
+                }
+                sym = page_virt_ptr(syms_pages);
+                sym_count = shdr->sh_size / sizeof(elf32_sym);
+                break;
+            case SHT_STRTAB:
+                if (strings) continue;
+                if (unlikely(errno = elf_section_read(shdr, file, &str_pages)))
+                {
+                    goto free;
+                }
+                strings = page_virt_ptr(str_pages);
+                strings_len = shdr->sh_size;
+                break;
         }
     }
 
-    *entry = ptr(header->e_entry);
+    if (unlikely(!sym || !strings))
+    {
+        errno = -ENOEXEC;
+        goto free;
+    }
 
-    return 0;
+    usyms_pages = page_alloc(
+        page_align(sizeof(usym_t) * sym_count + strings_len) / PAGE_SIZE,
+        PAGE_ALLOC_CONT);
+
+    if (unlikely(!usyms_pages))
+    {
+        errno = -ENOEXEC;
+        goto free;
+    }
+
+    *pages = usyms_pages;
+
+    elf_symbols_fill(usyms_pages, sym, sym_count, strings);
+
+    errno = 0;
+
+free:
+    if (str_pages)
+    {
+        ASSERT(pages_free(str_pages));
+    }
+    if (syms_pages)
+    {
+        ASSERT(pages_free(syms_pages));
+    }
+free_sht:
+    ASSERT(pages_free(sht_pages));
+    return errno;
 }

@@ -1,9 +1,11 @@
 #pragma once
 
-typedef struct spinlock
+struct spinlock
 {
     volatile unsigned int lock;
-} spinlock_t;
+};
+
+typedef struct spinlock spinlock_t;
 
 #define SPINLOCK_UNLOCKED   0
 #define SPINLOCK_LOCKED     1

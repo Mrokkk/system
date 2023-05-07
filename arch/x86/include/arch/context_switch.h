@@ -5,38 +5,18 @@
 
 #include <arch/segment.h>
 #include <arch/register.h>
-#include <kernel/trace.h>
+
 #include <kernel/page.h>
+#include <kernel/trace.h>
 #include <kernel/printk.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
-
-void stack_dump(const uint32_t* stack, uint32_t count)
-{
-    for (uint32_t i = 0; i < count; ++i)
-    {
-        log_exception("%08x: %08x", stack + i, stack[i]);
-    }
-}
-
-static inline uint32_t remaining_stack_prev(struct process* p)
-{
-    return PAGE_SIZE - (addr(p->mm->kernel_stack) - esp_get());
-}
-
-static inline uint32_t remaining_stack_next(struct process* p)
-{
-    return PAGE_SIZE - (addr(p->mm->kernel_stack) - p->context.esp);
-}
+#include <kernel/backtrace.h>
 
 static inline void paranoia(struct process*, struct process* next)
 {
-    extern pid_t last_pid;
-    extern void ret_from_syscall();
-
     uint32_t* stack;
     uint32_t stack_end;
-    uint32_t process_switch_addr;
 
     switch (next->type)
     {
@@ -62,10 +42,15 @@ static inline void paranoia(struct process*, struct process* next)
     stack = ptr(next->context.esp);
     stack_end = addr(next->mm->kernel_stack) - PAGE_SIZE;
 
+    if (unlikely(!stack))
+    {
+        panic("stack is null");
+    }
+
     if (unlikely(addr(stack) < stack_end))
     {
         cli();
-        stack_dump(stack, 32);
+        memory_dump(log_critical, stack, 32);
         panic("process %u:%x: kernel stack overflow at %x; esp = %x, stack_end = %x",
             next->pid,
             next,
@@ -77,7 +62,7 @@ static inline void paranoia(struct process*, struct process* next)
     if (unlikely(*(uint32_t*)stack_end != STACK_MAGIC))
     {
         cli();
-        stack_dump(stack, 32);
+        memory_dump(log_critical, stack, 32);
         panic("process %u:%x: memory corruption; %x = %x; expected: %x",
             next->pid,
             next,
@@ -86,29 +71,33 @@ static inline void paranoia(struct process*, struct process* next)
             STACK_MAGIC);
     }
 
-    asm volatile("movl $1f, %0" : "=m" (process_switch_addr));
-
-    if (next->context.eip == process_switch_addr)
+    if (next->context.eip == addr(&context_restore))
     {
-        uint32_t gs = *stack & 0xffff;
-        if (gs != KERNEL_DS && gs != USER_DS)
+        struct context_switch_frame* regs = ptr(stack);
+        if (regs->gs != KERNEL_DS && regs->gs != USER_DS)
         {
             cli();
-            stack_dump(stack, 32);
+            memory_dump(log_critical, stack, 32);
             panic("process %u:%x gs = %x, expected = %x or %x;",
                 next->pid,
                 next,
-                *stack,
+                regs->gs,
                 KERNEL_DS,
                 USER_DS);
         }
     }
-    else if (next->context.eip == addr(&ret_from_syscall))
+    else if (next->context.eip == addr(&exit_kernel))
     {
         struct pt_regs* regs = ptr(stack);
         switch (next->type)
         {
-            #define CHECK(seg, val) if (seg != val) { cli(); stack_dump(stack, 32); panic(#seg " = %x", seg); }
+            #define CHECK(seg, val) \
+                if (seg != val) \
+                { \
+                    cli(); \
+                    memory_dump(log_critical, stack, 32); panic(#seg " = %x", seg); \
+                }
+
             case USER_PROCESS:
                 CHECK(regs->cs, USER_CS);
                 CHECK(regs->ds, USER_DS);
@@ -150,10 +139,10 @@ static inline void process_switch(struct process* prev, struct process* next)
         "pushl %%gs;"
         "movl %%esp, %0;"
         "movl %2, %%esp;"
-        "movl $1f, %1;"
+        "movl $context_restore, %1;"
         "pushl %3;"
         "jmp __process_switch;"
-        "1:"
+        ".global context_restore; context_restore:"
         "popl %%gs;"
         "popl %%ebp;"
         "popl %%edi;"

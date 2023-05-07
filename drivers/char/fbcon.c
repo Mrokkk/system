@@ -42,36 +42,54 @@ typedef struct
     uint32_t bg_color;
 } data_t;
 
-data_t data;
-
 int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
 {
-    driver->data = &data;
-    data.fb = framebuffer.fb;
-    data.pitch = framebuffer.pitch;
-    data.font_height_offset = framebuffer.pitch * font.height;
-    data.font_width_offset =  (framebuffer.bpp / 8) * font.width;
-    data.fg_color = COLOR_WHITE;
-    data.bg_color = COLOR_BLACK;
+    int errno;
+    data_t* data;
+
+    if ((errno = font_load()))
+    {
+        log_warning("cannot load font: %d", errno);
+        return errno;
+    }
+
+    data = alloc(data_t);
+
+    if (unlikely(!data))
+    {
+        log_warning("cannot allocate memory for fbcon data");
+        return -ENOMEM;
+    }
+
+    data->fb = framebuffer.fb;
+    data->pitch = framebuffer.pitch;
+    data->font_height_offset = framebuffer.pitch * font.height;
+    data->font_width_offset =  (framebuffer.bpp / 8) * font.width;
+    data->fg_color = COLOR_WHITE;
+    data->bg_color = COLOR_BLACK;
+    driver->data = data;
+
     *resy = framebuffer.height / font.height;
-    *resx = framebuffer.width / font.width - 1; // FIXME: it crashes
+    *resx = framebuffer.width / font.width;
+
     return 0;
 }
 
-void fbcon_char_print(console_driver_t*, size_t y, size_t x, unsigned int c)
+void fbcon_char_print(console_driver_t* drv, size_t y, size_t x, uint8_t c, uint32_t fgcolor, uint32_t bgcolor)
 {
+    data_t* data = drv->data;
     uint32_t line, mask;
     uint8_t* glyph = font.glyphs[c].bytes;
-    uint32_t offset = data.font_height_offset * y + data.font_width_offset * x;
+    uint32_t offset = data->font_height_offset * y + data->font_width_offset * x;
 
-    for (uint32_t y = 0; y < font.bytes_per_glyph; y++, ++glyph, offset += data.pitch)
+    for (uint32_t y = 0; y < font.height; y++, ++glyph, offset += data->pitch)
     {
         line = offset;
         mask = 1 << 7;
-        for (uint32_t x = 0; x < font.bytes_per_glyph; x++)
+        for (uint32_t x = 0; x < font.width; x++)
         {
-            uint32_t value = *glyph & mask ? data.fg_color : data.bg_color;
-            uint32_t* pixel = (uint32_t*)(data.fb + line);
+            uint32_t value = *glyph & mask ? fgcolor : bgcolor;
+            uint32_t* pixel = (uint32_t*)(data->fb + line);
             *pixel = value;
             mask >>= 1;
             line += 4;
@@ -79,8 +97,9 @@ void fbcon_char_print(console_driver_t*, size_t y, size_t x, unsigned int c)
     }
 }
 
-void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count)
+void fbcon_setsgr(console_driver_t* drv, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
 {
+    data_t* data = drv->data;
     color_mode_t mode = NORMAL;
     uint32_t color = 0;
     for (size_t i = 0; i < count; ++i)
@@ -98,16 +117,16 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count)
         switch (param)
         {
             case 0:
-                data.fg_color = COLOR_WHITE;
-                data.bg_color = COLOR_BLACK;
+                data->fg_color = COLOR_WHITE;
+                data->bg_color = COLOR_BLACK;
                 break;
-            case 30: data.fg_color = COLOR_BLACK; break;
-            case 31: data.fg_color = COLOR_RED; break;
-            case 32: data.fg_color = COLOR_GREEN; break;
-            case 33: data.fg_color = COLOR_YELLOW; break;
-            case 34: data.fg_color = COLOR_BLUE; break;
-            case 35: data.fg_color = COLOR_MAGENTA; break;
-            case 36: data.fg_color = COLOR_CYAN; break;
+            case 30: data->fg_color = COLOR_BLACK; break;
+            case 31: data->fg_color = COLOR_RED; break;
+            case 32: data->fg_color = COLOR_GREEN; break;
+            case 33: data->fg_color = COLOR_YELLOW; break;
+            case 34: data->fg_color = COLOR_BLUE; break;
+            case 35: data->fg_color = COLOR_MAGENTA; break;
+            case 36: data->fg_color = COLOR_CYAN; break;
             case 38:
                 switch (params[++i])
                 {
@@ -117,25 +136,35 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count)
                         // TODO:
                 }
                 break;
-            case 40: data.bg_color = COLOR_BLACK; break;
-            case 41: data.bg_color = COLOR_RED; break;
-            case 42: data.bg_color = COLOR_GREEN; break;
-            case 43: data.bg_color = COLOR_YELLOW; break;
-            case 44: data.bg_color = COLOR_BLUE; break;
-            case 45: data.bg_color = COLOR_MAGENTA; break;
-            case 46: data.bg_color = COLOR_CYAN; break;
-            case 90: data.fg_color = COLOR_GRAY; break;
-            case 91: data.fg_color = COLOR_BRIGHTRED; break;
-            case 92: data.fg_color = COLOR_BRIGHTGREEN; break;
-            case 93: data.fg_color = COLOR_BRIGHTYELLOW; break;
-            case 94: data.fg_color = COLOR_BRIGHTBLUE; break;
-            case 95: data.fg_color = COLOR_BRIGHTMAGENTA; break;
-            case 96: data.fg_color = COLOR_BRIGHTCYAN; break;
-            case 97: data.fg_color = COLOR_BRIGHTWHITE; break;
+            case 40: data->bg_color = COLOR_BLACK; break;
+            case 41: data->bg_color = COLOR_RED; break;
+            case 42: data->bg_color = COLOR_GREEN; break;
+            case 43: data->bg_color = COLOR_YELLOW; break;
+            case 44: data->bg_color = COLOR_BLUE; break;
+            case 45: data->bg_color = COLOR_MAGENTA; break;
+            case 46: data->bg_color = COLOR_CYAN; break;
+            case 90: data->fg_color = COLOR_GRAY; break;
+            case 91: data->fg_color = COLOR_BRIGHTRED; break;
+            case 92: data->fg_color = COLOR_BRIGHTGREEN; break;
+            case 93: data->fg_color = COLOR_BRIGHTYELLOW; break;
+            case 94: data->fg_color = COLOR_BRIGHTBLUE; break;
+            case 95: data->fg_color = COLOR_BRIGHTMAGENTA; break;
+            case 96: data->fg_color = COLOR_BRIGHTCYAN; break;
+            case 97: data->fg_color = COLOR_BRIGHTWHITE; break;
         }
     }
+
     if (color)
     {
-        data.fg_color = color;
+        data->fg_color = color;
     }
+
+    *fgcolor = data->fg_color;
+    *bgcolor = data->bg_color;
+}
+
+void fbcon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
+{
+    *fgcolor = COLOR_WHITE;
+    *bgcolor = COLOR_BLACK;
 }

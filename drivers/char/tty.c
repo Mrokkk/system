@@ -2,6 +2,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/irq.h>
+#include <kernel/devfs.h>
 #include <kernel/device.h>
 #include <kernel/process.h>
 
@@ -9,31 +10,55 @@
 #include "egacon.h"
 #include "serial.h"
 #include "console.h"
-#include "keyboard.h"
+#include "tty_ldisc.h"
 #include "framebuffer.h"
 
-int tty_open(struct file* file);
-int tty_read(struct file* file, char* buffer, size_t size);
+#undef log_fmt
+#define log_fmt(fmt) "tty: " fmt
 
-#define TTY_INITIALIZED 0x4215
+#define DEFAULT_C_CC \
+    "\003"  /* VINTR    ^C */ \
+    "\034"  /* VQUIT    ^\ */ \
+    "\b"    /* VERASE   DEL */ \
+    "\025"  /* VKILL    ^U */ \
+    "\004"  /* VEOF     ^D */ \
+    "\0"    /* VTIME    \0 */ \
+    "\1"    /* VMIN     \1 */ \
+    "\0"    /* VSWTC    \0 */ \
+    "\021"  /* VSTART   ^Q */ \
+    "\023"  /* VSTOP    ^S */ \
+    "\032"  /* VSUSP    ^Z */ \
+    "\0"    /* VEOL     \0 */ \
+    "\022"  /* VREPRINT ^Q */ \
+    "\017"  /* VDISCARD ^U */ \
+    "\027"  /* VWERASE  ^W */ \
+    "\026"  /* VLNEXT   ^V */ \
+    "\0"    /* VEOL2    \0 */
 
-static struct file_operations fops = {
+#define DEFAULT_C_IFLAG (BRKINT | ISTRIP | ICRNL | IMAXBEL | IXON | IXANY)
+#define DEFAULT_C_OFLAG (OPOST | ONLCR | XTABS)
+#define DEFAULT_C_CFLAG (CREAD | CS7 | PARENB | HUPCL)
+#define DEFAULT_C_LFLAG (ECHO | ICANON | ISIG | IEXTEN | ECHOE| ECHOKE | ECHOCTL)
+
+static int tty_open(file_t* file);
+static int tty_read(file_t* file, char* buffer, size_t size);
+static int tty_write(file_t* file, const char* buffer, size_t size);
+
+static file_operations_t fops = {
     .open = &tty_open,
     .read = &tty_read,
-    .write = &console_write,
+    .write = &tty_write,
 };
 
 module_init(tty_init);
 module_exit(tty_deinit);
 KERNEL_MODULE(tty);
 
-#define TTY_NR 1
+static LIST_DECLARE(tty_list);
 
-tty_t ttys[TTY_NR];
-
-int tty_init()
+UNMAP_AFTER_INIT int tty_init()
 {
-    char_device_register(MAJOR_CHR_TTY, "tty", &fops, 0, NULL);
+    console_init();
     return 0;
 }
 
@@ -42,108 +67,114 @@ int tty_deinit()
     return 0;
 }
 
-int tty_open(struct file*)
+int tty_driver_register(tty_driver_t* drv)
 {
     int errno;
-    console_driver_t* driver;
+    char namebuf[32];
+    tty_t* new_tty = alloc(tty_t);
 
-    if (ttys[0].initialized == TTY_INITIALIZED)
-    {
-        return 0;
-    }
-
-    if (unlikely(!(driver = alloc(console_driver_t))))
+    if (unlikely(!new_tty))
     {
         return -ENOMEM;
     }
 
-    switch (framebuffer.type)
+    log_info("registering %s, num = %u", drv->name, drv->num);
+
+    if ((errno = char_device_register(drv->major, drv->name, &fops, drv->num - 1, NULL)))
     {
-        case FB_TYPE_RGB:
-            driver->init = &fbcon_init;
-            driver->putch = &fbcon_char_print;
-            driver->setsgr = &fbcon_setsgr;
-            break;
-        case FB_TYPE_TEXT:
-            driver->init = &egacon_init;
-            driver->putch = &egacon_char_print;
-            driver->setsgr = &egacon_setsgr;
-            break;
+        log_warning("failed to register char device");
+        delete(new_tty);
+        return errno;
     }
 
-    if ((errno = console_init(driver)))
+    new_tty->driver = drv;
+    new_tty->major = drv->major;
+    new_tty->termios.c_iflag = DEFAULT_C_IFLAG;
+    new_tty->termios.c_oflag = DEFAULT_C_OFLAG;
+    new_tty->termios.c_cflag = DEFAULT_C_CFLAG;
+    new_tty->termios.c_lflag = DEFAULT_C_LFLAG;
+    memcpy((char*)new_tty->termios.c_cc, DEFAULT_C_CC, NCCS);
+
+    list_init(&new_tty->list_entry);
+    list_add_tail(&new_tty->list_entry, &tty_list);
+
+    for (dev_t minor = drv->minor_start; minor < drv->minor_start + drv->num; ++minor)
     {
-        log_error("cannot initialize tty video driver");
-        return -ENOSYS;
+        sprintf(namebuf, "%s%u", drv->name, minor);
+        if ((errno = devfs_register(namebuf, drv->major, minor)))
+        {
+            log_error("failed to register %s: %d", namebuf, errno);
+        }
     }
-
-    ttys[0].tty_putchar = &console_putch;
-    buffer_init(&ttys[0].buf);
-    wait_queue_head_init(&ttys[0].wq);
-
-    keyboard_init();
-
-    ttys[0].initialized = TTY_INITIALIZED;
 
     return 0;
 }
 
-int tty_read(
-    struct file*,
-    char* buffer,
-    size_t size)
+static tty_t* tty_find(dev_t major)
 {
-    size_t i;
-    flags_t flags;
-    tty_t* tty = ttys;
-    WAIT_QUEUE_DECLARE(q, process_current);
-
-    for (i = 0; i < size; i++)
+    tty_t* tty;
+    list_for_each_entry(tty, &tty_list, list_entry)
     {
-        while (buffer_get(&tty->buf, &buffer[i]))
+        if (tty->major == major)
         {
-            irq_save(flags);
-            wait_queue_push(&q, &tty->wq);
-            process_wait(process_current, flags);
-        }
-        if (buffer[i] == '\n')
-        {
-            ++i;
-            goto finish;
-        }
-        else if (buffer[i] == 4)
-        {
-            i = 0;
-            goto finish;
-        }
-        else if (buffer[i] == 3)
-        {
-            do_kill(process_current, SIGINT);
-            i = 1;
-            buffer[0] = 0;
-            goto finish;
-        }
-        else if (buffer[i] == '\b' && i > 0)
-        {
-            buffer[i--] = 0;
-            buffer[i--] = 0;
+            return tty;
         }
     }
-
-finish:
-    return i;
+    return NULL;
 }
 
-void tty_char_insert(char c, int flag)
+static int tty_open(file_t* file)
 {
-    ttys[0].tty_putchar(c);
-    if (flag != TTY_DONT_PUT_TO_USER)
+    int major = MAJOR(file->inode->dev);
+    tty_t* tty = tty_find(major);
+
+    if (tty->driver->initialized == TTY_INITIALIZED)
     {
-        buffer_put(&ttys[0].buf, c);
-        if (!wait_queue_empty(&ttys[0].wq))
-        {
-            struct process* proc = wait_queue_pop(&ttys[0].wq);
-            process_wake(proc);
-        }
+        file->private = tty;
+        return 0;
     }
+
+    if (!tty->driver->open)
+    {
+        return -ENOSYS;
+    }
+
+    fifo_init(&tty->buf);
+    wait_queue_head_init(&tty->wq);
+
+    file->private = tty;
+
+    return tty_ldisc_open(tty, file);
+}
+
+static int tty_read(file_t* file, char* buffer, size_t count)
+{
+    return tty_ldisc_read(file->private, file, buffer, count);
+}
+
+static int tty_write(file_t* file, const char* buffer, size_t count)
+{
+    return tty_ldisc_write(file->private, file, buffer, count);
+}
+
+void tty_char_insert(tty_t* tty, char c, int flag)
+{
+    tty_ldisc_putch(tty, c, flag);
+}
+
+void tty_string_insert(tty_t* tty, const char* string, int flag)
+{
+    for (; *string; ++string)
+    {
+        char c = *string;
+        tty_ldisc_putch(tty, c, flag);
+    }
+}
+
+int sys_setsid(void)
+{
+    process_current->sid = process_current->pid;
+    tty_t* tty = process_current->files->files[0]->private;
+    tty->sid = process_current->pid;
+    return 0;
 }

@@ -1,5 +1,5 @@
-#include <arch/vm.h>
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/stat.h>
 #include <kernel/process.h>
 
@@ -16,7 +16,7 @@ int dirent_add(void* buf, const char* name, size_t len, ino_t ino, char type)
     struct readdir_data* data = buf;
     struct dirent* dirent = data->current;
 
-    int dirent_size = align_to_block_size(len + sizeof(struct dirent) + 1, sizeof(long));
+    int dirent_size = align(len + sizeof(struct dirent) + 1, sizeof(long));
 
     if (dirent_size > data->count)
     {
@@ -26,7 +26,8 @@ int dirent_add(void* buf, const char* name, size_t len, ino_t ino, char type)
     dirent->ino = ino;
     dirent->len = dirent_size;
     dirent->type = type;
-    strncpy(dirent->name, name, len + 1);
+    strncpy(dirent->name, name, len);
+    dirent->name[len] = 0;
 
     data->count -= dirent_size;
     data->previous = data->current;

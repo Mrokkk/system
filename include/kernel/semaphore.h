@@ -2,12 +2,14 @@
 
 #include <kernel/wait.h>
 
-typedef struct semaphore
+struct semaphore
 {
     volatile int count;
     volatile int waiting;
-    struct wait_queue_head queue;
-} semaphore_t;
+    wait_queue_head_t queue;
+};
+
+typedef struct semaphore semaphore_t;
 
 #define SEMAPHORE_INIT(sem, count) \
     { count, 0, WAIT_QUEUE_HEAD_INIT(sem.queue) }

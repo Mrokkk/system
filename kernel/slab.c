@@ -1,12 +1,16 @@
 #include <kernel/page.h>
+#include <kernel/debug.h>
 #include <kernel/malloc.h>
 #include <kernel/printk.h>
 
-#define SLAB_POISON 0x5324
+#define SLAB_REDZONE        0
+#define SLAB_POISON         0x5324
+#define SLAB_REDZONE_POISON 0xffc0deff
+#define SLAB_REDZONE_SIZE   8
 
 typedef struct slab
 {
-    struct list_head list_entry;
+    list_head_t list_entry;
     uint32_t poison;
 } slab_t;
 
@@ -14,7 +18,7 @@ typedef struct slab_allocator
 {
     size_t size;
     page_t* pages;
-    struct list_head free;
+    list_head_t free;
 } slab_allocator_t;
 
 #define SLAB_32     0
@@ -28,6 +32,9 @@ static slab_allocator_t allocators[SLABS_SIZE];
 
 static inline slab_allocator_t* slab_allocator_get(size_t size)
 {
+#if SLAB_REDZONE
+    size += SLAB_REDZONE_SIZE;
+#endif
     if (size <= 32) return allocators + SLAB_32;
     else if (size <= 64) return allocators + SLAB_64;
     else if (size <= 128) return allocators + SLAB_128;
@@ -50,9 +57,17 @@ void* slab_alloc(size_t size)
         return NULL;
     }
 
-    slab_t* slab = list_front(&allocator->free, struct slab, list_entry);
+    slab_t* slab = list_front(&allocator->free, slab_t, list_entry);
     list_del(&slab->list_entry);
     slab->poison = 0;
+
+#if SLAB_REDZONE
+    uint32_t* redzone = ptr(slab);
+    *redzone = SLAB_REDZONE_POISON;
+    redzone = ptr(addr(redzone) + size + 4);
+    *redzone = SLAB_REDZONE_POISON;
+    slab = ptr(addr(slab) + 4);
+#endif
 
     return slab;
 }
@@ -61,6 +76,14 @@ void slab_free(void* ptr, size_t size)
 {
     slab_t* slab = ptr;
     slab_allocator_t* allocator = slab_allocator_get(size);
+
+#if SLAB_REDZONE
+    slab = ptr(addr(slab) - 4);
+    uint32_t* redzone = ptr(slab);
+    ASSERT(*redzone == SLAB_REDZONE_POISON);
+    redzone = ptr(addr(redzone) + size + 4);
+    ASSERT(*redzone == SLAB_REDZONE_POISON);
+#endif
 
     if (unlikely(slab->poison == SLAB_POISON))
     {
@@ -78,7 +101,7 @@ void slab_free(void* ptr, size_t size)
     slab->poison = SLAB_POISON;
 }
 
-static void init(struct slab_allocator* allocator, size_t size, size_t count)
+UNMAP_AFTER_INIT static void init(struct slab_allocator* allocator, size_t size, size_t count)
 {
     uint8_t* ptr;
     page_t* pages;
@@ -89,6 +112,7 @@ static void init(struct slab_allocator* allocator, size_t size, size_t count)
 
     list_init(&allocator->free);
     allocator->pages = pages;
+    allocator->size = size;
 
     for (size_t i = 0; i < count; ++i, ptr += size)
     {
@@ -99,11 +123,11 @@ static void init(struct slab_allocator* allocator, size_t size, size_t count)
     }
 }
 
-void slab_allocator_init(void)
+UNMAP_AFTER_INIT void slab_allocator_init(void)
 {
-    init(&allocators[SLAB_32], 32, 512);
-    init(&allocators[SLAB_64], 64, 256);
-    init(&allocators[SLAB_128], 128, 128);
-    init(&allocators[SLAB_256], 256, 64);
-    init(&allocators[SLAB_512], 512, 32);
+    init(&allocators[SLAB_32], 32, 512 * 2);
+    init(&allocators[SLAB_64], 64, 256 * 16);
+    init(&allocators[SLAB_128], 128, 128 * 2);
+    init(&allocators[SLAB_256], 256, 64 * 2);
+    init(&allocators[SLAB_512], 512, 32 * 2);
 }

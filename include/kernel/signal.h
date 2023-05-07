@@ -38,12 +38,25 @@
 #define NSIGNALS    32
 
 typedef int (*sighandler_t)();
+typedef void (*sigrestorer_t)(void);
 
 struct process;
+
+typedef unsigned long sigset_t;
+
+struct sigaction
+{
+    void     (*sa_handler)(int);
+    void     (*sa_sigaction)(int, void*, void*);
+    sigset_t sa_mask;
+    int      sa_flags;
+    void     (*sa_restorer)(void);
+};
 
 int signal(int signum, sighandler_t handler);
 int kill(int pid, int signum);
 int do_kill(struct process* proc, int signum);
+int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact);
 
 static inline int signum_exists(int s)
 {

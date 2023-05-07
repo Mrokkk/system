@@ -1,3 +1,5 @@
 #pragma once
 
-int keyboard_init(void);
+struct tty;
+
+int keyboard_init(struct tty* tty);

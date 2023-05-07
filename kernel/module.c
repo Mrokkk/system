@@ -4,7 +4,7 @@
 
 static LIST_DECLARE(modules);
 
-int modules_init()
+UNMAP_AFTER_INIT int modules_init()
 {
     kmod_t* module;
 
@@ -21,16 +21,12 @@ int modules_init()
         {
             log_error("%s: FAIL", module->name);
         }
-        else
-        {
-            log_info("%s: SUCCESS", module->name);
-        }
     }
 
     return 0;
 }
 
-void module_add(kmod_t* new)
+UNMAP_AFTER_INIT void module_add(kmod_t* new)
 {
     list_add_tail(&new->modules, &modules);
 }

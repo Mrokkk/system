@@ -14,7 +14,7 @@ static struct fmalloc_stats
 
 void* fmalloc(size_t size)
 {
-    size_t blocks = align_to_block_size(size, FAST_MALLOC_BLOCK_SIZE) / FAST_MALLOC_BLOCK_SIZE;
+    size_t blocks = align(size, FAST_MALLOC_BLOCK_SIZE) / FAST_MALLOC_BLOCK_SIZE;
     ++fmalloc_stats.fmalloc_calls;
 
     int frame = bitset_find_clear_range(bitset, blocks);
@@ -35,7 +35,7 @@ void* fmalloc(size_t size)
 int ffree(void* ptr, size_t size)
 {
     size_t frame = (addr(ptr) - addr(fmalloc_mem)) / FAST_MALLOC_BLOCK_SIZE;
-    size_t blocks = align_to_block_size(size, FAST_MALLOC_BLOCK_SIZE) / FAST_MALLOC_BLOCK_SIZE;
+    size_t blocks = align(size, FAST_MALLOC_BLOCK_SIZE) / FAST_MALLOC_BLOCK_SIZE;
 
     log_debug(DEBUG_FMALLOC, "freeing %x, %u blocks at pos:%u", ptr, blocks, frame);
 
@@ -45,7 +45,7 @@ int ffree(void* ptr, size_t size)
     return 0;
 }
 
-void fmalloc_init()
+UNMAP_AFTER_INIT void fmalloc_init()
 {
     size_t required_pages = FAST_MALLOC_AREA / PAGE_SIZE;
     page_t* page_range = page_alloc(required_pages, PAGE_ALLOC_CONT);

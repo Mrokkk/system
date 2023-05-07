@@ -1,5 +1,7 @@
 #pragma once
 
+#include <kernel/fs.h>
+
 #define PROT_READ       0x1     /* page can be read */
 #define PROT_WRITE      0x2     /* page can be written */
 #define PROT_EXEC       0x4     /* page can be executed */
@@ -15,3 +17,5 @@
 #define MAP_DENYWRITE   0x0800  /* ETXTBSY */
 #define MAP_EXECUTABLE  0x1000  /* mark it as a executable */
 #define MAP_LOCKED      0x2000  /* pages are locked */
+
+void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t offset);

@@ -4,18 +4,29 @@
 #include <kernel/fs.h>
 #include "console_driver.h"
 
-int console_write(struct file*, const char* buffer, size_t size);
-void console_putch(uint8_t c);
-int console_init(console_driver_t* driver);
+struct line;
+struct console;
+struct line_char;
 
-typedef struct line
+typedef struct line line_t;
+typedef struct console console_t;
+typedef struct line_char line_char_t;
+
+struct line_char
 {
-    uint8_t* line;
-    uint8_t* pos;
+    uint32_t fgcolor;
+    uint32_t bgcolor;
+    uint8_t c;
+} PACKED;
+
+struct line
+{
+    line_char_t* line;
+    line_char_t* pos;
     size_t index;
     struct line* next;
     struct line* prev;
-} line_t;
+};
 
 #define PARAMS_SIZE 16
 
@@ -27,7 +38,7 @@ typedef enum
     ES_GETPARAM,
 } state_t;
 
-typedef struct
+struct console
 {
     size_t x, y;
     size_t resx, resy;
@@ -41,8 +52,14 @@ typedef struct
     line_t* orig_visible_line;
     int scrolling;
     size_t current_index;
+    uint32_t current_fgcolor, current_bgcolor;
+    uint32_t default_fgcolor, default_bgcolor;
+    bool redraw;
+    line_t* prev_visible_line;
 
     size_t params_nr;
     uint32_t params[PARAMS_SIZE];
     state_t state;
-} console_t;
+};
+
+int console_init(void);

@@ -8,6 +8,10 @@ void egacon_char_print(
     console_driver_t* driver,
     size_t row,
     size_t col,
-    unsigned int c);
+    uint8_t c,
+    uint32_t fgcolor,
+    uint32_t bgcolor);
 
-void egacon_setsgr(console_driver_t* driver, uint32_t params[], size_t count);
+void egacon_setsgr(console_driver_t* driver, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor);
+
+void egacon_defcolor(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);

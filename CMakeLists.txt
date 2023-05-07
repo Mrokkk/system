@@ -63,34 +63,27 @@ add_custom_target(
 )
 
 add_custom_target(
-    font
-    COMMAND "${PROJECT_SOURCE_DIR}/scripts/font_get.sh"
-    COMMENT "Copying font"
+    rootfs
+    COMMAND "${PROJECT_SOURCE_DIR}/scripts/build_filesystem.sh"
+    DEPENDS ${PROJECT_NAME} test test2 sh cat reboot poweroff ls colors init ksyms display date
+    COMMENT "Preparing rootfs"
 )
 
 add_custom_target(
    iso
    COMMAND "${PROJECT_SOURCE_DIR}/scripts/isomaker.sh"
            "-o" "${PROJECT_NAME}"
-           "--args" "console=/dev/tty0 syslog=/dev/ttyS0"
-           "--module" "${CMAKE_BINARY_DIR}/bin/sh/sh"
-           "--module" "${CMAKE_BINARY_DIR}/bin/test/test"
-           "--module" "${CMAKE_BINARY_DIR}/bin/test2/test2"
-           "--module" "${CMAKE_BINARY_DIR}/bin/reboot/reboot"
-           "--module" "${CMAKE_BINARY_DIR}/bin/ls/ls"
-           "--module" "${CMAKE_BINARY_DIR}/bin/cat/cat"
-           "--module" "${CMAKE_BINARY_DIR}/bin/init/init"
-           "--module" "${CMAKE_BINARY_DIR}/bin/colors/colors"
+           "--args" "console=/dev/tty0 syslog=/dev/debug0 earlycon"
            "--module" "${CMAKE_BINARY_DIR}/kernel.map"
-           "--module" "${CMAKE_SOURCE_DIR}/tux.tga"
-           "--module" "${CMAKE_BINARY_DIR}/font.psf"
-   DEPENDS ${PROJECT_NAME} test test2 sh cat reboot ls colors init ksyms font
+           "--module" "${CMAKE_BINARY_DIR}/disk.img"
+   DEPENDS rootfs
    COMMENT "Building ISO image"
 )
 
 add_custom_target(
     runqemu
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh runqemu
+    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh debugcon
     COMMAND ./runqemu -k
     DEPENDS iso
     COMMENT "Running qemu"

@@ -139,7 +139,7 @@ const char* errors[] = {
 
 void perror(const char* s)
 {
-    int e = -errno;
+    int e = errno;
     const char* error = errors[e];
 
     if (unlikely(!error))
