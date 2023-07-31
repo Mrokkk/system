@@ -8,6 +8,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/page.h>
+#include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/kernel.h>
 
@@ -30,6 +31,7 @@ static int console_open(tty_t* tty, file_t* file);
 static int console_setup(console_driver_t* driver);
 static int console_close(tty_t* tty, file_t* file);
 static int console_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
+static int console_ioctl(tty_t* tty, unsigned long request, void* arg);
 static void console_putch(tty_t* tty, uint8_t c);
 
 static command_t control(console_t* console, char c);
@@ -44,6 +46,7 @@ static tty_driver_t tty_driver = {
     .open = &console_open,
     .close = &console_close,
     .write = &console_write,
+    .ioctl = &console_ioctl,
     .putch = &console_putch,
     .initialized = 0,
 };
@@ -339,6 +342,10 @@ static inline void console_putc(console_t* console, uint8_t c)
 static void console_putch(tty_t* tty, uint8_t c)
 {
     console_t* console = tty->driver->driver_data;
+    if (console->disabled)
+    {
+        return;
+    }
     switch (control(console, c))
     {
         case C_PRINT:
@@ -454,6 +461,7 @@ static int console_setup(console_driver_t* driver)
     lines[0].prev = lines + i - 1;
     lines[i - 1].next = lines;
 
+    console->disabled = false;
     console->x = 0;
     console->y = 0;
     console->resx = col;
@@ -489,6 +497,31 @@ static int console_write(tty_t* tty, file_t*, const char* buffer, size_t size)
         console_putch(tty, buffer[i]);
     }
     return size;
+}
+
+static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
+{
+    console_t* console = tty->driver->driver_data;
+    switch (request)
+    {
+        case KDSETMODE:
+        {
+            int mode = (int)arg;
+            switch (mode)
+            {
+                case KD_TEXT:
+                    console->disabled = false;
+                    redraw_lines_full(console);
+                    return 0;
+                case KD_GRAPHICS:
+                    console->disabled = true;
+                    console_refresh(console);
+                    return 0;
+                default: return -EINVAL;
+            }
+        }
+    }
+    return -EINVAL;
 }
 
 static int allocate(console_t* console)

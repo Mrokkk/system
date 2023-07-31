@@ -1,8 +1,10 @@
 #include "framebuffer.h"
 
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
+#include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/process.h>
 
@@ -11,6 +13,7 @@
 static int framebuffer_open();
 static int framebuffer_write(file_t*, const char* data, size_t size);
 static int framebuffer_mmap(file_t* file, vm_area_t* vma, size_t offset);
+static int framebuffer_ioctl(file_t* file, unsigned long request, void* arg);
 
 framebuffer_t framebuffer;
 
@@ -18,6 +21,7 @@ static file_operations_t fops = {
     .open = &framebuffer_open,
     .write = &framebuffer_write,
     .mmap = &framebuffer_mmap,
+    .ioctl = &framebuffer_ioctl,
 };
 
 module_init(framebuffer_init);
@@ -78,4 +82,26 @@ static int framebuffer_write(file_t*, const char* data, size_t size)
 static int framebuffer_mmap(file_t*, vm_area_t* vma, size_t)
 {
     return vm_io_apply(vma, process_current->mm->pgd, framebuffer_ptr->addr);
+}
+
+static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
+{
+    int errno;
+    fb_var_screeninfo_t* vinfo = arg;
+
+    if ((errno = vm_verify(VERIFY_WRITE, vinfo, sizeof(fb_var_screeninfo_t), process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
+    switch (request)
+    {
+        case FBIOGET_VSCREENINFO:
+            vinfo->xres = framebuffer.width;
+            vinfo->yres = framebuffer.height;
+            vinfo->bits_per_pixel = framebuffer.bpp;
+            vinfo->pitch = framebuffer.pitch;
+            return 0;
+        default: return -EINVAL;
+    }
 }

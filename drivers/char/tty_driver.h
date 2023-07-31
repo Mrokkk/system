@@ -18,6 +18,7 @@ struct tty_driver
     int (*open)(struct tty* tty, struct file* file);
     int (*close)(struct tty* tty, struct file* file);
     int (*write)(struct tty* tty, struct file* file, const char* buf, size_t count);
+    int (*ioctl)(struct tty* tty, unsigned long request, void* arg);
     void (*putch)(struct tty* tty, uint8_t c);
     list_head_t drivers;
 };

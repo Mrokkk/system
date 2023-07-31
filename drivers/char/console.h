@@ -40,6 +40,7 @@ typedef enum
 
 struct console
 {
+    bool disabled;
     size_t x, y;
     size_t resx, resy;
 

@@ -1,18 +1,16 @@
 #include <errno.h>
 #include <stdio.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 
 #define addr(x) ((uint32_t)(x))
 #define ptr(x)  ((void*)(x))
-
-#define RESX 1600
-#define RESY 900
-#define PITCH RESX * 4
 
 struct tga_header
 {
@@ -32,35 +30,13 @@ struct tga_header
 uint8_t* framebuffer;
 uint8_t* buffer;
 
-static inline uint32_t color_make(uint8_t red, uint8_t green, uint8_t blue)
+static inline void pixel_set(uint32_t x, uint32_t y, uint32_t color, uint32_t pitch)
 {
-    return blue | (green << 8) | (red << 16);
-}
-
-static inline void pixel_set(uint32_t x, uint32_t y, uint32_t color)
-{
-    uint32_t* pixel = (uint32_t*)(buffer + y * PITCH + x * 4);
+    uint32_t* pixel = (uint32_t*)(buffer + y * pitch + x * 4);
     *pixel = color;
 }
 
-typedef struct vector2
-{
-    uint16_t x;
-    uint16_t y;
-} vector2_t;
-
-void draw_rectangle(vector2_t position, vector2_t size, uint32_t color)
-{
-    for (uint32_t i = 0; i < size.x; ++i)
-    {
-        for (uint32_t j = 0; j < size.y; ++j)
-        {
-            pixel_set(i + position.x, j + position.y, color);
-        }
-    }
-}
-
-static void img_draw(int x, int y, int width, int height, uint32_t* img)
+static void img_draw(int x, int y, int width, int height, uint32_t* img, uint32_t pitch)
 {
     int img_index = 0;
 
@@ -68,12 +44,12 @@ static void img_draw(int x, int y, int width, int height, uint32_t* img)
     {
         for (int i = 0; i < width; ++i, ++img_index)
         {
-            pixel_set(x + i, y + j, img[img_index]);
+            pixel_set(x + i, y + j, img[img_index], pitch);
         }
     }
 }
 
-int display_tga(struct tga_header *base)
+static int display_tga(struct tga_header *base, struct fb_var_screeninfo* vinfo)
 {
     uint32_t* img;
 
@@ -87,9 +63,18 @@ int display_tga(struct tga_header *base)
     }
 
     img = ptr(addr(base) + sizeof(struct tga_header));
-    img_draw(0, 0, base->w, base->h, img);
-    memcpy(framebuffer, buffer, RESY * PITCH);
+    img_draw(0, 0, base->w, base->h, img, vinfo->pitch);
+    memcpy(framebuffer, buffer, vinfo->yres * vinfo->pitch);
 
+    return 0;
+}
+
+static int cleanup()
+{
+    if (ioctl(STDIN_FILENO, KDSETMODE, KD_TEXT))
+    {
+        perror("ioctl tty");
+    }
     return 0;
 }
 
@@ -99,6 +84,8 @@ int main(int argc, char* argv[])
     int fb_fd, img_fd;
     const char* img_path;
     void* img;
+    struct fb_var_screeninfo vinfo;
+    memset(&vinfo, 0, sizeof(vinfo));
 
     if (argc < 2)
     {
@@ -116,7 +103,15 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    framebuffer = mmap(NULL, RESY * PITCH, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
+    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo))
+    {
+        perror("ioctl");
+        return EXIT_FAILURE;
+    }
+
+    printf("%u x %u x %u\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+
+    framebuffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
     if ((int)framebuffer == -1)
     {
         perror("mmap");
@@ -140,7 +135,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    buffer = mmap(NULL, RESY * PITCH, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    buffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     if ((int)buffer == -1)
     {
@@ -148,15 +143,30 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    memset(buffer, 0, RESY * PITCH);
+    signal(SIGTERM, cleanup);
+    signal(SIGINT, cleanup);
+    signal(SIGTSTP, cleanup);
 
-    if (display_tga(img))
+    if (ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS))
+    {
+        perror("ioctl tty");
+        return EXIT_FAILURE;
+    }
+
+    memset(buffer, 0, vinfo.yres * vinfo.pitch);
+
+    if (display_tga(img, &vinfo))
     {
         return EXIT_FAILURE;
     }
 
-    char buf[2];
-    read(STDIN_FILENO, buf, 1);
+    char buf[2] = {0, 0};
+    while (*buf != '\n')
+    {
+        read(STDIN_FILENO, buf, 1);
+    }
+
+    cleanup();
 
     return 0;
 }

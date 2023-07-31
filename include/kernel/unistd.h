@@ -36,7 +36,7 @@
 #define __NR_mkdir 33
 #define __NR_nice 34
 #define __NR_sleep 35
-#define __NR_sync 36
+#define __NR_ioctl 36
 #define __NR_kill 37
 #define __NR_chroot 38
 #define __NR_reboot 39
@@ -150,3 +150,4 @@ __syscall1(chroot, int, const char*)
 __syscall0(setsid, int)
 __syscall3(sigaction, int, int, const struct sigaction*, struct sigaction*)
 __syscall1(time, time_t, void*)
+__syscall3(ioctl, int, int, unsigned long, unsigned long)

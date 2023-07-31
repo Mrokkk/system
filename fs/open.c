@@ -134,7 +134,7 @@ int sys_dup(int fd)
     int new_fd;
     file_t* file;
 
-    if (fd_check_bounds(fd)) return -EMFILE;
+    if (fd_check_bounds(fd)) return -EBADF;
     if (process_find_free_fd(process_current, &new_fd)) return -ENOMEM;
     if (process_fd_get(process_current, fd, &file)) return -EBADF;
     process_fd_set(process_current, new_fd, file);

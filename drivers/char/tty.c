@@ -43,11 +43,13 @@
 static int tty_open(file_t* file);
 static int tty_read(file_t* file, char* buffer, size_t size);
 static int tty_write(file_t* file, const char* buffer, size_t size);
+static int tty_ioctl(file_t* file, unsigned long request, void* arg);
 
 static file_operations_t fops = {
     .open = &tty_open,
     .read = &tty_read,
     .write = &tty_write,
+    .ioctl = &tty_ioctl,
 };
 
 module_init(tty_init);
@@ -155,6 +157,18 @@ static int tty_read(file_t* file, char* buffer, size_t count)
 static int tty_write(file_t* file, const char* buffer, size_t count)
 {
     return tty_ldisc_write(file->private, file, buffer, count);
+}
+
+static int tty_ioctl(file_t* file, unsigned long request, void* arg)
+{
+    tty_t* tty = file->private;
+
+    if (!tty->driver->ioctl)
+    {
+        return -ENOSYS;
+    }
+
+    return tty->driver->ioctl(tty, request, arg);
 }
 
 void tty_char_insert(tty_t* tty, char c, int flag)

@@ -90,6 +90,7 @@ struct file_operations
     int (*write)(file_t* file, const char* buf, size_t count);
     int (*readdir)(file_t* file, void* buf, direntadd_t dirent_add);
     int (*mmap)(file_t* file, vm_area_t* vma, size_t offset);
+    int (*ioctl)(file_t* file, unsigned long request, void* arg);
     int (*open)(file_t* file);
     int (*close)(file_t* file);
 };
