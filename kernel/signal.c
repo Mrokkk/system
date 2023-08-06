@@ -59,6 +59,42 @@ static void default_sighandler(struct process* p, int signum)
     }
 }
 
+void signal_run(struct process* proc)
+{
+    uint32_t* pending = &proc->signals->pending;
+
+    for (int signum = 0; *pending; ++signum)
+    {
+        if (!(*pending & (1 << signum)))
+        {
+            continue;
+        }
+
+        log_debug(DEBUG_SIGNAL, "sending %u to %u", signum, proc->pid);
+        *pending &= ~(1 << signum);
+        signal_deliver(proc, signum);
+    }
+}
+
+int signal_deliver(struct process* proc, int signum)
+{
+    if (proc->signals->trapped & (1 << signum))
+    {
+        log_debug(DEBUG_SIGNAL, "calling custom handler for %u in %u", signum, proc->pid);
+        arch_process_execute_sighan(
+            proc,
+            addr(proc->signals->sighandler[signum]),
+            addr(proc->signals->sigrestorer));
+    }
+    else
+    {
+        log_debug(DEBUG_SIGNAL, "calling default handler for %u in %u", signum, proc->pid);
+        default_sighandler(proc, signum);
+    }
+
+    return 0;
+}
+
 int do_kill(struct process* proc, int signum)
 {
     if (!signum_exists(signum))
@@ -71,23 +107,14 @@ int do_kill(struct process* proc, int signum)
         return -EPERM;
     }
 
-    if (proc->signals->trapped & (1 << signum))
+    if (proc->stat == PROCESS_WAITING)
     {
-        log_debug(DEBUG_SIGNAL, "calling custom handler");
-        arch_process_execute_sighan(
-            proc,
-            addr(proc->signals->sighandler[signum]),
-            addr(proc->signals->sigrestorer));
-    }
-    else
-    {
-        // FIXME: this is wrong, it should be done only when process is running; if process is suspended, then
-        // it should be scheduled
-        log_debug(DEBUG_SIGNAL, "calling default handler");
-        default_sighandler(proc, signum);
+        process_wake(proc);
+        proc->signals->pending |= 1 << signum;
+        return 0;
     }
 
-    return 0;
+    return signal_deliver(proc, signum);
 }
 
 int sys_kill(int pid, int signum)

@@ -31,6 +31,9 @@ void slab_allocator_init(void);
 #define alloc_array(type, count) \
     ({ type* this = slab_alloc(sizeof(type) * count); this; })
 
+#define delete_array(object, count) \
+    ({ slab_free(object, sizeof(*object) * count); })
+
 #define CONSTRUCT_1(type)           __CONSTRUCT(type, 0)
 #define CONSTRUCT_2(type, init)     __CONSTRUCT(type, init)
 

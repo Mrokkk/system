@@ -5,22 +5,21 @@
 
 void __down_failed(semaphore_t* sem)
 {
-    WAIT_QUEUE_DECLARE(__sem, process_current);
+    WAIT_QUEUE_DECLARE(q, process_current);
 
-    flags_t flags;
-    irq_save(flags);
-
-    wait_queue_push(&__sem, &sem->queue);
     sem->waiting++;
 
-    process_wait2(process_current, flags);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdangling-pointer="
+    process_wait(&sem->queue, &q);
+#pragma GCC diagnostic pop
 }
 
 void __up(semaphore_t* sem)
 {
     struct process* proc;
 
-    proc = wait_queue_pop(&sem->queue);
+    proc = wait_queue_front(&sem->queue);
     if (!proc)
     {
         return;

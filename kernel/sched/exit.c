@@ -19,9 +19,7 @@ static inline void process_space_free(struct process* proc)
 
     vm_free(proc->mm->vm_areas, pgd);
 
-    log_debug(DEBUG_EXIT, "freeing pgd");
     page_free(proc->mm->pgd);
-    log_debug(DEBUG_EXIT, "freeing kstack");
     page_free(kernel_stack_end);
     delete(proc->mm);
 }
@@ -44,9 +42,8 @@ void process_delete(struct process* proc)
 int sys_waitpid(int pid, int* status, int wait_flags)
 {
     struct process* proc;
-    flags_t flags;
 
-    log_debug(DEBUG_EXIT, "%u called for %u; flags = %d", process_current->pid, pid, wait_flags);
+    log_debug(DEBUG_EXIT, "called for %u; flags = %d", pid, wait_flags);
 
     if (process_find(pid, &proc))
     {
@@ -57,24 +54,22 @@ int sys_waitpid(int pid, int* status, int wait_flags)
 
     if (process_is_zombie(proc))
     {
-        log_debug(DEBUG_EXIT, "proc %d is zombie", proc->pid);
         goto dont_wait;
     }
     else if (process_is_stopped(proc) && wait_flags == WUNTRACED)
     {
-        log_debug(DEBUG_EXIT, "proc %d is already stopped", proc->pid);
         goto dont_wait;
     }
 
     WAIT_QUEUE_DECLARE(temp, process_current);
 
-    irq_save(flags);
     temp.flags = wait_flags;
-    wait_queue_push(&temp, &proc->wait_child);
-    process_wait2(process_current, flags);
+    process_wait(&proc->wait_child, &temp);
+
+    log_debug(DEBUG_EXIT, "woken; proc %u state = %c", proc->pid, process_state_char(proc->stat));
 
 dont_wait:
-    if (proc->stat == PROCESS_STOPPED)
+    if (process_is_stopped(proc))
     {
         *status = WSTOPPED;
     }
@@ -89,6 +84,27 @@ dont_wait:
     }
 
     return 0;
+}
+
+void process_wake_waiting(struct process* proc)
+{
+    struct process* parent = proc->parent;
+
+    if (wait_queue_empty(&proc->wait_child))
+    {
+        return;
+    }
+
+    wait_queue_t* q = list_front(&proc->wait_child.queue, wait_queue_t, processes);
+    if (q->flags == WUNTRACED || proc->stat == PROCESS_ZOMBIE)
+    {
+        wait_queue_pop(&proc->wait_child);
+        log_debug(DEBUG_EXIT, "waking %u", parent->pid);
+        process_wake(parent);
+        return;
+    }
+
+    log_debug(DEBUG_EXIT, "not waking %u", parent->pid);
 }
 
 int sys_exit(int return_value)

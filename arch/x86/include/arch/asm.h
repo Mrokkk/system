@@ -32,10 +32,12 @@
     SAVE_USER_ESP;                \
 
 #define SAVE_USER_ESP \
-    mov REGS_CS(%esp), %edx; \
+    cmpl $KERNEL_CS, REGS_CS(%esp); \
+    je 1f; \
     mov SYMBOL_NAME(process_current), %ecx; \
     mov REGS_ESP(%esp), %edx; \
     mov %edx, CONTEXT_ESP2(%ecx); \
+    1:
 
 #define RESTORE_ALL \
     pop %ebx; \

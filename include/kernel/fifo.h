@@ -28,6 +28,11 @@ typedef struct fifo fifo_t;
 void __fifo_put(fifo_t* fifo, char c);
 int __fifo_get(fifo_t* fifo, char* c);
 
+static inline int __fifo_empty(fifo_t* fifo)
+{
+    return fifo->in == fifo->out;
+}
+
 #define fifo_init(name) \
     { \
         typecheck_ptr(name); \
@@ -41,3 +46,6 @@ int __fifo_get(fifo_t* fifo, char* c);
 
 #define fifo_get(b, c) \
     ({ typecheck_ptr(b); __fifo_get((fifo_t*)(b), c); })
+
+#define fifo_empty(b) \
+    ({ typecheck_ptr(b); __fifo_empty((fifo_t*)(b)); })

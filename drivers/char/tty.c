@@ -44,12 +44,14 @@ static int tty_open(file_t* file);
 static int tty_read(file_t* file, char* buffer, size_t size);
 static int tty_write(file_t* file, const char* buffer, size_t size);
 static int tty_ioctl(file_t* file, unsigned long request, void* arg);
+static int tty_poll(file_t* file, short events, short* revents, wait_queue_head_t** head);
 
 static file_operations_t fops = {
     .open = &tty_open,
     .read = &tty_read,
     .write = &tty_write,
     .ioctl = &tty_ioctl,
+    .poll = &tty_poll,
 };
 
 module_init(tty_init);
@@ -169,6 +171,11 @@ static int tty_ioctl(file_t* file, unsigned long request, void* arg)
     }
 
     return tty->driver->ioctl(tty, request, arg);
+}
+
+static int tty_poll(file_t* file, short events, short* revents, wait_queue_head_t** head)
+{
+    return tty_ldisc_poll(file->private, file, events, revents, head);
 }
 
 void tty_char_insert(tty_t* tty, char c, int flag)

@@ -14,9 +14,11 @@
 #define MAJOR_CHR_TTY       4
 #define MAJOR_CHR_SERIAL    5
 #define MAJOR_CHR_DEBUG     6
-#define MAJOR_CHR_MEM       7
-#define MAJOR_BLK_IDE       8
-#define MAJOR_BLK_DISKIMG   9
+#define MAJOR_CHR_MOUSE     7
+#define MAJOR_CHR_MEM       8
+
+#define MAJOR_BLK_IDE       256
+#define MAJOR_BLK_DISKIMG   257
 
 #define BLK_NO_PARTITION                0xf
 #define BLK_MINOR_DRIVE(drive)          (drive | (BLK_NO_PARTITION << 4))

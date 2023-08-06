@@ -68,11 +68,12 @@ struct signals
 {
     int count;
     uint32_t trapped;
+    uint32_t pending;
     sighandler_t sighandler[NSIGNALS];
     sigrestorer_t sigrestorer;
     struct signal_context context;
 #define SIGNALS_INIT \
-    { 1, 0, { 0, }, 0, { 0, }, }
+    { 1, 0, 0, { 0, }, 0, { 0, }, }
 };
 
 struct fs
@@ -212,6 +213,27 @@ static inline int process_is_zombie(struct process* p)
     return p->stat == PROCESS_ZOMBIE;
 }
 
+static inline void process_signal_check(struct process* p)
+{
+    uint32_t signals_pending = p->signals->pending;
+
+    if (!signals_pending)
+    {
+        return;
+    }
+
+    for (int signum = 0; signals_pending; ++signum)
+    {
+        if (!(signals_pending & (1 << signum)))
+        {
+            continue;
+        }
+
+        p->signals->pending &= ~(1 << signum);
+        signal_deliver(process_current, signum);
+    }
+}
+
 static inline void process_exit(struct process* p)
 {
     flags_t flags;
@@ -240,6 +262,11 @@ static inline void process_stop(struct process* p)
 static inline void process_wake(struct process* p)
 {
     flags_t flags;
+    if (p->stat == PROCESS_ZOMBIE)
+    {
+        log_warning("process %u:%x is zombie", p->pid, p);
+        return;
+    }
     irq_save(flags);
     if (p->stat != PROCESS_RUNNING)
     {
@@ -249,34 +276,32 @@ static inline void process_wake(struct process* p)
     irq_restore(flags);
 }
 
-static inline void process_wait(struct process* p, flags_t flags)
+static inline void process_wait(wait_queue_head_t* wq, wait_queue_t* q)
 {
-    list_del(&p->running);
-    p->stat = PROCESS_WAITING;
-    if (p == process_current)
-    {
-        *need_resched = true;
-        irq_restore(flags);
-    }
-    else
-    {
-        irq_restore(flags);
-    }
+    flags_t flags;
+
+    irq_save(flags);
+
+    wait_queue_push(q, wq);
+    list_del(&process_current->running);
+    process_current->stat = PROCESS_WAITING;
+
+    irq_restore(flags);
+
+    scheduler();
+
+    log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
+    wait_queue_remove(q, wq);
+
+    signal_run(process_current);
 }
 
-static inline void process_wait2(struct process* p, flags_t flags)
+static inline void process_wait2(flags_t flags)
 {
-    list_del(&p->running);
-    p->stat = PROCESS_WAITING;
-    if (p == process_current)
-    {
-        irq_restore(flags);
-        scheduler();
-    }
-    else
-    {
-        irq_restore(flags);
-    }
+    list_del(&process_current->running);
+    process_current->stat = PROCESS_WAITING;
+    irq_restore(flags);
+    scheduler();
 }
 
 static inline void process_fd_set(struct process* p, int fd, struct file* file)

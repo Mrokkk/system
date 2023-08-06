@@ -56,6 +56,8 @@ struct sigaction
 int signal(int signum, sighandler_t handler);
 int kill(int pid, int signum);
 int do_kill(struct process* proc, int signum);
+int signal_deliver(struct process* proc, int signum);
+void signal_run(struct process* proc);
 int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact);
 
 static inline int signum_exists(int s)

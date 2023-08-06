@@ -19,6 +19,7 @@ int c_cd();
 int c_pwd();
 int c_mkdir();
 int c_history();
+static void command_prompt_print(int status);
 
 #define COMMAND(name) {#name, c_##name}
 
@@ -36,12 +37,14 @@ static struct {
 int sigint(int)
 {
     printf("^C\n");
+    command_prompt_print(1);
     return 0;
 }
 
 int sigtstp(int)
 {
     printf("^Z\n");
+    command_prompt_print(1);
     return 0;
 }
 
@@ -109,7 +112,7 @@ int c_history(const char*)
     return 0;
 }
 
-static inline void command_prompt_print(int status)
+static void command_prompt_print(int status)
 {
     char cwd[128];
     getcwd(cwd, 128);

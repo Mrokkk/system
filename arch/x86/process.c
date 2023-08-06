@@ -146,6 +146,7 @@ int arch_process_copy(
     dest->context.eip = addr(&exit_kernel);
     dest->context.iomap_offset = IOMAP_OFFSET;
     dest->context.ss0 = KERNEL_DS;
+    dest->context.esp2 = 0;
 
     memcpy(dest->context.io_bitmap, src->context.io_bitmap, IO_BITMAP_SIZE);
 
@@ -304,8 +305,6 @@ int NORETURN(arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack)
     ASSERT_NOT_REACHED();
 }
 
-#include <kernel/backtrace.h>
-
 int arch_process_execute_sighan(struct process* proc, uint32_t eip, uint32_t restorer)
 {
     uint32_t* kernel_stack;
@@ -318,7 +317,7 @@ int arch_process_execute_sighan(struct process* proc, uint32_t eip, uint32_t res
 
     sighan_stack = virt_ptr(vm_paddr(virt_stack_addr, pgd));
 
-    log_debug(DEBUG_PROCESS, "user stack = %x", virt_stack_addr);
+    log_debug(DEBUG_SIGNAL, "user stack = %x", virt_stack_addr);
 
     kernel_stack = ptr(addr(proc->context.esp) - 1024); // TODO:
 
@@ -373,6 +372,7 @@ int NORETURN(sys_sigreturn(struct pt_regs))
         process_current->signals->context.eip);
 
     process_current->context.esp0 = process_current->signals->context.esp0;
+    process_current->context.esp2 = process_current->signals->context.esp2;
 
     set_context(
         process_current->signals->context.esp,

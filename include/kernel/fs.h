@@ -5,6 +5,7 @@
 #include <kernel/dev.h>
 #include <kernel/list.h>
 #include <kernel/page.h>
+#include <kernel/poll.h>
 #include <kernel/stat.h>
 #include <kernel/wait.h>
 #include <kernel/magic.h>
@@ -29,6 +30,7 @@
 
 struct inode;
 struct buffer;
+struct fd_set;
 struct super_block;
 struct file_operations;
 struct block_operations;
@@ -38,6 +40,7 @@ struct super_operations;
 typedef struct file file_t;
 typedef struct inode inode_t;
 typedef struct buffer buffer_t;
+typedef struct fd_set fd_set_t;
 typedef struct file_system file_system_t;
 typedef struct super_block super_block_t;
 typedef struct file_operations file_operations_t;
@@ -91,6 +94,7 @@ struct file_operations
     int (*readdir)(file_t* file, void* buf, direntadd_t dirent_add);
     int (*mmap)(file_t* file, vm_area_t* vma, size_t offset);
     int (*ioctl)(file_t* file, unsigned long request, void* arg);
+    int (*poll)(file_t* file, short events, short* revents, wait_queue_head_t** head);
     int (*open)(file_t* file);
     int (*close)(file_t* file);
 };

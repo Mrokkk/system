@@ -618,11 +618,6 @@ static int ide_fs_read(file_t* file, char* buf, size_t count)
     uint32_t offset = file->offset / ATA_SECTOR_SIZE;
     uint32_t first_sector, last_sector, max_count;
 
-    if (ide_devices[drive].dma)
-    {
-        irq_save(flags)
-    }
-
     if (partition != BLK_NO_PARTITION)
     {
         first_sector = ide_devices[drive].mbr->partitions[partition].lba_start;
@@ -639,14 +634,23 @@ static int ide_fs_read(file_t* file, char* buf, size_t count)
         ? max_count
         : count;
 
+    if (ide_devices[drive].dma)
+    {
+        irq_save(flags);
+    }
+
     ide_ata_access(ATA_READ, drive, offset, sectors, buf, ide_devices[drive].dma);
+
+    if (ide_devices[drive].dma)
+    {
+        irq_restore(flags);
+    }
 
     if (ide_devices[drive].dma)
     {
         log_info("putting %u to sleep", process_current->pid);
         WAIT_QUEUE_DECLARE(q, process_current);
-        wait_queue_push(&q, &ide_queue);
-        process_wait2(process_current, flags);
+        process_wait(&ide_queue, &q);
         memcpy(buf, dma_region->buffer, count);
     }
 

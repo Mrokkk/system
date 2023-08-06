@@ -18,10 +18,14 @@
 #define BRIGHTCYAN      "\e[96m"
 #define BRIGHTWHITE     "\e[97m"
 
-int main()
-{
 #define COLOR_PRINT(color) \
     printf(color #color RESET "\n")
+
+#define COLOR_256PRINT(color) \
+    printf("\e[38;5;%umCOLOR%u" RESET "\n", color, color)
+
+int main()
+{
     COLOR_PRINT(BLACK);
     COLOR_PRINT(RED);
     COLOR_PRINT(GREEN);
@@ -38,5 +42,11 @@ int main()
     COLOR_PRINT(BRIGHTMAGENTA);
     COLOR_PRINT(BRIGHTCYAN);
     COLOR_PRINT(BRIGHTWHITE);
+
+    for (int i = 0; i < 256; ++i)
+    {
+        COLOR_256PRINT(i);
+    }
+
     return 0;
 }

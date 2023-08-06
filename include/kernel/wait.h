@@ -43,6 +43,13 @@ static inline void wait_queue_head_init(wait_queue_head_t* head)
     spinlock_init(&head->lock);
 }
 
+static inline void wait_queue_init(wait_queue_t* queue, struct process* proc)
+{
+    queue->flags = 0;
+    queue->data = proc;
+    list_init(&queue->processes);
+}
+
 static inline void __wait_queue_push(wait_queue_t* new, wait_queue_head_t* head)
 {
     spinlock_lock(&head->lock);
@@ -67,7 +74,7 @@ static inline struct process* __wait_queue_pop(wait_queue_head_t* head)
 
     if (wait_queue_empty(head))
     {
-        return 0;
+        return NULL;
     }
 
     spinlock_lock(&head->lock);
@@ -88,17 +95,24 @@ static inline struct process* wait_queue_front(wait_queue_head_t* head)
 
     if (wait_queue_empty(head))
     {
-        return 0;
+        return NULL;
     }
 
     spinlock_lock(&head->lock);
 
     queue = list_next_entry(&head->queue, struct wait_queue, processes);
+
     data = queue->data;
 
     spinlock_unlock(&head->lock);
 
     return data;
+}
+
+static inline void wait_queue_remove(wait_queue_t* queue, wait_queue_head_t* head)
+{
+    (void)head;
+    list_del(&queue->processes);
 }
 
 #if DEBUG_WAIT_QUEUE

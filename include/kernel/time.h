@@ -20,7 +20,14 @@ struct timestamp
     uint32_t useconds;
 };
 
+struct timeval
+{
+    time_t      tv_sec;
+    suseconds_t tv_usec;
+};
+
 typedef struct timestamp ts_t;
+typedef struct timeval timeval_t;
 
 void timestamp_get(ts_t* ts);
 void timestamp_update(void);

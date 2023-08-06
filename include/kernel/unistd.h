@@ -52,6 +52,8 @@
 #define __NR_readdir 49
 #define __NR_dup2 50
 #define __NR_sbrk 51
+#define __NR_select 52
+#define __NR_poll 53
 #define __NR_getppid 64
 #define __NR_mmap 65
 #define __NR_sigreturn 119
@@ -87,6 +89,9 @@ int chroot(const char* path);
 int setsid(void);
 
 struct sigaction;
+struct fd_set;
+struct timeval;
+struct pollfd;
 
 #endif // __ASSEMBLER__
 
@@ -151,3 +156,5 @@ __syscall0(setsid, int)
 __syscall3(sigaction, int, int, const struct sigaction*, struct sigaction*)
 __syscall1(time, time_t, void*)
 __syscall3(ioctl, int, int, unsigned long, unsigned long)
+__syscall5(select, int, int, struct fd_set*, struct fd_set*, struct fd_set*, struct timeval*)
+__syscall3(poll, int, struct pollfd*, unsigned long, int)

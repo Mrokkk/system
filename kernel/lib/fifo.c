@@ -1,8 +1,5 @@
 #include <kernel/fifo.h>
 
-#define fifo_empty(fifo) \
-    ((fifo)->in == (fifo)->out)
-
 void __fifo_put(fifo_t* fifo, char c)
 {
     fifo->data[fifo->in++] = c;
@@ -15,7 +12,7 @@ void __fifo_put(fifo_t* fifo, char c)
 int __fifo_get(fifo_t* fifo, char* c)
 {
     int ret = 1;
-    if (fifo_empty(fifo))
+    if (__fifo_empty(fifo))
     {
         goto finish;
     }

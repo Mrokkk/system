@@ -38,9 +38,26 @@ typedef struct
     uint32_t pitch;
     uint32_t font_height_offset;
     uint32_t font_width_offset;
-    uint32_t fg_color;
-    uint32_t bg_color;
 } data_t;
+
+static uint32_t lookup_table[] = {
+    COLOR_BLACK,
+    COLOR_RED,
+    COLOR_GREEN,
+    COLOR_YELLOW,
+    COLOR_BLUE,
+    COLOR_MAGENTA,
+    COLOR_CYAN,
+    COLOR_WHITE,
+    COLOR_GRAY,
+    COLOR_BRIGHTRED,
+    COLOR_BRIGHTGREEN,
+    COLOR_BRIGHTYELLOW,
+    COLOR_BRIGHTBLUE,
+    COLOR_BRIGHTMAGENTA,
+    COLOR_BRIGHTCYAN,
+    COLOR_BRIGHTWHITE,
+};
 
 int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
 {
@@ -65,8 +82,6 @@ int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
     data->pitch = framebuffer.pitch;
     data->font_height_offset = framebuffer.pitch * font.height;
     data->font_width_offset =  (framebuffer.bpp / 8) * font.width;
-    data->fg_color = COLOR_WHITE;
-    data->bg_color = COLOR_BLACK;
     driver->data = data;
 
     *resy = framebuffer.height / font.height;
@@ -97,11 +112,11 @@ void fbcon_char_print(console_driver_t* drv, size_t y, size_t x, uint8_t c, uint
     }
 }
 
-void fbcon_setsgr(console_driver_t* drv, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
+void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
 {
-    data_t* data = drv->data;
     color_mode_t mode = NORMAL;
-    uint32_t color = 0;
+    uint32_t* color = NULL;
+
     for (size_t i = 0; i < count; ++i)
     {
         uint32_t param = params[i];
@@ -110,57 +125,74 @@ void fbcon_setsgr(console_driver_t* drv, uint32_t params[], size_t count, uint32
         if (mode == RGB)
         {
             log_debug(DEBUG_CONSOLE, "color = %d", param);
-            color = (color << 8) | param;
+            *color = (*color << 8) | param;
+            continue;
+        }
+        else if (mode == COLOR256)
+        {
+            if (param >= 232)
+            {
+                uint8_t c = (param - 232) * 10 + 8;
+                *color = c | c << 8 | c << 16;
+            }
+            else if (param < 16)
+            {
+                *color = lookup_table[param];
+            }
+            else
+            {
+                uint32_t rem;
+                param -= 16;
+
+                uint8_t r = ((uint32_t)param * 255) / (36 * 5);
+                uint8_t g = ((rem = param % 36) * 255) / (6 * 5);
+                uint8_t b = ((rem % 6) * 255) / 5;
+                *color = b | g << 8 | r << 16;
+            }
             continue;
         }
 
         switch (param)
         {
             case 0:
-                data->fg_color = COLOR_WHITE;
-                data->bg_color = COLOR_BLACK;
+                *fgcolor = COLOR_WHITE;
+                *bgcolor = COLOR_BLACK;
                 break;
-            case 30: data->fg_color = COLOR_BLACK; break;
-            case 31: data->fg_color = COLOR_RED; break;
-            case 32: data->fg_color = COLOR_GREEN; break;
-            case 33: data->fg_color = COLOR_YELLOW; break;
-            case 34: data->fg_color = COLOR_BLUE; break;
-            case 35: data->fg_color = COLOR_MAGENTA; break;
-            case 36: data->fg_color = COLOR_CYAN; break;
+            case 30 ... 37:
+                *fgcolor = lookup_table[param - 30];
+                 break;
             case 38:
+                color = fgcolor;
                 switch (params[++i])
                 {
                     case 2:
                         mode = RGB;
+                        break;
                     case 5:
-                        // TODO:
+                        mode = COLOR256;
+                        break;
                 }
                 break;
-            case 40: data->bg_color = COLOR_BLACK; break;
-            case 41: data->bg_color = COLOR_RED; break;
-            case 42: data->bg_color = COLOR_GREEN; break;
-            case 43: data->bg_color = COLOR_YELLOW; break;
-            case 44: data->bg_color = COLOR_BLUE; break;
-            case 45: data->bg_color = COLOR_MAGENTA; break;
-            case 46: data->bg_color = COLOR_CYAN; break;
-            case 90: data->fg_color = COLOR_GRAY; break;
-            case 91: data->fg_color = COLOR_BRIGHTRED; break;
-            case 92: data->fg_color = COLOR_BRIGHTGREEN; break;
-            case 93: data->fg_color = COLOR_BRIGHTYELLOW; break;
-            case 94: data->fg_color = COLOR_BRIGHTBLUE; break;
-            case 95: data->fg_color = COLOR_BRIGHTMAGENTA; break;
-            case 96: data->fg_color = COLOR_BRIGHTCYAN; break;
-            case 97: data->fg_color = COLOR_BRIGHTWHITE; break;
+            case 40 ... 47:
+                *bgcolor = lookup_table[param - 40];
+                 break;
+            case 48:
+                color = bgcolor;
+                switch (params[++i])
+                {
+                    case 2:
+                        mode = RGB;
+                        break;
+                    case 5:
+                        mode = COLOR256;
+                        break;
+                }
+                break;
+            case 90 ... 97:
+                *fgcolor = lookup_table[param - 90 + 8];
+                break;
         }
     }
-
-    if (color)
-    {
-        data->fg_color = color;
-    }
-
-    *fgcolor = data->fg_color;
-    *bgcolor = data->bg_color;
 }
 
 void fbcon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)

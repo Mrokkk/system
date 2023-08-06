@@ -24,10 +24,9 @@ int tty_ldisc_open(tty_t* tty, file_t* file)
     return 0;
 }
 
-int tty_ldisc_read(tty_t* tty, file_t*, char* buffer, size_t count)
+int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
 {
     size_t i;
-    flags_t flags;
     termios_t* termios = &tty->termios;
 
     WAIT_QUEUE_DECLARE(q, process_current);
@@ -36,9 +35,11 @@ int tty_ldisc_read(tty_t* tty, file_t*, char* buffer, size_t count)
     {
         while (fifo_get(&tty->buf, &buffer[i]))
         {
-            irq_save(flags);
-            wait_queue_push(&q, &tty->wq);
-            process_wait2(process_current, flags);
+            if (file->mode & O_NONBLOCK)
+            {
+                return i;
+            }
+            process_wait(&tty->wq, &q);
         }
 
         if (buffer[i] == '\n')
@@ -50,7 +51,8 @@ int tty_ldisc_read(tty_t* tty, file_t*, char* buffer, size_t count)
             return 0;
         }
     }
-    return 0;
+
+    return i;
 }
 
 int tty_ldisc_write(tty_t* tty, file_t* file, const char* buffer, size_t count)
@@ -58,11 +60,28 @@ int tty_ldisc_write(tty_t* tty, file_t* file, const char* buffer, size_t count)
     return tty->driver->write(tty, file, buffer, count);
 }
 
+int tty_ldisc_poll(tty_t* tty, file_t*, short events, short* revents, wait_queue_head_t** head)
+{
+    if (events != POLLIN)
+    {
+        return -EINVAL;
+    }
+    if (fifo_empty(&tty->buf))
+    {
+        *head = &tty->wq;
+    }
+    else
+    {
+        *revents = POLLIN;
+        *head = NULL;
+    }
+    return 0;
+}
+
 void tty_ldisc_putch(tty_t* tty, char c, int flag)
 {
     int signal = 0;
     struct process* p;
-    struct process* temp;
     termios_t* termios = &tty->termios;
 
     if (c == '\r' && I_ICRNL(tty))
@@ -92,17 +111,10 @@ void tty_ldisc_putch(tty_t* tty, char c, int flag)
     if (signal && L_ISIG(tty))
     {
         tty->ldisc_current = tty->ldisc_buf;
-        temp = wait_queue_front(&tty->wq);
         for_each_process(p)
         {
             if (p->sid == tty->sid)
             {
-                if (p == temp)
-                {
-                    fifo_put(&tty->buf, '\n');
-                    p = wait_queue_pop(&tty->wq);
-                    process_wake(p);
-                }
                 do_kill(p, signal);
             }
         }
@@ -137,7 +149,7 @@ void tty_ldisc_putch(tty_t* tty, char c, int flag)
 
         if (!wait_queue_empty(&tty->wq))
         {
-            p = wait_queue_pop(&tty->wq);
+            p = wait_queue_front(&tty->wq);
             process_wake(p);
             if (p != process_current)
             {

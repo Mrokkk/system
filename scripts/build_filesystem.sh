@@ -122,6 +122,7 @@ do
 done
 copy ../arch/x86/cpuid.c ${mountpoint}
 copy ../tux.tga ${mountpoint}
+copy ../cursor.tga ${mountpoint}
 
 if [ ! -f "font.psf" ] || [ "${0}" -nt "font.psf" ] || [ ! -z ${rebuild} ]
 then

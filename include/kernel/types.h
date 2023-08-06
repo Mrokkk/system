@@ -12,3 +12,4 @@ typedef unsigned short umode_t;
 typedef unsigned short uid_t;
 typedef unsigned short gid_t;
 typedef unsigned long time_t;
+typedef long suseconds_t;

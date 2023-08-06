@@ -1,7 +1,5 @@
 #define log_fmt(fmt) "kbd: " fmt
-#include <arch/io.h>
 #include <arch/i8042.h>
-
 #include <kernel/irq.h>
 #include <kernel/wait.h>
 #include <kernel/device.h>
@@ -12,12 +10,6 @@
 
 #include "tty.h"
 
-#define KBD_EKI     0x01
-#define KBD_SYS     0x04
-#define KBD_DMS     0x20
-#define KBD_KCC     0x40
-
-#define KBD_RATE_SET        0xf3
 #define KBD_HIGHEST_RATE    0x00
 
 #define L_CTRL      0x1d
@@ -91,12 +83,12 @@ static const char* scancodes[] = {
 
 static inline void keyboard_enable(void)
 {
-    i8042_send_cmd(PS2_1ST_PORT_ENABLE);
+    i8042_send_cmd(I8042_KBD_PORT_ENABLE);
 }
 
 static inline void keyboard_disable(void)
 {
-    i8042_send_cmd(PS2_1ST_PORT_DISABLE);
+    i8042_send_cmd(I8042_KBD_PORT_DISABLE);
 }
 
 static inline void keyboard_scancode_handle(uint8_t scan_code)
@@ -181,25 +173,18 @@ int keyboard_init(tty_t* tty)
         return -ENODEV;
     }
 
-    scoped_irq_lock();
-
-    i8042_flush();
-
-    i8042_send_cmd(PS2_CONFIG_WRITE);
-    i8042_send_data(KBD_EKI | KBD_SYS | KBD_KCC, PS2_1ST_PORT);
-
-    i8042_send_cmd(PS2_CONFIG_READ);
-    if (!(i8042_receive() & KBD_DMS))
+    if (i8042_config_set(KBD_EKI | KBD_SYS | KBD_KCC))
     {
-        log_info("supports dual channel");
+        log_warning("seting config failed");
+        return -ENODEV;
     }
 
-    if ((byte = i8042_send_and_receive(KBD_RATE_SET, PS2_1ST_PORT)) != I8042_RESP_ACK)
+    if ((byte = i8042_send_and_receive(I8042_RATE_SET, I8042_KBD_PORT)) != I8042_RESP_ACK)
     {
         log_warning("1: setting rate failed: %x", byte);
     }
 
-    if ((byte = i8042_send_and_receive(KBD_HIGHEST_RATE, PS2_1ST_PORT)) != I8042_RESP_ACK)
+    if ((byte = i8042_send_and_receive(KBD_HIGHEST_RATE, I8042_KBD_PORT)) != I8042_RESP_ACK)
     {
         log_warning("2: setting rate failed: %x", byte);
     }
@@ -208,7 +193,7 @@ int keyboard_init(tty_t* tty)
 
     kb_tty = tty;
 
-    irq_register(0x01, keyboard_irs, "keyboard", IRQ_DEFAULT);
+    irq_register(1, keyboard_irs, "keyboard", IRQ_DEFAULT);
 
     return 0;
 }

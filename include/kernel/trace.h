@@ -11,8 +11,9 @@
 #define DEBUG_KMALLOC       0
 #define DEBUG_FMALLOC       0
 #define DEBUG_PROCESS       0
-#define DEBUG_EXIT          0
+#define DEBUG_EXIT          1
 #define DEBUG_SIGNAL        0
+#define DEBUG_POLL          0
 #define DEBUG_EXCEPTION     0
 #define DEBUG_BTUSER        0
 #define DEBUG_SEQFILE       0

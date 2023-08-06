@@ -65,7 +65,7 @@ add_custom_target(
 add_custom_target(
     rootfs
     COMMAND "${PROJECT_SOURCE_DIR}/scripts/build_filesystem.sh"
-    DEPENDS ${PROJECT_NAME} test test2 sh cat reboot poweroff ls colors init ksyms display date
+    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init ksyms display date
     COMMENT "Preparing rootfs"
 )
 
