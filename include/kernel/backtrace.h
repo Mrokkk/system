@@ -27,10 +27,10 @@ void backtrace_exception(struct pt_regs* regs);
 #define memory_dump(log_fn, addr, count) \
     do \
     { \
-        uint32_t* stack = ptr(addr); \
+        uint32_t* s = ptr(addr); \
         for (uint32_t i = 0; i < count; ++i) \
         { \
-            log_fn("%08x: %08x", stack + i, stack[i]); \
+            log_fn("%08x: %08x", s + i, s[i]); \
         } \
     } while (0)
 

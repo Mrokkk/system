@@ -42,7 +42,7 @@ void printk_early_register(void (*print)(const char* string));
             .file       = __builtin_strrchr(__FILE__, '/') + 1, \
             .function   = __FUNCTION__, \
         }; \
-        __printk(&__e, fmt + KERN_LEVEL_SIZE, ##__VA_ARGS__); \
+        __printk(&__e, &fmt[KERN_LEVEL_SIZE], ##__VA_ARGS__); \
     })
 
 #ifndef log_fmt

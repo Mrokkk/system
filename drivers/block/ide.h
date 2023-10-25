@@ -77,6 +77,17 @@ typedef struct ide_channel ide_channel_t;
 
 #define ATA_SECTOR_SIZE     512
 
+#define BM_CMD_START        (1 << 0)
+#define BM_CMD_READ         (1 << 3)
+#define BM_CMD_WRITE        (0 << 3)
+
+#define BM_STATUS_ACTIVE    (1 << 0)
+#define BM_STATUS_ERROR     (1 << 1)
+#define BM_STATUS_INTERRUPT (1 << 2)
+#define BM_STATUS_DRV0_DMA  (1 << 5)
+#define BM_STATUS_DRV1_DMA  (1 << 6)
+#define BM_STATUS_SIMPLEX   (1 << 7)
+
 struct ide_channel
 {
     uint16_t base;

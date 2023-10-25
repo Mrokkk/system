@@ -65,6 +65,7 @@ static int ext2_lookup_raw(
     uint16_t* ino)
 {
     ext2_dir_entry_t* dirent;
+    size_t name_len = strlen(name);
 
     log_debug(DEBUG_EXT2FS, "name=%s", name);
 
@@ -72,7 +73,7 @@ static int ext2_lookup_raw(
         dirent->rec_len && dirent->name_len;
         dirent = ptr(addr(dirent) + dirent->rec_len))
     {
-        if (!strncmp(dirent->name, name, dirent->name_len))
+        if (name_len == dirent->name_len && !strncmp(dirent->name, name, dirent->name_len))
         {
             *child_inode = ext2_inode_get(data, dirent->inode);
             *ino = dirent->inode;

@@ -9,9 +9,13 @@ include(arch/${ARCH}/arch.cmake)
 
 set(C_FLAGS_STANDARD "-std=gnu11")
 set(C_FLAGS_OPTIMIZATION "-O2")
-set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib -no-pie -fno-PIC -nostartfiles -fno-asynchronous-unwind-tables -fno-stack-protector") # -fno-strength-reduce
+set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib -Wl,-no-pie -fno-pie -fno-PIC -nostartfiles -fno-asynchronous-unwind-tables -fno-stack-protector") # -fno-strength-reduce
 set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_DEBUG "-ggdb3")
+
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    set(C_FLAGS_ADDITIONAL "-Wno-error -Wno-unused-command-line-argument -Wno-c2x-extensions -Wno-strict-prototypes")
+endif()
 
 if(FRAME_POINTER)
     set(C_FLAGS_FRAME_POINTER "-fno-omit-frame-pointer -fno-optimize-sibling-calls")
@@ -27,6 +31,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_ARCH} \
     ${C_DEBUG} \
     ${C_FLAGS_FRAME_POINTER} \
+    ${C_FLAGS_ADDITIONAL} \
     -DFRAME_POINTER=${FRAME_POINTER}")
 
 include_directories(
@@ -65,7 +70,7 @@ add_custom_target(
 add_custom_target(
     rootfs
     COMMAND "${PROJECT_SOURCE_DIR}/scripts/build_filesystem.sh"
-    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init ksyms display date
+    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init ksyms display date snake
     COMMENT "Preparing rootfs"
 )
 
@@ -85,6 +90,6 @@ add_custom_target(
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh runqemu
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh debugcon
     COMMAND ./runqemu -k
-    DEPENDS iso
+    DEPENDS rootfs
     COMMENT "Running qemu"
 )

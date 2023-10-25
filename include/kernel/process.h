@@ -213,31 +213,11 @@ static inline int process_is_zombie(struct process* p)
     return p->stat == PROCESS_ZOMBIE;
 }
 
-static inline void process_signal_check(struct process* p)
-{
-    uint32_t signals_pending = p->signals->pending;
-
-    if (!signals_pending)
-    {
-        return;
-    }
-
-    for (int signum = 0; signals_pending; ++signum)
-    {
-        if (!(signals_pending & (1 << signum)))
-        {
-            continue;
-        }
-
-        p->signals->pending &= ~(1 << signum);
-        signal_deliver(process_current, signum);
-    }
-}
-
 static inline void process_exit(struct process* p)
 {
     flags_t flags;
     irq_save(flags);
+    log_debug(DEBUG_EXIT, "%u exiting", p->pid);
     list_del(&p->running);
     p->stat = PROCESS_ZOMBIE;
     process_wake_waiting(p);
@@ -276,11 +256,20 @@ static inline void process_wake(struct process* p)
     irq_restore(flags);
 }
 
-static inline void process_wait(wait_queue_head_t* wq, wait_queue_t* q)
+static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
 {
     flags_t flags;
 
+    if (process_current->stat == PROCESS_ZOMBIE)
+    {
+        log_warning("process %u:%x is zombie", process_current->pid, process_current);
+        scheduler();
+        return 0;
+    }
+
     irq_save(flags);
+
+    log_debug(DEBUG_EXIT, "%u waiting", process_current->pid);
 
     wait_queue_push(q, wq);
     list_del(&process_current->running);
@@ -293,7 +282,33 @@ static inline void process_wait(wait_queue_head_t* wq, wait_queue_t* q)
     log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
     wait_queue_remove(q, wq);
 
-    signal_run(process_current);
+    if (signal_run(process_current))
+    {
+        return -EINTR;
+    }
+
+    return 0;
+}
+
+static inline int process_wait_locked(wait_queue_head_t* wq, wait_queue_t* q, flags_t flags)
+{
+    wait_queue_push(q, wq);
+    list_del(&process_current->running);
+    process_current->stat = PROCESS_WAITING;
+
+    irq_restore(flags);
+
+    scheduler();
+
+    log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
+    wait_queue_remove(q, wq);
+
+    if (signal_run(process_current))
+    {
+        return -EINTR;
+    }
+
+    return 0;
 }
 
 static inline void process_wait2(flags_t flags)

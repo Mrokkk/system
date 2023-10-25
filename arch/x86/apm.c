@@ -156,6 +156,7 @@ static int apm_bios_call(regs_t* regs, const char* name)
 static void apm_shutdown(void)
 {
     regs_t regs;
+    log_info("performing shutdown");
     apm_call(APM_SHUTDOWN(regs), "shutdown");
 }
 

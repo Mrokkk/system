@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <arch/segment.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 #include <kernel/compiler.h>
 
 typedef uint32_t flags_t;

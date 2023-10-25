@@ -1,7 +1,7 @@
 #pragma once
 
 #include <kernel/list.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 #include <kernel/spinlock.h>
 
 struct process;

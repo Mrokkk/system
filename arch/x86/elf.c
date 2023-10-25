@@ -144,7 +144,11 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
             phdr[i].p_flags,
             phdr[i].p_align);
 
-        if (phdr[i].p_type != PT_LOAD)
+        if (phdr[i].p_type == PT_DYNAMIC)
+        {
+        }
+
+        if (phdr[i].p_type != PT_LOAD || phdr[i].p_offset == 0)
         {
             continue;
         }
@@ -169,6 +173,8 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
 
     bin->entry = ptr(header.e_entry);
     pages_free(page);
+
+    log_debug(DEBUG_ELF, "entry: %x", bin->entry);
 
     if (DEBUG_BTUSER)
     {

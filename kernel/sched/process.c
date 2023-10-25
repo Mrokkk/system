@@ -1,4 +1,4 @@
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 #include <kernel/procfs.h>
 #include <kernel/process.h>
 

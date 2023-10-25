@@ -15,7 +15,7 @@
 
 #define DEBUG_MADT 0
 #define DEBUG_APIC 0
-#define DEBUG_IOAPIC 0
+#define DEBUG_IOAPIC 1
 #define HPET_CALIBRATION_LOOPS 16
 
 #define apic_debug(...) ({ if (DEBUG_APIC) log_info(__VA_ARGS__); })

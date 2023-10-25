@@ -9,113 +9,41 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 
-#define addr(x) ((uint32_t)(x))
-#define ptr(x)  ((void*)(x))
+#include "font.h"
+#include "targa.h"
+#include "utils.h"
+#include "object.h"
+#include "window.h"
+#include "definitions.h"
 
 #define min(a, b) a < b ? a : b;
 
 #define MOUSE_LEFT_BUTTON       1
 #define MOUSE_RIGHT_BUTTON      2
 #define MOUSE_MIDDLE_BUTTON     4
-
-struct tga_header
-{
-    uint8_t magic1;
-    uint8_t colormap;
-    uint8_t encoding;
-    uint16_t cmaporig, cmaplen;
-    uint8_t cmapent;
-    uint16_t x;
-    uint16_t y;
-    uint16_t w;
-    uint16_t h;
-    uint8_t bpp;
-    uint8_t alpha_bits:4;
-    uint8_t pixel_ordering:2;
-    uint8_t reserved:2;
-} __attribute__((packed));
+#define MOUSE_BUTTONS_MASK      7
 
 uint8_t* framebuffer;
 uint8_t* buffer;
+struct tga_header* cursor;
+struct tga_header* close_icon;
+struct tga_header* close_pressed_icon;
+struct fb_var_screeninfo vinfo;
+static int xpos = 0, ypos = 0;
+static int old_xpos= 0, old_ypos = 0;
+char button_prev;
+int mousefd;
+window_t* main_window;
 
-static void pixel_set(uint32_t x, uint32_t y, uint32_t color, uint32_t pitch, uint8_t* dest)
-{
-    uint32_t* pixel = (uint32_t*)(dest + y * pitch + x * 4);
-    *pixel = color;
-}
+#define BUFFERED    1
+#define UNBUFFERED  2
 
-static void img_draw(
-    int x, int y,
-    int width, int height,
-    int xmax, int ymax,
-    uint32_t* img,
-    uint32_t pitch,
-    uint8_t* dest)
-{
-    int img_index = 0;
-
-    for (int j = 0; j < height; ++j)
-    {
-        if (y + j > ymax)
-        {
-            break;
-        }
-        for (int i = 0; i < width; ++i, ++img_index)
-        {
-            // FIXME: dummy handling of alpha channel
-            if ((img[img_index] >> 24) < 0x80)
-            {
-                continue;
-            }
-            if (x + i > xmax)
-            {
-                continue;
-            }
-            pixel_set(x + i, y + j, img[img_index], pitch, dest);
-        }
-    }
-}
-
-#define BUFFERED 1
-#define UNBUFFERED 2
-
-static int display_tga(struct tga_header *base, struct fb_var_screeninfo* vinfo, int x, int y, int flag)
-{
-    uint32_t* img;
-
-    if (base->magic1 != 0 || base->colormap != 0 ||
-        base->encoding != 2 || base->cmaporig != 0 ||
-        base->cmapent != 0 || base->x != 0 ||
-        base->bpp != 32 || base->pixel_ordering != 2)
-    {
-        return -1;
-    }
-
-    int xmax = (int)vinfo->xres - 1;
-    int ymax = (int)vinfo->yres - 1;
-
-    img = ptr(addr(base) + sizeof(struct tga_header));
-
-    if (flag == BUFFERED)
-    {
-        img_draw(x, y, base->w, base->h, xmax, ymax, img, vinfo->pitch, buffer);
-        memcpy(framebuffer, buffer, vinfo->yres * vinfo->pitch);
-    }
-    else if (flag == UNBUFFERED)
-    {
-        img_draw(x, y, base->w, base->h, xmax, ymax, img, vinfo->pitch, framebuffer);
-    }
-
-    return 0;
-}
-
-static int cleanup()
+static void cleanup()
 {
     if (ioctl(STDIN_FILENO, KDSETMODE, KD_TEXT))
     {
         perror("ioctl tty");
     }
-    return 0;
 }
 
 static int sighan()
@@ -125,66 +53,85 @@ static int sighan()
     return 0;
 }
 
-static void* file_map(const char* path)
+static void signal_handlers_set(void)
 {
-    int fd;
-    struct stat s;
-    void* res;
-
-    stat(path, &s);
-    fd = open(path, O_RDONLY, 0);
-
-    if (fd == -1)
-    {
-        perror(path);
-        return NULL;
-    }
-
-    res = mmap(NULL, s.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-
-    if ((int)res == -1)
-    {
-        perror(path);
-        return NULL;
-    }
-
-    return res;
-}
-
-static int clamp(int value, int min, int max)
-{
-    if (value >= max)
-    {
-        value = max - 1;
-    }
-    else if (value < min)
-    {
-        value = 0;
-    }
-    return value;
-}
-
-int main(int argc, char* argv[])
-{
-    int fb_fd, mouse_fd;
-    const char* img_path;
-    struct tga_header* img;
-    struct tga_header* cursor;
-    struct fb_var_screeninfo vinfo;
-    memset(&vinfo, 0, sizeof(vinfo));
-
     signal(SIGTERM, sighan);
     signal(SIGINT, sighan);
     signal(SIGTSTP, sighan);
     signal(SIGSEGV, sighan);
+}
 
-    if (argc < 2)
+static void area_refresh(int x, int y, int w, int h)
+{
+    for (int i = x; i < x + w; ++i)
     {
-        printf("display: no image path given\n");
+        if (i >= (int)vinfo.xres)
+        {
+            break;
+        }
+        for (int j = y; j < y + h; ++j)
+        {
+            if (j >= (int)vinfo.yres)
+            {
+                break;
+            }
+            uint32_t* pixel = (uint32_t*)(framebuffer + j * vinfo.pitch + i * 4);
+            *pixel = *(uint32_t*)(buffer + j * vinfo.pitch + i * 4);
+        }
+    }
+}
+
+static void rectangle_draw(int x, int y, int w, int h, uint32_t color)
+{
+    for (int i = x; i < x + w; ++i)
+    {
+        if (i >= (int)vinfo.xres)
+        {
+            break;
+        }
+        for (int j = y; j < y + h; ++j)
+        {
+            if (j >= (int)vinfo.yres)
+            {
+                break;
+            }
+            uint32_t* pixel = (uint32_t*)(buffer + j * vinfo.pitch + i * 4);
+            *pixel = color;
+        }
+    }
+}
+
+static void cursor_position_update(int xmov, int ymov)
+{
+    old_xpos = xpos;
+    old_ypos = ypos;
+
+    xpos += xmov;
+    ypos -= ymov;
+
+    xpos = clamp(xpos, 0, vinfo.xres);
+    ypos = clamp(ypos, 0, vinfo.yres);
+}
+
+static void cursor_draw(void)
+{
+    area_refresh(old_xpos, old_ypos, cursor->w, cursor->h);
+    tga_to_framebuffer(cursor, xpos, ypos, &vinfo, framebuffer);
+}
+
+int initialize()
+{
+    int fb_fd;
+
+    signal_handlers_set();
+
+    mousefd = open("/dev/mouse", O_RDONLY, 0);
+
+    if (mousefd == -1)
+    {
+        perror("/dev/mouse");
         return EXIT_FAILURE;
     }
-
-    img_path = argv[1];
 
     fb_fd = open("/dev/fb0", O_RDWR, 0);
 
@@ -201,30 +148,12 @@ int main(int argc, char* argv[])
     }
 
     framebuffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
+
     if ((int)framebuffer == -1)
     {
         perror("mmap");
         return EXIT_FAILURE;
     }
-
-    if (!(img = file_map(img_path)))
-    {
-        return EXIT_FAILURE;
-    }
-
-    /*printf("%u x %u x %u\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);*/
-    /*printf("magic1 = %u\n", img->magic1);*/
-    /*printf("colormap = %u\n", img->colormap);*/
-    /*printf("encoding = %u\n", img->encoding);*/
-    /*printf("cmaporig = %u\n", img->cmaporig);*/
-    /*printf("cmaplen = %u\n", img->cmaplen);*/
-    /*printf("cmapent = %u\n", img->cmapent);*/
-    /*printf("x = %u\n", img->x);*/
-    /*printf("y = %u\n", img->y);*/
-    /*printf("w = %u\n", img->w);*/
-    /*printf("h = %u\n", img->h);*/
-    /*printf("bpp = %u\n", img->bpp);*/
-    /*printf("pixeltype = %u\n", img->pixeltype);*/
 
     buffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
@@ -234,12 +163,23 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    memset(buffer, 0, vinfo.yres * vinfo.pitch);
-
-    if (!(cursor = file_map("/cursor.tga")))
+    if (!(cursor = file_map("/cursor.tga")) ||
+        !(close_icon = file_map("/close.tga")) ||
+        !(close_pressed_icon = file_map("/close_pressed.tga")))
     {
         return EXIT_FAILURE;
     }
+
+    window_t* window = malloc(sizeof(window_t));
+    window->position.x = 0;
+    window->position.y = 0;
+    window->size.x = vinfo.xres;
+    window->size.y = vinfo.yres;
+    list_init(&window->objects);
+    list_init(&window->dirty);
+    main_window_set(window);
+
+    font_load();
 
     if (ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS))
     {
@@ -247,66 +187,153 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    if (display_tga(img, &vinfo, 0, 0, BUFFERED))
-    {
-        cleanup();
-        printf("%s: unsupported format\n", img_path);
-        return EXIT_FAILURE;
-    }
+    return 0;
+}
 
-    mouse_fd = open("/dev/mouse", O_RDONLY, 0);
+#define button_just_pressed() \
+    (!(button_prev & MOUSE_LEFT_BUTTON) && (button_cur & MOUSE_LEFT_BUTTON))
 
-    if (mouse_fd == -1)
-    {
-        perror("/dev/mouse");
-        cleanup();
-        return EXIT_FAILURE;
-    }
+#define button_just_released() \
+    ((button_prev & MOUSE_LEFT_BUTTON) && !(button_cur & MOUSE_LEFT_BUTTON))
 
+void start(void)
+{
+    char button_cur;
     char buf[3];
-    int xpos = vinfo.xres / 2, ypos = vinfo.yres / 2;
-    int old_xpos, old_ypos;
+    object_t* o;
+    list_head_t* node;
+    list_head_t* prev;
+    bool button_just_pressed, button_just_released;
 
-    display_tga(cursor, &vinfo, xpos, ypos, UNBUFFERED);
+    xpos = old_xpos = vinfo.xres / 2;
+    ypos = old_ypos = vinfo.yres / 2;
+
+    memset(buffer, WINDOW_BODY_COLOR, vinfo.yres * vinfo.pitch);
+
+    rectangle_draw(
+        WINDOW_FRAME_WIDTH,
+        WINDOW_FRAME_WIDTH,
+        vinfo.xres - 2 * WINDOW_FRAME_WIDTH,
+        WINDOW_BAR_HEIGHT,
+        WINDOW_BAR_COLOR);
+
+    string_to_framebuffer(
+        WINDOW_FRAME_WIDTH * 3,
+        WINDOW_FRAME_WIDTH * 3,
+        main_window->title,
+        0xffffff,
+        WINDOW_BAR_COLOR,
+        buffer);
+
+    list_for_each_entry(o, &main_window->objects, list)
+    {
+        object_draw(o, false);
+        list_del(&o->dirty);
+        area_refresh(o->position.x, o->position.y, o->size.x, o->size.y);
+    }
+
+    memcpy(framebuffer, buffer, vinfo.yres * vinfo.pitch);
+    cursor_draw();
 
     while (1)
     {
-        read(mouse_fd, buf, 3);
+        read(mousefd, buf, 3);
 
-        if (buf[0] & MOUSE_LEFT_BUTTON)
+        button_cur = buf[0] & MOUSE_BUTTONS_MASK;
+        button_just_pressed = button_just_pressed();
+        button_just_released = button_just_released();
+        button_prev = button_cur;
+
+        cursor_position_update(buf[1], buf[2]);
+
+        list_for_each_entry(o, &main_window->objects, list)
         {
-            break;
-        }
-
-        old_xpos = xpos;
-        old_ypos = ypos;
-        xpos += buf[1];
-        ypos -= buf[2];
-
-        xpos = clamp(xpos, 0, vinfo.xres);
-        ypos = clamp(ypos, 0, vinfo.yres);
-
-        for (int x = old_xpos; x < old_xpos + cursor->w; ++x)
-        {
-            if (x >= (int)vinfo.xres)
+            if ((button_just_pressed || button_just_released) &&
+                xpos >= o->position.x &&
+                ypos >= o->position.y &&
+                xpos <= o->position.x + o->size.x &&
+                ypos <= o->position.y + o->size.y)
             {
-                break;
-            }
-            for (int y = old_ypos; y < old_ypos + cursor->h; ++y)
-            {
-                if (y >= (int)vinfo.yres)
+                if (button_just_pressed && o->pressed_img)
                 {
-                    break;
+                    object_draw(o, button_cur & MOUSE_LEFT_BUTTON);
                 }
-                uint32_t* pixel = (uint32_t*)(framebuffer + y * vinfo.pitch + x * 4);
-                *pixel = *(uint32_t*)(buffer + y * vinfo.pitch + x * 4);
+
+                if (button_just_released && o->on_click)
+                {
+                    vector2_t pos = {.x = xpos, .y = ypos};
+                    o->on_click(o, &pos);
+                }
+            }
+            else if (button_just_released)
+            {
+                object_draw(o, false);
             }
         }
 
-        display_tga(cursor, &vinfo, xpos, ypos, UNBUFFERED);
+        for (node = main_window->dirty.next; node != &main_window->dirty;)
+        {
+            prev = node;
+            o = list_entry(node, object_t, dirty);
+            area_refresh(o->position.x, o->position.y, o->size.x, o->size.y);
+            node = node->next;
+            list_del(prev);
+        }
+
+        cursor_draw();
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    const char* img_path;
+    struct tga_header* img;
+
+    if (argc < 2)
+    {
+        printf("display: no image path given\n");
+        return EXIT_FAILURE;
     }
 
-    cleanup();
+    img_path = argv[1];
+
+    if (initialize())
+    {
+        return EXIT_FAILURE;
+    }
+
+    if (!(img = file_map(img_path)))
+    {
+        return EXIT_FAILURE;
+    }
+
+    object_t* close_button = malloc(sizeof(object_t));
+    close_button->normal_img = close_icon;
+    close_button->pressed_img = close_pressed_icon;
+    close_button->position.x = vinfo.xres - close_icon->w - 2 * WINDOW_FRAME_WIDTH;
+    close_button->position.y = 2 * WINDOW_FRAME_WIDTH;
+    close_button->size.x = close_icon->w;
+    close_button->size.y = close_icon->h;
+    close_button->on_click = &sighan;
+    list_init(&close_button->list);
+    list_init(&close_button->dirty);
+
+    object_t* image = malloc(sizeof(object_t));
+    image->normal_img = img;
+    image->pressed_img = NULL;
+    image->position.x = (vinfo.xres - img->w) / 2;
+    image->position.y = (vinfo.yres - img->h) / 2;
+    image->size.x = img->w;
+    image->size.y = img->h;
+    image->on_click = NULL;
+    list_init(&image->list);
+    list_init(&image->dirty);
+
+    window_object_add(main_window, image);
+    window_object_add(main_window, close_button);
+    main_window->title = argv[0];
+
+    start();
 
     return 0;
 }

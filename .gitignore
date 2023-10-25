@@ -15,5 +15,7 @@ config
 .idea/
 /CMake/config.cmake
 /build/
+/.cache/
 .syntastic*
 .clang_complete
+compile_commands.json

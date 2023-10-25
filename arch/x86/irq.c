@@ -24,6 +24,8 @@ int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags)
         return -EBUSY;
     }
 
+    log_debug(DEBUG_IRQ, "%u:%s flags: %x", nr, name, flags);
+
     irq_list[nr].handler = handler;
     irq_list[nr].name = name;
     irq_list[nr].flags = flags;
@@ -43,6 +45,8 @@ int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags)
 
 void do_irq(uint32_t nr, struct pt_regs* regs)
 {
+    log_debug(DEBUG_IRQ, "%u", nr);
+
     if (unlikely(!irq_list[nr].handler))
     {
         log_error("not handled IRQ %u", nr);
@@ -60,6 +64,7 @@ void irq_eoi(uint32_t irq)
 
 int irq_enable(uint32_t irq)
 {
+    log_debug(DEBUG_IRQ, "%u", irq);
     used_chip->irq_enable(irq, irq_list[irq].flags);
     return 0;
 }
@@ -68,8 +73,11 @@ int irq_disable(uint32_t irq)
 {
     if (unlikely(!irq_list[irq].handler))
     {
+        log_warning("disabling not registred IRQ: %u", irq);
         return -EINVAL;
     }
+
+    log_debug(DEBUG_IRQ, "%u", irq);
 
     if (used_chip->irq_disable)
     {

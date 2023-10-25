@@ -16,6 +16,9 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 
+// https://pdos.csail.mit.edu/6.828/2018/readings/hardware/IDE-BusMaster.pdf
+// https://wiki.osdev.org/PCI_IDE_Controller
+
 #define CH(x)           (channels[x])
 #define ERROR_REG(c)    CH(c).error_reg
 #define NSECTOR_REG(c)  CH(c).nsector_reg
@@ -280,6 +283,8 @@ int ide_initialize(void)
             if (!(bm_status & 0x20))
             {
                 ide_devices[count].dma = false;
+                io_delay(10);
+                outb(bm_status | (1 << (5 + i)), channels[i].bmide + 2);
             }
             else
             {
@@ -518,7 +523,7 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
 
         outl(DMA_PRD, channels[channel].bmide + 4);
         io_delay(2);
-        outb((1 << 3), channels[channel].bmide);
+        outb(BM_CMD_READ, channels[channel].bmide);
         io_delay(2);
         outb(inb(channels[channel].bmide + 2) | 6, channels[channel].bmide + 2);
         io_delay(2);
@@ -529,7 +534,7 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
             dma_region->prdt[0].count,
             dma_region->prdt[0].last);
 
-        outb(1 | (1 << 3), channels[channel].bmide);
+        outb(BM_CMD_START | BM_CMD_READ, channels[channel].bmide);
         return 0;
     }
 
@@ -570,7 +575,7 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
 
 static void ide_irq()
 {
-    uint8_t error;
+    uint8_t error, ata_status;
     uint8_t status = inb(channels[0].bmide + 0x2);
 
     if (!(status & 0x4))
@@ -579,23 +584,25 @@ static void ide_irq()
         return;
     }
 
-    if (ide_read(0, ATA_REG_STATUS) & ATA_SR_ERR)
+    io_delay(10);
+    if ((ata_status = ide_read(0, ATA_REG_STATUS)) & ATA_SR_ERR)
     {
         error = inb(ERROR_REG(0));
         log_warning("irq: error %x (%s)", error, ide_error_string(error));
     }
 
-    outb(0, channels[0].bmide);
     io_delay(10);
+    outb(0, channels[0].bmide);
 
-    struct process* temp = wait_queue_pop(&ide_queue);
+    struct process* temp = wait_queue_front(&ide_queue);
 
     if (unlikely(!temp))
     {
         log_warning("no process in wq");
+        return;
     }
 
-    log_info("waking %u", temp->pid);
+    log_info("waking %u, bm status: %x, ata status: %x", temp->pid, status, ata_status);
     process_wake(temp);
 }
 
@@ -613,6 +620,7 @@ static int ide_fs_read(file_t* file, char* buf, size_t count)
 {
     flags_t flags = 0;
     size_t sectors = count / ATA_SECTOR_SIZE;
+    int errno;
     int drive = BLK_DRIVE(MINOR(file->inode->dev));
     int partition = BLK_PARTITION(MINOR(file->inode->dev));
     uint32_t offset = file->offset / ATA_SECTOR_SIZE;
@@ -643,14 +651,12 @@ static int ide_fs_read(file_t* file, char* buf, size_t count)
 
     if (ide_devices[drive].dma)
     {
-        irq_restore(flags);
-    }
-
-    if (ide_devices[drive].dma)
-    {
         log_info("putting %u to sleep", process_current->pid);
         WAIT_QUEUE_DECLARE(q, process_current);
-        process_wait(&ide_queue, &q);
+        if ((errno = process_wait_locked(&ide_queue, &q, flags)))
+        {
+            return errno;
+        }
         memcpy(buf, dma_region->buffer, count);
     }
 

@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <kernel/list.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 #include <kernel/memory.h>
 #include <kernel/compiler.h>
 

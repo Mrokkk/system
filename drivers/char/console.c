@@ -517,8 +517,14 @@ static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
                     console->disabled = true;
                     console_refresh(console);
                     return 0;
+
                 default: return -EINVAL;
             }
+        }
+        case 2137:
+        {
+            tty->termios.c_lflag &= ~ICANON;
+            return 0;
         }
     }
     return -EINVAL;

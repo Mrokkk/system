@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <bitset.h>
 
-#define MALLOC_AREA         0x4000
+#define MALLOC_AREA         0x14000
 #define MALLOC_BLOCK_SIZE   8
 
 BITSET_DECLARE(bitset, MALLOC_AREA / MALLOC_BLOCK_SIZE);

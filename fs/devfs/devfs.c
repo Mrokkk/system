@@ -1,8 +1,6 @@
+#define log_fmt(fmt) "devfs: " fmt
 #include <kernel/fs.h>
 #include <kernel/device.h>
-
-#undef log_fmt
-#define log_fmt(fmt) "devfs: " fmt
 
 static int devfs_lookup(inode_t* dir, const char* name, inode_t** result);
 static int devfs_open(file_t* file);

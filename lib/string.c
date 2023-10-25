@@ -100,6 +100,7 @@ char* strchr(const char* string, int c)
     return 0;
 }
 
+#ifndef __clang__
 void* memcpy(void* dest, const void* src, size_t size)
 {
     size_t size4;
@@ -118,7 +119,7 @@ void* memcpy(void* dest, const void* src, size_t size)
 
     return dest;
 }
-
+#endif
 void* memcpyw(uint16_t* dest, const uint16_t* src, size_t count)
 {
     uint16_t* s;
@@ -131,11 +132,13 @@ void* memcpyw(uint16_t* dest, const uint16_t* src, size_t count)
     return dest;
 }
 
+#ifndef __clang__
 void* memset(void* ptr, int c, size_t size)
 {
     for (size_t i = 0; i < size; ((char*)ptr)[i] = c, i++);
     return ptr;
 }
+#endif
 
 void* memsetw(uint16_t* dest, uint16_t val, size_t count)
 {

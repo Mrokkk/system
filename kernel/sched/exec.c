@@ -3,6 +3,8 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 
+LIST_DECLARE(libraries);
+
 static inline int binary_image_load(const char* pathname, binary_t* bin)
 {
     int errno;

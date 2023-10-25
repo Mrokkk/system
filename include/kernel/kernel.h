@@ -13,7 +13,7 @@
 #include <kernel/debug.h>
 #include <kernel/errno.h>
 #include <kernel/magic.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 #include <kernel/types.h>
 #include <kernel/limits.h>
 #include <kernel/malloc.h>

@@ -8,17 +8,15 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include "history.h"
+
 #define LINE_LEN        256
 #define ARGV_MAX_SIZE   16
-#define HISTORY_SIZE    32
-
-char* history[HISTORY_SIZE];
-int history_index = 0;
 
 int c_cd();
+int c_fg();
 int c_pwd();
 int c_mkdir();
-int c_history();
 static void command_prompt_print(int status);
 
 #define COMMAND(name) {#name, c_##name}
@@ -28,23 +26,28 @@ static struct {
     int (*function)();
 } commands[] = {
     COMMAND(cd),
+    COMMAND(fg),
     COMMAND(pwd),
     COMMAND(mkdir),
     COMMAND(history),
     {0, 0}
 };
 
+struct job
+{
+    int pid;
+    struct job* next;
+};
+
 int sigint(int)
 {
     printf("^C\n");
-    command_prompt_print(1);
     return 0;
 }
 
 int sigtstp(int)
 {
     printf("^Z\n");
-    command_prompt_print(1);
     return 0;
 }
 
@@ -84,6 +87,35 @@ int c_cd(const char* arg)
     return chdir(arg);
 }
 
+int c_fg(const char* arg)
+{
+    if (!arg || !arg[0])
+    {
+        return -1;
+    }
+
+    int err, status;
+    int pid = arg[0] - '0';
+
+    if ((err = kill(pid, SIGCONT)))
+    {
+        return err;
+    }
+
+    waitpid(pid, &status, WUNTRACED);
+
+    if (WIFSTOPPED(status))
+    {
+        printf("Stopped\n");
+    }
+    else if (WIFSIGNALED(status) && WTERMSIG(status) == SIGSEGV)
+    {
+        printf("Segmentation fault\n");
+    }
+
+    return 0;
+}
+
 int c_pwd(const char*)
 {
     char buf[32];
@@ -101,15 +133,6 @@ int c_pwd(const char*)
 int c_mkdir(const char* arg)
 {
     return mkdir(arg, 0);
-}
-
-int c_history(const char*)
-{
-    for (int i = 0; i < history_index; ++i)
-    {
-        printf("%u %s\n", i, history[i]);
-    }
-    return 0;
 }
 
 static void command_prompt_print(int status)
@@ -210,7 +233,7 @@ int main()
     signal(SIGINT, sigint);
     signal(SIGTSTP, sigtstp);
 
-    for (int i = 0; i < HISTORY_SIZE; history[i++] = malloc(32));
+    history_initialize();
 
     for (argc = 0; argc < ARGV_MAX_SIZE; arguments[argc++] = malloc(32));
 
@@ -225,12 +248,9 @@ int main()
             continue;
         }
 
-        strcpy(history[history_index++], line);
-        // FIXME: use a better container than array
-        if (history_index == HISTORY_SIZE) history_index = 0;
-
         cmd_args_read(command, &argc, argv, arguments, line);
         execute(command, argc, argv, &status);
+        history_add(line);
     }
 
     return 0;

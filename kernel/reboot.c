@@ -4,7 +4,7 @@
 #include <kernel/module.h>
 #include <kernel/reboot.h>
 #include <kernel/process.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 
 unsigned shutdown_in_progress;
 

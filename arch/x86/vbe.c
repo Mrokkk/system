@@ -26,6 +26,7 @@
         regs.ax = 0x4f15; \
         regs.bl = 0x01; \
         regs.cx = 0x00; \
+        regs.dx = 0x00; \
         regs.di = VBE_EDID_ADDR; \
         &regs; \
     })
@@ -38,6 +39,7 @@ struct
 {
     uint16_t resx, resy, bits;
 } res_priorities[] = {
+    {1024, 768, 32},
     {1920, 1080, 32},
     {1600, 900, 32},
     {1400, 1050, 32},
@@ -248,7 +250,10 @@ int vbe_initialize(void)
 
     if (regs.al != 0x4f || regs.ah == 1 || *(uint64_t*)VBE_EDID_ADDR != EDID_SIGNATURE)
     {
-        log_warning("EDID reading unsupported/failed");
+        log_warning("EDID reading unsupported/failed; al=%x ah=%x sig=%llx",
+            regs.al,
+            regs.ah,
+            *(uint64_t*)VBE_EDID_ADDR);
     }
     else
     {

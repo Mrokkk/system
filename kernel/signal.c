@@ -1,6 +1,45 @@
 #include <kernel/signal.h>
 #include <kernel/process.h>
 
+static const char* signame(int sig)
+{
+    switch (sig)
+    {
+        case SIGHUP: return "SIGHUP";
+        case SIGINT: return "SIGINT";
+        case SIGQUIT: return "SIGQUIT";
+        case SIGILL: return "SIGILL";
+        case SIGTRAP: return "SIGTRAP";
+        case SIGABRT: return "SIGABRT";
+        case SIGBUS: return "SIGBUS";
+        case SIGFPE: return "SIGFPE";
+        case SIGKILL: return "SIGKILL";
+        case SIGUSR1: return "SIGUSR1";
+        case SIGSEGV: return "SIGSEGV";
+        case SIGUSR2: return "SIGUSR2";
+        case SIGPIPE: return "SIGPIPE";
+        case SIGALRM: return "SIGALRM";
+        case SIGTERM: return "SIGTERM";
+        case SIGSTKFLT: return "SIGSTKFLT";
+        case SIGCHLD: return "SIGCHLD";
+        case SIGCONT: return "SIGCONT";
+        case SIGSTOP: return "SIGSTOP";
+        case SIGTSTP: return "SIGTSTP";
+        case SIGTTIN: return "SIGTTIN";
+        case SIGTTOU: return "SIGTTOU";
+        case SIGURG: return "SIGURG";
+        case SIGXCPU: return "SIGXCPU";
+        case SIGXFSZ: return "SIGXFSZ";
+        case SIGVTALRM: return "SIGVTALRM";
+        case SIGPROF: return "SIGPROF";
+        case SIGWINCH: return "SIGWINCH";
+        case SIGIO: return "SIGIO";
+        case SIGPWR: return "SIGPWR";
+        case SIGSYS: return "SIGSYS";
+    }
+    return "Unknown signal";
+}
+
 int sys_signal(int signum, sighandler_t handler)
 {
     if (!signum_exists(signum))
@@ -22,10 +61,10 @@ int sys_signal(int signum, sighandler_t handler)
         process_current->signals->trapped |= (1 << signum);
     }
 
-    log_debug(DEBUG_SIGNAL, "%u:%x set handler for %u",
+    log_debug(DEBUG_SIGNAL, "%u:%x set handler for %s",
         process_current->pid,
         process_current,
-        signum);
+        signame(signum));
 
     process_current->signals->sighandler[signum] = handler;
 
@@ -59,9 +98,10 @@ static void default_sighandler(struct process* p, int signum)
     }
 }
 
-void signal_run(struct process* proc)
+int signal_run(struct process* proc)
 {
     uint32_t* pending = &proc->signals->pending;
+    int signals = 0;
 
     for (int signum = 0; *pending; ++signum)
     {
@@ -70,17 +110,19 @@ void signal_run(struct process* proc)
             continue;
         }
 
-        log_debug(DEBUG_SIGNAL, "sending %u to %u", signum, proc->pid);
         *pending &= ~(1 << signum);
+        ++signals;
         signal_deliver(proc, signum);
     }
+
+    return signals;
 }
 
 int signal_deliver(struct process* proc, int signum)
 {
     if (proc->signals->trapped & (1 << signum))
     {
-        log_debug(DEBUG_SIGNAL, "calling custom handler for %u in %u", signum, proc->pid);
+        log_debug(DEBUG_SIGNAL, "calling custom handler for %s in %u", signame(signum), proc->pid);
         arch_process_execute_sighan(
             proc,
             addr(proc->signals->sighandler[signum]),
@@ -88,7 +130,7 @@ int signal_deliver(struct process* proc, int signum)
     }
     else
     {
-        log_debug(DEBUG_SIGNAL, "calling default handler for %u in %u", signum, proc->pid);
+        log_debug(DEBUG_SIGNAL, "calling default handler for %s in %u", signame(signum), proc->pid);
         default_sighandler(proc, signum);
     }
 
@@ -127,7 +169,7 @@ int sys_kill(int pid, int signum)
         return -ESRCH;
     }
 
-    log_debug(DEBUG_SIGNAL, "sending %d to pid %d", signum, pid);
+    log_debug(DEBUG_SIGNAL, "sending %s to pid %d", signame(signum), pid);
 
     return do_kill(p, signum);
 }

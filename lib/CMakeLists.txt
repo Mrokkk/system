@@ -11,3 +11,7 @@ add_library(libc STATIC
     ${lib_src}
     start.S
 )
+
+add_library(c SHARED
+    ${lib_src}
+)

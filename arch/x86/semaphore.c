@@ -10,8 +10,10 @@ void __down_failed(semaphore_t* sem)
     sem->waiting++;
 
 #pragma GCC diagnostic push
+#ifndef __clang__
 #pragma GCC diagnostic ignored "-Wdangling-pointer="
-    process_wait(&sem->queue, &q);
+#endif
+    while (process_wait(&sem->queue, &q));
 #pragma GCC diagnostic pop
 }
 

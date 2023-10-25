@@ -63,10 +63,13 @@ int sys_waitpid(int pid, int* status, int wait_flags)
 
     WAIT_QUEUE_DECLARE(temp, process_current);
 
-    temp.flags = wait_flags;
-    process_wait(&proc->wait_child, &temp);
+    while (process_is_running(proc) || proc->stat == PROCESS_WAITING)
+    {
+        temp.flags = wait_flags;
+        process_wait(&proc->wait_child, &temp);
 
-    log_debug(DEBUG_EXIT, "woken; proc %u state = %c", proc->pid, process_state_char(proc->stat));
+        log_debug(DEBUG_EXIT, "woken %u; proc %u state = %c", process_current->pid, proc->pid, process_state_char(proc->stat));
+    }
 
 dont_wait:
     if (process_is_stopped(proc))

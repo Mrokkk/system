@@ -9,7 +9,7 @@
 
 #include <kernel/list.h>
 #include <kernel/macro.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 
 MUST_CHECK(void*) fmalloc(size_t size);
 int ffree(void* ptr, size_t size);

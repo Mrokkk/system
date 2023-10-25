@@ -1,5 +1,7 @@
 #include "tty_ldisc.h"
 
+#include <kernel/errno.h>
+#include <kernel/signal.h>
 #include <kernel/process.h>
 
 int tty_ldisc_open(tty_t* tty, file_t* file)
@@ -27,6 +29,7 @@ int tty_ldisc_open(tty_t* tty, file_t* file)
 int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
 {
     size_t i;
+    int errno;
     termios_t* termios = &tty->termios;
 
     WAIT_QUEUE_DECLARE(q, process_current);
@@ -39,7 +42,12 @@ int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
             {
                 return i;
             }
-            process_wait(&tty->wq, &q);
+
+            if ((errno = process_wait(&tty->wq, &q)))
+            {
+                buffer[0] = 0;
+                return errno;
+            }
         }
 
         if (buffer[i] == '\n')
@@ -138,7 +146,7 @@ void tty_ldisc_putch(tty_t* tty, char c, int flag)
 
     *tty->ldisc_current++ = c;
 
-    if (c == '\n' || c == termios->c_cc[VEOF])
+    if (c == '\n' || c == termios->c_cc[VEOF] || !(termios->c_lflag & ICANON))
     {
         for (char* buf = tty->ldisc_buf; buf < tty->ldisc_current; ++buf)
         {

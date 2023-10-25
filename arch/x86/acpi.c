@@ -126,7 +126,7 @@ void acpi_initialize(void)
         return;
     }
 
-    static_assert(offsetof(fadt_t, reset_req) == 116);
+    static_assert(offsetof(fadt_t, reset_req) == 116, "Wrong offset of reset_req");
 
     log_notice("fadt: version: %x", fadt->header.revision);
     log_notice("fadt: facs: %x", fadt->firmware_ctrl);

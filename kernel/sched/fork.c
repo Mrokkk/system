@@ -49,9 +49,11 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
     return stack_vma;
 
 error:
-    list_head_t head = LIST_INIT(head);
-    list_merge(&head, &pages->list_entry);
-    page_range_free(&head);
+    {
+        list_head_t head = LIST_INIT(head);
+        list_merge(&head, &pages->list_entry);
+        page_range_free(&head);
+    }
     return NULL;
 }
 

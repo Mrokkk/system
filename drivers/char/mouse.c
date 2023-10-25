@@ -60,7 +60,7 @@ UNMAP_AFTER_INIT int mouse_init()
         log_warning("1: setting rate failed: %x", byte);
     }
 
-    if ((byte = i8042_send_and_receive(MOUSE_RATE_60Hz, I8042_AUX_PORT)) != I8042_RESP_ACK)
+    if ((byte = i8042_send_and_receive(MOUSE_RATE_40Hz, I8042_AUX_PORT)) != I8042_RESP_ACK)
     {
         log_warning("2: setting rate failed: %x", byte);
     }
@@ -90,6 +90,7 @@ static int mouse_open(file_t*)
 static int mouse_read(file_t* file, char* buffer, size_t count)
 {
     size_t i;
+    int errno;
 
     WAIT_QUEUE_DECLARE(q, process_current);
 
@@ -101,7 +102,11 @@ static int mouse_read(file_t* file, char* buffer, size_t count)
             {
                 return i;
             }
-            process_wait(&mouse_wq, &q);
+            if ((errno = process_wait(&mouse_wq, &q)))
+            {
+                buffer[0] = 0;
+                return errno;
+            }
         }
     }
 

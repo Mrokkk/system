@@ -7,7 +7,7 @@
 #include <arch/register.h>
 
 #include <kernel/page.h>
-#include <kernel/trace.h>
+#include <kernel/debug.h>
 #include <kernel/printk.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
@@ -45,6 +45,7 @@ static inline void paranoia(struct process*, struct process* next)
     if (unlikely(!stack))
     {
         panic("stack is null");
+        return;
     }
 
     if (unlikely(addr(stack) < stack_end))
