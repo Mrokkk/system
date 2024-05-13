@@ -279,8 +279,12 @@ static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
 
     scheduler();
 
+    irq_save(flags);
+
     log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
     wait_queue_remove(q, wq);
+
+    irq_restore(flags);
 
     if (signal_run(process_current))
     {

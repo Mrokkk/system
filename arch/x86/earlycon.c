@@ -95,11 +95,6 @@ static inline void videomem_write(uint16_t data, uint16_t offset)
     writew(data | (ATTR << 8), VIDEOMEM + offset);
 }
 
-static inline uint16_t videomem_read(uint16_t offset)
-{
-    return readw(VIDEOMEM + offset);
-}
-
 static void csr_move(uint16_t off)
 {
     outb(14, 0x3d4);

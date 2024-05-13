@@ -55,6 +55,7 @@ static void rtc_irq()
     if (events[0].handler)
     {
         events[0].handler(events[0].data);
+        events[0].handler = NULL;
     }
 }
 

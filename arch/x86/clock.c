@@ -120,7 +120,7 @@ UNMAP_AFTER_INIT int clock_sources_setup(void)
         if (clock_sources[i]->read)
         {
 #if 0
-            if (!strcmp("pit", clock_sources[i]->name))
+            if (!strcmp("i8253", clock_sources[i]->name))
             {
                 monotonic_best = clock_sources[i];
             }

@@ -295,10 +295,9 @@ int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
 {
     int errno = -ENOMEM;
     struct process* child;
+    scoped_irq_lock();
 
     log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
-
-    cli();
 
     if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, clone_flags)) goto cannot_allocate;
@@ -317,8 +316,6 @@ int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
 
     parent->need_resched = true;
 
-    sti();
-
     return child->pid;
 
 arch_error:
@@ -331,7 +328,6 @@ fs_error:
 cannot_allocate:
     delete(child);
 cannot_create_process:
-    sti();
     return errno;
 }
 

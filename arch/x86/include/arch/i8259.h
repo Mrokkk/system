@@ -28,7 +28,8 @@
 #define ICW4_BUF_MASTER 0x0C        // Buffered mode/master
 #define ICW4_SFNM       0x10        // Special fully nested mode
 
-#define OCW2_SPEC_EOI   (3 << 5)
+#define OCW2_SPEC_EOI       (3 << 5)
+#define OCW2_NONSPEC_EOI    (1 << 5)
 
 #ifndef __ASSEMBLER__
 

@@ -101,16 +101,26 @@ void i8259_eoi(uint32_t irq)
 {
     if (mask & (1 << irq))
     {
-        // FIXME: handle APIC timer + PIT properly
+        // TODO: handle APIC timer + PIC properly
         if (irq == 0)
         {
             extern void apic_eoi(uint32_t);
             apic_eoi(irq);
+
+            // FIXME: when APIC timer is used with i8259, sometimes the chip gets
+            // stuck with multiple IRQs in both IRR and ISR registers and no longer
+            // handles IRQs > 1. Below non-specific EOI seems to be a WA for the
+            // issue.
+            outb(OCW2_NONSPEC_EOI, PIC2_CMD);
+            outb(OCW2_NONSPEC_EOI, PIC1_CMD);
+
             return;
         }
-        // TODO: handle spurious interrupts
-        panic("unsupported spurious interrupt %u", irq);
-        return;
+        else
+        {
+            // TODO: handle spurious interrupts
+            panic("unsupported spurious interrupt %u", irq);
+        }
     }
 
     if (irq & 8)

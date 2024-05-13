@@ -53,7 +53,7 @@ int do_read(file_t* file, size_t offset, void* buffer, size_t count)
     file->offset = offset;
     retval = file->ops->read(file, buffer, count);
 
-    if (retval < 0 && retval >= ERRNO_MAX)
+    if (retval < 0 && retval >= -ERRNO_MAX)
     {
         return retval;
     }
@@ -61,7 +61,7 @@ int do_read(file_t* file, size_t offset, void* buffer, size_t count)
     // FIXME: this is wrong; such situation is normal
     if ((size_t)retval != count)
     {
-        log_warning("retval = %u, count = %u", retval, count);
+        log_warning("retval = %d, count = %u", retval, count);
         return -EIO;
     }
 

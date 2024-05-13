@@ -90,6 +90,6 @@ add_custom_target(
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh runqemu
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh debugcon
     COMMAND ./runqemu -k
-    DEPENDS rootfs
+    DEPENDS iso
     COMMENT "Running qemu"
 )

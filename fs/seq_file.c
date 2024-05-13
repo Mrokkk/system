@@ -50,7 +50,8 @@ int seq_read(file_t* file, char* buffer, size_t count)
 
     if (!s->buffer)
     {
-        page_t* pages = page_alloc(2, PAGE_ALLOC_CONT);
+        // FIXME: allocate pages dynamically
+        page_t* pages = page_alloc(4, PAGE_ALLOC_CONT);
 
         if (unlikely(!pages))
         {

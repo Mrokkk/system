@@ -340,6 +340,12 @@ int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
     }
 
     b = block_read(sb->dev, sb->device_file, 1);
+
+    if (!b)
+    {
+        return -EIO;
+    }
+
     raw_sb = ptr(b->data);
 
     if (raw_sb->magic != EXT2_SIGNATURE)

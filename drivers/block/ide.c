@@ -91,7 +91,7 @@ static inline void ide_channel_fill(int channel, pci_device_t* ide_pci)
     channels[channel].select_reg = port++;
     channels[channel].status_reg = port++;
     channels[channel].ctrl = base + 0x206;
-    channels[channel].bmide = (ide_pci->bar[4].addr & 0xfffffffc);
+    channels[channel].bmide = ide_pci->bar[4].addr & 0xfffffffc;
 }
 
 static inline const char* ide_error_string(int e)
@@ -113,10 +113,8 @@ static inline const char* ide_error_string(int e)
 
 void ide_device_print(ide_device_t* device)
 {
-    uint64_t size;
     const char* unit;
-
-    size = (uint64_t)device->size * ATA_SECTOR_SIZE;
+    uint64_t size = (uint64_t)device->size * ATA_SECTOR_SIZE;
 
     human_size(size, unit);
 
@@ -128,7 +126,19 @@ void ide_device_print(ide_device_t* device)
         device->model,
         device->signature);
 
-    log_continue("; cap: %x; DMA: %u", device->capabilities, device->dma);
+    log_continue("; cap: %x", device->capabilities);
+    if (device->dma)
+    {
+        log_continue("; DMA");
+    }
+    if (device->capabilities & 0x200)
+    {
+        log_continue("; LBA");
+    }
+    else
+    {
+        log_continue("; CHS");
+    }
 }
 
 static void ide_device_register(int i)
@@ -199,6 +209,12 @@ int ide_initialize(void)
     {
         log_warning("PCI native mode not supported yet");
         return -ENODEV;
+    }
+
+    if (!(ide_pci->prog_if & 0x80))
+    {
+        log_warning("bus mastering is not supported!");
+        use_dma = false;
     }
 
     dma_region = region_map(DMA_PRD, 5 * PAGE_SIZE, "dma");
@@ -280,19 +296,15 @@ int ide_initialize(void)
             // FIXME: this is a hack for QEMU, as apparently QEMU does not report this bit.
             // DMA is working fine on real HW (IBM ThinkPad T42), however on QEMU IRQ is fired
             // when transfer is still in progress (no data copied) and no further IRQ is received
-            if (!(bm_status & 0x20))
+            if (!(bm_status & BM_STATUS_DRV0_DMA))
             {
                 ide_devices[count].dma = false;
-                io_delay(10);
-                outb(bm_status | (1 << (5 + i)), channels[i].bmide + 2);
             }
             else
             {
-                io_delay(10);
-                ide_write(i, ATA_REG_FEATURES, 1);
-                io_delay(10);
-                ide_enable_irq(i);
                 ide_devices[count].dma = use_dma;
+                outb(bm_status | BM_STATUS_INTERRUPT, channels[i].bmide);
+                ide_enable_irq(i);
             }
 
             // (VI) Read Device Parameters:
@@ -416,16 +428,15 @@ enum mode
     IDE_LBA48 = 2,
 };
 
-static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, uint8_t numsects, void* buf, int dma)
+static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t lba, uint8_t numsects, int dma)
 {
     int lba_mode;
     uint8_t cmd;
     uint8_t lba_io[6];
     uint32_t channel = ide_devices[drive].channel;
     uint32_t slavebit = ide_devices[drive].drive;
-    uint32_t words = ATA_SECTOR_SIZE / 2;
-    uint16_t cyl, i;
-    uint8_t head, sect, err;
+    uint16_t cyl;
+    uint8_t head, sect;
 
     // (I) Select one from LBA28, LBA48 or CHS;
     if (lba >= 0x10000000) // LBA48
@@ -509,6 +520,19 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
 
     ide_write(channel, ATA_REG_COMMAND, cmd);
 
+    return lba_mode;
+}
+
+static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, uint8_t numsects, void* buf, int dma)
+{
+    int lba_mode;
+    uint32_t channel = ide_devices[drive].channel;
+    uint32_t words = ATA_SECTOR_SIZE / 2;
+    uint16_t i;
+    uint8_t err;
+
+    lba_mode = ide_ata_prepare_transfer(direction, drive, lba, numsects, dma);
+
     if (dma)
     {
         outb(0, channels[channel].bmide);
@@ -525,7 +549,7 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
         io_delay(2);
         outb(BM_CMD_READ, channels[channel].bmide);
         io_delay(2);
-        outb(inb(channels[channel].bmide + 2) | 6, channels[channel].bmide + 2);
+        outb(inb(channels[channel].bmide + 2) | BM_STATUS_ERROR | BM_STATUS_INTERRUPT, channels[channel].bmide + 2);
         io_delay(2);
 
         log_info("dma: ch%u PRD: addr: %x, size: %x, last: %x",
@@ -576,9 +600,9 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
 static void ide_irq()
 {
     uint8_t error, ata_status;
-    uint8_t status = inb(channels[0].bmide + 0x2);
+    uint8_t bm_status = inb(channels[0].bmide + 0x2);
 
-    if (!(status & 0x4))
+    if (!(bm_status & BM_STATUS_INTERRUPT))
     {
         log_warning("not for this drive");
         return;
@@ -591,6 +615,12 @@ static void ide_irq()
         log_warning("irq: error %x (%s)", error, ide_error_string(error));
     }
 
+    /*if (bm_status & BM_STATUS_ACTIVE)*/
+    /*{*/
+        /*log_warning("status has BM_STATUS_ACTIVE");*/
+        /*return;*/
+    /*}*/
+
     io_delay(10);
     outb(0, channels[0].bmide);
 
@@ -602,7 +632,7 @@ static void ide_irq()
         return;
     }
 
-    log_info("waking %u, bm status: %x, ata status: %x", temp->pid, status, ata_status);
+    log_info("waking %u, bm status: %x, ata status: %x", temp->pid, bm_status, ata_status);
     process_wake(temp);
 }
 
@@ -618,9 +648,9 @@ static int ide_fs_open(file_t* file)
 
 static int ide_fs_read(file_t* file, char* buf, size_t count)
 {
+    int errno;
     flags_t flags = 0;
     size_t sectors = count / ATA_SECTOR_SIZE;
-    int errno;
     int drive = BLK_DRIVE(MINOR(file->inode->dev));
     int partition = BLK_PARTITION(MINOR(file->inode->dev));
     uint32_t offset = file->offset / ATA_SECTOR_SIZE;

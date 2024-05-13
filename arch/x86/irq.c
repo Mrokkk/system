@@ -59,6 +59,7 @@ void do_irq(uint32_t nr, struct pt_regs* regs)
 
 void irq_eoi(uint32_t irq)
 {
+    log_debug(DEBUG_IRQ, "%u", irq);
     used_chip->eoi(irq);
 }
 
@@ -88,6 +89,7 @@ int irq_disable(uint32_t irq)
 
 int irq_chip_disable(void)
 {
+    log_debug(DEBUG_IRQ, "");
     if (used_chip && used_chip->disable)
     {
         used_chip->disable();

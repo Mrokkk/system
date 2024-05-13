@@ -439,12 +439,15 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
 
 void pci_device_print(pci_device_t* device)
 {
-    char description[128];
+    // FIXME: this can still overflow, some bound checking
+    // is needed in below functions
+    char description[256] = {0, };
 
     log_notice("%X:%X.%X %s",
         device->bus, device->slot, device->func,
         pci_device_description(description, device));
 
+    description[0] = 0;
     log_notice("\tSubsystem: %s", pci_device_subsystem_description(description, device));
     log_notice("\tStatus: %04x", device->status);
     log_notice("\tCommand: %04x", device->command);

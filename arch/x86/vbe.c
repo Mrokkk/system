@@ -39,7 +39,6 @@ struct
 {
     uint16_t resx, resy, bits;
 } res_priorities[] = {
-    {1024, 768, 32},
     {1920, 1080, 32},
     {1600, 900, 32},
     {1400, 1050, 32},
@@ -212,7 +211,7 @@ int vbe_initialize(void)
     vbe_info_block_t* vbe = ptr(VBE_INFO_BLOCK_ADDR);
     vbe_mib_t* mode_info = ptr(VBE_MODE_INFO_BLOCK_ADDR);
 
-    // IBM ThinkPad T42: apparently, BIOS calls disables couple of IRQs in i8259,
+    // IBM ThinkPad T42: apparently, BIOS calls disable couple of IRQs in i8259,
     // (e.g. RTC and PIT) so it's better to disable it here and reenable before returning
     if (i8259_used)
     {

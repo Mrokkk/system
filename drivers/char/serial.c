@@ -54,6 +54,7 @@ static inline uint16_t minor_to_port(int minor)
     }
 }
 
+#if 0
 static inline int port_to_minor(uint16_t port)
 {
     switch (port)
@@ -65,6 +66,7 @@ static inline int port_to_minor(uint16_t port)
         default: return 0;
     }
 }
+#endif
 
 UNMAP_AFTER_INIT int serial_init()
 {

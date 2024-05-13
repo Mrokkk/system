@@ -20,7 +20,7 @@
 
 #define PANIC_LINE_LEN          256
 #define PRINTK_LINE_LEN         512
-#define EARLY_PRINTK_BUF_SIZE   (8 * KiB)
+#define EARLY_PRINTK_BUF_SIZE   (16 * KiB)
 #define BUFFER_FULL_MESSAGE     "\n"WARNING"<buffer full; dropping further messages>"RESET
 #define PRINTK_INITIALIZED      0xFEED
 #define PRINTK_EARLY_INITIALIZED 0xFEEE
