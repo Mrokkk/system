@@ -15,6 +15,7 @@ struct e820_data
 
 typedef struct e820_data e820_data_t;
 
+#define E820_PRINT          0
 #define E820_MAGIC          0x534d4150
 #define E820_USABLE         0x1
 #define E820_RESERVED       0x2
@@ -49,7 +50,7 @@ static void e820_entries_sort(int* sorted, e820_data_t* map, size_t count)
 int e820_entries_read(e820_data_t* map, int sorted[])
 {
     int count;
-    struct regs regs = {ebx: 0};
+    struct regs regs = {.ebx = 0};
     e820_data_t* data = map;
 
     for (count = 0; count < E820_ENTRIES_COUNT; ++data, ++count)
@@ -62,12 +63,13 @@ int e820_entries_read(e820_data_t* map, int sorted[])
         regs.di = addr(data);
         bios_call(BIOS_SYSTEM, &regs);
 
-#if 0
+#if E820_PRINT
         e820_data_t* e = map + count;
-        log_notice("[mem %08llx - %08llx] %s",
+        log_notice("[mem %08llx - %08llx] %s(%x)",
             e->base,
             e->base + e->len - 1,
-            e->type == E820_USABLE ? "usable" : "reserved");
+            e->type == E820_USABLE ? "usable" : "reserved",
+            e->type);
 #endif
 
         if (regs.eax != E820_MAGIC || !regs.ebx)
@@ -77,6 +79,16 @@ int e820_entries_read(e820_data_t* map, int sorted[])
     }
 
     return count + 1;
+}
+
+static int memory_mm_type(int type)
+{
+    switch (type)
+    {
+        case E820_USABLE: return MMAP_TYPE_AVL;
+        case E820_RESERVED: return MMAP_TYPE_RES;
+        default: return MMAP_TYPE_RES;
+    }
 }
 
 void memory_detect(void)
@@ -130,10 +142,12 @@ void memory_detect(void)
             }
         }
 
+        int mm_type = memory_mm_type(current->type);
+
         for (; i < count - 1; ++i)
         {
             next = map + sorted[i + 1];
-            if (next->type != current->type)
+            if (memory_mm_type(next->type) != mm_type)
             {
                 e820_data_t* temp = map + sorted[i];
                 next = temp != current ? temp : next;
@@ -141,17 +155,9 @@ void memory_detect(void)
             }
         }
 
-        if (next && current->type == next->type)
+        if (next && mm_type == memory_mm_type(next->type))
         {
             current_end = next->base + next->len;
-        }
-
-        int mm_type;
-        switch (current->type)
-        {
-            case E820_USABLE: mm_type = MMAP_TYPE_AVL; break;
-            case E820_RESERVED: mm_type = MMAP_TYPE_RES; break;
-            default: mm_type = MMAP_TYPE_RES;
         }
 
         if (current_start == 0 && mm_type == MMAP_TYPE_AVL)

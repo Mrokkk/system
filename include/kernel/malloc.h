@@ -5,7 +5,6 @@
 #define FAST_MALLOC_AREA        (4096 * 2)
 
 #include <stddef.h>
-#include <stdint.h>
 
 #include <kernel/list.h>
 #include <kernel/macro.h>

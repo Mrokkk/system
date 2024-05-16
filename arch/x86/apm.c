@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "apm: " fmt
 #include <arch/apm.h>
+#include <arch/dmi.h>
 #include <arch/bios.h>
 #include <arch/reboot.h>
 #include <arch/segment.h>
@@ -164,13 +165,13 @@ static int apm_32bit_configure(regs_t* regs)
 {
     uint32_t code_start, code_16, data_start;
 
-    log_continue("; entry: %04x:%04x", regs->ax, regs->ebx);
-
-    if (regs->ebx & 0x3)
+    if (dmi.version && !strcmp("ThinkPad T42", dmi.version))
     {
-        log_warning("broken APM entry");
+        log_warning("disabling 32bit interface");
         return -1;
     }
+
+    log_continue("; entry: %04x:%04x", regs->ax, regs->ebx);
 
     code_start = regs->ax * 16;
     data_start = regs->dx * 16;

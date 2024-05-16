@@ -36,7 +36,7 @@ function copy()
 {
     local src=${1}
     local dest=${2}/$(basename ${src})
-    if [[ ${src} -nt ${dest} ]]
+    if ! cmp -s "${src}" "${dest}"
     then
         execute_cmd "copying ${src} to ${dest}... " rsync ${src} ${dest}
     else
@@ -89,7 +89,7 @@ fi
 
 [[ -z "${dev}" ]] && die "failed"
 
-echo "done; dev = ${dev}"
+echo "loopback device: ${dev}"
 
 partition_number="p1"
 

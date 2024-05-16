@@ -294,16 +294,17 @@ static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
     return 0;
 }
 
-static inline int process_wait_locked(wait_queue_head_t* wq, wait_queue_t* q, flags_t flags)
+static inline int process_wait_locked(wait_queue_head_t* wq, wait_queue_t* q, flags_t* flags)
 {
     wait_queue_push(q, wq);
     list_del(&process_current->running);
     process_current->stat = PROCESS_WAITING;
 
-    irq_restore(flags);
+    irq_restore(*flags);
 
     scheduler();
 
+    irq_save(*flags);
     log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
     wait_queue_remove(q, wq);
 

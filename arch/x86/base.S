@@ -56,6 +56,7 @@ ENTRY(timer_handler)
     call SYMBOL_NAME(timestamp_update)
     push $0
     call SYMBOL_NAME(irq_eoi)
+    sti
     call SYMBOL_NAME(scheduler)
     add $4, %esp
 ENDPROC(timer_handler)
@@ -67,9 +68,11 @@ ENTRY(exit_kernel)
     test %edx, %edx
     jne 1f
     RESTORE_ALL
+    sti
     iret
 1:
     movl $0, (%eax)
+    sti
     call SYMBOL_NAME(scheduler)
     RESTORE_ALL
     iret

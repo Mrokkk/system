@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <kernel/compiler.h>
 
 #define MBR_SECTOR_SIZE         512

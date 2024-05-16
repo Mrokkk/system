@@ -14,7 +14,7 @@ set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_DEBUG "-ggdb3")
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    set(C_FLAGS_ADDITIONAL "-Wno-error -Wno-unused-command-line-argument -Wno-c2x-extensions -Wno-strict-prototypes")
+    set(C_FLAGS_ADDITIONAL "-Wno-error -Wno-unused-command-line-argument -Wno-c2x-extensions -Wno-strict-prototypes -Wno-address-of-packed-member")
 endif()
 
 if(FRAME_POINTER)
@@ -24,7 +24,8 @@ else()
 endif()
 
 set(CMAKE_C_FLAGS
-    "${C_FLAGS_STANDARD} \
+    "-pipe \
+    ${C_FLAGS_STANDARD} \
     ${C_FLAGS_FREESTANDING} \
     ${C_FLAGS_OPTIMIZATION} \
     ${C_FLAGS_WARNINGS} \
@@ -89,7 +90,16 @@ add_custom_target(
     runqemu
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh runqemu
     COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh debugcon
+    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/rungdb.py rungdb
     COMMAND ./runqemu -k
     DEPENDS iso
     COMMENT "Running qemu"
+)
+
+add_custom_target(
+    runbochs
+    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runbochs.sh runbochs
+    COMMAND ./runbochs
+    DEPENDS iso
+    COMMENT "Running bochs"
 )

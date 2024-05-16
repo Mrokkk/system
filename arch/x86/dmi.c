@@ -42,9 +42,10 @@ static smbios_entry_t* smbios_entry_find(void)
 {
     int length, i;
     uint8_t checksum;
+
     for (uint8_t* mem = ptr(0xf0000); addr(mem) < 0x100000; mem += 16)
     {
-        if (mem[0] == '_' && mem[1] == 'S' && mem[2] == 'M' && mem[3] == '_')
+        if (!strncmp((char*)mem, "_SM_", 4))
         {
             length = mem[5];
             checksum = 0;
@@ -169,13 +170,13 @@ void smbios_entry_handle(smbios_header_t* header)
             dmi_string(header, 0x04),
             dmi_string(header, 0x05));
 
-        log_continue("; start: %x, ROM size: %u KB",
+        log_continue("; start: %x; ROM size: %u KB",
             (0x10000 - dmi_word(header, 0x06)) * 16,
             64 * (dmi_byte(header, 0x09) + 1));
 
         if (!dmi_bit(c, 3))
         {
-            log_continue(" ISA: %B EISA: %B PCI: %B APM: %B PnP: %B",
+            log_continue("; ISA: %B; EISA: %B; PCI: %B; APM: %B; PnP: %B",
                 c,
                 dmi_bit(c, 4),
                 dmi_bit(c, 6),
@@ -186,13 +187,18 @@ void smbios_entry_handle(smbios_header_t* header)
     }
     else if (header->type == 1)
     {
-        log_info("System Info: manufacturer: %.64s product: %.64s",
-            dmi_string(header, 0x04),
-            dmi_string(header, 0x05));
+        dmi.manufacturer = dmi_string(header, 0x04);
+        dmi.product = dmi_string(header, 0x05);
+        dmi.version = dmi_string(header, 0x06);
+
+        log_info("System Info: manufacturer: %.64s; product: %.64s; version: %.64s",
+            dmi.manufacturer,
+            dmi.product,
+            dmi.version);
     }
     else if (header->type == 4)
     {
-        log_info("Processor: manufacturer: %.64s product: %.64s max: %u MHz current %u MHz external: %u MHz",
+        log_info("Processor: manufacturer: %.64s; product: %.64s; max: %u MHz; current %u MHz; external: %u MHz",
             dmi_string(header, 0x07),
             dmi_string(header, 0x10),
             dmi_word(header, 0x14),
@@ -203,7 +209,7 @@ void smbios_entry_handle(smbios_header_t* header)
     {
         uint8_t form_factor = dmi_byte(header, 0x0e);
         uint8_t type = dmi_byte(header, 0x12);
-        log_info("Memory Device: %s %s %.64s size: %u MiB speed: %u MT/s",
+        log_info("Memory Device: %s %s %.64s; size: %u MiB; speed: %u MT/s",
             memory_type(type),
             memory_form_factor(form_factor),
             dmi_string(header, 0x11),

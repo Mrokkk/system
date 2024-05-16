@@ -22,7 +22,7 @@ typedef struct fifo fifo_t;
 
 #define BUFFER_DECLARE(name, size) \
     BUFFER_MEMBER_DECLARE(name, size) = { \
-        {0, 0, size, }, \
+        {0, 0, size, {}}, \
     }
 
 void __fifo_put(fifo_t* fifo, char c);

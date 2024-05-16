@@ -19,7 +19,6 @@
 #include <arch/earlycon.h>
 #include <arch/multiboot.h>
 
-void ide_dma(void);
 static int init(const char* cmdline);
 
 unsigned init_in_progress = INIT_IN_PROGRESS;
@@ -120,7 +119,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 static inline void rootfs_prepare()
 {
     int errno;
-    char* sources[] = {"/dev/hda0", "/dev/img0"};
+    char* sources[] = {"/dev/sda0", "/dev/hda0", "/dev/img0"};
 
     for (size_t i = 0; i < array_size(sources); ++i)
     {
@@ -253,17 +252,23 @@ static int NORETURN(init(const char* cmdline))
         int errno;
         scoped_file_t* file = NULL;
         char* buf = single_page();
+        const char* dev = "/dev/sda";
 
         memset(buf, 0, PAGE_SIZE);
 
-        if ((errno = do_open(&file, "/dev/hda", O_RDONLY, 0)))
+        if ((errno = do_open(&file, dev, O_RDONLY, 0)))
         {
-            log_info("cannot open /dev/hda");
+            if ((errno = do_open(&file, dev = "/dev/hda", O_RDONLY, 0)))
+            {
+                log_warning("cannot open any disk");
+            }
         }
-        else
+
+        if (!errno)
         {
-            log_info("reading data");
+            log_info("reading data from %s", dev);
             do_read(file, 0, buf, PAGE_SIZE);
+            memory_dump(log_info, buf, 5);
             memory_dump(log_info, buf + 508, 1);
         }
 
@@ -279,7 +284,8 @@ static int NORETURN(init(const char* cmdline))
 #if 0
     video_modes_print();
 #endif
-#if 1
+
+#if 0
     extern int debug_monitor();
     kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
 #endif

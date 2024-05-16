@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 
+use_ide=
 use_kvm=
 use_nographic=
-args=""
+args="\
+-boot once=d \
+-no-reboot \
+-rtc base=localtime,clock=host \
+-device isa-debugcon,chardev=char0 \
+-chardev stdio,id=char0,mux=on,signal=off \
+-chardev pipe,id=char1,path=ttyS0 \
+-mon chardev=char0 \
+-serial chardev:char1 \
+-usb"
 
 while [[ $# -gt 0 ]]; do
     case "${1}" in
@@ -15,6 +25,13 @@ while [[ $# -gt 0 ]]; do
         -k|--kvm)
             use_kvm=1
             ;;
+        -p|--qemu-path)
+            qemu_path="${2}"
+            shift
+            ;;
+        --ide)
+            use_ide=1
+            ;;
         *)
             args="${args} ${1}"
             ;;
@@ -22,8 +39,25 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-[[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,id=disk0,media=disk -device ich9-ahci"
-#[[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,id=disk0,media=disk,if=none -device ahci,id=ahci -device ide-hd,drive=disk0,bus=ahci.0"
+if [[ -z "${qemu_path}" ]]
+then
+    if [[ -f "qemu/qemu-system-i386" ]]
+    then
+        qemu_path="$(readlink -f "qemu/qemu-system-i386")"
+    else
+        qemu_path="$(which qemu-system-i386 || which qemu-system-x86_64)"
+    fi
+fi
+
+if [[ -z "${use_ide}" ]]
+then
+    args="${args} -device ahci,id=ahci"
+    [[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,id=disk0,media=disk,if=none -device ide-hd,drive=disk0,bus=ahci.0"
+    args="${args} -drive file=system.iso,format=raw,id=cdrom0,media=cdrom,if=none -device ide-cd,drive=cdrom0,bus=ahci.1"
+else
+    [[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,id=disk0,media=disk"
+    args="${args} -cdrom system.iso"
+fi
 
 if [[ -z ${use_nographic} ]]
 then
@@ -34,9 +68,9 @@ fi
 
 if [[ -z ${use_kvm} ]]
 then
-    args="${args} -cpu qemu64"
+    args="-cpu qemu64 ${args}"
 else
-    args="${args} -enable-kvm -cpu host"
+    args="-enable-kvm -cpu host ${args}"
     if [[ -z ${use_nographic} ]]
     then
         args="${args} -device virtio-gpu,edid=on,xres=1600,yres=900"
@@ -55,17 +89,6 @@ then
     mkfifo ttyS0.out
 fi
 
-echo "Args: ${args}"
+echo "Command: ${qemu_path} ${args}"
 
-exec $(which qemu-system-i386 || which qemu-system-x86_64) \
-    ${args} \
-    -cdrom system.iso \
-    -boot once=d \
-    -no-reboot \
-    -rtc base=localtime,clock=host \
-    -device isa-debugcon,chardev=char0 \
-    -chardev stdio,id=char0,mux=on,signal=off \
-    -chardev pipe,id=char1,path=ttyS0 \
-    -mon chardev=char0 \
-    -serial chardev:char1 \
-    -usb
+exec "${qemu_path}" ${args}

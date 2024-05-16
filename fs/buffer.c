@@ -8,7 +8,7 @@ static LIST_DECLARE(buffers);
 
 buffer_t* block_read(dev_t dev, file_t* file, uint32_t block)
 {
-    int res;
+    int res, errno;
     page_t* page;
     buffer_t* t;
     buffer_t* b[PAGE_SIZE / BLOCK_SIZE];
@@ -29,13 +29,14 @@ buffer_t* block_read(dev_t dev, file_t* file, uint32_t block)
     log_debug(DEBUG_BUFFER, "reading buffer");
 
     page = page_alloc1();
-    memset(page_virt_ptr(page), 0, PAGE_SIZE);
 
     if (unlikely(!page))
     {
-        log_warning("no pages!");
-        return NULL;
+        log_warning("cannot allocate page for buffer");
+        return ptr(-ENOMEM);
     }
+
+    memset(page_virt_ptr(page), 0, PAGE_SIZE);
 
     for (int i = 0; i < PAGE_SIZE / BLOCK_SIZE; ++i)
     {
@@ -44,7 +45,7 @@ buffer_t* block_read(dev_t dev, file_t* file, uint32_t block)
         if (unlikely(!b[i]))
         {
             log_warning("no mem for buf %u", i);
-            return NULL;
+            return ptr(-ENOMEM);
         }
 
         list_init(&b[i]->entry);
@@ -61,10 +62,10 @@ buffer_t* block_read(dev_t dev, file_t* file, uint32_t block)
     file->offset = pages * PAGE_SIZE;
     res = file->ops->read(file, page_virt_ptr(page), PAGE_SIZE);
 
-    if (errno_get(res))
+    if ((errno = errno_get(res)))
     {
         log_warning("read failed with %d", res);
-        return NULL;
+        return ptr(errno);
     }
 
     ASSERT(offset < 4);

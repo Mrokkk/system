@@ -1,5 +1,7 @@
 #pragma once
 
+#include <kernel/page.h>
+
 struct pages;
 struct vm_area;
 typedef struct pages pages_t;

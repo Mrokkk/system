@@ -7,6 +7,9 @@ typedef struct dmi dmi_t;
 
 struct dmi
 {
+    const char* manufacturer;
+    const char* product;
+    const char* version;
     struct
     {
         uint32_t isa:1;

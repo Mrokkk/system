@@ -1,0 +1,44 @@
+diff --git a/hw/pci/pci.c b/hw/pci/pci.c
+index 324c130..34e62d1 100644
+--- a/hw/pci/pci.c
++++ b/hw/pci/pci.c
+@@ -1200,10 +1200,35 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev,
+     pci_dev->requester_id_cache = pci_req_id_cache_get(pci_dev);
+     pstrcpy(pci_dev->name, sizeof(pci_dev->name), name);
+
+-    memory_region_init(&pci_dev->bus_master_container_region, OBJECT(pci_dev),
+-                       "bus master container", UINT64_MAX);
+-    address_space_init(&pci_dev->bus_master_as,
+-                       &pci_dev->bus_master_container_region, pci_dev->name);
++    if (!strcmp(pci_dev->name, "piix3-ide"))
++    {
++        MachineState* m = MACHINE(qdev_get_machine());
++        memory_region_init_alias(
++            &pci_dev->bus_master_container_region,
++            OBJECT(pci_dev),
++            "bm memory",
++            m->ram,
++            0,
++            0x10000);
++
++        address_space_init(
++            &pci_dev->bus_master_as,
++            &pci_dev->bus_master_container_region,
++            pci_dev->name);
++    }
++    else
++    {
++        memory_region_init(
++            &pci_dev->bus_master_container_region,
++            OBJECT(pci_dev),
++            "bus master container",
++            UINT64_MAX);
++
++        address_space_init(
++            &pci_dev->bus_master_as,
++            &pci_dev->bus_master_container_region,
++            pci_dev->name);
++    }
+
+     if (phase_check(PHASE_MACHINE_READY)) {
+         pci_init_bus_master(pci_dev);

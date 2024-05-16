@@ -33,6 +33,7 @@
 #define DEBUG_RAMFS         0
 #define DEBUG_EXT2FS        0
 
+#define DEBUG_IDE           0
 #define DEBUG_SERIAL        0
 #define DEBUG_CONSOLE       0
 #define DEBUG_CON_SCROLL    0

@@ -378,7 +378,7 @@ static inline void* page_map_region(uint32_t paddr_start, uint32_t vaddr_start, 
                 return 0;
             }
 
-            pde_set(pde_index, phys_addr(pgt) | PAGE_KERNEL_FLAGS);
+            pde_set(pde_index, phys_addr(pgt) | PAGE_KERNEL_FLAGS | PDE_CACHEDIS);
         }
         else
         {

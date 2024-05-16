@@ -4,8 +4,9 @@
 #include <kernel/compiler.h>
 
 typedef volatile uint8_t io8;
-typedef volatile uint8_t io16;
+typedef volatile uint16_t io16;
 typedef volatile uint32_t io32;
+typedef volatile uint64_t io64;
 
 #define readb(address) (*(io8*)(address))
 #define readw(address) (*(io16*)(address))

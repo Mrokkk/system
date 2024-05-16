@@ -43,17 +43,29 @@ static inode_operations_t ext2_inode_ops = {
 
 static inline void* block(ext2_data_t* data, size_t block)
 {
+    int errno;
     buffer_t* b = block_read(data->dev, data->file, block);
+    if ((errno = errno_get(b)))
+    {
+        return ptr(errno);
+    }
     return b->data;
 }
 
 static ext2_inode_t* ext2_inode_get(ext2_data_t* data, uint32_t ino)
 {
+    int errno;
     uint32_t index = (ino - 1) % data->inodes_per_group;
     uint32_t block_nr = (index * sizeof(ext2_inode_t)) / data->block_size;
     uint32_t off = index % data->inodes_per_block;
     ext2_bgd_t* bgd = ptr(addr(data->sb) + sizeof(ext2_sb_t));
     ext2_inode_t* inode = block(data, bgd->inode_table + block_nr);
+
+    if ((errno = errno_get(inode)))
+    {
+        return NULL;
+    }
+
     return inode + off;
 }
 
@@ -135,6 +147,7 @@ int ext2_open(file_t*)
 
 int ext2_read(file_t* file, char* buffer, size_t count)
 {
+    int errno;
     char* block_data;
     size_t to_copy, left;
     uint32_t* ind_block_nr = NULL;
@@ -177,6 +190,11 @@ int ext2_read(file_t* file, char* buffer, size_t count)
             break;
         }
 
+        if ((errno = errno_get(block_data)))
+        {
+            return errno;
+        }
+
         block_data += block_offset;
         log_debug(DEBUG_EXT2FS, "copying %u B from block %u at %x to %x", to_copy, block_nr, block_data, buffer);
         memcpy(buffer, block_data, to_copy);
@@ -193,6 +211,7 @@ int ext2_read(file_t* file, char* buffer, size_t count)
 
 int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
 {
+    int errno;
     ext2_inode_t* raw_inode = file->inode->fs_data;
     ext2_data_t* data = file->inode->sb->fs_data;
     uint32_t cur = offset, pos = offset, data_size;
@@ -220,6 +239,11 @@ int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
         void* data_ptr = off(page_virt_ptr(current_page), pos % PAGE_SIZE);
         data_size = min(block_size, raw_inode->size - pos);
 
+        if ((errno = errno_get(block_ptr)))
+        {
+            return errno;
+        }
+
         log_debug(DEBUG_EXT2FS, "copying %u B from %x to %x", data_size, block_ptr, data_ptr);
 
         memcpy(data_ptr, block_ptr, data_size);
@@ -237,14 +261,25 @@ int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
     block_nr = cur / block_size - EXT2_NDIR_BLOCKS;
     log_debug(DEBUG_EXT2FS, "block_nr = %u", block_nr);
     uint32_t* ind_block = block(data, raw_inode->block[EXT2_IND_BLOCK]);
+
+    if ((errno = errno_get(ind_block)))
+    {
+        return errno;
+    }
+
     ind_block += block_nr;
-    uint32_t* ind_block_end = off(block(data, raw_inode->block[EXT2_IND_BLOCK]), block_size);
+    uint32_t* ind_block_end = off(ind_block, block_size);
 
     for (; ind_block < ind_block_end && pos < raw_inode->size && pos < size + offset; )
     {
         void* block_ptr = block(data, *ind_block);
         void* data_ptr = off(page_virt_ptr(current_page), pos % PAGE_SIZE);
         data_size = min(block_size, raw_inode->size - pos);
+
+        if ((errno = errno_get(block_ptr)))
+        {
+            return errno;
+        }
 
         log_debug(DEBUG_EXT2FS, "copying %u B from indirect block %u:%x to %x",
             data_size,
@@ -329,6 +364,7 @@ int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 
 int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
 {
+    int errno;
     buffer_t* b;
     ext2_sb_t* raw_sb;
     ext2_inode_t* root;
@@ -341,15 +377,17 @@ int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
 
     b = block_read(sb->dev, sb->device_file, 1);
 
-    if (!b)
+    if ((errno = errno_get(b)))
     {
-        return -EIO;
+        log_warning("cannot read block!");
+        return errno;
     }
 
     raw_sb = ptr(b->data);
 
     if (raw_sb->magic != EXT2_SIGNATURE)
     {
+        log_warning("invalid signature!");
         return -ENODEV;
     }
 

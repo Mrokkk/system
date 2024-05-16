@@ -16,28 +16,29 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 
+#include "ata.h"
+
+// http://ftp.parisc-linux.org/docs/chips/PC87415.pdf
 // https://pdos.csail.mit.edu/6.828/2018/readings/hardware/IDE-BusMaster.pdf
 // https://wiki.osdev.org/PCI_IDE_Controller
+// http://bos.asmhackers.net/docs/ata/docs/29860001.pdf
 
-#define CH(x)           (channels[x])
-#define ERROR_REG(c)    CH(c).error_reg
-#define NSECTOR_REG(c)  CH(c).nsector_reg
-#define LBA0_REG(c)     CH(c).sector_reg
-#define LBA1_REG(c)     CH(c).lcyl_reg
-#define LBA2_REG(c)     CH(c).hcyl_reg
-#define SELECT_REG(c)   CH(c).select_reg
-#define CMD_REG(c)      CH(c).status_reg
+#define FORCE_PIO                   0
+#define DISABLE_DMA_AFTER_FAILURE   1
 
 static int ide_fs_open(file_t* file);
 static int ide_fs_read(file_t* file, char* buf, size_t count);
 static void ide_irq();
 static void ide_write(uint8_t channel, uint8_t reg, uint8_t data);
-static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, uint8_t numsects, void* buf, int dma);
+static int ide_pio_request(request_t* req);
+static int ide_dma_request(request_t* req);
 
+static pci_device_t* ide_pci;
 static ide_channel_t channels[2];
-static ide_device_t ide_devices[4];
-static uint8_t ide_buf[ATA_SECTOR_SIZE];
+static ata_device_t* ide_devices;
+static uint8_t* ide_buf;
 static dma_t* dma_region;
+static request_t* current_request;
 
 module_init(ide_initialize);
 module_exit(ide_deinit);
@@ -57,6 +58,7 @@ static uint8_t ide_read(uint8_t channel, uint8_t reg)
 
 static void ide_write(uint8_t channel, uint8_t reg, uint8_t data)
 {
+    log_debug(DEBUG_IDE, "outb(data=%x, port=%x)", data, channels[channel].base + reg);
     outb(data, channels[channel].base + reg);
 }
 
@@ -68,13 +70,28 @@ static void ide_read_buffer(uint8_t channel, uint8_t reg, void* buffer, uint32_t
 static void ide_enable_irq(uint8_t channel)
 {
     outb(0x00, channels[channel].ctrl + ATA_REG_CONTROL);
-    io_delay(10);
 }
 
 static void ide_disable_irq(uint8_t channel)
 {
     outb(0x02, channels[channel].ctrl + ATA_REG_CONTROL);
-    io_delay(10);
+}
+
+static uint8_t bm_readb(uint8_t channel, uint8_t reg)
+{
+    return inb(channels[channel].bmide + reg);
+}
+
+static void bm_writeb(uint8_t channel, uint8_t reg, uint8_t data)
+{
+    log_debug(DEBUG_IDE, "outb(data=%x, port=%x)", data, channels[channel].bmide + reg);
+    outb(data, channels[channel].bmide + reg);
+}
+
+static void bm_writel(uint8_t channel, uint8_t reg, uint32_t data)
+{
+    log_debug(DEBUG_IDE, "outl(data=%x, reg=%x)", data, channels[channel].bmide + reg);
+    outl(data, channels[channel].bmide + reg);
 }
 
 static inline void ide_channel_fill(int channel, pci_device_t* ide_pci)
@@ -91,7 +108,7 @@ static inline void ide_channel_fill(int channel, pci_device_t* ide_pci)
     channels[channel].select_reg = port++;
     channels[channel].status_reg = port++;
     channels[channel].ctrl = base + 0x206;
-    channels[channel].bmide = ide_pci->bar[4].addr & 0xfffffffc;
+    channels[channel].bmide = ide_pci->bar[4].addr & ~1;
 }
 
 static inline const char* ide_error_string(int e)
@@ -111,52 +128,33 @@ static inline const char* ide_error_string(int e)
     }
 }
 
-void ide_device_print(ide_device_t* device)
-{
-    const char* unit;
-    uint64_t size = (uint64_t)device->size * ATA_SECTOR_SIZE;
-
-    human_size(size, unit);
-
-    log_info("%u: %s drive %u %s: %s; signature: %x",
-        device->channel | device->drive << 1,
-        device->type ? "ATAPI" : "ATA",
-        (uint32_t)size,
-        unit,
-        device->model,
-        device->signature);
-
-    log_continue("; cap: %x", device->capabilities);
-    if (device->dma)
-    {
-        log_continue("; DMA");
-    }
-    if (device->capabilities & 0x200)
-    {
-        log_continue("; LBA");
-    }
-    else
-    {
-        log_continue("; CHS");
-    }
-}
-
 static void ide_device_register(int i)
 {
     char buf[12];
     partition_t* p;
     mbr_t* mbr = ptr(ide_buf);
 
-    ide_device_print(&ide_devices[i]);
+    ata_device_print(&ide_devices[i]);
 
     devfs_blk_register(fmtstr(buf, "hd%c", i + 'a'), MAJOR_BLK_IDE, BLK_MINOR_DRIVE(i), &ops);
 
-    if (ide_devices[i].type == 1)
+    // TODO: handle CD
+    if (ide_devices[i].type == ATA_TYPE_ATAPI)
     {
         return;
     }
 
-    if (ide_ata_access(ATA_READ, 0, 0, 1, ide_buf, 0))
+    request_t req = {
+        .drive = i,
+        .direction = ATA_READ,
+        .offset = 0,
+        .sectors = 1,
+        .count = ATA_SECTOR_SIZE,
+        .buffer = (char*)ide_buf,
+        .dma = false
+    };
+
+    if (ide_pio_request(&req))
     {
         log_warning("error reading MBR");
         return;
@@ -169,7 +167,7 @@ static void ide_device_register(int i)
         return;
     }
 
-    ide_devices[i].mbr = mbr; // FIXME: allocate a new buffer for each possible drive
+    memcpy(&ide_devices[i].mbr, mbr, ATA_SECTOR_SIZE);
 
     for (int j = 0; j < 4; ++j)
     {
@@ -191,17 +189,90 @@ static void ide_device_register(int i)
     }
 }
 
+static void ide_device_detect(int drive, bool use_dma)
+{
+    uint8_t err = 0, status;
+    uint8_t channel = drive / 2;
+    uint8_t role = drive % 2;
+
+    // (I) Select Drive:
+    ide_write(channel, ATA_REG_HDDEVSEL, 0xa0 | (role << 4)); // Select Drive.
+    io_delay(100);
+
+    // (II) Send ATA Identify Command:
+    ide_write(channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
+    io_delay(100);
+
+    // (III) Polling:
+    if (ide_read(channel, ATA_REG_STATUS) == 0)
+    {
+        return;
+    }
+
+    while (1)
+    {
+        status = ide_read(channel, ATA_REG_STATUS);
+        if ((status & ATA_SR_ERR))
+        {
+            err = 1;
+            break;
+        }
+        if (!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ))
+        {
+            break;
+        }
+    }
+
+    if (err)
+    {
+        uint8_t cl = ide_read(channel, ATA_REG_LBA1);
+        uint8_t ch = ide_read(channel, ATA_REG_LBA2);
+
+        if ((cl == 0x14 && ch == 0xeb) || (cl == 0x69 && ch == 0x96))
+        {
+            ide_write(channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
+            io_delay(100);
+        }
+
+        return;
+    }
+
+    // (V) Read Identification Space of the Device:
+    ide_read_buffer(channel, ATA_REG_DATA, ide_buf, 128);
+
+    uint8_t bm_status = bm_readb(channel, BM_REG_STATUS);
+
+    ata_device_initialize(&ide_devices[drive], ide_buf, drive, NULL);
+    // (VI) Read Device Parameters:
+
+    if ((ide_devices[drive].dma = use_dma))
+    {
+        bm_writeb(channel, BM_REG_STATUS, bm_status | BM_STATUS_INTERRUPT | BM_STATUS_DRV0_DMA | BM_STATUS_DRV1_DMA);
+        ide_enable_irq(channel);
+    }
+}
+
 int ide_initialize(void)
 {
-    int i, j, k, count = 0;
     bool use_dma = true;
-    pci_device_t* ide_pci = pci_device_get(0x01, 0x01);
+
+    ide_pci = pci_device_get(0x01, 0x01);
 
     if (!ide_pci)
     {
         log_notice("no IDE controller");
-        return -ENODEV;
+        return 0;
     }
+
+    ide_devices = single_page();
+
+    if (unlikely(!ide_devices))
+    {
+        return -ENOMEM;
+    }
+
+    ide_buf = ptr(addr(ide_devices) + PAGE_SIZE - ATA_SECTOR_SIZE);
+    memset(ide_devices, 0, PAGE_SIZE);
 
     pci_device_print(ide_pci);
 
@@ -211,13 +282,25 @@ int ide_initialize(void)
         return -ENODEV;
     }
 
+#if FORCE_PIO
+    use_dma = false;
+#else
     if (!(ide_pci->prog_if & 0x80))
     {
         log_warning("bus mastering is not supported!");
         use_dma = false;
     }
+    else
+    {
+        ide_pci->command |= (1 << 2) | (1 << 1) | 1;
+        ASSERT(ide_pci->command & (1 << 2));
+        ASSERT(ide_pci->command & (1 << 1));
+        ASSERT(ide_pci->command & 1);
+    }
 
-    dma_region = region_map(DMA_PRD, 5 * PAGE_SIZE, "dma");
+    dma_region = region_map(DMA_PRD, DMA_SIZE, "dma");
+
+    log_info("command: %x", ide_pci->command);
 
     if (unlikely(!dma_region))
     {
@@ -226,8 +309,9 @@ int ide_initialize(void)
     }
     else
     {
-        memset(dma_region, 0, 5 * PAGE_SIZE);
+        memset(dma_region, 0, DMA_SIZE);
     }
+#endif
 
     ide_channel_fill(ATA_PRIMARY, ide_pci);
     ide_channel_fill(ATA_SECONDARY, ide_pci);
@@ -235,126 +319,10 @@ int ide_initialize(void)
     ide_disable_irq(ATA_PRIMARY);
     ide_disable_irq(ATA_SECONDARY);
 
-    // 3- Detect ATA-ATAPI Devices:
-    for (i = 0; i < 2; i++)
+    for (int i = 0; i < 4; i++)
     {
-        for (j = 0; j < 2; j++)
-        {
-            uint8_t err = 0, type = IDE_ATA, status;
+        ide_device_detect(i, use_dma);
 
-            // (I) Select Drive:
-            ide_write(i, ATA_REG_HDDEVSEL, 0xa0 | (j << 4)); // Select Drive.
-            io_delay(100);
-
-            // (II) Send ATA Identify Command:
-            ide_write(i, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
-            io_delay(100);
-
-            // (III) Polling:
-            if (ide_read(i, ATA_REG_STATUS) == 0)
-            {
-                continue; // If Status = 0, No Device.
-            }
-
-            while (1)
-            {
-                status = ide_read(i, ATA_REG_STATUS);
-                if ((status & ATA_SR_ERR))
-                {
-                    err = 1;
-                    break;
-                }
-                if (!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ))
-                {
-                    break;
-                }
-            }
-
-            if (err)
-            {
-                uint8_t cl = ide_read(i, ATA_REG_LBA1);
-                uint8_t ch = ide_read(i, ATA_REG_LBA2);
-
-                if ((cl == 0x14 && ch == 0xeb) || (cl == 0x69 && ch == 0x96))
-                {
-                    type = IDE_ATAPI;
-                }
-                else
-                {
-                    continue;
-                }
-
-                ide_write(i, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
-                io_delay(100);
-            }
-
-            // (V) Read Identification Space of the Device:
-            ide_read_buffer(i, ATA_REG_DATA, ide_buf, 128);
-
-            uint8_t bm_status = inb(channels[i].bmide + 2);
-
-            // FIXME: this is a hack for QEMU, as apparently QEMU does not report this bit.
-            // DMA is working fine on real HW (IBM ThinkPad T42), however on QEMU IRQ is fired
-            // when transfer is still in progress (no data copied) and no further IRQ is received
-            if (!(bm_status & BM_STATUS_DRV0_DMA))
-            {
-                ide_devices[count].dma = false;
-            }
-            else
-            {
-                ide_devices[count].dma = use_dma;
-                outb(bm_status | BM_STATUS_INTERRUPT, channels[i].bmide);
-                ide_enable_irq(i);
-            }
-
-            // (VI) Read Device Parameters:
-            ide_devices[count].type         = type;
-            ide_devices[count].channel      = i;
-            ide_devices[count].drive        = j;
-            ide_devices[count].signature    = *((uint16_t*)(ide_buf + ATA_IDENT_DEVICETYPE));
-            ide_devices[count].capabilities = *((uint16_t*)(ide_buf + ATA_IDENT_CAPABILITIES));
-            ide_devices[count].command_sets = *((uint32_t*)(ide_buf + ATA_IDENT_COMMANDSETS));
-
-            // (VII) Get Size:
-            if (ide_devices[count].command_sets & (1 << 26))
-            {
-                // Device uses 48-Bit Addressing:
-                ide_devices[count].size   = *((uint32_t*)(ide_buf + ATA_IDENT_MAX_LBA_EXT));
-            }
-            else
-            {
-                // Device uses CHS or 28-bit Addressing:
-                ide_devices[count].size   = *((uint32_t*)(ide_buf + ATA_IDENT_MAX_LBA));
-            }
-
-            // (VIII) String indicates model of device (like Western Digital HDD and SONY DVD-RW...):
-            for (k = 0; k < 40; k += 2)
-            {
-                if (ide_buf[ATA_IDENT_MODEL + k + 1] < 0x20 || ide_buf[ATA_IDENT_MODEL + k + 1] > 0x7e)
-                {
-                    strcpy((char*)ide_devices[count].model, "<garbage>");
-                    goto next;
-                }
-                ide_devices[count].model[k] = ide_buf[ATA_IDENT_MODEL + k + 1];
-                ide_devices[count].model[k + 1] = ide_buf[ATA_IDENT_MODEL + k];
-            }
-
-            for (; k; --k)
-            {
-                if (ide_devices[count].model[k] != ' ' && ide_devices[count].model[k] != 0)
-                {
-                    break;
-                }
-            }
-            ide_devices[count].model[k + 1] = 0;
-
-next:
-            count++;
-        }
-    }
-
-    for (i = 0; i < 4; i++)
-    {
         if (!ide_devices[i].signature)
         {
             continue;
@@ -386,7 +354,7 @@ static uint8_t ide_polling(uint8_t channel, uint32_t advanced_check)
     while (1)
     {
         status = ide_read(channel, ATA_REG_STATUS);
-        if (!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ))
+        if ((status & (ATA_SR_DRQ | ATA_SR_BSY)) == ATA_SR_DRQ)
         {
             break;
         }
@@ -428,15 +396,16 @@ enum mode
     IDE_LBA48 = 2,
 };
 
-static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t lba, uint8_t numsects, int dma)
+static int ide_ata_prepare_transfer(request_t* req)
 {
     int lba_mode;
-    uint8_t cmd;
-    uint8_t lba_io[6];
-    uint32_t channel = ide_devices[drive].channel;
-    uint32_t slavebit = ide_devices[drive].drive;
+    uint8_t cmd, head, sect, lba_io[6];
     uint16_t cyl;
-    uint8_t head, sect;
+    uint32_t lba = req->offset;
+    uint8_t channel = ide_devices[req->drive].id / 2;
+    uint8_t slavebit = ide_devices[req->drive].id % 2;
+    int direction = req->direction;
+    bool dma = req->dma;
 
     // (I) Select one from LBA28, LBA48 or CHS;
     if (lba >= 0x10000000) // LBA48
@@ -450,7 +419,7 @@ static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t l
         lba_io[5] = 0; // LBA28 is integer, so 32-bits are enough to access 2TB.
         head      = 0; // Lower 4-bits of HDDEVSEL are not used here.
     }
-    else if (ide_devices[drive].capabilities & 0x200) // LBA28
+    else if (ide_devices[req->drive].capabilities & 0x200) // LBA28
     {
         lba_mode  = IDE_LBA28;
         lba_io[0] = (lba & 0x00000ff) >> 0;
@@ -473,7 +442,7 @@ static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t l
         lba_io[3] = 0;
         lba_io[4] = 0;
         lba_io[5] = 0;
-        head      = (lba + 1  - sect) % (16 * 63) / (63); // Head number is written to HDDEVSEL lower 4-bits.
+        head      = (lba + 1 - sect) % (16 * 63) / (63); // Head number is written to HDDEVSEL lower 4-bits.
     }
 
     // (III) Wait if the drive is busy;
@@ -482,11 +451,11 @@ static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t l
     // (IV) Select Drive from the controller;
     if (lba_mode == IDE_CHS)
     {
-        ide_write(channel, ATA_REG_HDDEVSEL, 0xa0 | (slavebit << 4) | head); // Drive & CHS.
+        ide_write(channel, ATA_REG_HDDEVSEL, 0xa0 | (slavebit << 4) | head);
     }
     else
     {
-        ide_write(channel, ATA_REG_HDDEVSEL, 0xe0 | (slavebit << 4) | head); // Drive & LBA
+        ide_write(channel, ATA_REG_HDDEVSEL, 0xe0 | (slavebit << 4) | head);
     }
 
     // (V) Write Parameters;
@@ -498,7 +467,7 @@ static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t l
         ide_write(channel, ATA_REG_LBA5,        lba_io[5]);
     }
 
-    ide_write(channel, ATA_REG_SECCOUNT0,   numsects);
+    ide_write(channel, ATA_REG_SECCOUNT0,   req->sectors);
     ide_write(channel, ATA_REG_LBA0,        lba_io[0]);
     ide_write(channel, ATA_REG_LBA1,        lba_io[1]);
     ide_write(channel, ATA_REG_LBA2,        lba_io[2]);
@@ -523,54 +492,24 @@ static int ide_ata_prepare_transfer(uint8_t direction, uint8_t drive, uint32_t l
     return lba_mode;
 }
 
-static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, uint8_t numsects, void* buf, int dma)
+static int ide_pio_request(request_t* req)
 {
     int lba_mode;
-    uint32_t channel = ide_devices[drive].channel;
+    uint32_t channel = ide_devices[req->drive].id / 2;
     uint32_t words = ATA_SECTOR_SIZE / 2;
-    uint16_t i;
     uint8_t err;
+    char* buf = req->buffer;
 
-    lba_mode = ide_ata_prepare_transfer(direction, drive, lba, numsects, dma);
+    lba_mode = ide_ata_prepare_transfer(req);
 
-    if (dma)
+    if (req->direction == ATA_READ)
     {
-        outb(0, channels[channel].bmide);
-        io_delay(2);
-
-        dma_region->prdt[0].addr = DMA_START;
-        dma_region->prdt[0].count = numsects * ATA_SECTOR_SIZE;
-        dma_region->prdt[0].last = 0xffff;
-        dma_region->prdt[1].addr = 0;
-        dma_region->prdt[1].count = 0;
-        dma_region->prdt[1].last = 0;
-
-        outl(DMA_PRD, channels[channel].bmide + 4);
-        io_delay(2);
-        outb(BM_CMD_READ, channels[channel].bmide);
-        io_delay(2);
-        outb(inb(channels[channel].bmide + 2) | BM_STATUS_ERROR | BM_STATUS_INTERRUPT, channels[channel].bmide + 2);
-        io_delay(2);
-
-        log_info("dma: ch%u PRD: addr: %x, size: %x, last: %x",
-            channel,
-            dma_region->prdt[0].addr,
-            dma_region->prdt[0].count,
-            dma_region->prdt[0].last);
-
-        outb(BM_CMD_START | BM_CMD_READ, channels[channel].bmide);
-        return 0;
-    }
-
-    if (direction == 0)
-    {
-        // PIO Read.
-        for (i = 0; i < numsects; i++)
+        for (int i = 0; i < req->sectors; i++)
         {
             if ((err = ide_polling(channel, 1)))
             {
                 log_warning("polling error: %x", err);
-                return err;
+                return -EIO;
             }
             insw(channels[channel].data_reg, buf, words);
             buf = ptr(addr(buf) + (words * 2));
@@ -578,10 +517,9 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
     }
     else
     {
-        // PIO Write.
-        for (i = 0; i < numsects; i++)
+        for (int i = 0; i < req->sectors; i++)
         {
-            ide_polling(channel, 0); // Polling.
+            ide_polling(channel, 0);
             asm("rep outsw" :: "c" (words), "d" (channels[channel].data_reg), "S" (buf)); // Send Data
             buf = ptr(addr(buf) + (words * 2));
         }
@@ -594,62 +532,168 @@ static uint8_t ide_ata_access(uint8_t direction, uint8_t drive, uint32_t lba, ui
         ide_polling(channel, 0); // Polling.
     }
 
+    ide_read(channel, ATA_REG_STATUS);
+
     return 0;
+}
+
+static int ide_dma_request(request_t* req)
+{
+    int errno;
+    flags_t flags;
+    uint32_t channel = ide_devices[req->drive].id / 2;
+
+    irq_save(flags);
+
+    // FIXME: currently nothing blocks signals when drive is accessed, so it's possible to kill
+    // the process before it manages to clear the request
+    if (unlikely(current_request))
+    {
+        log_warning("cannot perform DMA request, another one is ongoing: %x", current_request);
+        errno = -EAGAIN;
+        goto error;
+    }
+
+    if (unlikely(!(current_request = alloc(request_t, memcpy(this, req, sizeof(*req))))))
+    {
+        log_warning("no memory to allocate DMA request");
+        errno = -ENOMEM;
+        goto error;
+    }
+
+    // 1) Software prepares a PRD Table in system memory. Each PRD is 8 bytes long and consists of an
+    // address pointer to the starting address and the transfer count of the memory buffer to be
+    // transferred. In any given PRD Table, two consecutive PRDs are offset by 8-bytes and are aligned
+    // on a 4-byte boundary.
+    dma_region->prdt->addr = DMA_START;
+    dma_region->prdt->count = req->sectors * ATA_SECTOR_SIZE | DMA_EOT;
+
+    log_debug(DEBUG_IDE, "dma: ch%u buffer: {phys=%x, virt=%x}, PRD: addr: %x, size: %x",
+        channel,
+        DMA_START,
+        dma_region->buffer,
+        dma_region->prdt->addr,
+        dma_region->prdt->count);
+
+    // 2) Software provides the starting address of the PRD Table by loading the PRD Table Pointer
+    // Register. The direction of the data transfer is specified by setting the Read/Write Control bit.
+    // Clear the Interrupt bit and Error bit in the Status register.
+    bm_writel(channel, BM_REG_PRDT, DMA_PRD);
+    bm_writeb(channel, BM_REG_CMD, BM_CMD_READ);
+    bm_writeb(channel, BM_REG_STATUS, BM_STATUS_ERROR | BM_STATUS_INTERRUPT);
+
+    // 3) Software issues the appropriate DMA transfer command to the disk device.
+    ide_ata_prepare_transfer(req);
+
+    // 4) Engage the bus master function by writing a '1' to the Start bit in the Bus Master IDE Command
+    // Register for the appropriate channel.
+    bm_writeb(channel, BM_REG_CMD, BM_CMD_READ | BM_CMD_START);
+
+    log_debug(DEBUG_IDE, "putting %u to sleep", process_current->pid);
+    WAIT_QUEUE_DECLARE(q, process_current);
+
+    if ((errno = process_wait_locked(&ide_queue, &q, &flags)))
+    {
+        goto cleanup_request;
+    }
+
+    if (unlikely((errno = current_request->errno)))
+    {
+        goto cleanup_request;
+    }
+
+    delete(current_request);
+    current_request = NULL;
+    log_debug(DEBUG_IDE, "copying %u B from %x to %x", req->count, dma_region->buffer, req->buffer);
+    memcpy(req->buffer, dma_region->buffer, req->count);
+    irq_restore(flags);
+
+    return 0;
+
+cleanup_request:
+    delete(current_request);
+    current_request = NULL;
+    if (DISABLE_DMA_AFTER_FAILURE)
+    {
+        req->dma = false;
+        irq_restore(flags);
+        return ide_pio_request(req);
+    }
+error:
+    irq_restore(flags);
+    return errno;
 }
 
 static void ide_irq()
 {
+    int errno = 0;
     uint8_t error, ata_status;
-    uint8_t bm_status = inb(channels[0].bmide + 0x2);
+    uint8_t bm_status = bm_readb(ATA_PRIMARY, BM_REG_STATUS);
 
-    if (!(bm_status & BM_STATUS_INTERRUPT))
+    if (unlikely(!current_request))
+    {
+        log_warning("irq without ongoing request");
+        return;
+    }
+
+    if (unlikely(!(bm_status & BM_STATUS_INTERRUPT)))
     {
         log_warning("not for this drive");
         return;
     }
 
-    io_delay(10);
-    if ((ata_status = ide_read(0, ATA_REG_STATUS)) & ATA_SR_ERR)
+    if (unlikely((ata_status = ide_read(ATA_PRIMARY, ATA_REG_STATUS)) & ATA_SR_ERR))
     {
-        error = inb(ERROR_REG(0));
+        error = ide_read(ATA_PRIMARY, ATA_REG_ERROR);
         log_warning("irq: error %x (%s)", error, ide_error_string(error));
+        errno = -EIO;
     }
 
-    /*if (bm_status & BM_STATUS_ACTIVE)*/
-    /*{*/
-        /*log_warning("status has BM_STATUS_ACTIVE");*/
-        /*return;*/
-    /*}*/
+    if (unlikely(bm_status & BM_STATUS_ACTIVE))
+    {
+        log_warning("DMA request not finished, error: %x, command: %x", ide_pci->status, ide_pci->command);
+        errno = -EIO;
+    }
 
-    io_delay(10);
-    outb(0, channels[0].bmide);
+    // 6) At the end of the transfer the IDE device signals an interrupt.
+    // 7) In response to the interrupt, software resets the Start/Stop bit in the command register. It then
+    // reads the controller status and then the drive status to determine if the transfer completed
+    // successfully.
 
-    struct process* temp = wait_queue_front(&ide_queue);
+    bm_writeb(ATA_PRIMARY, BM_REG_CMD, 0);
 
-    if (unlikely(!temp))
+    struct process* proc = wait_queue_front(&ide_queue);
+
+    if (unlikely(!proc))
     {
         log_warning("no process in wq");
         return;
     }
 
-    log_info("waking %u, bm status: %x, ata status: %x", temp->pid, bm_status, ata_status);
-    process_wake(temp);
+    if (DISABLE_DMA_AFTER_FAILURE && (current_request->errno = errno))
+    {
+        log_warning("disabling DMA for drive %u", current_request->drive);
+        ide_devices[current_request->drive].dma = false;
+        bm_writeb(ATA_PRIMARY, BM_REG_STATUS, bm_status | BM_STATUS_INTERRUPT);
+        ide_disable_irq(ATA_PRIMARY);
+    }
+
+    log_debug(DEBUG_IDE, "waking %u, bm status: %x, ata status: %x", proc->pid, bm_status, ata_status);
+    process_wake(proc);
 }
 
 static int ide_fs_open(file_t* file)
 {
     int drive = BLK_DRIVE(MINOR(file->inode->dev));
-    if (!ide_devices[drive].mbr)
+    if (!ide_devices[drive].mbr.signature)
     {
         return -ENODEV;
     }
     return 0;
 }
 
-static int ide_fs_read(file_t* file, char* buf, size_t count)
+static request_t ide_create_request(int direction, file_t* file, char* buf, size_t count)
 {
-    int errno;
-    flags_t flags = 0;
     size_t sectors = count / ATA_SECTOR_SIZE;
     int drive = BLK_DRIVE(MINOR(file->inode->dev));
     int partition = BLK_PARTITION(MINOR(file->inode->dev));
@@ -658,36 +702,48 @@ static int ide_fs_read(file_t* file, char* buf, size_t count)
 
     if (partition != BLK_NO_PARTITION)
     {
-        first_sector = ide_devices[drive].mbr->partitions[partition].lba_start;
+        first_sector = ide_devices[drive].mbr.partitions[partition].lba_start;
         offset += first_sector;
-        last_sector = first_sector + ide_devices[drive].mbr->partitions[partition].sectors;
+        last_sector = first_sector + ide_devices[drive].mbr.partitions[partition].sectors;
     }
     else
     {
         last_sector = ide_devices[drive].size;
     }
 
-    max_count = last_sector - offset;
+    max_count = (last_sector - offset) * ATA_SECTOR_SIZE;
     count = count > max_count
         ? max_count
         : count;
 
-    if (ide_devices[drive].dma)
-    {
-        irq_save(flags);
-    }
+    log_debug(DEBUG_IDE, "drive=%x, dir=%u, offset=%x, sectors=%x, count=%x",
+        drive,
+        direction,
+        offset,
+        sectors,
+        count);
 
-    ide_ata_access(ATA_READ, drive, offset, sectors, buf, ide_devices[drive].dma);
+    request_t req = {
+        .drive = drive,
+        .direction = direction,
+        .offset = offset,
+        .sectors = sectors,
+        .count = count,
+        .buffer = buf,
+        .dma = ide_devices[drive].dma
+    };
 
-    if (ide_devices[drive].dma)
+    return req;
+}
+
+static int ide_fs_read(file_t* file, char* buf, size_t count)
+{
+    int errno;
+    request_t req = ide_create_request(ATA_READ, file, buf, count);
+
+    if ((errno = req.dma ? ide_dma_request(&req) : ide_pio_request(&req)))
     {
-        log_info("putting %u to sleep", process_current->pid);
-        WAIT_QUEUE_DECLARE(q, process_current);
-        if ((errno = process_wait_locked(&ide_queue, &q, flags)))
-        {
-            return errno;
-        }
-        memcpy(buf, dma_region->buffer, count);
+        return errno;
     }
 
     file->offset += count;
