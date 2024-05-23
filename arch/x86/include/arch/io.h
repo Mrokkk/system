@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <kernel/compiler.h>
 
+// Discussion about port 0x80 and Linux: https://groups.google.com/g/linux.kernel/c/UTKlqyBFiyU
+
 typedef volatile uint8_t io8;
 typedef volatile uint16_t io16;
 typedef volatile uint32_t io32;
@@ -45,20 +47,26 @@ static inline void insw(int port, void* addr, uint32_t count)
     asm volatile("rep; insw" : "+D" (addr), "+c" (count) : "d" (port));
 }
 
-static inline void insl(int port, void *addr, uint32_t count)
+static inline void insl(int port, void* addr, uint32_t count)
 {
     asm volatile("rep; insl" : "+D" (addr), "+c" (count) : "d" (port));
+}
+
+static inline void outsw(int port, void* addr, uint32_t count)
+{
+    asm volatile("rep; outsw" :: "c" (count), "d" (port), "S" (addr));
+}
+
+static inline void io_dummy(void)
+{
+    inb(0x80);
 }
 
 static inline void io_delay(uint32_t loops)
 {
     for (uint32_t i = 0; i < loops; ++i)
     {
-        inb(0x80);
+        io_dummy();
     }
 }
 
-static inline void io_wait(void)
-{
-    io_delay(1);
-}

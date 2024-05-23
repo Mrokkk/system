@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-use_ide=
+use_ide=1
 use_kvm=
 use_nographic=
 args="\

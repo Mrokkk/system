@@ -1,3 +1,4 @@
+#include <arch/io.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
 #include <kernel/kernel.h>
@@ -72,24 +73,49 @@ static inline void mult_shift_calculate(uint32_t* mult, uint32_t* shift, uint32_
     *shift = 32;
 }
 
-void udelay(uint32_t useconds)
+static inline void wait_for(uint64_t time)
 {
     uint64_t current = monotonic_clock->read();
+    uint64_t elapsed = 0;
+    uint64_t next;
+    do
+    {
+        elapsed += ((next = monotonic_clock->read()) - current) & monotonic_clock->mask;
+        current = next;
+    }
+    while (elapsed < time);
+}
+
+void udelay(uint32_t useconds)
+{
     uint64_t diff = (uint64_t)useconds * (uint64_t)monotonic_clock->freq_khz;
     do_div(diff, 1000);
-    uint64_t next = current + diff;
-    while (monotonic_clock->read() < next);
+    wait_for(diff);
 }
 
 void mdelay(uint32_t mseconds)
 {
-    uint64_t current = monotonic_clock->read();
-    uint64_t next = current + (uint64_t)mseconds * (uint64_t)monotonic_clock->freq_khz;
-    if (unlikely(next > monotonic_clock->mask))
+    uint64_t diff = (uint64_t)mseconds * (uint64_t)monotonic_clock->freq_khz;
+    wait_for(diff);
+}
+
+void io_delay_measure(void)
+{
+    uint64_t start = monotonic_clock->read();
+    uint64_t stop = monotonic_clock->read();
+    uint64_t error = stop - start;
+
+    start = monotonic_clock->read();
+    for (int i = 0; i < 1000; ++i)
     {
-        return;
+        io_dummy();
     }
-    while ((current = monotonic_clock->read()) < next);
+    stop = monotonic_clock->read();
+
+    uint64_t diff = (stop - start - error) & monotonic_clock->mask;
+    uint32_t nseconds = (diff * monotonic_clock->mult) >> monotonic_clock->shift;
+
+    log_info("IO read duration: %u ns", nseconds);
 }
 
 UNMAP_AFTER_INIT int clock_sources_setup(void)
@@ -171,6 +197,8 @@ UNMAP_AFTER_INIT int clock_sources_setup(void)
     uint64_t test2 = ((TEST_VALUE * 1000) / (monotonic_clock->freq_khz));
 
     ASSERT(test == test2);
+
+    io_delay_measure();
 
     return 0;
 }

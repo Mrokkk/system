@@ -2,7 +2,15 @@
 
 #include <stdint.h>
 #include <kernel/mbr.h>
+#include <kernel/wait.h>
 #include <kernel/kernel.h>
+
+// References:
+// http://ftp.parisc-linux.org/docs/chips/PC87415.pdf
+// https://pdos.csail.mit.edu/6.828/2018/readings/hardware/IDE-BusMaster.pdf
+// https://wiki.osdev.org/PCI_IDE_Controller
+// http://bos.asmhackers.net/docs/ata/docs/29860001.pdf
+// https://forum.osdev.org/viewtopic.php?f=1&t=21151
 
 typedef struct request request_t;
 typedef struct ide_device ide_device_t;
@@ -29,6 +37,7 @@ typedef struct ide_channel ide_channel_t;
 #define ATA_REG_ALTSTATUS   0x00
 
 // Channels
+#define ATA_CHANNELS_SIZE   2
 #define ATA_PRIMARY         0x00
 #define ATA_SECONDARY       0x01
 
@@ -77,4 +86,6 @@ struct ide_channel
     uint16_t ctrl;
     uint16_t irq_reg;
     uint16_t bmide;
+    request_t* current_request;
+    wait_queue_head_t queue;
 };

@@ -6,6 +6,7 @@
 
 // References:
 // https://people.freebsd.org/~imp/asiabsdcon2015/works/d2161r5-ATAATAPI_Command_Set_-_3.pdf
+// http://users.utcluj.ro/~baruch/media/siee/labor/ATA-Interface.pdf
 
 struct ata_device;
 typedef struct ata_device ata_device_t;
@@ -31,6 +32,7 @@ typedef struct ata_device ata_device_t;
 #define ATAPI_CMD_READ          0xa8
 #define ATAPI_CMD_EJECT         0x1b
 
+#define ATA_IDENT_SIZE          128
 #define ATA_IDENT_DEVICETYPE    0
 #define ATA_IDENT_CYLINDERS     2
 #define ATA_IDENT_HEADS         6
@@ -58,6 +60,7 @@ typedef struct ata_device ata_device_t;
 #define ATA_CMD_IDENTIFY        0xec
 
 #define ATA_SECTOR_SIZE         512
+#define ATAPI_SECTOR_SIZE       2048
 
 #define ATA_TYPE_ATA    0
 #define ATA_TYPE_ATAPI  1
