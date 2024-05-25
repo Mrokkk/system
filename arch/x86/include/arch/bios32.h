@@ -2,9 +2,7 @@
 
 #include <stdint.h>
 #include <arch/register.h>
-
-#define U32(a, b, c, d) \
-    ((a << 0) + (b << 8) + (c << 16) + (d << 24))
+#include <kernel/byteorder.h>
 
 #define BIOS32_SIGNATURE    U32('_', '3', '2', '_')
 

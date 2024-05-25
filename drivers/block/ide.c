@@ -381,7 +381,7 @@ int ide_initialize(void)
         return -ENOMEM;
     }
 
-    ide_buf = ptr(addr(ide_devices) + PAGE_SIZE - ATA_SECTOR_SIZE);
+    ide_buf = shift_as(void*, ide_devices, PAGE_SIZE - ATA_SECTOR_SIZE);
     memset(ide_devices, 0, PAGE_SIZE);
 
     if (execute(ide_pci_initialize(), "initializing PCI") ||
@@ -556,7 +556,7 @@ static int ide_pio_request(request_t* req)
                 return -EIO;
             }
             insw(channels[channel].data_reg, buf, words);
-            buf = ptr(addr(buf) + (words * 2));
+            buf = shift(buf, words * 2);
         }
     }
     else
@@ -565,7 +565,7 @@ static int ide_pio_request(request_t* req)
         {
             ide_polling(channel);
             outsw(channels[channel].data_reg, buf, words);
-            buf = ptr(addr(buf) + (words * 2));
+            buf = shift(buf, words * 2);
         }
 
         ide_write(
@@ -684,13 +684,15 @@ static int ide_atapi_request(request_t* req)
     scsi_packet_t packet = ATAPI_READ_PACKET(lba, numsects);
     request_t** current_request = &channels[channel].current_request;
 
-    if (count < ATAPI_SECTOR_SIZE)
+    if (count % ATAPI_SECTOR_SIZE)
     {
         log_warning("invalid count: %u", count);
         return -EINVAL;
     }
 
     irq_save(flags);
+
+    log_debug(DEBUG_IDE, "count: %u B, sectors: %u, lba: %u", count, numsects, lba);
 
     if (unlikely(*current_request))
     {
@@ -743,8 +745,8 @@ static int ide_atapi_request(request_t* req)
             errno = -EIO;
             goto error;
         }
-        insw(bus, buf, count / 2);
-        buf += count;
+        insw(bus, buf, ATAPI_SECTOR_SIZE / 2);
+        buf += ATAPI_SECTOR_SIZE;
     }
 
     log_debug(DEBUG_IDE, "putting %u to sleep", process_current->pid);

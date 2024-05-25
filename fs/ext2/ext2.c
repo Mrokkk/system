@@ -142,7 +142,6 @@ int ext2_open(file_t*)
     return 0;
 }
 
-#define off(ptr, off)               (typeof(ptr))(addr(ptr) + off)
 #define in_range(v, first, last)    ((v) >= (first) && (v) <= (last))
 
 int ext2_read(file_t* file, char* buffer, size_t count)
@@ -236,7 +235,7 @@ int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
     for (; block_nr < EXT2_NDIR_BLOCKS && pos < raw_inode->size && pos < size + offset; )
     {
         void* block_ptr = block(data, raw_inode->block[block_nr]);
-        void* data_ptr = off(page_virt_ptr(current_page), pos % PAGE_SIZE);
+        void* data_ptr = shift(page_virt_ptr(current_page), pos % PAGE_SIZE);
         data_size = min(block_size, raw_inode->size - pos);
 
         if ((errno = errno_get(block_ptr)))
@@ -268,12 +267,12 @@ int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
     }
 
     ind_block += block_nr;
-    uint32_t* ind_block_end = off(ind_block, block_size);
+    uint32_t* ind_block_end = shift(ind_block, block_size);
 
     for (; ind_block < ind_block_end && pos < raw_inode->size && pos < size + offset; )
     {
         void* block_ptr = block(data, *ind_block);
-        void* data_ptr = off(page_virt_ptr(current_page), pos % PAGE_SIZE);
+        void* data_ptr = shift(page_virt_ptr(current_page), pos % PAGE_SIZE);
         data_size = min(block_size, raw_inode->size - pos);
 
         if ((errno = errno_get(block_ptr)))

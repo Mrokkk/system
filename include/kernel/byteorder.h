@@ -2,6 +2,12 @@
 
 #include <stdint.h>
 
+#define U16(a, b) \
+    (((a) << 0) | ((b) << 8))
+
+#define U32(a, b, c, d) \
+    (((a) << 0) | ((b) << 8) | ((c) << 16) | ((d) << 24))
+
 #define U32_ORDER_SWAP(value) \
     ({ \
         ((((value)  >> 24)  & 0x000000ff) | \

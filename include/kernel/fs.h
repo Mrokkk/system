@@ -28,15 +28,6 @@
 
 #define BLOCK_SIZE       1024
 
-struct inode;
-struct buffer;
-struct fd_set;
-struct super_block;
-struct file_operations;
-struct block_operations;
-struct inode_operations;
-struct super_operations;
-
 typedef struct file file_t;
 typedef struct inode inode_t;
 typedef struct buffer buffer_t;
@@ -149,7 +140,7 @@ struct buffer
     dev_t dev;
     size_t count;
     list_head_t buf_in_page;
-    char* data;
+    void* data;
 };
 
 extern list_head_t files;

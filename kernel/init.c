@@ -119,21 +119,26 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 static inline void rootfs_prepare()
 {
     int errno;
-    char* sources[] = {"/dev/sda0", "/dev/hda0", "/dev/img0"};
+    const char* sources[] = {"/dev/hdc", "/dev/sda0", "/dev/hda0", "/dev/img0"};
+    const char* fs_types[] = {"iso9660", "ext2"};
 
     for (size_t i = 0; i < array_size(sources); ++i)
     {
-        log_info("mounting root on %s", sources[i]);
-        if ((errno = mount(sources[i], "/", "ext2", 0, 0)))
+        for (size_t j = 0; j < array_size(fs_types); ++j)
         {
-            log_info("mounting ext2 on %s failed with %d", sources[i], errno);
-        }
-        else
-        {
-            break;
+            log_info("mounting root as %s on %s", fs_types[j], sources[i]);
+            if ((errno = mount(sources[i], "/", fs_types[j], 0, 0)))
+            {
+                log_info("mounting %s on %s failed with %d", fs_types[j], sources[i], errno);
+            }
+            else
+            {
+                goto mounted;
+            }
         }
     }
 
+mounted:
     if (unlikely(errno))
     {
         panic("cannot mount root: %d", errno);

@@ -14,7 +14,7 @@
 
 struct dirent
 {
-    int ino;
+    ino_t ino;
     //size_t off; // TODO: add support for this
     size_t len;
     char type;
