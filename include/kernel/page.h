@@ -61,8 +61,9 @@ struct vm_region
 
 typedef enum
 {
-    PAGE_ALLOC_DISCONT,
-    PAGE_ALLOC_CONT,
+    PAGE_ALLOC_DISCONT = 0,
+    PAGE_ALLOC_CONT = 1,
+    PAGE_ALLOC_UNCACHED = 2,
 } alloc_flag_t;
 
 // Allocate a page(s) and map it/them in kernel; allocation of

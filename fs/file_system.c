@@ -129,7 +129,7 @@ int do_mount(file_system_t* fs, const char* source, const char* mount_point, dev
 
     if (unlikely(errno))
     {
-        log_warning("mount on %s returned %d", fs->name, errno);
+        log_info("mount on %s returned %d", fs->name, errno);
         return errno;
     }
 

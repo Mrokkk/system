@@ -132,23 +132,23 @@ static inline page_t* free_page_range_find(const int count)
     return first_page;
 }
 
-static inline void page_kernel_identity_mapping(page_t* page)
+static inline void page_kernel_identity_mapping(page_t* page, int pte_flag)
 {
     uint32_t paddr = page_phys(page);
     uint32_t vaddr = virt(paddr);
     uint32_t pfn = paddr / PAGE_SIZE;
 
-    pte_set(pfn, paddr | PTE_PRESENT | PTE_WRITEABLE);
+    pte_set(pfn, paddr | PTE_PRESENT | PTE_WRITEABLE | pte_flag);
     page->virtual = ptr(vaddr);
 }
 
-static inline void page_kernel_identity_mapping_range(page_t* page)
+static inline void page_kernel_identity_mapping_range(page_t* page, int pte_flag)
 {
     page_t* temp;
-    page_kernel_identity_mapping(page);
+    page_kernel_identity_mapping(page, pte_flag);
     list_for_each_entry(temp, &page->list_entry, list_entry)
     {
-        page_kernel_identity_mapping(temp);
+        page_kernel_identity_mapping(temp, pte_flag);
     }
 }
 
@@ -177,7 +177,7 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
 
     mutex_lock(&page_mutex);
 
-    first_page = flag == PAGE_ALLOC_CONT
+    first_page = flag & PAGE_ALLOC_CONT
         ? free_page_range_find(count)
         : free_page_range_find_discont(count);
 
@@ -188,7 +188,7 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
     }
 
     first_page->pages_count = count;
-    page_kernel_identity_mapping_range(first_page);
+    page_kernel_identity_mapping_range(first_page, flag & PAGE_ALLOC_UNCACHED ? PTE_CACHEDIS : 0);
 
 #if DEBUG_PAGE_DETAILED
     void* caller = __builtin_return_address(0);

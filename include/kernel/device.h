@@ -17,8 +17,9 @@
 #define MAJOR_CHR_MOUSE     7
 #define MAJOR_CHR_MEM       8
 
-#define MAJOR_BLK_IDE       256
-#define MAJOR_BLK_DISKIMG   257
+#define MAJOR_BLK_DISKIMG   256
+#define MAJOR_BLK_IDE       257
+#define MAJOR_BLK_AHCI      258
 
 #define BLK_NO_PARTITION                0xf
 #define BLK_MINOR_DRIVE(drive)          (drive | (BLK_NO_PARTITION << 4))

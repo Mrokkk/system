@@ -8,7 +8,6 @@
 // https://people.freebsd.org/~imp/asiabsdcon2015/works/d2161r5-ATAATAPI_Command_Set_-_3.pdf
 // http://users.utcluj.ro/~baruch/media/siee/labor/ATA-Interface.pdf
 
-struct ata_device;
 typedef struct ata_device ata_device_t;
 
 #define ATA_SR_BSY              0x80    // Busy
@@ -28,9 +27,6 @@ typedef struct ata_device ata_device_t;
 #define ATA_ER_ABRT             0x04    // Command aborted
 #define ATA_ER_TK0NF            0x02    // Track 0 not found
 #define ATA_ER_AMNF             0x01    // No address mark
-
-#define ATAPI_CMD_READ          0xa8
-#define ATAPI_CMD_EJECT         0x1b
 
 #define ATA_IDENT_SIZE          128
 #define ATA_IDENT_DEVICETYPE    0
