@@ -6,6 +6,7 @@
 #include <kernel/byteorder.h>
 
 // References:
+// https://wiki.osdev.org/ISO_9660
 // https://ftpmirror.your.org/pub/misc/bitsavers/projects/cdrom/Rock_Ridge_Interchange_Protocol.pdf
 
 typedef struct lsb_msb16 lsb_msb16_t;
@@ -13,7 +14,7 @@ typedef struct lsb_msb32 lsb_msb32_t;
 typedef struct iso9660_sb iso9660_sb_t;
 typedef struct iso9660_pvd iso9660_pvd_t;
 typedef struct iso9660_data iso9660_data_t;
-typedef struct iso9660_dentry iso9660_dentry_t;
+typedef struct iso9660_dirent iso9660_dirent_t;
 
 typedef struct px px_t;
 typedef struct nm nm_t;
@@ -29,6 +30,7 @@ enum
 
 };
 
+#define ISO9660_ROOT_INO        2
 #define ISO9660_SIGNATURE       "CD001"
 #define ISO9660_SIGNATURE_LEN   (sizeof(ISO9660_SIGNATURE) - 1)
 
@@ -63,7 +65,7 @@ static inline uint16_t _lsb16_get(void* data)
         lsb_msb16_t: _lsb16_get(&value), \
         lsb_msb32_t: _lsb32_get(&value))
 
-struct iso9660_dentry
+struct iso9660_dirent
 {
     uint8_t         len;
     uint8_t         ext_attr_len;
@@ -90,7 +92,7 @@ struct px
 };
 
 #define NM_SIGNATURE    U16('N', 'M')
-#define NM_NAME_LEN(rr) ((rr)->len - 5)
+#define NM_NAME_LEN(rr) ((size_t)(rr)->len - 5)
 
 struct nm
 {
@@ -127,7 +129,7 @@ struct iso9660_pvd
     uint32_t    unused2;
     union
     {
-        iso9660_dentry_t root;
+        iso9660_dirent_t root;
         uint8_t alignment[34];
     };
 };
@@ -150,4 +152,5 @@ struct iso9660_data
     dev_t dev;
     file_t* file;
     uint32_t block_size;
+    iso9660_dirent_t* root;
 };
