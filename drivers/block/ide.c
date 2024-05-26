@@ -163,15 +163,25 @@ static void ide_device_atapi(int device)
     outsw(bus, &packet, 6);
     ide_wait();
 
-    uint8_t* buf = ide_buf;
+    void* buf = single_page();
+
+    if (unlikely(!buf))
     {
-        if ((err = ide_polling(channel)))
-        {
-            return;
-        }
-        insw(bus, buf, count / 2);
-        buf += count;
+        log_warning("channel %u: cannot allocate buffer", channel);
+        return;
     }
+
+    if ((err = ide_polling(channel)))
+    {
+        goto finish;
+    }
+
+    insw(bus, buf, count / 2);
+
+    memcpy(ide_buf, buf, ATA_SECTOR_SIZE);
+
+finish:
+    page_free(buf);
 }
 
 static void ide_device_register(ata_device_t* device)
