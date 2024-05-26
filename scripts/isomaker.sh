@@ -42,7 +42,7 @@ fi
 
 modules_load=""
 for mod in "${modules[@]}"; do
-    modules_load+="module /$(basename ${mod}) $(basename ${mod})
+    modules_load+="module /boot/$(basename ${mod}) $(basename ${mod})
     "
 done
 
@@ -53,7 +53,7 @@ terminal_input serial
 terminal_output serial
 set default=0
 menuentry "${binary}" {
-    if ! ${multiboot_command} /kernel ${args}; then reboot; fi
+    if ! ${multiboot_command} /boot/kernel ${args}; then reboot; fi
     ${modules_load}
     boot
 }"
@@ -63,8 +63,9 @@ mkdir -p ${name}.d/boot/grub
 echo "${menu_entry}" >${name}.d/boot/grub/grub.cfg
 
 for mod in "${modules[@]}"; do
-    cp ${mod} ${name}.d
+    cp ${mod} ${name}.d/boot
 done
 
-cp ${binary} ${name}.d/kernel
+cp ${binary} ${name}.d/boot/kernel
+cp -r mnt/* ${name}.d
 grub-mkrescue -o ${name}.iso ${name}.d

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-use_ide=
+use_ide=1
 use_kvm=
 use_nographic=
 args="\
@@ -31,6 +31,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ide)
             use_ide=1
+            ;;
+        --ahci)
+            use_ide=
             ;;
         *)
             args="${args} ${1}"
