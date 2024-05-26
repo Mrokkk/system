@@ -1,48 +1,19 @@
 #!/bin/bash
 
-set -e
+base_dir=$(dirname $0)
+
+. "${base_dir}/utils.sh"
 
 disk_image="disk.img"
 disk_size=2
 mountpoint=mnt
+boot_dir="${mountpoint}/boot"
+grub_cfg="${boot_dir}/grub/grub.cfg"
 dev=""
 create_partition=
 mount_loopback=
 rebuild=
-stderr=$(mktemp)
 font=/usr/share/kbd/consolefonts/Lat2-Terminus16.psfu.gz
-
-function die()
-{
-    echo "${@}"
-    if [[ -f ${stderr} ]]
-    then
-        echo "Error:"
-        cat ${stderr}
-        rm -f ${stderr}
-    fi
-    exit -1
-}
-
-function execute_cmd()
-{
-    local cmd="${@:2}"
-    echo -n "${1}"
-    eval ${cmd} &>${stderr} || die "failed"
-    echo "done"
-}
-
-function copy()
-{
-    local src=${1}
-    local dest=${2}/$(basename ${src})
-    if ! cmp -s "${src}" "${dest}"
-    then
-        execute_cmd "copying ${src} to ${dest}... " rsync ${src} ${dest}
-    else
-        echo "${dest}: up to date"
-    fi
-}
 
 while [[ $# -gt 0 ]]; do
     arg="$1"
@@ -50,6 +21,8 @@ while [[ $# -gt 0 ]]; do
         --rebuild)
             mount_loopback=1
             rebuild=1 ;;
+        -v|--verbose)
+            verbose=1 ;;
         *)
             break ;;
     esac
@@ -83,11 +56,8 @@ fi
 
 if [[ -z "${dev}" ]]
 then
-    echo -n "creating loopback... "
-    dev=$(sudo losetup --find --partscan --show "${disk_image}" 2>${stderr})
+    execute_cmd "creating loopback... " dev=$(sudo losetup --find --partscan --show "${disk_image}")
 fi
-
-[[ -z "${dev}" ]] && die "failed"
 
 echo "loopback device: ${dev}"
 
@@ -110,30 +80,32 @@ then
     sudo chgrp -R ${USER} ${mountpoint}
 fi
 
-mkdir -p ${mountpoint}/bin
-mkdir -p ${mountpoint}/dev
-mkdir -p ${mountpoint}/usr/share
-mkdir -p ${mountpoint}/lib
-mkdir -p ${mountpoint}/tmp
-mkdir -p ${mountpoint}/proc
+if [[ ! -f "font.psf" ]] || [[ "${0}" -nt "font.psf" ]] || [[ -n ${rebuild} ]]
+then
+    rm -f font.psf
+    cp ${font} font.psf.gz
+    gzip -d font.psf.gz
+fi
+
+create_dir "${mountpoint}/bin"
+create_dir "${mountpoint}/dev"
+create_dir "${mountpoint}/usr/share"
+create_dir "${mountpoint}/lib"
+create_dir "${mountpoint}/tmp"
+create_dir "${mountpoint}/proc"
+
 for binary in $(find bin -type f -executable)
 do
     copy ${binary} ${mountpoint}/bin
 done
+
 copy ../arch/x86/cpuid.c ${mountpoint}
 copy ../tux.tga ${mountpoint}
 copy ../cursor.tga ${mountpoint}
 copy ../close.tga ${mountpoint}
 copy ../close_pressed.tga ${mountpoint}
+copy font.psf ${mountpoint}/usr/share
 
-if [ ! -f "font.psf" ] || [ "${0}" -nt "font.psf" ] || [ ! -z ${rebuild} ]
-then
-    rm -f font.psf
-    cp ${font} font.psf.gz
-    gzip -d font.psf.gz
-    copy font.psf ${mountpoint}/usr/share
-fi
+sync -f ${mountpoint}
 
-sync
-
-[[ -f ${stderr} ]] && rm -f "${stderr}"
+cleanup

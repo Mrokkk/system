@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-set -e
-
 base_dir=$(dirname $0)
+
+. "${base_dir}/utils.sh"
+
 modules=()
 
 while [[ $# -gt 0 ]]; do
@@ -24,6 +25,9 @@ while [[ $# -gt 0 ]]; do
         --module)
             modules+=("$(readlink -e ${2})")
             shift ;;
+        -v|--verbose)
+            verbose=1
+            shift ;;
         *)
             break ;;
     esac
@@ -40,6 +44,10 @@ else
     multiboot_command="multiboot"
 fi
 
+iso_dir="${name}.d"
+grub_cfg="${name}.d/boot/grub/grub.cfg"
+iso="${name}.iso"
+
 modules_load=""
 for mod in "${modules[@]}"; do
     modules_load+="module /boot/$(basename ${mod}) $(basename ${mod})
@@ -53,19 +61,33 @@ terminal_input serial
 terminal_output serial
 set default=0
 menuentry "${binary}" {
-    if ! ${multiboot_command} /boot/kernel ${args}; then reboot; fi
+    if ! ${multiboot_command} /boot/${name} ${args}; then reboot; fi
     ${modules_load}
     boot
 }"
 
-mkdir -p ${name}.d/boot/grub
+create_dir ${name}.d/boot/grub
 
-echo "${menu_entry}" >${name}.d/boot/grub/grub.cfg
+write_to "${menu_entry}" "${grub_cfg}"
 
 for mod in "${modules[@]}"; do
-    cp ${mod} ${name}.d/boot
+    copy "${mod}" ${name}.d/boot
 done
 
-cp ${binary} ${name}.d/boot/kernel
-cp -r mnt/* ${name}.d
-grub-mkrescue -o ${name}.iso ${name}.d
+copy ${binary} ${name}.d/boot
+copy_dir_content "mnt" "${iso_dir}"
+
+if [[ -n "${verbose}" ]]
+then
+    echo "Changed files (${modification_list}):"
+    cat "${modification_list}"
+fi
+
+if any_change_done
+then
+    execute_cmd "creating ${iso}... " grub-mkrescue -o "${iso}" "${iso_dir}"
+else
+    echo "${iso}: up to date"
+fi
+
+cleanup

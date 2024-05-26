@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 use_ide=1
 use_kvm=
 use_nographic=

@@ -1,3 +1,7 @@
+#!/bin/bash
+
+set -e
+
 device="${1}"
 
 if [[ -z "${device}" ]]
