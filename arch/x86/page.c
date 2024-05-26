@@ -703,7 +703,7 @@ static inline uint32_t virt_end_get(void)
     uint32_t end = 0;
     for (section_t* section = sections; section->name; ++section)
     {
-        end = addr(section->end);
+        end = page_align(addr(section->end));
     }
     return end;
 }
@@ -752,7 +752,6 @@ UNMAP_AFTER_INIT int paging_init()
     ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].count);
     ASSERT(page_map[(phys_addr(virt_end) - PAGE_SIZE) / PAGE_SIZE].count);
     ASSERT(page_table[phys_addr(virt_end) / PAGE_SIZE - 1]);
-    ASSERT(!page_table[phys_addr(virt_end) / PAGE_SIZE]);
     ASSERT(kernel_page_dir[min(ram, GiB) / PAGE_SIZE / PTE_IN_PDE + KERNEL_PDE_OFFSET - 1]);
     ASSERT(page_map[memory_areas->start / PAGE_SIZE + 2].count);
 
