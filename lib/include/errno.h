@@ -7,5 +7,3 @@
 #endif
 
 extern volatile int errno;
-
-void perror(const char* s);

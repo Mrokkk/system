@@ -1,8 +1,6 @@
-#include <errno.h>
 #include <stdio.h>
 #include <dirent.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -31,7 +29,6 @@ static inline void permissions_fill(char* buffer, umode_t mode)
     {
         *buffer++ = '-';
     }
-    *buffer++ = S_ISDIR(mode) ? 'd' : '-';
     *buffer++ = mode & S_IRUSR ? 'r' : '-';
     *buffer++ = mode & S_IWUSR ? 'w' : '-';
     *buffer++ = mode & S_IXUSR ? 'x' : '-';
