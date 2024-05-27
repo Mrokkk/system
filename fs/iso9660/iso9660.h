@@ -15,7 +15,6 @@ typedef struct iso9660_sb iso9660_sb_t;
 typedef struct iso9660_pvd iso9660_pvd_t;
 typedef struct iso9660_data iso9660_data_t;
 typedef struct iso9660_dirent iso9660_dirent_t;
-
 typedef struct px px_t;
 typedef struct nm nm_t;
 typedef struct rrip rrip_t;
@@ -28,11 +27,17 @@ enum
     ISO9660_VOLUME_PARTITION        = 3,
     ISO9660_VOLUME_TERMINATOR       = 255,
 
+    ISO9660_BLOCK_SIZE              = 2048,
+    ISO9660_START_BLOCK             = 16,
+    ISO9660_ROOT_INO                = 2
 };
 
-#define ISO9660_ROOT_INO        2
 #define ISO9660_SIGNATURE       "CD001"
 #define ISO9660_SIGNATURE_LEN   (sizeof(ISO9660_SIGNATURE) - 1)
+
+#define PX_SIGNATURE    U16('P', 'X')
+#define NM_SIGNATURE    U16('N', 'M')
+#define NM_NAME_LEN(rr) ((size_t)(rr)->len - 5)
 
 struct lsb_msb16
 {
@@ -80,8 +85,6 @@ struct iso9660_dirent
     char            name[0];
 } PACKED;
 
-#define PX_SIGNATURE    U16('P', 'X')
-
 struct px
 {
     uint64_t    mode;
@@ -90,9 +93,6 @@ struct px
     uint64_t    gid;
     uint64_t    ino;
 };
-
-#define NM_SIGNATURE    U16('N', 'M')
-#define NM_NAME_LEN(rr) ((size_t)(rr)->len - 5)
 
 struct nm
 {
@@ -151,6 +151,5 @@ struct iso9660_data
     iso9660_sb_t* raw_sb;
     dev_t dev;
     file_t* file;
-    uint32_t block_size;
     iso9660_dirent_t* root;
 };

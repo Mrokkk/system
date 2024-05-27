@@ -45,25 +45,12 @@ static file_operations_t iso9660_fops = {
     .mmap = &iso9660_mmap,
 };
 
-static const char* iso9660_volume_desc_string(uint8_t type)
+static uint32_t block_nr_convert(uint32_t iso_block_nr)
 {
-    switch (type)
-    {
-        case ISO9660_VOLUME_BOOT_RECORD: return "Boot Record";
-        case ISO9660_VOLUME_PRIMARY: return "Primary Volume Descriptor";
-        case ISO9660_VOLUME_SUPPLEMENTARY: return "Supplementary Volume Descriptor";
-        case ISO9660_VOLUME_PARTITION: return "Volume Partition Descriptor";
-        case ISO9660_VOLUME_TERMINATOR: return "Volume Descriptor Set Terminator";
-        default: return "Reserved";
-    }
+    return (iso_block_nr * ISO9660_BLOCK_SIZE) / BLOCK_SIZE;
 }
 
-static uint32_t convert_block_nr(uint32_t iso_block_nr, uint32_t iso_block_size)
-{
-    return (iso_block_nr * iso_block_size) / BLOCK_SIZE;
-}
-
-static ino_t iso9660_ino_get(const buffer_t* block, void* ptr)
+static ino_t ino_get(const buffer_t* block, void* ptr)
 {
     return block->block * BLOCK_SIZE + (addr(ptr) - addr(block->data));
 }
@@ -71,7 +58,7 @@ static ino_t iso9660_ino_get(const buffer_t* block, void* ptr)
 static buffer_t* block(iso9660_data_t* data, uint32_t block)
 {
     log_debug(DEBUG_ISO9660, "reading block %x", block);
-    return block_read(data->dev, data->file, convert_block_nr(block, data->block_size));
+    return block_read(data->dev, data->file, block_nr_convert(block));
 }
 
 static int iso9660_px_nm_find(iso9660_dirent_t* dirent, rrip_t** px, rrip_t** nm)
@@ -107,7 +94,7 @@ static int iso9660_next_entry(
 
     dirent = shift(dirent, dirent_len);
 
-    if (addr(dirent) > addr(b->data) + BLOCK_SIZE)
+    if (addr(dirent) - addr(b->data) > BLOCK_SIZE)
     {
         b = block_read(data->dev, data->file, b->block + 1);
 
@@ -152,6 +139,96 @@ static int iso9660_next_entry(
     return 0;
 }
 
+typedef int (*iso9660_visitor_t)(iso9660_dirent_t* dirent, rrip_t* px, rrip_t* nm, buffer_t* b, void* visitor_data);
+
+static int iso9660_traverse(
+    iso9660_data_t* data,
+    iso9660_dirent_t* parent_dirent,
+    void* visitor_data,
+    iso9660_visitor_t visitor,
+    iso9660_dirent_t** result_dirent,
+    rrip_t** result_px,
+    rrip_t** result_nm,
+    buffer_t** result_b)
+{
+    int errno, ret;
+    iso9660_dirent_t* dirent;
+    size_t dirents_len = GET(parent_dirent->data_len);
+    buffer_t* b = block(data, GET(parent_dirent->lba));
+    rrip_t* px;
+    rrip_t* nm;
+
+    if (unlikely((errno = errno_get(b))))
+    {
+        log_debug(DEBUG_ISO9660, "cannot read block %u", GET(parent_dirent->lba));
+        return errno;
+    }
+
+    for (dirent = b->data; dirents_len; errno = iso9660_next_entry(data, &dirent, &b, &dirents_len))
+    {
+        if (errno)
+        {
+            log_debug(DEBUG_ISO9660, "cannot go to next entry: %d", errno);
+            return errno;
+        }
+
+        if (dirent->name_len == 1 && (dirent->name[0] == 0 || dirent->name[0] == 1))
+        {
+            px = NULL;
+            nm = NULL;
+        }
+        else if (iso9660_px_nm_find(dirent, &px, &nm))
+        {
+            log_debug(DEBUG_ISO9660, "cannot find required entries: PX=%x, NM=%x", px, nm);
+            continue;
+        }
+
+        if ((ret = visitor(dirent, px, nm, b, visitor_data)))
+        {
+            *result_dirent = dirent;
+            *result_px = px;
+            *result_nm = nm;
+            *result_b = b;
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
+typedef struct find_data find_data_t;
+struct find_data
+{
+    const char* name;
+    const size_t name_len;
+};
+
+enum find_result
+{
+    DIRENT_NOT_FOUND = 0,
+    DIRENT_FOUND = 1,
+};
+
+static int iso9660_find_visitor(
+    iso9660_dirent_t* dirent,
+    rrip_t*,
+    rrip_t* nm,
+    buffer_t*,
+    void* visitor_data)
+{
+    find_data_t* data = visitor_data;
+
+    if (dirent->name_len == 1) // Ignore "." and ".." as VFS handles them on it's own
+    {
+        return DIRENT_NOT_FOUND;
+    }
+
+    size_t nm_name_len = NM_NAME_LEN(nm);
+    return data->name_len == nm_name_len && !strncmp(data->name, nm->nm.name, nm_name_len)
+        ? DIRENT_FOUND
+        : DIRENT_NOT_FOUND;
+}
+
 static int iso9660_dirent_find(
     iso9660_data_t* data,
     iso9660_dirent_t* parent_dirent,
@@ -163,69 +240,68 @@ static int iso9660_dirent_find(
 {
     int errno;
     iso9660_dirent_t* dirent;
-    rrip_t* px = NULL;
-    rrip_t* nm = NULL;
-    bool found = false;
-    size_t name_len = strlen(name);
-    size_t dirents_len = GET(parent_dirent->data_len);
+    rrip_t* px;
+    rrip_t* nm;
+    buffer_t* b;
 
-    buffer_t* b = block(data, GET(parent_dirent->lba));
+    find_data_t find_data = {.name = name, .name_len = strlen(name)};
+    errno = iso9660_traverse(data, parent_dirent, &find_data, &iso9660_find_visitor, &dirent, &px, &nm, &b);
 
-    if (unlikely((errno = errno_get(b))))
+    if (errno == DIRENT_FOUND)
     {
-        log_debug(DEBUG_ISO9660, "cannot read block %u", GET(parent_dirent->lba));
-        return errno;
+        *result_dirent = dirent;
+        *result_px = px;
+        *result_nm = nm;
+        *ino = ino_get(b, dirent);
+        return 0;
     }
 
-    dirent = b->data;
+    return errno ? errno : -ENOENT;
+}
 
-    for (dirent = b->data; dirents_len; errno = iso9660_next_entry(data, &dirent, &b, &dirents_len))
+typedef struct readdir_data readdir_data_t;
+struct readdir_data
+{
+    int count;
+    void* buf;
+    direntadd_t dirent_add;
+};
+
+enum readdir_result
+{
+    READDIR_CONTINUE = 0,
+    READDIR_STOP = 1,
+};
+
+static int iso9660_readdir_visitor(
+    iso9660_dirent_t* dirent,
+    rrip_t* px,
+    rrip_t* nm,
+    buffer_t* b,
+    void* visitor_data)
+{
+    ino_t ino = ino_get(b, dirent);
+    readdir_data_t* data = visitor_data;
+    direntadd_t dirent_add = data->dirent_add;
+    void* buf = data->buf;
+    int over;
+
+    if (dirent->name_len == 1 && dirent->name[0] == 0) // .
     {
-        if (errno)
-        {
-            log_debug(DEBUG_ISO9660, "cannot go to next entry: %d", errno);
-            return errno;
-        }
-
-        if (dirent->name_len == 1 && dirent->name[0] == 0) // .
-        {
-            if (!strcmp(".", name))
-            {
-                found = true;
-                break;
-            }
-            continue;
-        }
-        else if (dirent->name_len == 1 && dirent->name[0] == 1) // ..
-        {
-            if (!strcmp("..", name))
-            {
-                found = true;
-                break;
-            }
-            continue;
-        }
-
-        if (iso9660_px_nm_find(dirent, &px, &nm))
-        {
-            log_debug(DEBUG_ISO9660, "cannot find required entries: PX=%x, NM=%x", px, nm);
-            continue;
-        }
-
-        size_t nm_name_len = NM_NAME_LEN(nm);
-        if (name_len == nm_name_len && !strncmp(name, nm->nm.name, nm_name_len))
-        {
-            found = true;
-            break;
-        }
+        over = dirent_add(buf, ".", 1, 0, DT_DIR);
+    }
+    else if (dirent->name_len == 1 && dirent->name[0] == 1) // ..
+    {
+        over = dirent_add(buf, "..", 2, ino, DT_DIR);
+    }
+    else
+    {
+        size_t name_len = NM_NAME_LEN(nm);
+        over = dirent_add(buf, nm->nm.name, name_len, ino, S_ISDIR((umode_t)px->px.mode) ? DT_DIR : DT_REG);
     }
 
-    *result_dirent = dirent;
-    *result_px = px;
-    *result_nm = nm;
-    *ino = iso9660_ino_get(b, dirent);
-
-    return found ? 0 : -ENOENT;
+    ++data->count;
+    return over ? READDIR_STOP : READDIR_CONTINUE;
 }
 
 static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
@@ -246,6 +322,7 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
 
     if (unlikely((errno = inode_get(result))))
     {
+        log_debug(DEBUG_ISO9660, "cannot get free inode for \"%s\"", name);
         return errno;
     }
 
@@ -255,12 +332,21 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
     (*result)->size = GET(dirent->data_len);
     (*result)->file_ops = &iso9660_fops;
     (*result)->fs_data = dirent;
-    (*result)->mode = px ? (umode_t)px->px.mode : 0777 | S_IFDIR;
-    // FIXME: set those properly
-    (*result)->uid = 0;
-    (*result)->gid = 0;
-    (*result)->ctime = 0;
-    (*result)->mtime = 0;
+    if (px)
+    {
+        (*result)->mode = (umode_t)px->px.mode;
+        (*result)->uid = (uid_t)px->px.uid;
+        (*result)->gid = (gid_t)px->px.gid;
+        // FIXME: set time properly
+        (*result)->ctime = 0;
+        (*result)->mtime = 0;
+    }
+    else
+    {
+        (*result)->mode = parent->mode;
+        (*result)->uid = parent->uid;
+        (*result)->gid = parent->gid;
+    }
 
     return 0;
 }
@@ -279,7 +365,7 @@ static int iso9660_mmap(file_t* file, vm_area_t* vma, size_t offset)
     int errno;
     void* data_ptr;
     uint32_t pos = offset, data_size;
-    uint32_t block_nr = offset / BLOCK_SIZE + (GET(dirent->lba) * data->block_size) / BLOCK_SIZE;
+    uint32_t block_nr = offset / BLOCK_SIZE + block_nr_convert(GET(dirent->lba));
     size_t size = vma->end - vma->start;
     page_t* current_page;
     page_t* pages;
@@ -342,9 +428,8 @@ static int iso9660_read(file_t* file, char* buffer, size_t count)
     }
 
     int errno;
-    size_t block_size = data->block_size;
-    size_t block_nr = file->offset / block_size;
-    size_t block_offset = file->offset % block_size;
+    size_t block_nr = file->offset / ISO9660_BLOCK_SIZE;
+    size_t block_offset = file->offset % ISO9660_BLOCK_SIZE;
     size_t left = count = min(count, GET(dirent->data_len) - file->offset);
     size_t to_copy;
     buffer_t* b;
@@ -360,7 +445,7 @@ static int iso9660_read(file_t* file, char* buffer, size_t count)
 
     while (left)
     {
-        to_copy = min(block_size - block_offset, left);
+        to_copy = min(ISO9660_BLOCK_SIZE - block_offset, left);
         b = block(data, block_nr + lba);
 
         if (unlikely(errno = errno_get(b)))
@@ -393,59 +478,24 @@ static int iso9660_open(file_t*)
 
 static int iso9660_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
-    int i = 0;
-    int errno;
     iso9660_data_t* data = file->inode->sb->fs_data;
-    iso9660_dirent_t* dirent;
     iso9660_dirent_t* parent_dirent = file->inode->fs_data;
-    rrip_t* px = NULL;
-    rrip_t* nm = NULL;
-    bool over;
-    ino_t ino;
-    buffer_t* b = block(data, GET(parent_dirent->lba));
 
-    if (unlikely((errno = errno_get(b))))
+    int errno;
+    iso9660_dirent_t* dirent;
+    rrip_t* px;
+    rrip_t* nm;
+    buffer_t* b;
+
+    readdir_data_t readdir_data = {.dirent_add = dirent_add, .buf = buf, .count = 0};
+    errno = iso9660_traverse(data, parent_dirent, &readdir_data, &iso9660_readdir_visitor, &dirent, &px, &nm, &b);
+
+    if (errno < 0)
     {
-        log_debug(DEBUG_ISO9660, "cannot read block %u", GET(parent_dirent->lba));
         return errno;
     }
 
-    dirent = b->data;
-    size_t dirents_len = GET(parent_dirent->data_len);
-
-    for (dirent = b->data; dirents_len; errno = iso9660_next_entry(data, &dirent, &b, &dirents_len))
-    {
-        ino = iso9660_ino_get(b, dirent);
-
-        if (dirent->name_len == 1 && dirent->name[0] == 0) // .
-        {
-            over = dirent_add(buf, ".", 1, file->inode->ino, DT_DIR);
-            ++i;
-        }
-        else if (dirent->name_len == 1 && dirent->name[0] == 1) // ..
-        {
-            over = dirent_add(buf, "..", 2, ino, DT_DIR);
-            ++i;
-        }
-        else
-        {
-            if (iso9660_px_nm_find(dirent, &px, &nm))
-            {
-                log_debug(DEBUG_ISO9660, "cannot find required entries: PX=%x, NM=%x", px, nm);
-                continue;
-            }
-
-            over = dirent_add(buf, nm->nm.name, NM_NAME_LEN(nm), ino, S_ISDIR(px->px.mode) ? DT_DIR : DT_REG);
-            ++i;
-        }
-
-        if (over)
-        {
-            break;
-        }
-    }
-
-    return i;
+    return readdir_data.count;
 }
 
 static int iso9660_mount(super_block_t* sb, inode_t* inode, void*, int)
@@ -454,8 +504,7 @@ static int iso9660_mount(super_block_t* sb, inode_t* inode, void*, int)
     iso9660_sb_t* raw_sb;
     iso9660_pvd_t* pvd;
     iso9660_data_t* data;
-    uint32_t block_size;
-    buffer_t* b = block_read(sb->dev, sb->device_file, 32);
+    buffer_t* b = block_read(sb->dev, sb->device_file, block_nr_convert(ISO9660_START_BLOCK));
 
     if (unlikely(errno = errno_get(b)))
     {
@@ -471,35 +520,34 @@ static int iso9660_mount(super_block_t* sb, inode_t* inode, void*, int)
         return -ENODEV;
     }
 
+    if (unlikely(raw_sb->type != ISO9660_VOLUME_PRIMARY))
+    {
+        log_debug(DEBUG_ISO9660, "not a Primary Volume Descriptor");
+        return -ENODEV;
+    }
+
+    if (unlikely(GET(raw_sb->pvd.block_size) != ISO9660_BLOCK_SIZE))
+    {
+        log_debug(DEBUG_ISO9660, "unsupported block size: %u", GET(raw_sb->pvd.block_size));
+        return -EINVAL;
+    }
+
     if (unlikely(!(data = alloc(iso9660_data_t))))
     {
         log_debug(DEBUG_ISO9660, "cannot allocate memory for data");
         return -ENOMEM;
     }
+
     data->dev = sb->dev;
     data->file = sb->device_file;
     data->raw_sb = raw_sb;
+    data->root = &raw_sb->pvd.root;
 
     sb->ops = &iso9660_sb_ops;
     sb->module = this_module;
     sb->fs_data = data;
 
-    log_debug(DEBUG_ISO9660, "type: %s (%x), identifier: %.5s, version: %x",
-        iso9660_volume_desc_string(raw_sb->type),
-        raw_sb->type,
-        raw_sb->identifier,
-        raw_sb->version);
-
-    if (unlikely(raw_sb->type != ISO9660_VOLUME_PRIMARY))
-    {
-        return -ENODEV;
-    }
-
     pvd = &raw_sb->pvd;
-    block_size = GET(pvd->block_size);
-    data->block_size = block_size;
-    data->root = &pvd->root;
-
     inode->ino = ISO9660_ROOT_INO;
     inode->ops = &iso9660_inode_ops;
     inode->fs_data = &pvd->root;
