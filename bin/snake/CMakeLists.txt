@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     snake
     PRIVATE
-        libc
         "-Wl,-Map=snake.map"
 )

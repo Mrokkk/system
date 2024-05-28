@@ -433,3 +433,18 @@ int fprintf(FILE* file, const char* fmt, ...)
 
     return printed;
 }
+
+int fputs(const char* s, FILE* file)
+{
+    size_t len = strlen(s);
+    write(file->fd, s, len);
+
+    return len;
+}
+
+int puts(const char* s)
+{
+    int a = fputs(s, stdout);
+    write(stdout->fd, "\n", 1);
+    return a + 1;
+}

@@ -148,7 +148,7 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
         {
         }
 
-        if (phdr[i].p_type != PT_LOAD || phdr[i].p_offset == 0)
+        if (phdr[i].p_type != PT_LOAD)
         {
             continue;
         }

@@ -1,0 +1,133 @@
+commit e9228c4b6f8d99e165f3b5d6042e85be204284df
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Mon May 27 23:30:56 2024 +0200
+
+    Support for Phoenix
+    
+    * remove existing support for Phoenix-RTOS
+    * don't link shared libgcc with libc (for the future)
+
+diff --git a/fixincludes/mkfixinc.sh b/fixincludes/mkfixinc.sh
+index df90720b7..2f5541721 100755
+--- a/fixincludes/mkfixinc.sh
++++ b/fixincludes/mkfixinc.sh
+@@ -11,6 +11,8 @@ target=fixinc.sh
+ 
+ # Check for special fix rules for particular targets
+ case $machine in
++    *-phoenix* | \
++    *-*-phoenix* | \
+     i?86-*-cygwin* | \
+     i?86-*-mingw32* | \
+     x86_64-*-mingw32* | \
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 648b3dc21..dc1a020ad 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -966,6 +966,7 @@ case ${target} in
+   gas=yes
+   gnu_ld=yes
+   default_use_cxa_atexit=yes
++  use_gcc_stdint=provide
+   ;;
+ *-*-rtems*)
+   case ${enable_threads} in
+@@ -2021,6 +2022,10 @@ i[34567]86-pc-msdosdjgpp*)
+ 	gas=yes
+ 	use_gcc_stdint=wrap
+ 	;;
++
++i[34567]86-*-phoenix*)
++	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h phoenix.h"
++	;;
+ i[34567]86-*-lynxos*)
+ 	xm_defines=POSIX
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h i386/lynx.h lynx.h"
+diff --git a/gcc/config/phoenix.h b/gcc/config/phoenix.h
+index bbfdca449..68eb37804 100644
+--- a/gcc/config/phoenix.h
++++ b/gcc/config/phoenix.h
+@@ -1,33 +1,28 @@
+-/* Base configuration file for all Phoenix-RTOS targets.
+-   Copyright (C) 2016-2023 Free Software Foundation, Inc.
++/* Useful if you wish to make target-specific GCC changes. */
++#undef TARGET_PHOENIX
++#define TARGET_PHOENIX 1
+ 
+-This file is part of GCC.
++/* Default arguments you want when running your
++   i686-phoenix-gcc/x86_64-phoenix-gcc toolchain */
++#undef LIB_SPEC
++#define LIB_SPEC "-lc" /* link against C standard library */
+ 
+-GCC is free software; you can redistribute it and/or modify
+-it under the terms of the GNU General Public License as published by
+-the Free Software Foundation; either version 3, or (at your option)
+-any later version.
++/* Files that are linked before user code.
++   The %s tells GCC to look for these files in the library directory. */
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
+ 
+-GCC is distributed in the hope that it will be useful,
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License
+-along with GCC; see the file COPYING3.  If not see
+-<http://www.gnu.org/licenses/>.  */
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "crtend.o%s crtn.o%s"
+ 
++/* Additional predefined macros. */
+ #undef TARGET_OS_CPP_BUILTINS
+-#define TARGET_OS_CPP_BUILTINS()           \
+-    do {                                   \
+-      builtin_define_std ("phoenix");      \
+-      builtin_define_std ("unix");         \
+-      builtin_assert ("system=phoenix");   \
+-      builtin_assert ("system=unix");      \
+-    } while (0)
+-
+-#define STD_LIB_SPEC "%{!shared:%{g*:-lg} %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"
+-
+-/* This will prevent selecting 'unsigned long int' instead of 'unsigned int' as 'uint32_t' in stdint-newlib.h. */
+-#undef STDINT_LONG32
+-#define STDINT_LONG32		0
++#define TARGET_OS_CPP_BUILTINS()      \
++  do {                                \
++    builtin_define ("__phoenix__");      \
++    builtin_define ("__unix__");      \
++    builtin_assert ("system=phoenix");   \
++    builtin_assert ("system=unix");   \
++    builtin_assert ("system=posix");   \
++  } while(0);
+diff --git a/libgcc/config.host b/libgcc/config.host
+index 9d7212028..e7a16a769 100644
+--- a/libgcc/config.host
++++ b/libgcc/config.host
+@@ -704,6 +704,10 @@ i[34567]86-*-elfiamcu)
+ i[34567]86-*-elf*)
+ 	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
+ 	;;
++i[34567]86-*-phoenix*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
+ x86_64-*-elf* | x86_64-*-rtems*)
+ 	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
+ 	case ${host} in
+diff --git a/libgcc/config/t-slibgcc b/libgcc/config/t-slibgcc
+index 29765bce8..3f18082dd 100644
+--- a/libgcc/config/t-slibgcc
++++ b/libgcc/config/t-slibgcc
+@@ -26,7 +26,6 @@ SHLIB_MAP = @shlib_map_file@
+ SHLIB_OBJS = @shlib_objs@
+ SHLIB_DIR = @multilib_dir@
+ SHLIB_SLIBDIR_QUAL = @shlib_slibdir_qual@
+-SHLIB_LC = -lc
+ SHLIB_MAKE_SOLINK = $(LN_S) $(SHLIB_SONAME) $(SHLIB_DIR)/$(SHLIB_SOLINK)
+ SHLIB_INSTALL_SOLINK = $(LN_S) $(SHLIB_SONAME) \
+ 	$(DESTDIR)$(slibdir)$(SHLIB_SLIBDIR_QUAL)/$(SHLIB_SOLINK)

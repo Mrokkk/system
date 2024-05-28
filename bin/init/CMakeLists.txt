@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     init
     PRIVATE
-        libc
         "-Wl,-Map=init.map"
 )

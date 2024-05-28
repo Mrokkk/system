@@ -68,7 +68,7 @@ void dirent_print(struct dirent* dirent, struct stat* s)
 
     permissions_fill(buf, s->st_mode);
 
-    printf("%s %-5u %-5u %-10u %-10u %s%s"RESET"\n",
+    printf("%s %-5u %-5u %-10u %-10lu %s%s"RESET"\n",
         buf,
         s->st_uid,
         s->st_gid,

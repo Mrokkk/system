@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     colors
     PRIVATE
-        libc
         "-Wl,-Map=colors.map"
 )

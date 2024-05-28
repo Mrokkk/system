@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 void* malloc(size_t size);
-void* calloc(size_t size);
-void free(void* ptr, size_t size); // FIXME: non-standard free
+void* calloc(size_t nmemb, size_t size);
+void free(void* ptr); // FIXME: non-standard free
 
 [[noreturn]] void exit(int retcode);
 [[noreturn]] void abort(void);

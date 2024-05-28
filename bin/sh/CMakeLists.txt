@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     sh
     PRIVATE
-        libc
         "-Wl,-Map=sh.map"
 )

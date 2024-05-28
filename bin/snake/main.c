@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <stdio.h>
 #include <signal.h>
 #include <stdint.h>
@@ -116,7 +115,7 @@ static void map_initialize()
     xgrids = vinfo.xres / GRID_SIZE;
     ygrids = vinfo.yres / GRID_SIZE;
 
-    printf("Map: %u x %u\n", xgrids, ygrids);
+    printf("Map: %lu x %lu\n", xgrids, ygrids);
 
     cells = malloc(sizeof(struct cell) * xgrids * ygrids);
 

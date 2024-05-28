@@ -179,7 +179,7 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
 
     if (command[0] != '/')
     {
-        sprintf(buffer, "/bin/%s", command);
+        sprintf(buffer, "/bin/%.120s", command);
         err = stat(buffer, &s);
         if (err)
         {

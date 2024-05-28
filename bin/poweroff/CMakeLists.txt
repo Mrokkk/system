@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     poweroff
     PRIVATE
-        libc
         "-Wl,-Map=poweroff.map"
 )

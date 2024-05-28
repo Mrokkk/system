@@ -1,5 +1,5 @@
 void bss_init()
 {
-    extern char _sbss[], _ebss[];
-    __builtin_memset(_sbss, 0, _ebss - _sbss);
+    extern char __bss_start[], _end[];
+    __builtin_memset(__bss_start, 0, _end - __bss_start);
 }

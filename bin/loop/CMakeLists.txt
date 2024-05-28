@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     loop
     PRIVATE
-        libc
         "-Wl,-Map=loop.map"
 )

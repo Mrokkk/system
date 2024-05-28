@@ -5,7 +5,9 @@
 
 #define addr(x)             ((uint32_t)(x))
 #define ptr(x)              ((void*)(x))
+#ifndef offsetof
 #define offsetof(st, m)     __builtin_offsetof(st, m)
+#endif
 
 static inline int clamp(int value, int min, int max)
 {

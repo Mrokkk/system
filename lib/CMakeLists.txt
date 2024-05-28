@@ -4,7 +4,7 @@ include_directories(
    ${PROJECT_SOURCE_DIR}/lib/include
 )
 
-add_library(libc STATIC
+add_library(c STATIC
     abort.c
     bss.c
     errno.c
@@ -14,5 +14,25 @@ add_library(libc STATIC
     stdio.c
     string.c
     syscall.c
-    crt0.c
 )
+
+add_library(crt0 STATIC crt0.c)
+
+add_custom_target(
+    libc_headers_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/lib/include" ../toolchain/sysroot/usr/include
+    COMMENT "Installing libc headers"
+)
+
+add_custom_target(
+    crt0_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0> ../toolchain/sysroot/usr/lib/crt0.o
+    DEPENDS crt0 libc_headers_install
+    COMMENT "Installing crt0"
+)
+
+add_custom_target(
+    libc_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.a ../toolchain/sysroot/usr/lib/libc.a
+    DEPENDS crt0_install c
+    COMMENT "Installing libc")

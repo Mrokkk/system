@@ -10,6 +10,8 @@ BITSET_DECLARE(bitset, MALLOC_AREA / MALLOC_BLOCK_SIZE);
 
 static void* data;
 
+// TODO: write proper allocator
+
 #define ADDR(a) ((unsigned int)(a))
 #define PTR(a) ((void*)(a))
 
@@ -37,19 +39,19 @@ void* malloc(size_t size)
     return data + frame * MALLOC_BLOCK_SIZE;
 }
 
-void* calloc(size_t size)
+void* calloc(size_t nmemb, size_t size)
 {
-    void* data = malloc(size);
+    void* data = malloc(size * nmemb);
     if (data)
     {
-        memset(data, 0, size);
+        memset(data, 0, size * nmemb);
     }
     return data;
 }
 
-void free(void* PTR, size_t size)
+void free(void*)
 {
-    size_t frame = (ADDR(PTR) - ADDR(data)) / MALLOC_BLOCK_SIZE;
-    size_t blocks = ALIGN_TO(size, MALLOC_BLOCK_SIZE) / MALLOC_BLOCK_SIZE;
-    bitset_clear_range(bitset, frame, blocks);
+    /*size_t frame = (ADDR(PTR) - ADDR(data)) / MALLOC_BLOCK_SIZE;*/
+    /*size_t blocks = ALIGN_TO(size, MALLOC_BLOCK_SIZE) / MALLOC_BLOCK_SIZE;*/
+    /*bitset_clear_range(bitset, frame, blocks);*/
 }

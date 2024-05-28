@@ -9,6 +9,5 @@ add_executable(
 target_link_libraries(
     reboot
     PRIVATE
-        libc
         "-Wl,-Map=reboot.map"
 )

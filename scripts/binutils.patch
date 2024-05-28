@@ -1,0 +1,98 @@
+commit 14ef51748e299da4ab8faf59bfefcbbe2518128c
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Mon May 27 22:25:00 2024 +0200
+
+    Add support for Phoenix
+    
+    * data section aligned to 0x1000, as a WA for not handling the mmap with
+      offset not aligned to page size
+
+diff --git a/bfd/config.bfd b/bfd/config.bfd
+index bbf12447..f7c8661d 100644
+--- a/bfd/config.bfd
++++ b/bfd/config.bfd
+@@ -621,6 +621,10 @@ case "${targ}" in
+     targ_defvec=i386_coff_go32_vec
+     targ_selvecs="i386_coff_go32stubbed_vec i386_aout_vec"
+     ;;
++  i[3-7]86-*-phoenix*)
++    targ_defvec=i386_elf32_vec
++    targ_selvecs="iamcu_elf32_vec"
++    ;;
+   i[3-7]86-*-darwin* | i[3-7]86-*-macos10* | i[3-7]86-*-rhapsody*)
+     targ_defvec=i386_mach_o_vec
+     targ_selvecs="mach_o_le_vec mach_o_be_vec mach_o_fat_vec pef_vec pef_xlib_vec sym_vec"
+diff --git a/config.sub b/config.sub
+index defe52c0..39a66f25 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1766,7 +1766,7 @@ case $os in
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
+-	     | fiwix* | mlibc* | cos* | mbr* )
++	     | fiwix* | mlibc* | cos* | mbr* | phoenix* )
+ 		;;
+ 	# This one is extra strict with allowed versions
+ 	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
+diff --git a/gas/configure.tgt b/gas/configure.tgt
+index 7c66734e..81e65f83 100644
+--- a/gas/configure.tgt
++++ b/gas/configure.tgt
+@@ -237,6 +237,7 @@ case ${generic_target} in
+   i386-*-knetbsd*-gnu | \
+   i386-*-netbsd* | \
+   i386-*-openbsd*)			fmt=elf em=nbsd ;;
++  i386-*-phoenix*)			fmt=elf em=linux ;;
+   i386-*-linux-*)			fmt=elf em=linux
+     case ${cpu}-${os} in
+       x86_64*-linux-gnux32)		arch=x86_64:32 ;;
+diff --git a/ld/Makefile.am b/ld/Makefile.am
+index f9ee05b1..aeeed65c 100644
+--- a/ld/Makefile.am
++++ b/ld/Makefile.am
+@@ -152,6 +152,7 @@ endif
+ 
+ # These all start with e so 'make clean' can find them.
+ ALL_EMULATION_SOURCES = \
++	eelf_i386_phoenix.c \
+ 	eaix5ppc.c \
+ 	eaix5rs6.c \
+ 	eaixppc.c \
+diff --git a/ld/configure.tgt b/ld/configure.tgt
+index f937f78b..595086e2 100644
+--- a/ld/configure.tgt
++++ b/ld/configure.tgt
+@@ -446,6 +446,9 @@ i[3-7]86-*-beos*)	targ_emul=elf_i386_be
+ 			;;
+ i[3-7]86-*-haiku*)	targ_emul=elf_i386_haiku
+ 			;;
++i[3-7]86-*-phoenix*)	targ_emul=elf_i386_phoenix
++			targ_extra_emuls=elf_i386
++			;;
+ i[3-7]86-*-vxworks*)	targ_emul=elf_i386_vxworks
+ 			;;
+ i[3-7]86-*-chaos)	targ_emul=elf_i386_chaos
+diff --git a/ld/emulparams/elf_i386_phoenix.sh b/ld/emulparams/elf_i386_phoenix.sh
+new file mode 100644
+index 00000000..2009665d
+--- /dev/null
++++ b/ld/emulparams/elf_i386_phoenix.sh
+@@ -0,0 +1,3 @@
++source_sh ${srcdir}/emulparams/elf_i386.sh
++TEXT_START_ADDR=0x1000
++DATA_ADDR="ALIGN (0x1000)"
+diff --git a/ld/emulparams/elf_phoenix.sh b/ld/emulparams/elf_phoenix.sh
+new file mode 100644
+index 00000000..59e8e04e
+--- /dev/null
++++ b/ld/emulparams/elf_phoenix.sh
+@@ -0,0 +1 @@
++source_sh ${srcdir}/emulparams/elf_i386_phoenix.sh
+diff --git a/ld/emulparams/i386phoenix.sh b/ld/emulparams/i386phoenix.sh
+new file mode 100644
+index 00000000..59e8e04e
+--- /dev/null
++++ b/ld/emulparams/i386phoenix.sh
+@@ -0,0 +1 @@
++source_sh ${srcdir}/emulparams/elf_i386_phoenix.sh
