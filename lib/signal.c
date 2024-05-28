@@ -7,6 +7,11 @@ static void restore(void)
     syscall(__NR_sigreturn, 0);
 }
 
+int raise(int sig)
+{
+    return kill(getpid(), sig);
+}
+
 void signals_init()
 {
     struct sigaction s;

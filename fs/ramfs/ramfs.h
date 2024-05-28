@@ -22,7 +22,7 @@ struct ram_sb
 struct ram_node
 {
     char name[RAMFS_NAME_MAX_LEN];
-    umode_t mode;
+    mode_t mode;
     struct inode* inode;
     void* data;
 };

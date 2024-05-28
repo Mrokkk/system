@@ -122,7 +122,7 @@ int ramfs_open(file_t*)
     return 0;
 }
 
-static inline void ram_node_init(ram_node_t* this, umode_t mode, const char* name)
+static inline void ram_node_init(ram_node_t* this, mode_t mode, const char* name)
 {
     this->mode = mode | S_IRUGO | S_IWUGO | S_IXUGO;
     this->data = NULL;
@@ -130,7 +130,7 @@ static inline void ram_node_init(ram_node_t* this, umode_t mode, const char* nam
     strcpy(this->name, name);
 }
 
-static inline int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t** result, umode_t mode)
+static inline int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t** result, mode_t mode)
 {
     ram_node_t* new_node;
     ram_dirent_t* dirent;
@@ -192,7 +192,7 @@ int ramfs_create_node(
     inode_t* parent,
     const char* name,
     inode_t** result_inode,
-    umode_t mode)
+    mode_t mode)
 {
     int errno;
     ram_node_t* new_node;

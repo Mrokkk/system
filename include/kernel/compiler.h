@@ -51,9 +51,6 @@
 #define typecheck_ptr(x) \
     ({ typeof(x) dummy; (void)sizeof(*dummy); 1; })
 
-#define div(value, div, mod) \
-    ({ mod = (value) % (div); (value) / (div); })
-
 #else
 
 #error "Not compatibile compiler!"

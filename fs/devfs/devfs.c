@@ -24,7 +24,7 @@ typedef struct
 
 typedef struct
 {
-    umode_t mode;
+    mode_t mode;
     union
     {
         dir_node_t dir;

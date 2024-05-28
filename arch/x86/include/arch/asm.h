@@ -120,6 +120,8 @@
         ret; \
     ENDPROC(name)
 
+#define __syscall1_noret __syscall1
+
 #define __syscall2(name, ...) \
     ENTRY(name) \
         push %ebx; \

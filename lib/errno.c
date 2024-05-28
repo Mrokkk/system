@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-volatile int errno;
+int errno;
 
 const char* errors[] = {
     [EPERM]           = "Operation not permitted",

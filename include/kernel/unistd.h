@@ -68,7 +68,7 @@
 int fork(void);
 int getpid(void);
 int getppid(void);
-int exit(int);
+[[noreturn]] void exit(int);
 int write(int, const char*, size_t);
 int read(int, char*, size_t);
 int open(const char*, int, int);
@@ -105,6 +105,10 @@ struct pollfd;
 #define __syscall1(...)
 #endif
 
+#ifndef __syscall1_noret
+#define __syscall1_noret(...)
+#endif
+
 #ifndef __syscall2
 #define __syscall2(...)
 #endif
@@ -125,7 +129,7 @@ struct pollfd;
 #define __syscall6(...)
 #endif
 
-__syscall1(exit, int, int)
+__syscall1_noret(exit, void, int)
 __syscall0(fork, int)
 __syscall3(read, int, int, char*, size_t)
 __syscall3(write, int, int, const char*, size_t)

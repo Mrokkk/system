@@ -18,7 +18,7 @@ struct procfs_entry
 {
     const char* name;
     size_t len;
-    umode_t mode;
+    mode_t mode;
     inode_operations_t* iops;
     file_operations_t* fops;
 };

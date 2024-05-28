@@ -35,6 +35,8 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_ADDITIONAL} \
     -DFRAME_POINTER=${FRAME_POINTER}")
 
+set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
+
 include_directories(
    ${PROJECT_SOURCE_DIR}/include
    ${PROJECT_SOURCE_DIR}/arch/${ARCH}/include

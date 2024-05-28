@@ -178,7 +178,7 @@ int process_find(int pid, struct process** p);
 void process_wake_waiting(struct process* p);
 int process_find_free_fd(struct process* p, int* fd);
 void scheduler();
-int exit(int);
+void exit(int);
 int fork(void);
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[]);

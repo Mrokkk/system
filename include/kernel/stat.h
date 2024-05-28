@@ -44,7 +44,7 @@
 
 struct stat
 {
-    umode_t st_mode;    // File mode
+    mode_t st_mode;    // File mode
     ino_t   st_ino;     // File serial number
     dev_t   st_dev;     // Device containing the file
     uid_t   st_uid;     // User ID of the file's owner

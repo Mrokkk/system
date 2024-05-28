@@ -11,7 +11,7 @@
 #define DIRECTORY   "\033[34m"
 #define RESET       "\033[0m"
 
-static inline void permissions_fill(char* buffer, umode_t mode)
+static inline void permissions_fill(char* buffer, mode_t mode)
 {
     if (S_ISDIR(mode))
     {

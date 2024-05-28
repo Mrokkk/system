@@ -266,7 +266,7 @@ int sys_chdir(const char* __user path)
 {
     int errno;
     dentry_t* dentry;
-    umode_t mode;
+    mode_t mode;
 
     if ((errno = path_validate(path)))
     {

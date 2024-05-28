@@ -297,7 +297,7 @@ static int iso9660_readdir_visitor(
     else
     {
         size_t name_len = NM_NAME_LEN(nm);
-        over = dirent_add(buf, nm->nm.name, name_len, ino, S_ISDIR((umode_t)px->px.mode) ? DT_DIR : DT_REG);
+        over = dirent_add(buf, nm->nm.name, name_len, ino, S_ISDIR((mode_t)px->px.mode) ? DT_DIR : DT_REG);
     }
 
     ++data->count;
@@ -334,7 +334,7 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
     (*result)->fs_data = dirent;
     if (px)
     {
-        (*result)->mode = (umode_t)px->px.mode;
+        (*result)->mode = (mode_t)px->px.mode;
         (*result)->uid = (uid_t)px->px.uid;
         (*result)->gid = (gid_t)px->px.gid;
         // FIXME: set time properly

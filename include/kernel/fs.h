@@ -44,7 +44,7 @@ struct inode
     MAGIC_NUMBER;
     dev_t dev;
     ino_t ino;
-    umode_t mode;
+    mode_t mode;
     uid_t uid;
     gid_t gid;
     time_t ctime;
@@ -172,7 +172,7 @@ static inline void __close(file_t** file)
 
 #define scoped_file_t CLEANUP(__close) file_t
 
-static inline char mode_to_type(umode_t mode)
+static inline char mode_to_type(mode_t mode)
 {
     if (S_ISREG(mode)) return DT_REG;
     if (S_ISDIR(mode)) return DT_DIR;

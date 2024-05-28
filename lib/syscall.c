@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <stdio.h>
 #include <stdarg.h>
 #include <sys/stat.h>
 
@@ -46,6 +45,13 @@ int syscall(int nr, ...)
     ret name(typeof(t1) a1) \
     { \
         return (ret)syscall(__NR_##name, a1); \
+    }
+
+#define __syscall1_noret(name, ret, t1) \
+    ret name(typeof(t1) a1) \
+    { \
+        syscall(__NR_##name, a1); \
+        __builtin_unreachable(); \
     }
 
 #define __syscall2(name, ret, t1, t2) \

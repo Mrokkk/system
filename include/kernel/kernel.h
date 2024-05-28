@@ -1,7 +1,5 @@
 #pragma once
 
-// Some common used includes and functions
-
 #include <stddef.h>
 #include <stdint.h>
 
