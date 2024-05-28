@@ -7,6 +7,7 @@ void* malloc(size_t size);
 void* calloc(size_t size);
 void free(void* ptr, size_t size); // FIXME: non-standard free
 
+[[noreturn]] void exit(int retcode);
 [[noreturn]] void abort(void);
 
 #define EXIT_SUCCESS    0

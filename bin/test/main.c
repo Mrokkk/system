@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <signal.h>
-#include <stdint.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -26,6 +25,7 @@ int sighan()
         waitpid(pid, &status, 0); \
         EXPECT_GT(WIFEXITED(status), 0); \
         EXPECT_EQ(WEXITSTATUS(status), expected_error_code); \
+        EXPECT_EQ(WIFSIGNALED(status), 0); \
     } \
     else
 
