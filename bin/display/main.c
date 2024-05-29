@@ -46,11 +46,10 @@ static void cleanup()
     }
 }
 
-static int sighan()
+static void sighan()
 {
     cleanup();
     exit(EXIT_FAILURE);
-    return 0;
 }
 
 static void signal_handlers_set(void)

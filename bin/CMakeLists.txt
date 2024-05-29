@@ -1,7 +1,12 @@
 project(bin)
 
-set(BIN_C_FLAGS "${C_FLAGS_STANDARD} -Os ${C_FLAGS_OTHER} ${C_FLAGS_WARNINGS} -DUSER -ggdb3")
-set(CMAKE_C_FLAGS "${BIN_C_FLAGS} -m32 -msse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
+set(CMAKE_C_FLAGS
+    "-pipe \
+    ${C_FLAGS_STANDARD} \
+    ${C_FLAGS_OPTIMIZATION} \
+    ${C_FLAGS_WARNINGS} \
+    ${C_FLAGS_DEBUG} \
+    -m32 -msse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
 
 file(GLOB bin_common_src "*.c")
 

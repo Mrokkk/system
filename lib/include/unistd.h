@@ -9,5 +9,6 @@
 #ifndef __ASSEMBLER__
 
 int syscall(int nr, ...);
+int isatty(int fd);
 
 #endif // __ASSEMBLER__

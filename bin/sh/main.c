@@ -39,16 +39,14 @@ struct job
     struct job* next;
 };
 
-int sigint(int)
+void sigint(int)
 {
     printf("^C\n");
-    return 0;
 }
 
-int sigtstp(int)
+void sigtstp(int)
 {
     printf("^Z\n");
-    return 0;
 }
 
 static inline void read_line(char* line, size_t size)
@@ -119,9 +117,8 @@ int c_fg(const char* arg)
 int c_pwd(const char*)
 {
     char buf[32];
-    int errno;
 
-    if ((errno = getcwd(buf, 32)))
+    if (getcwd(buf, 32))
     {
         return errno;
     }

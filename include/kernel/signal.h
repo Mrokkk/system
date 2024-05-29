@@ -37,7 +37,11 @@
 
 #define NSIGNALS    32
 
-typedef int (*sighandler_t)();
+#define SIG_DFL     ((void (*)(int))1)
+#define SIG_IGN     ((void (*)(int))2)
+#define SIG_ERR     (-1)
+
+typedef void (*sighandler_t)();
 typedef void (*sigrestorer_t)(void);
 
 struct process;

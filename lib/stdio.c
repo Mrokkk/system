@@ -1,15 +1,24 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
+#define PRINTF_BUFFER   512
+
+struct file
+{
+    int fd;
+    uint32_t magic;
+};
+
 static FILE files[] = {
-    { STDIN_FILENO },
-    { STDOUT_FILENO },
-    { STDERR_FILENO }
+    { STDIN_FILENO, FILE_MAGIC },
+    { STDOUT_FILENO, FILE_MAGIC },
+    { STDERR_FILENO, FILE_MAGIC }
 };
 
 FILE* stdin = &files[STDIN_FILENO];
@@ -164,6 +173,26 @@ static char* number(
         *str++ = ' ';
     }
     return str;
+}
+
+int scanf(const char*, ...)
+{
+    NOT_IMPLEMENTED(EOF);
+}
+
+int fscanf(FILE*, const char*, ...)
+{
+    NOT_IMPLEMENTED(EOF);
+}
+
+int vscanf(const char*, va_list)
+{
+    NOT_IMPLEMENTED(EOF);
+}
+
+int vfscanf(FILE*, const char*, va_list)
+{
+    NOT_IMPLEMENTED(EOF);
 }
 
 int vsprintf(char* buf, const char* fmt, va_list args)
@@ -397,6 +426,8 @@ int sprintf(char* buf, const char* fmt, ...)
     va_list args;
     int i;
 
+    VALIDATE_INPUT(buf && fmt, -1);
+
     va_start(args, fmt);
     i = vsprintf(buf, fmt, args);
     va_end(args);
@@ -406,45 +437,101 @@ int sprintf(char* buf, const char* fmt, ...)
 
 int printf(const char* fmt, ...)
 {
-    char printf_buf[512];
+    char printf_buf[PRINTF_BUFFER];
     va_list args;
     int printed;
+
+    VALIDATE_INPUT(fmt, -1);
 
     va_start(args, fmt);
     printed = vsprintf(printf_buf, fmt, args);
     va_end(args);
 
-    write(1, printf_buf, strlen(printf_buf));
-
-    return printed;
+    return write(1, printf_buf, printed);
 }
 
 int fprintf(FILE* file, const char* fmt, ...)
 {
-    char printf_buf[512];
+    char printf_buf[PRINTF_BUFFER];
     va_list args;
     int printed;
+
+    VALIDATE_INPUT(file && fmt, -1);
 
     va_start(args, fmt);
     printed = vsprintf(printf_buf, fmt, args);
     va_end(args);
 
-    write(file->fd, printf_buf, strlen(printf_buf));
+    return write(file->fd, printf_buf, printed);
+}
 
-    return printed;
+FILE* fopen(const char* pathname, const char* mode)
+{
+    int fd;
+    FILE* file;
+
+    VALIDATE_INPUT(pathname && mode, NULL);
+    fd = SAFE_SYSCALL(open(pathname, O_RDONLY), NULL); // FIXME: parse mode
+    file = SAFE_ALLOC(malloc(sizeof(*file)), NULL);
+
+    file->fd = fd;
+    file->magic = FILE_MAGIC;
+
+    return file;
+}
+
+int fclose(FILE* stream)
+{
+    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
+    return close(stream->fd);
+}
+
+int fileno(FILE* stream)
+{
+    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
+    return stream->fd;
+}
+
+int fgetc(FILE* stream)
+{
+    char data[2];
+    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
+    SAFE_SYSCALL(read(stream->fd, data, 1), EOF);
+    return (int)data[0];
+}
+
+char* fgets(char*, int, FILE*)
+{
+    NOT_IMPLEMENTED(NULL);
+}
+
+int ungetc(int, FILE*)
+{
+    NOT_IMPLEMENTED(EOF);
+}
+
+int fputc(int c, FILE* stream)
+{
+    SAFE_SYSCALL(write(stream->fd, (const char*)&c, 1), EOF);
+    return c;
+}
+
+STRONG_ALIAS(fputc, putc);
+
+int putchar(int c)
+{
+    return fputc(c, stdout);
 }
 
 int fputs(const char* s, FILE* file)
 {
-    size_t len = strlen(s);
-    write(file->fd, s, len);
-
-    return len;
+    VALIDATE_INPUT(FILE_CHECK(file) && s, EOF);
+    return SAFE_SYSCALL(write(file->fd, s, strlen(s)), EOF);
 }
 
 int puts(const char* s)
 {
-    int a = fputs(s, stdout);
-    write(stdout->fd, "\n", 1);
-    return a + 1;
+    int len = fputs(s, stdout);
+    SAFE_SYSCALL(write(stdout->fd, "\n", 1), EOF);
+    return len + 1;
 }

@@ -73,6 +73,19 @@ dentry_t* dentry_lookup(dentry_t* parent_dentry, const char* name)
     return NULL;
 }
 
+dentry_t* dentry_get(struct inode* inode)
+{
+    dentry_t* dentry;
+    list_for_each_entry(dentry, &dentry_cache, cache)
+    {
+        if (dentry->inode == inode)
+        {
+            return dentry;
+        }
+    }
+    return NULL;
+}
+
 char* dentry_print(const void* data, char* str)
 {
     const dentry_t* dentry = data;

@@ -1,7 +1,8 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <bitset.h>
+#include <kernel/bitset.h>
 
 #define MALLOC_AREA         0x14000
 #define MALLOC_BLOCK_SIZE   8
@@ -12,15 +13,11 @@ static void* data;
 
 // TODO: write proper allocator
 
-#define ADDR(a) ((unsigned int)(a))
-#define PTR(a) ((void*)(a))
-
-#define ALIGN_TO(address, size) \
-    (((address) + size - 1) & (~(size - 1)))
-
 void* malloc(size_t size)
 {
     size_t blocks = ALIGN_TO(size, MALLOC_BLOCK_SIZE) / MALLOC_BLOCK_SIZE;
+
+    VALIDATE_INPUT(size, NULL);
 
     if (!data)
     {

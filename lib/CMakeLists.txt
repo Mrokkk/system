@@ -1,4 +1,4 @@
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -nostdinc -include ${PROJECT_SOURCE_DIR}/lib/libc.h")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${PROJECT_SOURCE_DIR}/lib/libc.h")
 
 include_directories(
    ${PROJECT_SOURCE_DIR}/lib/include
@@ -8,12 +8,17 @@ add_library(c STATIC
     abort.c
     bss.c
     errno.c
+    getcwd.c
+    getenv.c
     libc_main.c
     malloc.c
+    pwd.c
     signal.c
     stdio.c
     string.c
     syscall.c
+    time.c
+    ../kernel/lib/bitset.c
 )
 
 add_library(crt0 STATIC crt0.c)
@@ -22,6 +27,7 @@ add_custom_target(
     libc_headers_install
     COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/lib/include" ../toolchain/sysroot/usr/include
     COMMENT "Installing libc headers"
+    DEPENDS kernel_headers_install
 )
 
 add_custom_target(

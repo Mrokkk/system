@@ -1,9 +1,15 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 project(system C)
 
 set(ARCH x86)
 set(FRAME_POINTER 1)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
 
 include(arch/${ARCH}/arch.cmake)
 
@@ -11,7 +17,7 @@ set(C_FLAGS_STANDARD "-std=gnu11")
 set(C_FLAGS_OPTIMIZATION "-O2")
 set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib -Wl,-no-pie -fno-pie -fno-PIC -nostartfiles -fno-asynchronous-unwind-tables -fno-stack-protector") # -fno-strength-reduce
 set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
-set(C_DEBUG "-ggdb3")
+set(C_FLAGS_DEBUG "-ggdb3")
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     set(C_FLAGS_ADDITIONAL "-Wno-error -Wno-unused-command-line-argument -Wno-c2x-extensions -Wno-strict-prototypes -Wno-address-of-packed-member")
@@ -30,7 +36,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_OPTIMIZATION} \
     ${C_FLAGS_WARNINGS} \
     ${C_FLAGS_ARCH} \
-    ${C_DEBUG} \
+    ${C_FLAGS_DEBUG} \
     ${C_FLAGS_FRAME_POINTER} \
     ${C_FLAGS_ADDITIONAL} \
     -DFRAME_POINTER=${FRAME_POINTER}")
@@ -62,6 +68,12 @@ target_link_libraries(
 
 add_subdirectory(lib)
 add_subdirectory(bin)
+
+add_custom_target(
+    kernel_headers_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/include" toolchain/sysroot/usr/include
+    COMMENT "Installing libc headers"
+)
 
 add_custom_target(
     ksyms

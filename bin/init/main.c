@@ -5,10 +5,12 @@
 #include <unistd.h>
 #include <kernel/reboot.h>
 
+#define MAX_CMDLINE_LEN 128
+
 typedef struct options
 {
     const char* cmdline;
-    char console_device[32];
+    char console_device[128];
 } options_t;
 
 static inline const char* parse_key_value(
@@ -20,19 +22,17 @@ static inline const char* parse_key_value(
     {
         src = strchr(src, '=') + 1;
         const char* next = strchr(src, ' ');
-        size_t len = strlen(src);
-
-        char* string = strncpy(
-            dest,
-            src,
-            next ? (size_t)(next - src) : len);
+        size_t len = strnlen(src, MAX_CMDLINE_LEN);
+        char* string;
 
         if (next)
         {
+            string = strncpy(dest, src, next - src);
             src = next + 1;
         }
         else
         {
+            string = strncpy(dest, src, len);
             src += len;
         }
         *string = 0;

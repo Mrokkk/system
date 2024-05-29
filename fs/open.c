@@ -329,3 +329,28 @@ int sys_stat(const char* __user pathname, struct stat* __user statbuf)
 
     return 0;
 }
+
+int sys_fstat(int fd, struct stat* statbuf)
+{
+    dentry_t* dentry;
+
+    file_t* file;
+
+    if (fd_check_bounds(fd)) return -EBADF;
+    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    if (!(dentry = dentry_get(file->inode)))
+    {
+        log_error("VFS issue: inode %x has no dentry", file->inode);
+        return -ENOENT;
+    }
+
+    statbuf->st_ino = dentry->inode->ino;
+    statbuf->st_dev = dentry->inode->dev;
+    statbuf->st_size = dentry->inode->size;
+    statbuf->st_mode = dentry->inode->mode;
+    statbuf->st_uid = dentry->inode->uid;
+    statbuf->st_gid = dentry->inode->gid;
+
+    return 0;
+}

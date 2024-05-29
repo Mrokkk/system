@@ -11,7 +11,7 @@ typedef int (*syscall_t)();
 #define __syscall4(...)         __syscall(__VA_ARGS__)
 #define __syscall5(...)         __syscall(__VA_ARGS__)
 #define __syscall6(...)         __syscall(__VA_ARGS__)
-#include <kernel/unistd.h>
+#include <kernel/syscall.h>
 
 #undef __syscall
 #undef __syscall0
@@ -33,5 +33,5 @@ typedef int (*syscall_t)();
 #define __syscall6(...)         __syscall(__VA_ARGS__)
 
 syscall_t syscalls[] = {
-#include <kernel/unistd.h>
+#include <kernel/syscall.h>
 };

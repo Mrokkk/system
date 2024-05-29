@@ -6,7 +6,7 @@
 #include <kernel/errno.h>
 
 #include <arch/isr.h>
-#include <kernel/unistd.h>
+#include <kernel/syscall.h>
 #include <arch/exception.h>
 
 ENTRY(__semaphore_wake)

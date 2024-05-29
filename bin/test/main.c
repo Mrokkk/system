@@ -12,10 +12,9 @@ int data3[1028];
 
 int sigreceived;
 
-int sighan()
+void sighan()
 {
     sigreceived = 1;
-    return 0;
 }
 
 #define FORK_TEST_CASE_EQ(expected_error_code) \

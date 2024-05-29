@@ -16,7 +16,7 @@ struct object
     struct tga_header* pressed_img;
     vector2_t position;
     vector2_t size;
-    int (*on_click)(object_t* object, vector2_t* position);
+    void (*on_click)(object_t* object, vector2_t* position);
     struct window* window;
     list_head_t list;
     list_head_t dirty;

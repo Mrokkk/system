@@ -56,3 +56,4 @@ struct stat
 };
 
 int stat(const char* restrict pathname, struct stat* restrict statbuf);
+int fstat(int fd, struct stat* statbuf);

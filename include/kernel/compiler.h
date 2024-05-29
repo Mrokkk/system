@@ -16,8 +16,6 @@
 #define SECTION(x)              __attribute__((section(#x)))
 #define COMPILE_ERROR(msg)      __attribute__((__error__(msg)))
 #define CLEANUP(fn)             __attribute__((cleanup(fn)))
-#define LIKELY                  __attribute__((unused, hot))
-#define UNLIKELY                __attribute__((unused, cold))
 #define MUST_CHECK(ret)         __attribute__((warn_unused_result)) ret
 #define NORETURN(fn)             __attribute__((noreturn)) fn
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn

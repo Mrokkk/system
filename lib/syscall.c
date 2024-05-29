@@ -26,7 +26,7 @@ int syscall(int nr, ...)
           "D" (a5)
         : "memory");
 
-    if (unlikely(res < 0 && res >= -ERRNO_MAX))
+    if (UNLIKELY(res < 0 && res >= -ERRNO_MAX))
     {
         errno = -res;
         res = -1;
@@ -36,52 +36,60 @@ int syscall(int nr, ...)
 }
 
 #define __syscall0(name, ret) \
-    ret name(void) \
+    ret LIBC(name)(void) \
     { \
         return (ret)syscall(__NR_##name); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall1(name, ret, t1) \
-    ret name(typeof(t1) a1) \
+    ret LIBC(name)(typeof(t1) a1) \
     { \
         return (ret)syscall(__NR_##name, a1); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall1_noret(name, ret, t1) \
-    ret name(typeof(t1) a1) \
+    ret LIBC(name)(typeof(t1) a1) \
     { \
         syscall(__NR_##name, a1); \
         __builtin_unreachable(); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall2(name, ret, t1, t2) \
-    ret name(typeof(t1) a1, typeof(t2) a2) \
+    ret LIBC(name)(typeof(t1) a1, typeof(t2) a2) \
     { \
         return (ret)syscall(__NR_##name, a1, a2); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall3(name, ret, t1, t2, t3) \
-    ret name(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3) \
+    ret LIBC(name)(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3) \
     { \
         return (ret)syscall(__NR_##name, a1, a2, a3); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall4(name, ret, t1, t2, t3, t4) \
-    ret name(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3, typeof(t4) a4) \
+    ret LIBC(name)(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3, typeof(t4) a4) \
     { \
         return (ret)syscall(__NR_##name, a1, a2, a3, a4); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall5(name, ret, t1, t2, t3, t4, t5) \
-    ret name(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3, typeof(t4) a4, typeof(t5) a5) \
+    ret LIBC(name)(typeof(t1) a1, typeof(t2) a2, typeof(t3) a3, typeof(t4) a4, typeof(t5) a5) \
     { \
         return (ret)syscall(__NR_##name, a1, a2, a3, a4, a5); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define __syscall6(name, ret, t1, t2, t3, t4, t5, t6) \
-    ret name(typeof(t1) a1, typeof(t2), typeof(t3), typeof(t4), typeof(t5), typeof(t6)) \
+    ret LIBC(name)(typeof(t1) a1, typeof(t2), typeof(t3), typeof(t4), typeof(t5), typeof(t6)) \
     { \
         return (ret)syscall(__NR_##name, &a1); \
-    }
+    } \
+    WEAK_ALIAS(LIBC(name), name)
 
-#include <kernel/unistd.h>
+#include <kernel/syscall.h>

@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <kernel/syscall.h>
 
 static void restore(void)
 {

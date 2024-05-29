@@ -55,11 +55,10 @@ static void snake_create(int segments);
 static void graphic_mode_enter();
 static void graphic_mode_exit();
 
-int sighan()
+void sighan()
 {
     graphic_mode_exit();
     exit(EXIT_FAILURE);
-    return 0;
 }
 
 static void signal_handlers_set(void)

@@ -142,7 +142,7 @@ void perror(const char* s)
     int e = errno;
     const char* error = errors[e];
 
-    if (unlikely(!error))
+    if (UNLIKELY(!error))
     {
         fprintf(stderr, "internal libc error; errors=0x%x errors[%d]=0x%x\n",
             errors, e, errors[e]);
