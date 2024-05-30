@@ -25,20 +25,20 @@ add_library(crt0 STATIC crt0.c)
 
 add_custom_target(
     libc_headers_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/lib/include" ../toolchain/sysroot/usr/include
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/lib/include" ../sysroot/usr/include
     COMMENT "Installing libc headers"
     DEPENDS kernel_headers_install
 )
 
 add_custom_target(
     crt0_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0> ../toolchain/sysroot/usr/lib/crt0.o
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0> ../sysroot/usr/lib/crt0.o
     DEPENDS crt0 libc_headers_install
     COMMENT "Installing crt0"
 )
 
 add_custom_target(
     libc_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.a ../toolchain/sysroot/usr/lib/libc.a
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.a ../sysroot/usr/lib/libc.a
     DEPENDS crt0_install c
     COMMENT "Installing libc")

@@ -2,6 +2,10 @@
 
 set -e
 
+base_dir="$(dirname `readlink -f ${0}`)"
+
+. "${base_dir}/utils.sh"
+
 use_ide=1
 use_kvm=
 use_nographic=
@@ -44,14 +48,11 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+qemu_path=$(from_native_sysroot "qemu-system-i386")
+
 if [[ -z "${qemu_path}" ]]
 then
-    if [[ -f "qemu/qemu-system-i386" ]]
-    then
-        qemu_path="$(readlink -f "qemu/qemu-system-i386")"
-    else
-        qemu_path="$(which qemu-system-i386 || which qemu-system-x86_64)"
-    fi
+    qemu_path="$(which qemu-system-i386 || which qemu-system-x86_64)"
 fi
 
 if [[ -z "${use_ide}" ]]

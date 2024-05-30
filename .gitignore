@@ -19,8 +19,3 @@ config
 .syntastic*
 .clang_complete
 compile_commands.json
-toolchain/qemu
-toolchain/bochs
-toolchain/gcc
-toolchain/binutils
-toolchain/newlib

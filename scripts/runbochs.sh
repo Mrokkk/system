@@ -1,11 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-base_dir=$(dirname `readlink -f "$0"`)
+base_dir="$(dirname `readlink -f ${0}`)"
 
-bochs_dir="${base_dir}/../toolchain/bochs"
-bochs="${PWD}/bochs/bochs"
-bios="${bochs_dir}/bios/BIOS-bochs-latest"
-vgabios="${bochs_dir}/bios/VGABIOS-lgpl-latest"
+. "${base_dir}/utils.sh"
+
+bochs="$(binary_from_native_sysroot bochs)"
+bios="$(resource_from_native_sysroot BIOS-bochs-latest)"
+vgabios="$(resource_from_native_sysroot VGABIOS-lgpl-latest)"
 
 echo """
 memory: guest=128, host=128

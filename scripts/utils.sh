@@ -3,6 +3,14 @@
 stderr=
 verbose=
 modification_list=
+RED="\e[31m"
+GREEN="\e[32m"
+BLUE="\e[34m"
+ERROR="[ ERROR   ]"
+SUCCESS="[ SUCCESS ]"
+INFO="[  INFO   ]"
+DEBUG="[  DEBUG  ]"
+RESET="\e[0m"
 
 function cleanup()
 {
@@ -13,7 +21,7 @@ function cleanup()
     fi
 }
 
-function any_change_done()
+function any_file_changed()
 {
     if [[ -n "${modification_list}" ]]
     then
@@ -37,15 +45,41 @@ function create_modification_list()
     fi
 }
 
+function binary_from_native_sysroot()
+{
+    [[ -f "native-sysroot/bin/${1}" ]] && echo $(readlink -f "native-sysroot/bin/${1}")
+}
+
+function resource_from_native_sysroot()
+{
+    local file="$(find native-sysroot -name ${1} | head -n 1)"
+    [[ -n "${file}" ]] && echo $(readlink -f "${file}")
+}
+
 function display_file()
 {
     local file="${1}"
     cat "${stderr}" | sed 's/^/>>>> /'
 }
 
+function info()
+{
+    echo -e "${BLUE}${INFO}${RESET} ${@}"
+}
+
+function debug()
+{
+    echo -e "${BLUE}${INFO}${RESET} ${@}"
+}
+
+function success()
+{
+    echo -e "${GREEN}${SUCCESS}${RESET} ${@}"
+}
+
 function die()
 {
-    echo "${@}"
+    echo -e "${RED}${ERROR} ${@}${RESET}"
     if [[ -f ${stderr} ]]
     then
         echo "Error:"
@@ -53,6 +87,16 @@ function die()
     fi
     cleanup
     exit -1
+}
+
+function pushd_silent()
+{
+    pushd "${1}" &>/dev/null || die "No directory: ${1}"
+}
+
+function popd_silent()
+{
+    popd &>/dev/null || die "Cannot go back to previous dir!"
 }
 
 function execute_cmd()

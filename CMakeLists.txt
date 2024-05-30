@@ -71,12 +71,12 @@ add_subdirectory(bin)
 
 add_custom_target(
     kernel_headers_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/include" toolchain/sysroot/usr/include
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/include" sysroot/usr/include
     COMMENT "Installing libc headers"
 )
 
 add_custom_target(
-    ksyms
+    kernel_symbols
     COMMAND nm -S ${CMAKE_BINARY_DIR}/${PROJECT_NAME} | sort > ${CMAKE_BINARY_DIR}/kernel.map
     DEPENDS ${PROJECT_NAME}
     COMMENT "Creating kernel.map"
@@ -85,7 +85,7 @@ add_custom_target(
 add_custom_target(
     rootfs
     COMMAND "${PROJECT_SOURCE_DIR}/scripts/build_filesystem.sh"
-    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init ksyms display date snake
+    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init display date snake kernel_symbols
     COMMENT "Preparing rootfs"
 )
 
@@ -102,9 +102,9 @@ add_custom_target(
 
 add_custom_target(
     runqemu
-    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh runqemu
-    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh debugcon
-    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/rungdb.py rungdb
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh ${CMAKE_BINARY_DIR}/runqemu
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh ${CMAKE_BINARY_DIR}/debugcon
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/rungdb.py ${CMAKE_BINARY_DIR}/rungdb
     COMMAND ./runqemu -k
     DEPENDS iso
     COMMENT "Running qemu"
@@ -112,7 +112,7 @@ add_custom_target(
 
 add_custom_target(
     runbochs
-    COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/runbochs.sh runbochs
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/runbochs.sh ${CMAKE_BINARY_DIR}/runbochs
     COMMAND ./runbochs
     DEPENDS iso
     COMMENT "Running bochs"

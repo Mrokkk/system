@@ -83,7 +83,7 @@ then
     cat "${modification_list}"
 fi
 
-if any_change_done
+if any_file_changed
 then
     execute_cmd "creating ${iso}... " grub-mkrescue -o "${iso}" "${iso_dir}"
 else

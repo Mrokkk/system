@@ -5,110 +5,139 @@ base_dir=$(dirname `readlink -f "$0"`)
 . "${base_dir}/utils.sh"
 
 target="i686-pc-phoenix"
-
-toolchain_dir="${base_dir}/../toolchain"
-build_dir="${PWD}/toolchain"
-prefix="${build_dir}/prefix"
-sysroot="${build_dir}/sysroot"
-
-binutils_repo="git://sourceware.org/git/binutils-gdb.git"
-binutils_src_dir="${toolchain_dir}/binutils"
-binutils_build_dir="${build_dir}/binutils"
-binutils_version="2.42"
-
-gcc_repo="git://gcc.gnu.org/git/gcc.git"
-gcc_src_dir="${toolchain_dir}/gcc"
-gcc_build_dir="${build_dir}/gcc"
-gcc_version="13.2.0"
-
-newlib_src_dir="${toolchain_dir}/newlib"
-newlib_build_dir="${build_dir}/newlib"
-
+toolchain_input_dir="$(readlink -f ${base_dir}/../toolchain)"
+toolchain_output_dir="${PWD}/toolchain"
+build_dir="${toolchain_output_dir}/build"
+prefix="${PWD}/native-sysroot"
+sysroot="${PWD}/sysroot"
 nproc=$(nproc)
+packages=()
 
-components=("binutils" "gcc")
-
-function binutils_prepare()
-{
-    if [[ ! -d "${binutils_src_dir}" ]]
-    then
-        git clone --branch binutils-$(echo "${binutils_version}" | tr "." "_")-branch --depth 1 "${binutils_repo}" "${binutils_src_dir}"
-        pushd "${binutils_src_dir}"
-        patch -p1 < "${base_dir}/binutils.patch"
-        popd
-    fi
-}
-
-function binutils_build()
-{
-    if [[ ! -d "${binutils_build_dir}" ]] || [[ ! -f "${binutils_build_dir}/Makefile" ]]
-    then
-        create_dir "${binutils_build_dir}"
-        pushd "${binutils_build_dir}"
-        ${binutils_src_dir}/configure \
-            --prefix="${prefix}" \
-            --target="${target}" \
-            --with-sysroot="${sysroot}" \
-            --enable-shared \
-            --disable-nls || die "binutils: configuration failed"
-    else
-        pushd "${binutils_build_dir}"
-    fi
-
-    make all -j${nproc} || die "binutils: compilation failed"
-    make install -j${nproc} || die "binutils: installation failed"
-    popd
-}
-
-function gcc_prepare()
-{
-    if [[ ! -d "${gcc_src_dir}" ]]
-    then
-        git clone --branch "releases/gcc-${gcc_version}" --depth 1 "${gcc_repo}" "${gcc_src_dir}"
-        pushd "${gcc_src_dir}"
-        patch -p1 < "${base_dir}/gcc.patch"
-        popd
-    fi
-}
-
-function gcc_build()
-{
-    if [[ ! -d "${gcc_build_dir}" ]] || [[ ! -f "${gcc_build_dir}/Makefile" ]]
-    then
-        create_dir "${gcc_build_dir}"
-        pushd "${gcc_build_dir}"
-        ${gcc_src_dir}/configure \
-            --prefix="${prefix}" \
-            --target="${target}" \
-            --with-sysroot="${sysroot}" \
-            --disable-nls \
-            --enable-languages=c \
-            --disable-gcov || die "Failed to configure GCC"
-    else
-        pushd "${gcc_build_dir}"
-    fi
-
-    make all-gcc -j${nproc} || die "gcc: compilation failed"
-    make all-target-libgcc -j${nproc} || die "gcc: libgcc compilation failed"
-    make install-gcc -j${nproc} || die "gcc: installation failed"
-    make install-target-libgcc -j${nproc} || die "gcc: libgcc installation failed"
-    popd
-}
-
-echo "Prefix: ${prefix}"
-echo "Sysroot: ${sysroot}"
-
-create_dir "${build_dir}"
-create_dir "${prefix}"
-create_dir "${sysroot}"
-create_dir "${sysroot}/usr/include"
-copy_dir_content "${toolchain_dir}/../lib/include" "${sysroot}/usr/include"
-copy_dir_content "${toolchain_dir}/../include" "${sysroot}/usr/include"
-
-for component in "${components[@]}"
-do
-    eval "${component}_prepare"
-    eval "${component}_build"
+while [[ $# -gt 0 ]]; do
+    arg="$1"
+    case $arg in
+        -v|--verbose)
+            verbose=1 ;;
+        *)
+            packages+=("${1}")
+            ;;
+    esac
+    shift
 done
+
+function _recipe_read()
+{
+    local recipe="${toolchain_input_dir}/${PKG}/recipe.sh"
+    [[ -f "${recipe}" ]] || die "No ${recipe}"
+    . ${recipe}
+}
+
+function _recipe_close()
+{
+    unset -f build install
+    unset REPO VERSION BRANCH OPTIONAL
+}
+
+function _prepare()
+{
+    info "${PKG}: preparing..."
+
+    create_dir "${BUILD_DIR}"
+
+    if [[ ! -d "${SRC_DIR}" ]]
+    then
+        info "${PKG}: downloading ${REPO}..."
+
+        if [[ "${REPO}" == *"git"* ]]
+        then
+            local branch_arg=""
+            if [[ -n "${BRANCH}" ]]
+            then
+                branch_arg="--branch ${BRANCH}"
+            fi
+            git clone ${branch_arg} --depth 1 ${REPO} ${SRC_DIR}
+        elif [[ "${REPO}" == *"svn"* ]]
+        then
+            svn checkout "${REPO}" "${SRC_DIR}"
+        fi
+
+        pushd_silent ${SRC_DIR}
+
+        if [[ -d "${CONF_DIR}/patches" ]]
+        then
+            for f in "${CONF_DIR}"/patches/*
+            do
+                echo "patching with ${f}"
+                patch -p1 < "${f}" || die "cannot patch"
+            done
+        fi
+
+        popd_silent
+    else
+        debug "${PKG}: ${SRC_DIR} already exists"
+    fi
+}
+
+function _step_execute()
+{
+    info "${PKG}: starting ${1}..."
+
+    pushd_silent "${BUILD_DIR}"
+
+    (set -eo pipefail; \
+    SRC_DIR=${SRC_DIR} \
+    PREFIX=${prefix} \
+    TARGET=${target} \
+    SYSROOT=${sysroot} \
+    NPROC=${nproc} \
+        ${1}) || die "${PKG}: ${1} failed"
+
+    success "${PKG}: ${1} succeeded"
+
+    popd_silent
+}
+
+function _pkg_make()
+{
+    export PKG="${1}"
+    export CONF_DIR="${toolchain_input_dir}/${PKG}"
+    export SRC_DIR="${toolchain_output_dir}/${PKG}"
+    export BUILD_DIR="${build_dir}/${PKG}"
+    _recipe_read
+
+    if [[ -z "${OPTIONAL}" ]] || [[ -n "${2}" ]]
+    then
+        _prepare
+        _step_execute build
+        _step_execute install
+    else
+        info "${PKG}: ignoring; optional package"
+    fi
+
+    _recipe_close
+    unset PKG SRC_DIR BUILD_DIR
+}
+
+info "Native sysroot: ${prefix}"
+info "Sysroot:        ${sysroot}"
+
+create_dir "${prefix}"
+create_dir "${sysroot}/usr/include"
+create_dir "${sysroot}/usr/lib"
+copy_dir_content "${base_dir}/../lib/include" "${sysroot}/usr/include"
+copy_dir_content "${base_dir}/../include" "${sysroot}/usr/include"
+
+if [[ ${#packages[@]} -eq 0 ]]
+then
+    for component in ${toolchain_input_dir}/*
+    do
+        _pkg_make "$(basename ${component})"
+    done
+else
+    for component in "${packages[@]}"
+    do
+        _pkg_make "${component}" "force"
+    done
+fi
 
 cleanup
