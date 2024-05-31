@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #define PRINTF_BUFFER   512
 
@@ -13,12 +14,13 @@ struct file
 {
     int fd;
     uint32_t magic;
+    bool error;
 };
 
 static FILE files[] = {
-    { STDIN_FILENO, FILE_MAGIC },
-    { STDOUT_FILENO, FILE_MAGIC },
-    { STDERR_FILENO, FILE_MAGIC }
+    { STDIN_FILENO, FILE_MAGIC, false },
+    { STDOUT_FILENO, FILE_MAGIC, false },
+    { STDERR_FILENO, FILE_MAGIC, false }
 };
 
 FILE* stdin = &files[STDIN_FILENO];
@@ -534,4 +536,51 @@ int puts(const char* s)
     int len = fputs(s, stdout);
     SAFE_SYSCALL(write(stdout->fd, "\n", 1), EOF);
     return len + 1;
+}
+
+void clearerr(FILE* stream)
+{
+    if (stream)
+    {
+        stream->error = false;
+    }
+}
+
+int feof(FILE*)
+{
+    return 0;
+}
+
+int ferror(FILE* stream)
+{
+    VALIDATE_INPUT(FILE_CHECK(stream), 1);
+    return stream->error;
+}
+
+size_t fread(void* ptr, size_t size, size_t nmemb, FILE* stream)
+{
+    VALIDATE_INPUT(FILE_CHECK(stream) && ptr, 0);
+    int count = read(stream->fd, ptr, size * nmemb);
+
+    if (UNLIKELY(count < 0))
+    {
+        stream->error = true;
+        return 0;
+    }
+
+    return count;
+}
+
+size_t fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream)
+{
+    VALIDATE_INPUT(FILE_CHECK(stream) && ptr, 0);
+    int count = write(stream->fd, ptr, size * nmemb);
+
+    if (UNLIKELY(count < 0))
+    {
+        stream->error = true;
+        return 0;
+    }
+
+    return count;
 }

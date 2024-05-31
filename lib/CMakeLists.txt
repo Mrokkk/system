@@ -6,6 +6,7 @@ include_directories(
 
 add_library(c STATIC
     abort.c
+    atexit.c
     atoi.c
     bss.c
     errno.c
@@ -14,6 +15,7 @@ add_library(c STATIC
     libc_main.c
     locale.c
     malloc.c
+    mnent.c
     pwd.c
     signal.c
     stdio.c

@@ -225,6 +225,16 @@ error:
     return errno;
 }
 
+int sys_umount(const char*)
+{
+    return -ENOSYS;
+}
+
+int sys_umount2(const char*, int)
+{
+    return -ENOSYS;
+}
+
 int sys_chroot(const char* path)
 {
     int errno;

@@ -23,11 +23,12 @@ int dirent_add(void* buf, const char* name, size_t len, ino_t ino, char type)
         return 1;
     }
 
-    dirent->ino = ino;
-    dirent->len = dirent_size;
-    dirent->type = type;
-    strncpy(dirent->name, name, len);
-    dirent->name[len] = 0;
+    strncpy(dirent->d_name, name, len);
+    dirent->d_ino       = ino;
+    dirent->d_off       = 0;
+    dirent->d_reclen    = dirent_size;
+    dirent->d_type      = type;
+    dirent->d_name[len] = 0;
 
     data->count -= dirent_size;
     data->previous = data->current;

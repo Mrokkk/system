@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int errno;
 
@@ -149,4 +150,14 @@ void perror(const char* s)
     }
 
     fprintf(stderr, "%s: %s\n", s, error);
+}
+
+char* strerror(int errnum)
+{
+    if (errnum < 0 || errnum > ERRNO_MAX)
+    {
+        return NULL;
+    }
+
+    return (char*)errors[errnum];
 }

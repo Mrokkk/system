@@ -12,31 +12,35 @@
 #define __NR_exit           9
 #define __NR_fork           10
 #define __NR_fstat          11
-#define __NR_getcwd         12
-#define __NR_getdents       13
-#define __NR_getpid         14
-#define __NR_getppid        15
-#define __NR_ioctl          16
-#define __NR_kill           17
-#define __NR_mkdir          18
-#define __NR_mmap           19
-#define __NR_mount          20
-#define __NR_open           21
-#define __NR_poll           22
-#define __NR_read           23
-#define __NR_reboot         24
-#define __NR_sbrk           25
-#define __NR_select         26
-#define __NR_setsid         27
-#define __NR_sigaction      28
-#define __NR_signal         29
-#define __NR_sigreturn      30
-#define __NR_stat           31
-#define __NR_time           32
-#define __NR_waitpid        33
-#define __NR_write          34
+#define __NR_fstatvfs       12
+#define __NR_getcwd         13
+#define __NR_getdents       14
+#define __NR_getpid         15
+#define __NR_getppid        16
+#define __NR_ioctl          17
+#define __NR_kill           18
+#define __NR_mkdir          19
+#define __NR_mmap           20
+#define __NR_mount          21
+#define __NR_open           22
+#define __NR_poll           23
+#define __NR_read           24
+#define __NR_reboot         25
+#define __NR_sbrk           26
+#define __NR_select         27
+#define __NR_setsid         28
+#define __NR_sigaction      29
+#define __NR_signal         30
+#define __NR_sigreturn      31
+#define __NR_stat           32
+#define __NR_statvfs        33
+#define __NR_time           34
+#define __NR_umount         35
+#define __NR_umount2        36
+#define __NR_waitpid        37
+#define __NR_write          38
 
-#define __NR_syscalls       35
+#define __NR_syscalls       39
 
 #ifndef __ASSEMBLER__
 
@@ -44,6 +48,7 @@ struct fd_set;
 struct pollfd;
 struct sigaction;
 struct stat;
+struct statvfs;
 struct timeval;
 
 #endif  // __ASSEMBLER__
@@ -83,13 +88,14 @@ __syscall2(exec, int, const char*, char* const[])
 __syscall1_noret(exit, void, int)
 __syscall0(fork, int)
 __syscall2(fstat, int, int, struct stat*)
+__syscall2(fstatvfs, int, int, struct statvfs*)
 __syscall2(getcwd, int, char*, size_t)
 __syscall3(getdents, int, unsigned int, void*, size_t)
 __syscall0(getpid, int)
 __syscall0(getppid, int)
 __syscall3(ioctl, int, int, unsigned long, unsigned long)
 __syscall2(kill, int, int, int)
-__syscall2(mkdir, int, const char*, int)
+__syscall2(mkdir, int, const char*, mode_t)
 __syscall6(mmap, void*, void*, size_t, int, int, int , size_t)
 __syscall5(mount, int, const char*, const char*, const char*, int, void*)
 __syscall3(open, int, const char*, int, int)
@@ -103,6 +109,9 @@ __syscall3(sigaction, int, int, const struct sigaction*, struct sigaction*)
 __syscall2(signal, int, int, int (*)(int))
 __syscall1(sigreturn, int, int)
 __syscall2(stat, int, const char*, struct stat*)
+__syscall2(statvfs, int, const char*, struct statvfs*)
 __syscall1(time, time_t, void*)
+__syscall1(umount, int, const char*)
+__syscall2(umount2, int, const char*, int)
 __syscall3(waitpid, int, int, int*, int)
 __syscall3(write, int, int, const char*, size_t)

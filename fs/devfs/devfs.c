@@ -275,12 +275,12 @@ static int devfs_lookup(inode_t* dir, const char* name, inode_t** result)
 
     device = &child_node->data->dev;
 
-    new_inode->ops = &devfs_inode_ops;
+    new_inode->ops      = &devfs_inode_ops;
     new_inode->file_ops = device->ops;
-    new_inode->dev = MKDEV(device->major, device->minor);
-    new_inode->ino = ++ino;
-    new_inode->sb = dir->sb;
-    new_inode->mode = child_node->data->mode;
+    new_inode->dev      = MKDEV(device->major, device->minor);
+    new_inode->ino      = ++ino;
+    new_inode->sb       = dir->sb;
+    new_inode->mode     = child_node->data->mode;
 
     *result = new_inode;
 

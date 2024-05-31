@@ -61,4 +61,11 @@ static inline int isupper(int c)
 #define tolower __builtin_tolower
 #endif
 
+#ifndef isprint
+static inline int isprint(int c)
+{
+    return isalnum(c) || isblank(c);
+}
+#endif
+
 #endif

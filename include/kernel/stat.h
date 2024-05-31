@@ -44,9 +44,11 @@
 
 struct stat
 {
-    mode_t st_mode;    // File mode
+    mode_t  st_mode;    // File mode
     ino_t   st_ino;     // File serial number
     dev_t   st_dev;     // Device containing the file
+    nlink_t st_nlink;   // Number of hard links to the file
+    dev_t   st_rdev;    // Device ID (if file is character or block special)
     uid_t   st_uid;     // User ID of the file's owner
     gid_t   st_gid;     // Group ID of the file's group
     size_t  st_size;    // Size of file, in bytes

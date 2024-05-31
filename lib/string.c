@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 int strcmp(const char* string1, const char* string2)
@@ -16,6 +18,8 @@ int strcmp(const char* string1, const char* string2)
 
     return 0;
 }
+
+STRONG_ALIAS(strcmp, strcoll);
 
 int strncmp(const char* string1, const char* string2, size_t count)
 {
@@ -100,7 +104,38 @@ char* strchr(const char* string, int c)
     return 0;
 }
 
-#ifndef __clang__
+char* strtok_r(char* restrict str, const char* restrict delim, char** restrict saveptr)
+{
+    UNUSED(str); UNUSED(delim); UNUSED(saveptr);
+    return NULL;
+}
+
+char* strtok(char* str, const char* delim)
+{
+    static char* buf;
+    return strtok_r(str, delim, &buf);
+}
+
+size_t strspn(const char* str, const char* accept)
+{
+    const char* s = str;
+    char buf[256];
+
+    memset(buf, 0, 256);
+
+    while (*accept)
+    {
+        buf[(unsigned char)*accept++] = 1;
+    }
+
+    while (buf[(unsigned char)*s])
+    {
+        ++s;
+    }
+
+    return s - str;
+}
+
 void* memcpy(void* dest, const void* src, size_t size)
 {
     size_t size4;
@@ -119,29 +154,25 @@ void* memcpy(void* dest, const void* src, size_t size)
 
     return dest;
 }
-#endif
-void* memcpyw(uint16_t* dest, const uint16_t* src, size_t count)
-{
-    uint16_t* s;
-    uint16_t* d;
 
-    for (s = (uint16_t*)src, d = (uint16_t*)dest;
-         count != 0;
-         count--, *d++ = *s++);
-
-    return dest;
-}
-
-#ifndef __clang__
 void* memset(void* ptr, int c, size_t size)
 {
     for (size_t i = 0; i < size; ((char*)ptr)[i] = c, i++);
     return ptr;
 }
-#endif
 
-void* memsetw(uint16_t* dest, uint16_t val, size_t count)
+int memcmp(const void* s1, const void* s2, size_t n)
 {
-    for (uint16_t* temp = dest; count; count--, *temp++ = val);
-    return dest;
+    char __res = 0;
+
+    while (n)
+    {
+        if ((__res = *(uint8_t*)s1++ - *(uint8_t*)s2++) != 0)
+        {
+            break;
+        }
+        n--;
+    }
+
+    return __res;
 }

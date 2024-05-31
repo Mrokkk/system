@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <kernel/types.h>
 
 #define DT_UNKNOWN  0
@@ -14,11 +15,11 @@
 
 struct dirent
 {
-    ino_t ino;
-    //size_t off; // TODO: add support for this
-    size_t len;
-    char type;
-    char name[1];
+    ino_t       d_ino;
+    off_t       d_off; // TODO: add support for this
+    uint16_t    d_reclen;
+    uint8_t     d_type;
+    char        d_name[1];
 };
 
 int getdents(unsigned int, void*, size_t);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernel/unistd.h>
+#include <getopt.h>
 
 // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/basedefs/unistd.h.html
 
@@ -10,5 +11,7 @@
 
 int syscall(int nr, ...);
 int isatty(int fd);
+
+#define execvp exec
 
 #endif // __ASSEMBLER__

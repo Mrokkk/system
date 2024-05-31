@@ -15,6 +15,8 @@ char* secure_getenv(const char* name);
 
 int atoi(const char* nptr);
 
+int atexit(void (*function)(void));
+
 #define EXIT_SUCCESS    0
 #define EXIT_FAILURE    -1
 

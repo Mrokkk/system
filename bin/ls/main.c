@@ -45,23 +45,23 @@ void dirent_print(struct dirent* dirent, struct stat* s)
 {
     char buf[12];
     const char* type = "";
-    int errno = stat(dirent->name, s);
+    int errno = stat(dirent->d_name, s);
 
     if (errno)
     {
-        perror(dirent->name);
+        perror(dirent->d_name);
         return;
     }
 
-    if (dirent->type == DT_CHR)
+    if (dirent->d_type == DT_CHR)
     {
         type = DEVICE;
     }
-    else if (dirent->type == DT_BLK)
+    else if (dirent->d_type == DT_BLK)
     {
         type = DEVICE;
     }
-    else if (dirent->type == DT_DIR)
+    else if (dirent->d_type == DT_DIR)
     {
         type = DIRECTORY;
     }
@@ -75,7 +75,7 @@ void dirent_print(struct dirent* dirent, struct stat* s)
         s->st_ino,
         s->st_size,
         type,
-        dirent->name);
+        dirent->d_name);
 }
 
 int main()
@@ -107,7 +107,7 @@ int main()
     for (int i = 0; i < count; ++i)
     {
         dirent_print(dirent, stats + i);
-        dirent = (struct dirent*)((char*)dirent + dirent->len);
+        dirent = (struct dirent*)((char*)dirent + dirent->d_reclen);
     }
 
     return 0;

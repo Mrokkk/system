@@ -41,3 +41,8 @@ static inline int isupper(int c)
 {
     return (c > 96 && c < 123);
 }
+
+static inline int isprint(int c)
+{
+    return isalnum(c) || isblank(c);
+}

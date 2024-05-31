@@ -3,6 +3,7 @@
 #include <kernel/stat.h>
 #include <kernel/dentry.h>
 #include <kernel/process.h>
+#include <kernel/statvfs.h>
 
 LIST_DECLARE(files);
 
@@ -311,6 +312,16 @@ int sys_getcwd(char* __user buf, size_t size)
     return path_construct(process_current->fs->cwd, buf, size);
 }
 
+static void stat_fill(struct stat* statbuf, const dentry_t* dentry)
+{
+    statbuf->st_ino = dentry->inode->ino;
+    statbuf->st_dev = dentry->inode->dev;
+    statbuf->st_size = dentry->inode->size;
+    statbuf->st_mode = dentry->inode->mode;
+    statbuf->st_uid = dentry->inode->uid;
+    statbuf->st_gid = dentry->inode->gid;
+}
+
 int sys_stat(const char* __user pathname, struct stat* __user statbuf)
 {
     dentry_t* dentry;
@@ -320,12 +331,7 @@ int sys_stat(const char* __user pathname, struct stat* __user statbuf)
         return -ENOENT;
     }
 
-    statbuf->st_ino = dentry->inode->ino;
-    statbuf->st_dev = dentry->inode->dev;
-    statbuf->st_size = dentry->inode->size;
-    statbuf->st_mode = dentry->inode->mode;
-    statbuf->st_uid = dentry->inode->uid;
-    statbuf->st_gid = dentry->inode->gid;
+    stat_fill(statbuf, dentry);
 
     return 0;
 }
@@ -345,12 +351,41 @@ int sys_fstat(int fd, struct stat* statbuf)
         return -ENOENT;
     }
 
-    statbuf->st_ino = dentry->inode->ino;
-    statbuf->st_dev = dentry->inode->dev;
-    statbuf->st_size = dentry->inode->size;
-    statbuf->st_mode = dentry->inode->mode;
-    statbuf->st_uid = dentry->inode->uid;
-    statbuf->st_gid = dentry->inode->gid;
+    stat_fill(statbuf, dentry);
+
+    return 0;
+}
+
+int sys_statvfs(const char* path, struct statvfs* buf)
+{
+    int errno;
+    dentry_t* dentry;
+
+    if ((errno = path_validate(path)))
+    {
+        return errno;
+    }
+
+    if ((dentry = lookup(path)) == NULL)
+    {
+        return -ENOENT;
+    }
+
+    // FIXME: add proper implementation
+    memset(buf, 0, sizeof(*buf));
+
+    return 0;
+}
+
+int sys_fstatvfs(int fd, struct statvfs* buf)
+{
+    file_t* file;
+
+    if (fd_check_bounds(fd)) return -EBADF;
+    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    // FIXME: add proper implementation
+    memset(buf, 0, sizeof(*buf));
 
     return 0;
 }

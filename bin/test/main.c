@@ -258,6 +258,26 @@ TEST(bad_syscall)
     EXPECT_EQ(errno, ENOSYS);
 }
 
+TEST(strspn)
+{
+    char buf[128];
+    {
+        const char* string = "test123_test456\xff";
+        strcpy(buf, string);
+    }
+
+    EXPECT_EQ(strspn(buf, "_"), 0);
+    EXPECT_EQ(strspn(buf, "t"), 1);
+    EXPECT_EQ(strspn(buf, "e"), 0);
+    EXPECT_EQ(strspn(buf, "est"), 4);
+    EXPECT_EQ(strspn(buf, "est_"), 4);
+    EXPECT_EQ(strspn(buf, "test"), 4);
+    EXPECT_EQ(strspn(buf, "tsea"), 4);
+    EXPECT_EQ(strspn(buf, "ste1"), 5);
+    EXPECT_EQ(strspn(buf, "456est123_"), 15);
+    EXPECT_EQ(strspn(buf, "\xff" "456est123_"), 16);
+}
+
 TEST(atoi)
 {
     char buf[128];

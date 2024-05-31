@@ -12,7 +12,7 @@ typedef uint32_t    clockid_t;
 typedef uint16_t    dev_t;
 typedef uint32_t    fsblkcnt_t;
 typedef uint32_t    fsfilcnt_t;
-typedef uint16_t    gid_t;
+typedef int         gid_t;
 typedef uint32_t    id_t;
 typedef uint32_t    ino_t;
 typedef uint16_t    mode_t;

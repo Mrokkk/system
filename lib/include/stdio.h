@@ -2,10 +2,13 @@
 
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stddef.h>
 
 #define STDIN_FILENO    0
 #define STDOUT_FILENO   1
 #define STDERR_FILENO   2
+
+#define BUFSIZ          0
 
 #define EOF             (-1)
 
@@ -30,6 +33,9 @@ int putchar(int c);
 int fputs(const char* restrict s, FILE* restrict stream);
 int puts(const char* s);
 
+size_t fread(void* ptr, size_t size, size_t nmemb, FILE* restrict stream);
+size_t fwrite(const void* ptr, size_t size, size_t nmemb, FILE* restrict stream);
+
 FILE* fopen(const char* restrict pathname, const char* restrict mode);
 int fclose(FILE* stream);
 int fileno(FILE* stream);
@@ -46,3 +52,7 @@ int fprintf(FILE* file, const char* fmt, ...);
 int printf(const char* fmt, ...);
 
 void perror(const char* s);
+
+void clearerr(FILE* stream);
+int feof(FILE* stream);
+int ferror(FILE* stream);
