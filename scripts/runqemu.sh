@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-qemu_path=$(from_native_sysroot "qemu-system-i386")
+qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
 
 if [[ -z "${qemu_path}" ]]
 then
