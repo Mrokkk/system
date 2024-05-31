@@ -1,196 +1,170 @@
 #pragma once
 
 #include <stdio.h>
-#include <stddef.h>
-#include <string.h>
+#include <stdbool.h>
 
-#define RED "\033[31m"
-#define GREEN "\033[32m"
-#define RESET "\033[0m"
+#define TEST_SUITES_COUNT       16
+#define LIKELY(x)               __builtin_expect(!!(x), 1)
+#define UNLIKELY(x)             __builtin_expect(!!(x), 0)
+#define __STRINGIFY(x)          #x
+#define STRINGIFY(x)            __STRINGIFY(x)
+
+typedef struct config config_t;
+typedef struct test_case test_case_t;
+typedef struct test_suite test_suite_t;
 
 struct test_case
 {
-    char* name;
-    void (*test)(int*);
+    const char* name;
+    void (*test)(int* assert_failed, config_t* config);
     int failed;
 };
 
-extern struct test_case test_cases[];
-
-#define __RUN_UNTIL_FAIL 2
-
-static inline const char* __argv_parse(int argc, char* argv[], int* flags)
+struct test_suite
 {
-    const char* tc_name = NULL;
-    for (int i = 0; i < argc; ++i)
-    {
-        unsigned len = strlen(argv[i]);
-        if (len == 9)
-        {
-            if (!strncmp(argv[i], "--forever", 9))
-            {
-                *flags = __RUN_UNTIL_FAIL;
-            }
-        }
-        else if (len > 7)
-        {
-            if (!strncmp(argv[i], "--test=", 7))
-            {
-                tc_name = argv[i] + 7;
-            }
-        }
-        else if (len == 2)
-        {
-            if (!strncmp(argv[i], "-f", 2))
-            {
-                *flags = __RUN_UNTIL_FAIL;
-            }
-        }
-    }
-    return tc_name;
-}
+    const char* name;
+    test_case_t* test_cases;
+    size_t test_cases_count;
+    int failed;
+};
 
-static inline int __tc_run(struct test_case* tc)
+struct config
 {
-    int assert_failed = 0;
+    const char* test_to_run;
+    bool run_forever;
+    bool verbose;
+};
 
-    printf(GREEN"[  RUN   ]"RESET" %s\n", tc->name);
+extern const char* const GEN_RED_MSG;
+extern const char* const EXPECT_MSG;
+extern const char* const ACTUAL_MSG;
 
-    tc->test(&assert_failed);
+void __test_suite_register(test_suite_t* suite);
+int __tcs_run(test_case_t* test_cases, int count, config_t* config);
+int __test_suites_run(int argc, char* argv[]);
 
-    if (assert_failed)
-    {
-        printf(RED"[  FAIL  ]"RESET" %s\n", tc->name);
-    }
-    else
-    {
-        printf(GREEN"[  PASS  ]"RESET" %s\n", tc->name);
-    }
+#define VALUE_FORMAT(val) \
+    _Generic((val), \
+        uint32_t:   "%u", \
+        uint16_t:   "%u", \
+        uint8_t:    "%u", \
+        int:        "%d", \
+        short:      "%d", \
+        char:       "%c", \
+        default:    "0x%lx")
 
-    return assert_failed;
-}
+#define VALUE(val) \
+    _Generic((val), \
+        uint32_t:   (val), \
+        uint16_t:   (val), \
+        uint8_t:    (val), \
+        int:        (val), \
+        short:      (val), \
+        char:       (val), \
+        default:    (unsigned long)(val))
 
-static inline void __verdict_print(int passed, int failed, int count)
-{
-    struct test_case* tc;
-
-    printf(GREEN"[========]"RESET" Passed %u\n", passed);
-    if (failed)
-    {
-        printf(RED"[========]"RESET" Failed %u\n", failed);
-        for (int i = 0; i < count; ++i)
-        {
-            tc = test_cases + i;
-            if (tc->failed)
-            {
-                printf(RED"[========]"RESET" %s\n", tc->name);
-            }
-        }
-    }
-}
-
-static inline int __tcs_run(int argc, char* argv[], int count)
-{
-    int assert_failed = 0, passed = 0, failed = 0, flags = 0;
-    const char* test_name = __argv_parse(argc, argv, &flags);
-    struct test_case* tc;
-
-    for (int i = 0; i < count; ++i)
-    {
-        tc = test_cases + i;
-        if (test_name && strcmp(test_name, tc->name))
-        {
-            continue;
-        }
-
-        if (test_name && flags & __RUN_UNTIL_FAIL)
-        {
-            while (!(assert_failed = __tc_run(tc)));
-        }
-        else
-        {
-            assert_failed = __tc_run(tc);
-        }
-
-        if (assert_failed == 0)
-        {
-            ++passed;
-        }
-        else
-        {
-            ++failed;
-            tc->failed = 1;
-        }
-    }
-
-    __verdict_print(passed, failed, count);
-    return failed;
-}
-
-#define EXPECT_FAILED(expected, actual, sign) \
+#define EXPECT_FAILED(expected, expected_s, actual, actual_s, sign) \
     do { \
-        printf( \
-            RED"[========]"RESET" " __FILE__ ":%u\n" \
-            RED"[ EXPECT ]"RESET" "#actual" "#sign" "#expected"\n" \
-            RED"[ ACTUAL ]"RESET" "#actual" = %u (0x%x)\n", \
-            __LINE__, (uint32_t)actual, (uint32_t)actual); \
+        char __buf[1024]; \
+        char* __it = __buf; \
+        __it += sprintf(__it, "%s " __FILE__ ":%u\n", GEN_RED_MSG, __LINE__); \
+        __it += sprintf(__it, "%s " actual_s " " sign " " expected_s " (", EXPECT_MSG); \
+        __it += sprintf(__it, VALUE_FORMAT(expected), VALUE(expected)); \
+        __it += sprintf(__it, ")\n"); \
+        __it += sprintf(__it, "%s " actual_s " = ", ACTUAL_MSG); \
+        __it += sprintf(__it, VALUE_FORMAT(actual), VALUE(actual)); \
+        __it += sprintf(__it, "\n"); \
+        fputs(__buf, stdout); \
         ++*assert_failed; \
     } while(0)
 
 #define EXPECT_EQ(var, value) \
     do { \
         typeof(var) test = (typeof(var))(value); \
-        if (test != (var)) { EXPECT_FAILED(value, var, ==); } \
+        typeof(var) actual = var; \
+        if (UNLIKELY(test != actual)) \
+        { \
+            EXPECT_FAILED(value, #value, actual, #var, STRINGIFY(==)); \
+        } \
     } while (0)
 
 #define EXPECT_NE(var, value) \
     do { \
         typeof(var) test = (typeof(var))(value); \
-        if (test == (var)) { EXPECT_FAILED(value, var, !=); } \
+        typeof(var) actual = var; \
+        if (UNLIKELY(test == actual)) \
+        { \
+            EXPECT_FAILED(value, #value, actual, #var, STRINGIFY(!=)); \
+        } \
     } while (0)
 
 #define EXPECT_GT(var, value) \
     do { \
         typeof(var) test = (typeof(var))(value); \
-        if (!((var) > test)) { EXPECT_FAILED(value, var, >); } \
+        typeof(var) actual = var; \
+        if (UNLIKELY(!(actual > test))) \
+        { \
+            EXPECT_FAILED(value, #value, actual, #var, STRINGIFY(>)); \
+        } \
     } while (0)
 
 #define EXPECT_GE(var, value) \
     do { \
         typeof(var) test = (typeof(var))(value); \
-        if (!((var) >= test)) { EXPECT_FAILED(value, var, >=); } \
+        typeof(var) actual = var; \
+        if (UNLIKELY(!(actual >= test))) \
+        { \
+            EXPECT_FAILED(value, #value, actual, #var, STRINGIFY(>=)); \
+        } \
     } while (0)
 
 #define EXPECT_LT(var, value) \
     do { \
         typeof(var) test = (typeof(var))(value); \
-        if (!((var) < test)) { EXPECT_FAILED(value, var, <); } \
+        typeof(var) actual = var; \
+        if (UNLIKELY(!(actual < test))) \
+        { \
+            EXPECT_FAILED(value, #value, actual, #var, STRINGIFY(<)); \
+        } \
     } while (0)
 
 #define EXPECT_LE(var, value) \
     do { \
         typeof(var) test = (typeof(var))(value); \
-        if (!((var) <= test)) { EXPECT_FAILED(value, var, <); } \
+        typeof(var) actual = var; \
+        if (UNLIKELY(!(actual <= test))) \
+        { \
+            EXPECT_FAILED(value, #value, actual, #var, STRINGIFY(<)); \
+        } \
     } while (0)
 
-#define TEST_SUITE() \
-    int __suite(int argc, char* argv[]) \
-    { \
+#define TEST_SUITE(n) \
+    extern test_case_t __##n##_test_cases[]; \
+    static test_case_t* test_cases = __##n##_test_cases; \
+    static test_suite_t suite = { \
+        .name = #n, \
+        .test_cases = __##n##_test_cases, \
+        .failed = 0, \
+    }
 
-#define TEST_SUITE_END() \
-        return __tcs_run(argc, argv, __COUNTER__); \
+#define TEST_SUITE_END(name) \
+    static __attribute__((constructor)) void __##n##_ctor() \
+    { \
+        suite.test_cases_count = __COUNTER__; \
+        __test_suite_register(&suite); \
     } \
-    struct test_case test_cases[__COUNTER__ - 1]
+    test_case_t __##name##_test_cases[__COUNTER__ - 1]
 
 #define TEST(tc_name) \
-    auto void CASE_##tc_name(int* assert_failed); \
+    void CASE_##tc_name(int* assert_failed, config_t* config); \
+    static __attribute__((constructor)) void __##tc_name##_ctor() \
     { \
-        struct test_case* test_case = &test_cases[__COUNTER__]; \
+        test_case_t* test_case = &test_cases[__COUNTER__]; \
         test_case->name = #tc_name; \
         test_case->test = &CASE_##tc_name; \
         test_case->failed = 0; \
     } \
-    void CASE_##tc_name(int* assert_failed)
+    void CASE_##tc_name(int* assert_failed, config_t*)
 
 #define TESTS_RUN(argc, argv) \
-    __suite(argc, argv);
+    __test_suites_run(argc, argv)
