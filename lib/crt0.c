@@ -15,9 +15,10 @@ __attribute__((used)) void _call_global_dtors(void)
     for (ctor_t* dtor = __fini_array_start; dtor != __fini_array_end; (*dtor++)());
 }
 
-__attribute__((naked,noreturn,used)) void _start(int, char**)
+__attribute__((naked,noreturn,used)) void _start(int, int, char**)
 {
     asm volatile(
+        "call bss_init;"
         "call __libc_start_main;"
         "call _call_global_ctors;"
         "call main;"

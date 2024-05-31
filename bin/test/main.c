@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -62,6 +63,11 @@ void sighan()
     }
 
 TEST_SUITE();
+
+TEST(bss_is_zeroed)
+{
+    EXPECT_EQ(data, 0);
+}
 
 TEST(sse)
 {
