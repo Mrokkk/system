@@ -6,6 +6,7 @@ include_directories(
 
 add_library(c STATIC
     abort.c
+    atoi.c
     bss.c
     errno.c
     getcwd.c
