@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "magic.h"
 
+#define UNUSED(x)   (void)x
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 
 #define LIBC(name)      __libc_##name

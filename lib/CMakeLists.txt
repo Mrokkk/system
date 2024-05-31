@@ -11,6 +11,7 @@ add_library(c STATIC
     getcwd.c
     getenv.c
     libc_main.c
+    locale.c
     malloc.c
     pwd.c
     signal.c
