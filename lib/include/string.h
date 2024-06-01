@@ -18,5 +18,6 @@ char* strrchr(const char*, int);
 char* strtok(char* restrict str, const char* restrict delim);
 char* strtok_r(char* restrict str, const char* restrict delim, char** restrict saveptr);
 size_t strspn(const char* s, const char* accept);
+size_t strcspn(const char* s, const char* reject);
 
 char* strerror(int errnum);

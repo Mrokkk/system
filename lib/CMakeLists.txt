@@ -19,9 +19,18 @@ add_library(c STATIC
     pwd.c
     signal.c
     stdio.c
-    string.c
     syscall.c
     time.c
+
+    string/memcpy.c
+    string/memset.c
+    string/strchr.c
+    string/strcmp.c
+    string/strcpy.c
+    string/strlen.c
+    string/strspn.c
+    string/strtok.c
+
     ../kernel/lib/bitset.c
 )
 
