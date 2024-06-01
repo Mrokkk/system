@@ -12,12 +12,17 @@ function build()
             --with-sysroot="${SYSROOT}" \
             --enable-shared \
             --disable-nls \
-            --disable-gdb || die "binutils configuration failed"
+            --disable-gdb \
+            --disable-gdbserver \
+            --disable-libdecnumber \
+            --disable-threads \
+            --disable-sim \
+            --with-system-zlib || die "binutils configuration failed"
     fi
-    make all || die "binutils compilation failed"
+    make -O all -j${NPROC} || die "binutils compilation failed"
 }
 
 function install()
 {
-    make install -j${NPROC} || die "binutils installation failed"
+    make -O install -j${NPROC} || die "binutils installation failed"
 }

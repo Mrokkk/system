@@ -4,6 +4,9 @@ BRANCH="releases/gcc-${gcc_version}"
 
 function build()
 {
+    export CFLAGS="-g -O2"
+    export CXXFLAGS="-g -O2"
+
     if [[ ! -f "Makefile" ]]
     then
         ${SRC_DIR}/configure \
@@ -12,15 +15,19 @@ function build()
             --with-sysroot="${SYSROOT}" \
             --disable-nls \
             --enable-languages=c \
-            --disable-gcov || die "configuration failed"
+            --disable-gcov \
+            --disable-bootstrap \
+            --enable-checking=release \
+            --enable-host-shared \
+            --with-system-zlib || die "configuration failed"
     fi
 
-    make all-gcc -j${NPROC}           || die "gcc compilation failed"
-    make all-target-libgcc -j${NPROC} || die "libgcc compilation failed"
+    make -O all-gcc -j${NPROC}           || die "gcc compilation failed"
+    make -O all-target-libgcc -j${NPROC} || die "libgcc compilation failed"
 }
 
 function install()
 {
-    make install-gcc -j${NPROC}           || die "gcc installation failed"
-    make install-target-libgcc -j${NPROC} || die "libgcc installation failed"
+    make -O install-gcc -j${NPROC}           || die "gcc installation failed"
+    make -O install-target-libgcc -j${NPROC} || die "libgcc installation failed"
 }

@@ -1,11 +1,12 @@
-commit 14ef51748e299da4ab8faf59bfefcbbe2518128c
+commit 9ba73e150066aa1e4cffcce51e0b1dcd0c9cf638
 Author: Mrokkk <mrokk@protonmail.com>
-Date:   Mon May 27 22:25:00 2024 +0200
+Date:   Sat Jun 1 16:46:57 2024 +0200
 
     Add support for Phoenix
     
     * data section aligned to 0x1000, as a WA for not handling the mmap with
       offset not aligned to page size
+    * disable development mode
 
 diff --git a/bfd/config.bfd b/bfd/config.bfd
 index bbf12447..f7c8661d 100644
@@ -22,6 +23,19 @@ index bbf12447..f7c8661d 100644
    i[3-7]86-*-darwin* | i[3-7]86-*-macos10* | i[3-7]86-*-rhapsody*)
      targ_defvec=i386_mach_o_vec
      targ_selvecs="mach_o_le_vec mach_o_be_vec mach_o_fat_vec pef_vec pef_xlib_vec sym_vec"
+diff --git a/bfd/development.sh b/bfd/development.sh
+index 1112d2ec..535d7406 100644
+--- a/bfd/development.sh
++++ b/bfd/development.sh
+@@ -16,7 +16,7 @@
+ # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ # Controls whether to enable development-mode features by default.
+-development=true
++development=false
+ 
+ # Indicate whether this is a release branch.
+ experimental=false
 diff --git a/config.sub b/config.sub
 index defe52c0..39a66f25 100755
 --- a/config.sub
@@ -48,17 +62,19 @@ index 7c66734e..81e65f83 100644
      case ${cpu}-${os} in
        x86_64*-linux-gnux32)		arch=x86_64:32 ;;
 diff --git a/ld/Makefile.am b/ld/Makefile.am
-index f9ee05b1..aeeed65c 100644
+index f9ee05b1..3cca3ce9 100644
 --- a/ld/Makefile.am
 +++ b/ld/Makefile.am
-@@ -152,6 +152,7 @@ endif
+@@ -372,7 +372,8 @@ ALL_EMULATION_SOURCES = \
+ 	exgateelf.c \
+ 	ez80.c \
+ 	ez8001.c \
+-	ez8002.c
++	ez8002.c \
++	eelf_i386_phoenix.c
  
- # These all start with e so 'make clean' can find them.
- ALL_EMULATION_SOURCES = \
-+	eelf_i386_phoenix.c \
- 	eaix5ppc.c \
- 	eaix5rs6.c \
- 	eaixppc.c \
+ ALL_EMULATIONS = $(ALL_EMULATION_SOURCES:.c=.@OBJEXT@)
+ 
 diff --git a/ld/configure.tgt b/ld/configure.tgt
 index f937f78b..595086e2 100644
 --- a/ld/configure.tgt
