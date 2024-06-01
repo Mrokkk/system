@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#ifndef TEST_SUITES_COUNT
 #define TEST_SUITES_COUNT       16
+#endif
 #define LIKELY(x)               __builtin_expect(!!(x), 1)
 #define UNLIKELY(x)             __builtin_expect(!!(x), 0)
 #define __STRINGIFY(x)          #x
@@ -31,7 +33,7 @@ struct test_suite
 struct config
 {
     const char* test_to_run;
-    bool run_forever;
+    bool run_until_failure;
     bool verbose;
 };
 
@@ -50,7 +52,7 @@ int __test_suites_run(int argc, char* argv[]);
         uint8_t:    "%u", \
         int:        "%d", \
         short:      "%d", \
-        char:       "%c", \
+        char:       "%d", \
         default:    "0x%lx")
 
 #define VALUE(val) \

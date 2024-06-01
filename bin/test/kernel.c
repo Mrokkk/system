@@ -2,19 +2,18 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
 #include "test.h"
 
-int data;
-int data2 = 13;
-int data3[1028];
+static int data;
+static int data2 = 13;
+static int data3[1028];
 
-int sigreceived;
+static int sigreceived;
 
-void sighan()
+static void sighan()
 {
     sigreceived = 1;
 }
@@ -221,7 +220,7 @@ TEST(own_copy_of_program)
     data = 34;
     FORK_TEST_CASE_EQ(0)
     {
-        char* argv[] = {"--test=modify_data", 0};
+        char* argv[] = {"/bin/test", "--test=modify_data", 0};
         close(STDOUT_FILENO);
         close(STDERR_FILENO);
         exec("/bin/test", argv);
@@ -260,5 +259,3 @@ TEST(bad_syscall)
 }
 
 TEST_SUITE_END(kernel);
-
-
