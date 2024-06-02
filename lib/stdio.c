@@ -333,11 +333,11 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 if (field_width == -1)
                 {
                     field_width = 2 * sizeof(void*);
-                    flags |= ZEROPAD;
+                    flags |= ZEROPAD | SMALL | SPECIAL;
                 }
                 str = number(
                     str,
-                    (unsigned long)va_arg(args, void*),
+                    va_arg(args, unsigned long),
                     16,
                     field_width,
                     precision,

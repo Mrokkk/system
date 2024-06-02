@@ -10,7 +10,6 @@
 static int data;
 static int data2 = 13;
 static int data3[1028];
-
 static int sigreceived;
 
 static void sighan()
@@ -18,31 +17,45 @@ static void sighan()
     sigreceived = 1;
 }
 
-#define FORK_TEST_CASE_EQ(expected_error_code) \
-    int status, pid = fork(); \
+TEST_SUITE(kernel);
+
+static void expect_exit_with(int pid, int expected_error_code)
+{
+    int status;
+    waitpid(pid, &status, 0);
+    EXPECT_GT(WIFEXITED(status), 0);
+    EXPECT_EQ(WEXITSTATUS(status), expected_error_code);
+    EXPECT_EQ(WIFSIGNALED(status), 0);
+}
+
+static void expect_killed_by(int pid, int signal)
+{
+    int status;
+    waitpid(pid, &status, 0);
+    EXPECT_GT(WIFSIGNALED(status), 0);
+    EXPECT_EQ(WTERMSIG(status), signal);
+}
+
+#define EXPECT_EXIT_WITH(expected_error_code) \
+    int pid = fork(); \
     if (pid > 0) \
     { \
-        waitpid(pid, &status, 0); \
-        EXPECT_GT(WIFEXITED(status), 0); \
-        EXPECT_EQ(WEXITSTATUS(status), expected_error_code); \
-        EXPECT_EQ(WIFSIGNALED(status), 0); \
+        expect_exit_with(pid, expected_error_code); \
     } \
     else
 
-#define FORK_TEST_CASE_SIGSEGV(expected_error_code) \
-    int status, pid = fork(); \
+#define EXPECT_KILLED_BY(signal) \
+    int pid = fork(); \
     if (pid > 0) \
     { \
-        waitpid(pid, &status, 0); \
-        EXPECT_GT(WIFSIGNALED(status), 0); \
-        EXPECT_EQ(WTERMSIG(status), SIGSEGV); \
+        expect_killed_by(pid, signal); \
     } \
     else
 
 #define TEST_CRASH_WRITE_ADDRESS(name, address) \
     TEST(name) \
     { \
-        FORK_TEST_CASE_SIGSEGV(0) \
+        EXPECT_KILLED_BY(SIGSEGV) \
         { \
             int* ptr = (int*)address; \
             *ptr = 2; \
@@ -53,7 +66,7 @@ static void sighan()
 #define TEST_CRASH_READ_ADDRESS(name, address) \
     TEST(name) \
     { \
-        FORK_TEST_CASE_SIGSEGV(0) \
+        EXPECT_KILLED_BY(SIGSEGV) \
         { \
             int* ptr = (int*)address; \
             printf("%u\n", *ptr); \
@@ -61,11 +74,9 @@ static void sighan()
         } \
     }
 
-TEST_SUITE(kernel);
-
 TEST(sse)
 {
-    FORK_TEST_CASE_EQ(154)
+    EXPECT_EXIT_WITH(154)
     {
         asm volatile(
             "movapd %0, %%xmm0"
@@ -84,16 +95,16 @@ TEST(getppid)
 {
     int parent_pid = getpid();
     EXPECT_GT(getppid(), 0);
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         EXPECT_EQ(getppid(), parent_pid);
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
 }
 
 TEST(getdents_bad_ptr1)
 {
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         char buf[128];
         int dirfd, count;
@@ -112,13 +123,13 @@ TEST(getdents_bad_ptr1)
         EXPECT_EQ(count, -1);
         EXPECT_EQ(errno, EFAULT);
 
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
 }
 
 TEST(getdents_bad_ptr2)
 {
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         char buf[128];
         int dirfd, count;
@@ -137,7 +148,7 @@ TEST(getdents_bad_ptr2)
         EXPECT_EQ(count, -1);
         EXPECT_EQ(errno, EFAULT);
 
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
 }
 
@@ -158,7 +169,7 @@ TEST(signal)
         signal(SIGUSR1, &sighan);
         kill(getpid(), SIGSTOP);
         EXPECT_EQ(sigreceived, 1);
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
 }
 
@@ -166,13 +177,13 @@ TEST(copy_on_write)
 {
     data = 93;
     data3[1027] = 2221;
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         data = 58;
         data3[1027] = 29304;
         EXPECT_EQ(data, 58);
         EXPECT_EQ(data3[1027], 29304);
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
     EXPECT_EQ(data, 93);
     EXPECT_EQ(data3[1027], 2221);
@@ -180,18 +191,18 @@ TEST(copy_on_write)
 
 TEST(sbrk1)
 {
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         uint8_t* data = sbrk(0x333);
         data[2] = 29;
         EXPECT_EQ(data[2], 29);
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
 }
 
 TEST(sbrk2)
 {
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         uint8_t* data = sbrk(0x1000);
         data[2] = 29;
@@ -210,7 +221,7 @@ TEST(sbrk2)
         EXPECT_EQ(data3[2], 254);
         EXPECT_EQ(data3[0x10000 - 1], 34);
 
-        exit(*assert_failed);
+        exit(FAILED_EXPECTATIONS());
     }
 }
 
@@ -218,7 +229,7 @@ TEST(own_copy_of_program)
 {
     EXPECT_EQ(data2, 13);
     data = 34;
-    FORK_TEST_CASE_EQ(0)
+    EXPECT_EXIT_WITH(0)
     {
         char* argv[] = {"/bin/test", "--test=modify_data", 0};
         close(STDOUT_FILENO);
