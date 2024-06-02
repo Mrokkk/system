@@ -10,47 +10,30 @@
 typedef struct options
 {
     const char* cmdline;
-    char console_device[128];
+    char console_device[MAX_CMDLINE_LEN];
 } options_t;
-
-static inline const char* parse_key_value(
-    char* dest,
-    const char* src,
-    const char* key)
-{
-    if (!strncmp(key, src, strlen(key)))
-    {
-        src = strchr(src, '=') + 1;
-        const char* next = strchr(src, ' ');
-        size_t len = strnlen(src, MAX_CMDLINE_LEN);
-        char* string;
-
-        if (next)
-        {
-            string = strncpy(dest, src, next - src);
-            src = next + 1;
-        }
-        else
-        {
-            string = strncpy(dest, src, len);
-            src += len;
-        }
-        *string = 0;
-    }
-
-    return src;
-}
 
 static inline void parse_cmdline(options_t* options, const char* cmdline)
 {
-    const char* temp = cmdline;
+    char* token;
+    char* temp = malloc(strlen(cmdline) + 1);
+    strcpy(temp, cmdline);
 
     options->cmdline = cmdline;
 
-    while (*temp)
+    token = strtok(temp, " ");
+
+    while (token)
     {
-        temp = parse_key_value(options->console_device, temp, "console=");
-        ++temp;
+        if (!strncmp(token, "console=", 8))
+        {
+            if (!(token = strtok(token + 8, " ")))
+            {
+                abort();
+            }
+            strcpy(options->console_device, token);
+        }
+        token = strtok(NULL, " ");
     }
 }
 
