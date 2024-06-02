@@ -69,7 +69,7 @@ function info()
 
 function debug()
 {
-    echo -e "${BLUE}${INFO}${RESET} ${@}"
+    [[ -n "${verbose}" ]] && echo -e "${BLUE}${INFO}${RESET} ${@}"
 }
 
 function success()

@@ -5,9 +5,12 @@ OPTIONAL=true
 
 function build()
 {
-    "${SRC_DIR}"/configure \
-        --prefix="${PREFIX}" \
-        --target-list=i386-softmmu || die "configuration failed"
+    if [[ ! -f ".ninja_deps" ]]
+    then
+        "${SRC_DIR}"/configure \
+            --prefix="${PREFIX}" \
+            --target-list=i386-softmmu || die "configuration failed"
+    fi
     ninja all || die "compilation failed"
 }
 
