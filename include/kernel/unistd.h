@@ -29,3 +29,6 @@ int chroot(const char* path);
 int setsid(void);
 int setuid(gid_t gid);
 int setgid(uid_t uid);
+int getgid(void);
+int getuid(void);
+int geteuid(void);

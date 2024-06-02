@@ -47,14 +47,29 @@ int process_find_free_fd(struct process* proc, int* fd)
     return 0;
 }
 
-int sys_getpid()
+int sys_getpid(void)
 {
     return process_current->pid;
 }
 
-int sys_getppid()
+int sys_getppid(void)
 {
     return process_current->ppid;
+}
+
+int sys_getuid(void)
+{
+    return 0;
+}
+
+int sys_geteuid(void)
+{
+    return 0;
+}
+
+int sys_getgid(void)
+{
+    return 0;
 }
 
 char* mm_print(const struct mm* mm, char* str)

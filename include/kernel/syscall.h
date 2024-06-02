@@ -15,32 +15,35 @@
 #define __NR_fstatvfs       12
 #define __NR_getcwd         13
 #define __NR_getdents       14
-#define __NR_getpid         15
-#define __NR_getppid        16
-#define __NR_ioctl          17
-#define __NR_kill           18
-#define __NR_mkdir          19
-#define __NR_mmap           20
-#define __NR_mount          21
-#define __NR_open           22
-#define __NR_poll           23
-#define __NR_read           24
-#define __NR_reboot         25
-#define __NR_sbrk           26
-#define __NR_select         27
-#define __NR_setsid         28
-#define __NR_sigaction      29
-#define __NR_signal         30
-#define __NR_sigreturn      31
-#define __NR_stat           32
-#define __NR_statvfs        33
-#define __NR_time           34
-#define __NR_umount         35
-#define __NR_umount2        36
-#define __NR_waitpid        37
-#define __NR_write          38
+#define __NR_geteuid        15
+#define __NR_getgid         16
+#define __NR_getpid         17
+#define __NR_getppid        18
+#define __NR_getuid         19
+#define __NR_ioctl          20
+#define __NR_kill           21
+#define __NR_mkdir          22
+#define __NR_mmap           23
+#define __NR_mount          24
+#define __NR_open           25
+#define __NR_poll           26
+#define __NR_read           27
+#define __NR_reboot         28
+#define __NR_sbrk           29
+#define __NR_select         30
+#define __NR_setsid         31
+#define __NR_sigaction      32
+#define __NR_signal         33
+#define __NR_sigreturn      34
+#define __NR_stat           35
+#define __NR_statvfs        36
+#define __NR_time           37
+#define __NR_umount         38
+#define __NR_umount2        39
+#define __NR_waitpid        40
+#define __NR_write          41
 
-#define __NR_syscalls       39
+#define __NR_syscalls       42
 
 #ifndef __ASSEMBLER__
 
@@ -91,8 +94,11 @@ __syscall2(fstat, int, int, struct stat*)
 __syscall2(fstatvfs, int, int, struct statvfs*)
 __syscall2(getcwd, int, char*, size_t)
 __syscall3(getdents, int, unsigned int, void*, size_t)
+__syscall0(geteuid, int)
+__syscall0(getgid, int)
 __syscall0(getpid, int)
 __syscall0(getppid, int)
+__syscall0(getuid, int)
 __syscall3(ioctl, int, int, unsigned long, unsigned long)
 __syscall2(kill, int, int, int)
 __syscall2(mkdir, int, const char*, mode_t)
