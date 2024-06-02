@@ -12,14 +12,19 @@ add_library(c STATIC
     errno.c
     getcwd.c
     getenv.c
+    gethostname.c
     libc_main.c
     locale.c
     malloc.c
+    math.c
     mnent.c
+    poll.c
     pwd.c
     signal.c
+    sleep.c
     stdio.c
     syscall.c
+    termios.c
     time.c
 
     string/memcpy.c
@@ -29,6 +34,7 @@ add_library(c STATIC
     string/strcpy.c
     string/strlen.c
     string/strspn.c
+    string/strstr.c
     string/strtok.c
 
     ../kernel/lib/bitset.c

@@ -22,28 +22,29 @@
 #define __NR_getuid         19
 #define __NR_ioctl          20
 #define __NR_kill           21
-#define __NR_mkdir          22
-#define __NR_mmap           23
-#define __NR_mount          24
-#define __NR_open           25
-#define __NR_poll           26
-#define __NR_read           27
-#define __NR_reboot         28
-#define __NR_sbrk           29
-#define __NR_select         30
-#define __NR_setsid         31
-#define __NR_sigaction      32
-#define __NR_signal         33
-#define __NR_sigreturn      34
-#define __NR_stat           35
-#define __NR_statvfs        36
-#define __NR_time           37
-#define __NR_umount         38
-#define __NR_umount2        39
-#define __NR_waitpid        40
-#define __NR_write          41
+#define __NR_lseek          22
+#define __NR_mkdir          23
+#define __NR_mmap           24
+#define __NR_mount          25
+#define __NR_open           26
+#define __NR_poll           27
+#define __NR_read           28
+#define __NR_reboot         29
+#define __NR_sbrk           30
+#define __NR_select         31
+#define __NR_setsid         32
+#define __NR_sigaction      33
+#define __NR_signal         34
+#define __NR_sigreturn      35
+#define __NR_stat           36
+#define __NR_statvfs        37
+#define __NR_time           38
+#define __NR_umount         39
+#define __NR_umount2        40
+#define __NR_waitpid        41
+#define __NR_write          42
 
-#define __NR_syscalls       42
+#define __NR_syscalls       43
 
 #ifndef __ASSEMBLER__
 
@@ -101,6 +102,7 @@ __syscall0(getppid, int)
 __syscall0(getuid, int)
 __syscall3(ioctl, int, int, unsigned long, unsigned long)
 __syscall2(kill, int, int, int)
+__syscall3(lseek, off_t, int, off_t, int)
 __syscall2(mkdir, int, const char*, mode_t)
 __syscall6(mmap, void*, void*, size_t, int, int, int , size_t)
 __syscall5(mount, int, const char*, const char*, const char*, int, void*)

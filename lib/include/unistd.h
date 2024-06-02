@@ -14,4 +14,7 @@ int isatty(int fd);
 
 #define execvp exec
 
+unsigned int sleep(unsigned int seconds);
+int gethostname(char* name, size_t namelen);
+
 #endif // __ASSEMBLER__

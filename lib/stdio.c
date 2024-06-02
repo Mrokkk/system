@@ -482,6 +482,16 @@ FILE* fopen(const char* pathname, const char* mode)
     return file;
 }
 
+FILE* fdopen(int fd, const char* mode)
+{
+    FILE* file;
+    VALIDATE_INPUT(mode, NULL);
+    file = SAFE_ALLOC(malloc(sizeof(*file)), NULL);
+    file->fd = fd;
+    file->magic = FILE_MAGIC;
+    return file;
+}
+
 int fclose(FILE* stream)
 {
     VALIDATE_INPUT(FILE_CHECK(stream), EOF);
@@ -583,4 +593,10 @@ size_t fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream)
     }
 
     return count;
+}
+
+int fflush(FILE* stream)
+{
+    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
+    return 0;
 }

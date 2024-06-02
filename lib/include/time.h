@@ -25,9 +25,15 @@ size_t strftime(
     const struct tm* restrict tm);
 
 size_t strftime_l(
-    char* s, size_t max,
-    const char *restrict format,
+    char* s,
+    size_t max,
+    const char* restrict format,
     const struct tm* restrict tm,
     locale_t locale);
 
 time_t time(void*);
+
+struct tm* localtime(const time_t* timep);
+time_t mktime(struct tm* tm);
+
+extern char *tzname[];

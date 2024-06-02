@@ -2,6 +2,15 @@
 
 #include <kernel/types.h>
 
+#define SEEK_SET    1
+#define SEEK_CUR    2
+#define SEEK_END    3
+
+#define R_OK        4   // Test for read permission
+#define W_OK        2   // Test for write permission
+#define X_OK        1   // Test for execute permission
+#define F_OK        0   // Test for existence
+
 int fork(void);
 int getpid(void);
 int getppid(void);
@@ -29,6 +38,8 @@ int chroot(const char* path);
 int setsid(void);
 int setuid(gid_t gid);
 int setgid(uid_t uid);
+int getegid(void);
 int getgid(void);
 int getuid(void);
 int geteuid(void);
+off_t lseek(int fildes, off_t offset, int whence);

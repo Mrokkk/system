@@ -41,7 +41,7 @@ static inline void ts_align(ts_t* ts)
 }
 
 // This one is from Linux 2.0
-static inline uint32_t mktime(
+static inline time_t mktime_raw(
     uint32_t year,
     uint32_t month,
     uint32_t day,

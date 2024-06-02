@@ -1,5 +1,6 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
+#include <kernel/unistd.h>
 #include <kernel/process.h>
 
 int sys_write(int fd, const char* buffer, size_t size)
@@ -63,6 +64,35 @@ int do_read(file_t* file, size_t offset, void* buffer, size_t count)
     {
         log_warning("retval = %d, count = %u", retval, count);
         return -EIO;
+    }
+
+    return 0;
+}
+
+int sys_lseek(int fd, off_t offset, int whence)
+{
+    file_t* file;
+
+    if (whence > SEEK_END || whence < SEEK_SET)
+    {
+        return -EINVAL;
+    }
+
+    if (fd_check_bounds(fd)) return -EBADF;
+    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    // TODO: add checking whether offset can be set
+    switch (whence)
+    {
+        case SEEK_SET:
+            file->offset = offset;
+            break;
+        case SEEK_CUR:
+            file->offset += offset;
+            break;
+        case SEEK_END:
+            file->offset = file->inode->size + offset;
+            break;
     }
 
     return 0;

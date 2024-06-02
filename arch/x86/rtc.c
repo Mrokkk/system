@@ -100,12 +100,12 @@ void rtc_print(void)
     rtc_meas_t m;
     rtc_read(&m);
     log_notice("%02u-%02u-%u %02u:%02u:%02u %u", m.day, m.month, m.year, m.hour, m.minute, m.second,
-        mktime(m.year + 2000, m.month, m.day, m.hour, m.minute, m.second));
+        mktime_raw(m.year + 2000, m.month, m.day, m.hour, m.minute, m.second));
 }
 
 time_t sys_time(void*)
 {
     rtc_meas_t m;
     rtc_read(&m);
-    return mktime(m.year + 2000, m.month, m.day, m.hour, m.minute, m.second);
+    return mktime_raw(m.year + 2000, m.month, m.day, m.hour, m.minute, m.second);
 }

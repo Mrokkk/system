@@ -37,6 +37,7 @@ size_t fread(void* ptr, size_t size, size_t nmemb, FILE* restrict stream);
 size_t fwrite(const void* ptr, size_t size, size_t nmemb, FILE* restrict stream);
 
 FILE* fopen(const char* restrict pathname, const char* restrict mode);
+FILE* fdopen(int fd, const char* mode);
 int fclose(FILE* stream);
 int fileno(FILE* stream);
 
@@ -56,3 +57,5 @@ void perror(const char* s);
 void clearerr(FILE* stream);
 int feof(FILE* stream);
 int ferror(FILE* stream);
+
+int fflush(FILE* stream);
