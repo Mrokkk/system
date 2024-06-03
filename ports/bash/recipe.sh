@@ -9,18 +9,21 @@ function build()
 
     [[ ! -f "${CC}" ]] && die "Toolchain not built"
 
-    [[ -f "Makefile" ]] && make distclean
+    #[[ -f "Makefile" ]] && make distclean
 
-    ${SRC_DIR}/configure \
-        --prefix=${SYSROOT} \
-        --host=i686-pc-phoenix \
-        --target=i686-pc-phoenix \
-        --enable-minimal-config \
-        --disable-largefile \
-        --disable-nls \
-        --disable-threads \
-        --without-bash-malloc \
-        --disable-multibyte || die "configuration failed"
+    if [[ ! -f "Makefile" ]]
+    then
+        ${SRC_DIR}/configure \
+            --prefix=${SYSROOT} \
+            --host=i686-pc-phoenix \
+            --target=i686-pc-phoenix \
+            --enable-minimal-config \
+            --disable-largefile \
+            --disable-nls \
+            --disable-threads \
+            --without-bash-malloc \
+            --disable-multibyte || die "configuration failed"
+    fi
 
     make bash -j${NPROC} || die "compilation failed"
 }

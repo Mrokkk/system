@@ -9,15 +9,20 @@ add_library(c STATIC
     atexit.c
     atoi.c
     bss.c
+    dirent.c
+    environ.c
     errno.c
+    fcntl.c
     getcwd.c
     getenv.c
     gethostname.c
+    isatty.c
     libc_main.c
     locale.c
     malloc.c
     math.c
     mnent.c
+    pipe.c
     poll.c
     pwd.c
     signal.c
@@ -26,6 +31,7 @@ add_library(c STATIC
     syscall.c
     termios.c
     time.c
+    ttyname.c
 
     string/memcmp.c
     string/memcpy.c

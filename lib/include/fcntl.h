@@ -21,4 +21,4 @@
 #define F_GETFL             3 // Get file status flags
 #define F_SETFL             4 // Set file status flags
 
-int fcntl(int, int, ...);
+int fcntl(int fildes, int cmd, ...);

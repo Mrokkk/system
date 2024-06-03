@@ -72,6 +72,21 @@ int sys_getgid(void)
     return 0;
 }
 
+int sys_getegid(void)
+{
+    return 0;
+}
+
+int sys_setuid(uid_t)
+{
+    return 0;
+}
+
+int sys_setgid(gid_t)
+{
+    return 0;
+}
+
 char* mm_print(const struct mm* mm, char* str)
 {
     str += sprintf(str,

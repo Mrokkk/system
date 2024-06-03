@@ -78,4 +78,11 @@ static inline int isprint(int c)
 }
 #endif
 
+#ifndef iscntrl
+static inline int iscntrl(int c)
+{
+    return c & (' ' - 1);
+}
+#endif
+
 #endif
