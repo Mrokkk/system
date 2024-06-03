@@ -1,0 +1,46 @@
+commit cd90f1bf625f5e36cf648733f8cbc38980f8a9ae
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Mon Jun 3 23:09:42 2024 +0200
+
+    Some hacks to make it compile
+
+diff --git a/include/posixstat.h b/include/posixstat.h
+index b607786..6457101 100644
+--- a/include/posixstat.h
++++ b/include/posixstat.h
+@@ -155,8 +155,10 @@
+ #endif /* !S_IRWXU */
+ 
+ /* These are non-standard, but are used in builtins.c$symbolic_umask() */
++#ifndef S_IRUGO
+ #define S_IRUGO		(S_IRUSR | S_IRGRP | S_IROTH)
+ #define S_IWUGO		(S_IWUSR | S_IWGRP | S_IWOTH)
+ #define S_IXUGO		(S_IXUSR | S_IXGRP | S_IXOTH)
++#endif
+ 
+ #endif /* _POSIXSTAT_H_ */
+diff --git a/lib/sh/strtod.c b/lib/sh/strtod.c
+index 55e1154..46c3dad 100644
+--- a/lib/sh/strtod.c
++++ b/lib/sh/strtod.c
+@@ -50,7 +50,7 @@ extern int errno;
+ #endif
+ 
+ #ifndef locale_decpoint
+-extern int locale_decpoint PARAMS((void));
++extern int locale_decpoint (void);
+ #endif
+ 
+ /* Convert NPTR to a double.  If ENDPTR is not NULL, a pointer to the
+diff --git a/y.tab.c b/y.tab.c
+index 78c7930..c8d30ba 100644
+--- a/y.tab.c
++++ b/y.tab.c
+@@ -272,6 +272,7 @@ static char *shell_input_line_property = NULL;
+ static size_t shell_input_line_propsize = 0;
+ #else
+ #  define set_line_mbstate()
++static char *shell_input_line_property = NULL;
+ #endif
+ 
+ extern int yyerror PARAMS((const char *));

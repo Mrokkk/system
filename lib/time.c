@@ -2,8 +2,32 @@
 #include <time.h>
 #include <sys/time.h>
 
-char* tzname[2];
+long    timezone;
+long    altzone;
+char*   tzname[2];
+int     daylight;
 static struct tm __tm;
+
+size_t strftime(
+    char* s,
+    size_t max,
+    const char* restrict format,
+    const struct tm* restrict tm)
+{
+    UNUSED(s); UNUSED(max); UNUSED(format); UNUSED(tm);
+    return 0;
+}
+
+size_t strftime_l(
+    char* s,
+    size_t max,
+    const char* restrict format,
+    const struct tm* restrict tm,
+    locale_t locale)
+{
+    UNUSED(s); UNUSED(max); UNUSED(format); UNUSED(tm); UNUSED(locale);
+    return 0;
+}
 
 int gettimeofday(struct timeval* restrict tp, void* restrict tzp)
 {
@@ -28,4 +52,9 @@ time_t mktime(struct tm* tm)
         tm->tm_hour,
         tm->tm_min,
         tm->tm_sec);
+}
+
+clock_t clock(void)
+{
+    return 0;
 }

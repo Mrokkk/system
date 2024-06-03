@@ -5,6 +5,12 @@
 
 // https://pubs.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
 
+struct timespec
+{
+    time_t  tv_sec;     // Seconds
+    long    tv_nsec;    // Nanoseconds
+};
+
 struct tm
 {
     int tm_sec;     // Seconds [0,60]
@@ -31,9 +37,16 @@ size_t strftime_l(
     const struct tm* restrict tm,
     locale_t locale);
 
-time_t time(void*);
+time_t time(time_t* time);
 
 struct tm* localtime(const time_t* timep);
 time_t mktime(struct tm* tm);
 
-extern char *tzname[];
+clock_t clock(void);
+int clock_gettime(clockid_t clockid, struct timespec* tp);
+int clock_settime(clockid_t clockid, struct timespec* tp);
+
+extern long     timezone;
+extern long     altzone;
+extern char*    tzname[2];
+extern int      daylight;

@@ -14,6 +14,12 @@
 #define USEC_IN_SEC     MHz
 #define USEC_IN_MSEC    KHz
 
+#define CLOCK_REALTIME          1
+#define CLOCK_MONOTONIC         2
+#define CLOCK_MONOTONIC_RAW     3
+#define CLOCK_REALTIME_COARSE   4
+#define CLOCK_ID_COUNT          5
+
 struct timestamp
 {
     uint32_t seconds;
