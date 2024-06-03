@@ -29,6 +29,7 @@ add_library(c STATIC
 
     string/memcmp.c
     string/memcpy.c
+    string/memmove.c
     string/memset.c
     string/strchr.c
     string/strcmp.c

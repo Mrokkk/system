@@ -147,6 +147,35 @@ TEST(strstr)
     EXPECT_EQ(strstr(string, "string"), string + 5);
 }
 
+TEST(memmove)
+{
+    char buf[16] = {0, };
+    const char* data1 = "test123";
+    EXPECT_EQ(memmove(buf, data1, 8), buf);
+    EXPECT_EQ(buf[0], 't');
+    EXPECT_EQ(buf[1], 'e');
+    EXPECT_EQ(buf[2], 's');
+    EXPECT_EQ(buf[3], 't');
+    EXPECT_EQ(buf[4], '1');
+    EXPECT_EQ(buf[5], '2');
+    EXPECT_EQ(buf[6], '3');
+    EXPECT_EQ(buf[7], 0);
+    EXPECT_EQ(memmove(buf, buf + 2, 6), buf);
+    EXPECT_EQ(buf[0], 's');
+    EXPECT_EQ(buf[1], 't');
+    EXPECT_EQ(buf[2], '1');
+    EXPECT_EQ(buf[3], '2');
+    EXPECT_EQ(buf[4], '3');
+    EXPECT_EQ(buf[5], 0);
+    memcpy(buf, data1, 8);
+    EXPECT_EQ(memmove(buf + 2, buf, 6), buf + 2);
+    EXPECT_EQ(buf[0], 't');
+    EXPECT_EQ(buf[1], 'e');
+    EXPECT_EQ(buf[2], 't');
+    EXPECT_EQ(buf[3], 'e');
+    EXPECT_EQ(buf[4], 's');
+}
+
 TEST(atoi)
 {
     EXPECT_EQ(atoi("154"), 154);
