@@ -20,5 +20,6 @@ target_compile_options(test PRIVATE
 target_link_libraries(
     test
     PRIVATE
+        c
         "-Wl,-Map=test.map"
 )

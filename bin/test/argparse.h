@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 typedef void (*action_t)();
-typedef struct option option_t;
+typedef struct opt option_t;
 typedef enum option_type option_type_t;
 
 enum option_type
@@ -13,7 +13,7 @@ enum option_type
     OPT_BOOL
 };
 
-struct option
+struct opt
 {
     const char*     short_v;
     const char*     long_v;

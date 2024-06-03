@@ -13,7 +13,11 @@
 int syscall(int nr, ...);
 int isatty(int fd);
 
-#define execvp exec
+static inline int execvp(const char* path, char* const argv[])
+{
+    extern char** environ;
+    return execve(path, argv, environ);
+}
 
 unsigned int sleep(unsigned int seconds);
 int gethostname(char* name, size_t namelen);

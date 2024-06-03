@@ -19,39 +19,6 @@ static void sighan()
 
 TEST_SUITE(kernel);
 
-static void expect_exit_with(int pid, int expected_error_code)
-{
-    int status;
-    waitpid(pid, &status, 0);
-    EXPECT_GT(WIFEXITED(status), 0);
-    EXPECT_EQ(WEXITSTATUS(status), expected_error_code);
-    EXPECT_EQ(WIFSIGNALED(status), 0);
-}
-
-static void expect_killed_by(int pid, int signal)
-{
-    int status;
-    waitpid(pid, &status, 0);
-    EXPECT_GT(WIFSIGNALED(status), 0);
-    EXPECT_EQ(WTERMSIG(status), signal);
-}
-
-#define EXPECT_EXIT_WITH(expected_error_code) \
-    int pid = fork(); \
-    if (pid > 0) \
-    { \
-        expect_exit_with(pid, expected_error_code); \
-    } \
-    else
-
-#define EXPECT_KILLED_BY(signal) \
-    int pid = fork(); \
-    if (pid > 0) \
-    { \
-        expect_killed_by(pid, signal); \
-    } \
-    else
-
 #define TEST_CRASH_WRITE_ADDRESS(name, address) \
     TEST(name) \
     { \
@@ -234,7 +201,7 @@ TEST(own_copy_of_program)
         char* argv[] = {"/bin/test", "--test=modify_data", 0};
         close(STDOUT_FILENO);
         close(STDERR_FILENO);
-        exec("/bin/test", argv);
+        execvp(argv[0], argv);
         exit(1);
     }
     EXPECT_EQ(data, 34);

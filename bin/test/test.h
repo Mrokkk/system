@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <unistd.h>
 #include <stdbool.h>
 #include <kernel/list.h>
 
@@ -106,11 +107,19 @@ struct test_suite
 void __test_suite_register(test_suite_t* suite);
 int __tcs_run(test_case_t* test_cases, int count, config_t* config);
 int __test_suites_run(int argc, char* argv[]);
+int expect_exit_with(int pid, int expected_error_code);
+int expect_killed_by(int pid, int signal);
 
 void failure_print(
     value_t* actual,
     value_t* expected,
     comp_t comp,
+    const char* file,
+    size_t line);
+
+void string_failure_print(
+    value_t* actual,
+    value_t* expected,
     const char* file,
     size_t line);
 
@@ -188,12 +197,58 @@ void failure_print(
     } \
     while (0)
 
+#define EXPECT_STR_EQ(A, E) \
+    do \
+    { \
+        const char* actual = (const char*)A; \
+        const char* expected = (const char*)E; \
+        if (!actual || !expected) \
+        { \
+            EXPECT_EQ(A, E); \
+        } \
+        else \
+        { \
+            if (UNLIKELY(strcmp(actual, expected))) \
+            { \
+                value_t expected_value = { \
+                    .value = (void*)&expected, \
+                    .name = #E, \
+                    .type = TYPE_CHAR_PTR, \
+                }; \
+                value_t actual_value = { \
+                    .value = (void*)&actual, \
+                    .name = #A, \
+                    .type = TYPE_CHAR_PTR, \
+                }; \
+                string_failure_print(&actual_value, &expected_value, __FILE__, __LINE__); \
+                ++(*__assert_failed); \
+            } \
+        } \
+    } \
+    while (0)
+
 #define EXPECT_EQ(var, value) EXPECT_GENERIC(EQ, ==, var, value)
 #define EXPECT_NE(var, value) EXPECT_GENERIC(NE, !=, var, value)
 #define EXPECT_GT(var, value) EXPECT_GENERIC(GT, >, var, value)
 #define EXPECT_GE(var, value) EXPECT_GENERIC(GE, >=, var, value)
 #define EXPECT_LT(var, value) EXPECT_GENERIC(LT, <, var, value)
 #define EXPECT_LE(var, value) EXPECT_GENERIC(LE, <=, var, value)
+
+#define EXPECT_EXIT_WITH(expected_error_code) \
+    int pid = fork(); \
+    if (pid > 0) \
+    { \
+        *__assert_failed += expect_exit_with(pid, expected_error_code); \
+    } \
+    else
+
+#define EXPECT_KILLED_BY(signal) \
+    int pid = fork(); \
+    if (pid > 0) \
+    { \
+        *__assert_failed += expect_killed_by(pid, signal); \
+    } \
+    else
 
 #define TEST_SUITE(n) \
     extern test_case_t __##n##_test_cases[]; \

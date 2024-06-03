@@ -181,7 +181,7 @@ void scheduler();
 void exit(int);
 int fork(void);
 void processes_stats_print(void);
-int do_exec(const char* pathname, const char* const argv[]);
+int do_exec(const char* pathname, const char* const argv[], const char* const envp[]);
 vm_area_t* stack_create(uint32_t address, pgd_t* pgd);
 char* process_print(const struct process* p, char* str);
 vm_area_t* exec_prepare_initial_vma();

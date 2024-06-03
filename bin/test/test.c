@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/wait.h>
 
 #include "argparse.h"
 
@@ -154,6 +155,8 @@ static const char* comp_string_get(comp_t comp)
     }
 }
 
+static const char* FAILED_EXPECTATION_MSG = "  Failed expectation from " BLUE  "%s" RESET ":%u\n";
+
 void failure_print(
     value_t* actual,
     value_t* expected,
@@ -163,17 +166,57 @@ void failure_print(
 {
     char buf[1024];
     char* it = buf;
-    it += sprintf(it, "  Failed expectation from " BLUE  "%s" RESET ":%u\n", file, line);
+    it += sprintf(it, FAILED_EXPECTATION_MSG, file, line);
     it += sprintf(it, "    expected: %s\n"
                       "        which is ", actual->name);
     it += print_value(it, actual->value, actual->type);
     it += sprintf(it, "\n"
-                      "    to be %s ", comp_string_get(comp));
-    it += sprintf(it, "%s\n", expected->name);
-    it += sprintf(it, "        which is ");
+                      "    to be %s %s\n"
+                      "        which is ", comp_string_get(comp), expected->name);
     it += print_value(it, expected->value, expected->type);
     sprintf(it, "\n");
     fputs(buf, stdout);
+}
+
+void string_failure_print(
+    value_t* actual,
+    value_t* expected,
+    const char* file,
+    size_t line)
+{
+    char buf[1024];
+    char* it = buf;
+    it += sprintf(it, FAILED_EXPECTATION_MSG, file, line);
+    it += sprintf(it, "    expected: %s\n"
+                      "        which is \"%s\"\n"
+                      "    to be equal to %s\n"
+                      "        which is \"%s\"",
+                      actual->name, *(char**)actual->value, expected->name, *(char**)expected->value);
+    sprintf(it, "\n");
+    fputs(buf, stdout);
+}
+
+int expect_exit_with(int pid, int expected_error_code)
+{
+    int assert_failed = 0;
+    int* __assert_failed = &assert_failed;
+    int status;
+    waitpid(pid, &status, 0);
+    EXPECT_GT(WIFEXITED(status), 0);
+    EXPECT_EQ(WEXITSTATUS(status), expected_error_code);
+    EXPECT_EQ(WIFSIGNALED(status), 0);
+    return assert_failed;
+}
+
+int expect_killed_by(int pid, int signal)
+{
+    int assert_failed = 0;
+    int* __assert_failed = &assert_failed;
+    int status;
+    waitpid(pid, &status, 0);
+    EXPECT_GT(WIFSIGNALED(status), 0);
+    EXPECT_EQ(WTERMSIG(status), signal);
+    return assert_failed;
 }
 
 static void final_verdict_print(int passed, int failed, list_head_t* failed_tests)

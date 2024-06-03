@@ -10,6 +10,8 @@ void free(void* ptr);
 [[noreturn]] void exit(int retcode);
 [[noreturn]] void abort(void);
 
+int setenv(const char* name, const char* value, int overwrite);
+int unsetenv(const char* name);
 char* getenv(const char* name);
 char* secure_getenv(const char* name);
 

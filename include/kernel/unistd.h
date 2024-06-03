@@ -22,7 +22,7 @@ int close(int);
 int dup(int);
 int dup2(int, int);
 int waitpid(int, int*, int);
-int exec(const char*, char* const argv[]);
+int execve(const char*, char* const argv[], char* const envp[]);
 int mount(const char*, const char*, const char*, int, void*);
 int umount(const char*);
 int umount2(const char* target, int flags);

@@ -8,7 +8,7 @@
 #define __NR_creat          5
 #define __NR_dup            6
 #define __NR_dup2           7
-#define __NR_exec           8
+#define __NR_execve         8
 #define __NR_exit           9
 #define __NR_fork           10
 #define __NR_fstat          11
@@ -91,7 +91,7 @@ __syscall1(close, int, int)
 __syscall2(creat, int, const char*, int)
 __syscall1(dup, int, int)
 __syscall2(dup2, int, int, int)
-__syscall2(exec, int, const char*, char* const[])
+__syscall3(execve, int, const char*, char* const[], char* const[])
 __syscall1_noret(exit, void, int)
 __syscall0(fork, int)
 __syscall2(fstat, int, int, struct stat*)

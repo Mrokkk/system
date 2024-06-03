@@ -243,11 +243,12 @@ static inline void exec_kernel_stack_frame(
 #undef pushk
 }
 
-int sys_exec(struct pt_regs regs)
+int sys_execve(struct pt_regs regs)
 {
     const char* pathname = cptr(regs.ebx);
     const char* const* argv = (const char* const*)(regs.ecx);
-    return do_exec(pathname, argv);
+    const char* const* envp = (const char* const*)(regs.edx);
+    return do_exec(pathname, argv, envp);
 }
 
 int arch_process_spawn(struct process* child, int (*entry)(), void* args, int)

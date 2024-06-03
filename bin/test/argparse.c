@@ -91,11 +91,11 @@ static bool arg_parse(
         switch (opt->type)
         {
             case OPT_BOOL:
-                if (strcmp(is_long ? opt->long_v : opt->short_v, arg))
+                if (!strcmp(is_long ? opt->long_v : opt->short_v, arg))
                 {
-                    break;
+                    opt->action(user_data);
                 }
-                opt->action(user_data);
+                break;
                 return true;
             case OPT_VALUE:
                 if (is_long && (long_len = strlen(opt->long_v)))

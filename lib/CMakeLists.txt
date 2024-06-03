@@ -10,11 +10,10 @@ add_library(c STATIC
     atoi.c
     bss.c
     dirent.c
-    environ.c
+    env.c
     errno.c
     fcntl.c
     getcwd.c
-    getenv.c
     gethostname.c
     isatty.c
     libc_main.c

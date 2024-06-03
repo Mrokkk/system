@@ -1,4 +1,6 @@
 #include "test.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -187,6 +189,68 @@ TEST(atoi)
     EXPECT_EQ(atoi("-23450"), -23450);
     EXPECT_EQ(atoi("2147483647"), 2147483647);
     EXPECT_EQ(atoi("-2147483648"), -2147483648);
+}
+
+TEST(env)
+{
+    EXPECT_EXIT_WITH(0)
+    {
+        extern char** environ;
+
+        // Set value with same length
+        {
+            EXPECT_EQ(setenv("PHOENIX", "TEST", 1), 0);
+            EXPECT_STR_EQ(getenv("PHOENIX"), "TEST");
+        }
+
+        // Set value with longer length
+        {
+            char* old_var = getenv("PHOENIX");
+            EXPECT_EQ(setenv("PHOENIX", "__PHOENIX__", 1), 0);
+            EXPECT_STR_EQ(getenv("PHOENIX"), "__PHOENIX__");
+            EXPECT_NE(getenv("PHOENIX"), old_var);
+        }
+
+        // Set value for new variable (reallocate environ)
+        {
+            char** old_environ = environ;
+            EXPECT_STR_EQ(getenv("TEST"), NULL);
+            EXPECT_EQ(setenv("TEST", "AAABBB", 0), 0);
+            EXPECT_STR_EQ(getenv("TEST"), "AAABBB");
+            EXPECT_NE(environ, old_environ);
+        }
+
+        // Set value for new variable (no reallocation)
+        {
+            char** old_environ = environ;
+            EXPECT_STR_EQ(getenv("TEST2"), NULL);
+            EXPECT_EQ(setenv("TEST2", "BBBB", 0), 0);
+            EXPECT_STR_EQ(getenv("TEST2"), "BBBB");
+            EXPECT_EQ(environ, old_environ);
+        }
+
+        // Trigger another reallocation
+        {
+            char** old_environ = environ;
+            for (int i = 0; i < 31; ++i)
+            {
+                char buf[12];
+                sprintf(buf, "TEST%u", i);
+                EXPECT_EQ(setenv(buf, "VALUE", 0), 0);
+            }
+            EXPECT_NE(environ, old_environ);
+            EXPECT_STR_EQ(getenv("TEST30"), "VALUE");
+        }
+
+        // Check that variables are passed to child process
+        EXPECT_EXIT_WITH(0)
+        {
+            EXPECT_STR_EQ(getenv("TEST30"), "VALUE");
+            exit(FAILED_EXPECTATIONS());
+        }
+
+        exit(FAILED_EXPECTATIONS());
+    }
 }
 
 TEST_SUITE_END(libc);

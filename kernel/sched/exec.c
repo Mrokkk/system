@@ -2,10 +2,11 @@
 #include <kernel/path.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/backtrace.h>
 
 LIST_DECLARE(libraries);
 
-static inline int binary_image_load(const char* pathname, binary_t* bin)
+static int binary_image_load(const char* pathname, binary_t* bin)
 {
     int errno;
     char buffer[4];
@@ -47,12 +48,31 @@ static inline int binary_image_load(const char* pathname, binary_t* bin)
     return errno;
 }
 
-// Memory layout of args:
-// 0      4      8        12   8+argc*4     12+argc*4
-// |------|------|---------|-------|------------|
-// | argc | argv | argv[0] |  ...  | argv[argc] |
-// |------|------|---------|-------|------------|
-static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
+// Memory layout of stack:
+// +------------+ 0 <- top
+// | argc       |
+// +------------+ 4
+// | argv       |
+// +------------+ 8
+// | envp       |
+// +------------+ 12
+// | argv[0]    |
+// +------------+
+// | ...        |
+// +------------+ 12 + 4 * argc
+// | argv[argc] |
+// +------------+ 16 + 4 * argc
+// | envp[0]    |
+// +------------+
+// | ...        |
+// +------------+ 16 + 4 * (argc + n)
+// | envp[n]    |
+// +------------+ 20 + 4 * (argc + n)
+// | argv str   |
+// +------------+ variable
+// | envp str   |
+// +------------+ <- bottom
+static void* argv_envp_copy(uint32_t* dest, int argc, char** argv, int envc, char** envp)
 {
     char* temp;
     size_t len;
@@ -60,12 +80,17 @@ static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
     // Put argc
     *dest++ = argc;
 
-    // Put argv address
-    *dest = addr(dest + 1);
+    // Put argv address, dest + 2, because next will be envp
+    *dest = addr(dest + 2);
+    dest++;
+
+    // Put envp address, argc + 2, because there will be argc + 1
+    // entries before envp[0]
+    *dest = addr(dest + argc + 2);
     dest++;
 
     // argv will always have size == argc + 1; argv[argc] must be 0
-    temp = ptr(dest + argc + 1);
+    temp = ptr(dest + argc + 2 + envc);
 
     for (int i = 0; i < argc; ++i)
     {
@@ -76,21 +101,35 @@ static inline void* argv_copy(uint32_t* dest, int argc, char** argv)
         temp += len + 1;
     }
 
+    *dest++ = 0;
+
+    for (int i = 0; i < envc; ++i)
+    {
+        // Put envp[i] address and copy content of envp[i]
+        *dest++ = addr(temp);
+        len = strlen(envp[i]);
+        strcpy(temp, envp[i]);
+        temp += len + 1;
+    }
+
+    *dest++ = 0;
+
     return temp;
 }
 
-static inline char** args_get(int* argc, const char* const argv[], size_t* args_size)
+static char** args_get(const char* const argv[], bool has_count, int* argc, size_t* args_size)
 {
     size_t len;
     char** copied_argv;
+    int count = 0;
 
-    for (*argc = 0; argv[*argc]; ++*argc);
+    for (count = 0; argv[count]; ++count);
 
-    *args_size =  sizeof(int) + sizeof(char**) + (*argc + 1) * sizeof(char*) + sizeof(int);
+    *args_size =  (has_count ? sizeof(int) : 0) + sizeof(char**) + (count + 1) * sizeof(char*);
 
-    copied_argv = fmalloc(sizeof(char*) * (*argc + 1));
+    copied_argv = fmalloc(sizeof(char*) * (count + 1));
 
-    for (int i = 0; i < *argc; ++i)
+    for (int i = 0; i < count; ++i)
     {
         len = strlen(argv[i]) + 1;
         copied_argv[i] = fmalloc(len);
@@ -98,12 +137,13 @@ static inline char** args_get(int* argc, const char* const argv[], size_t* args_
         *args_size += len;
     }
 
-    copied_argv[*argc] = NULL;
+    copied_argv[count] = NULL;
+    *argc = count;
 
     return copied_argv;
 }
 
-static inline void args_put(int argc, char** copied_argv)
+static void args_put(int argc, char** copied_argv)
 {
     for (int i = 0; i < argc; ++i)
     {
@@ -114,17 +154,17 @@ static inline void args_put(int argc, char** copied_argv)
     ffree(copied_argv, sizeof(char*) * (argc + 1));
 }
 
-int do_exec(const char* pathname, const char* const argv[])
+int do_exec(const char* pathname, const char* const argv[], const char* const envp[])
 {
     binary_t* bin;
-    char copied_path[256];
-    int errno, argc;
+    char copied_path[PATH_MAX];
+    int errno, argc, envc;
     uint32_t user_stack;
     uint32_t* kernel_stack;
-    size_t args_size;
+    size_t args_size, env_size;
     char** copied_argv;
+    char** copied_envp;
     struct process* p = process_current;
-    pgd_t* pgd = ptr(p->mm->pgd);
 
     if ((errno = path_validate(pathname)))
     {
@@ -142,11 +182,18 @@ int do_exec(const char* pathname, const char* const argv[])
     }
 
     strcpy(copied_path, pathname);
-    copied_argv = args_get(&argc, argv, &args_size);
+    copied_argv = args_get(argv, true, &argc, &args_size);
+    copied_envp = args_get(envp, false, &envc, &env_size);
 
-    log_debug(DEBUG_PROCESS, "%s, argc=%u, argv=%x, pgd=%x", pathname, argc, argv, pgd);
+    log_debug(DEBUG_PROCESS, "%s, argc=%u, argv=%x, envc=%u, envp=%x",
+        pathname,
+        argc,
+        argv,
+        envc,
+        envp);
 
     kernel_stack = p->mm->kernel_stack; // FIXME: maybe I should alloc a new stack?
+                                        // Maybe I should also move this after binary_image_load?
 
     if ((errno = binary_image_load(pathname, bin)))
     {
@@ -167,10 +214,11 @@ int do_exec(const char* pathname, const char* const argv[])
     p->mm->args_end = user_stack;
     p->signals->trapped = 0;
 
-    argv_copy(ptr(user_stack - args_size), argc, copied_argv);
-    user_stack -= args_size;
+    user_stack -= args_size + env_size;
+    argv_envp_copy(ptr(user_stack), argc, copied_argv, envc, copied_envp);
 
     args_put(argc, copied_argv);
+    args_put(envc, copied_envp);
 
     ASSERT(*(int*)user_stack == argc);
 

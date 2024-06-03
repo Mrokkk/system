@@ -289,14 +289,15 @@ static int NORETURN(init(const char* cmdline))
 #if 0
     video_modes_print();
 #endif
-
 #if 0
     extern int debug_monitor();
     kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
 #endif
 
     const char* const argv[] = {options.init, ptr(cmdline), NULL, };
-    if (unlikely(do_exec(options.init, argv)))
+    const char* const envp[] = {"PHOENIX=TRUE", NULL};
+
+    if (unlikely(do_exec(options.init, argv, envp)))
     {
         panic("cannot run %s", options.init);
     }

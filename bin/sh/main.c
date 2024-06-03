@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <signal.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -10,13 +9,16 @@
 
 #include "history.h"
 
+#define CWD_LEN         256
 #define LINE_LEN        256
 #define ARGV_MAX_SIZE   16
 
 int c_cd();
 int c_fg();
+int c_env();
 int c_pwd();
 int c_mkdir();
+int c_export();
 static void command_prompt_print(int status);
 
 #define COMMAND(name) {#name, c_##name}
@@ -27,8 +29,10 @@ static struct {
 } commands[] = {
     COMMAND(cd),
     COMMAND(fg),
+    COMMAND(env),
     COMMAND(pwd),
     COMMAND(mkdir),
+    COMMAND(export),
     COMMAND(history),
     {0, 0}
 };
@@ -38,6 +42,11 @@ struct job
     int pid;
     struct job* next;
 };
+
+static char cwd[256];
+
+#define SYSTEM_ERROR    1
+#define COMMAND_ERROR   2
 
 void sigint(int)
 {
@@ -77,12 +86,17 @@ static inline const char* word_read(const char* string, char* output)
 
 int c_cd(const char* arg)
 {
-    if (!arg || !arg[0])
+    int error = chdir(!arg || !arg[0] ? "/" : arg);
+    if (error)
     {
-        chdir("/");
-        return 0;
+        return SYSTEM_ERROR;
     }
-    return chdir(arg);
+    if (!getcwd(cwd, CWD_LEN))
+    {
+        return SYSTEM_ERROR;
+    }
+    setenv("PWD", cwd, 1);
+    return 0;
 }
 
 int c_fg(const char* arg)
@@ -97,10 +111,13 @@ int c_fg(const char* arg)
 
     if ((err = kill(pid, SIGCONT)))
     {
-        return err;
+        return SYSTEM_ERROR;
     }
 
-    waitpid(pid, &status, WUNTRACED);
+    if (waitpid(pid, &status, WUNTRACED))
+    {
+        return SYSTEM_ERROR;
+    }
 
     if (WIFSTOPPED(status))
     {
@@ -114,16 +131,19 @@ int c_fg(const char* arg)
     return 0;
 }
 
+int c_env()
+{
+    extern char** environ;
+    for (int i = 0; environ[i]; ++i)
+    {
+        printf("%s\n", environ[i]);
+    }
+    return 0;
+}
+
 int c_pwd(const char*)
 {
-    char buf[32];
-
-    if (getcwd(buf, 32))
-    {
-        return errno;
-    }
-
-    printf("%s\n", buf);
+    puts(cwd);
     return 0;
 }
 
@@ -132,12 +152,39 @@ int c_mkdir(const char* arg)
     return mkdir(arg, 0);
 }
 
+int c_export(const char* arg)
+{
+    if (!arg || !*arg)
+    {
+        printf("KEY=VALUE expected\n");
+        return COMMAND_ERROR;
+    }
+
+    char name[256];
+    size_t len = strlen(arg);
+    size_t delim = strcspn(arg, "=");
+
+    if (delim == len)
+    {
+        printf("KEY=VALUE expected\n");
+        return COMMAND_ERROR;
+    }
+
+    strncpy(name, arg, delim);
+    name[delim] = 0;
+
+    if (setenv(name, arg + delim + 1, 1))
+    {
+        printf("Failed to set env variable\n");
+        return COMMAND_ERROR;
+    }
+
+    return 0;
+}
+
 static void command_prompt_print(int status)
 {
-    char cwd[128];
-    getcwd(cwd, 128);
-    printf(cwd);
-    status ? printf(" * ") : printf(" # ");
+    printf("%s %c ", cwd, status ? '*' : '#');
 }
 
 static inline void cmd_args_read(char* command, int* argc, char* argv[], char* buffer[], const char* line)
@@ -168,7 +215,10 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
         {
             if ((*status = commands[i].function(argv[1])))
             {
-                perror(argv[1]);
+                if (*status == SYSTEM_ERROR)
+                {
+                    perror(argv[1]);
+                }
             }
             return 0;
         }
@@ -189,7 +239,7 @@ static inline int execute(const char* command, int argc, char* argv[], int* stat
 
     if ((pid = fork()) == 0)
     {
-        exec(command, argv);
+        execvp(command, argv);
         perror(command);
         exit(errno);
     }
@@ -231,6 +281,13 @@ int main()
     signal(SIGTSTP, sigtstp);
 
     history_initialize();
+
+    const char* home = getenv("HOME");
+
+    if (c_cd(home ? home : "/"))
+    {
+        perror("cannot set dir");
+    }
 
     for (argc = 0; argc < ARGV_MAX_SIZE; arguments[argc++] = malloc(32));
 

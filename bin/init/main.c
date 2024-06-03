@@ -50,7 +50,12 @@ int shell_run()
     {
         char* pathname = "/bin/sh";
         char* const argv[] = {pathname, NULL, };
-        if (exec(pathname, argv))
+
+        setenv("PATH", "/bin", 0);
+        setenv("SHELL", pathname, 0);
+        setenv("HOME", "/", 0);
+
+        if (execvp(pathname, argv))
         {
             printf("exec error in init!\n");
             return EXIT_FAILURE;
