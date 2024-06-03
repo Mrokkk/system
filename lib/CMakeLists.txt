@@ -27,6 +27,7 @@ add_library(c STATIC
     termios.c
     time.c
 
+    string/memcmp.c
     string/memcpy.c
     string/memset.c
     string/strchr.c

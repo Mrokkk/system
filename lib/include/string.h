@@ -19,6 +19,6 @@ char* strtok(char* restrict str, const char* restrict delim);
 char* strtok_r(char* restrict str, const char* restrict delim, char** restrict saveptr);
 size_t strspn(const char* s, const char* accept);
 size_t strcspn(const char* s, const char* reject);
-char *strstr(const char* haystack, const char* needle);
+char* strstr(const char* haystack, const char* needle);
 
 char* strerror(int errnum);

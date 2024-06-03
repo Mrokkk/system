@@ -136,6 +136,17 @@ TEST(strtok)
     EXPECT_EQ(strtok(NULL, ";="), NULL);
 }
 
+TEST(strstr)
+{
+    const char* string = "test_string_est";
+    EXPECT_EQ(strstr(string, "est"), string + 1);
+    EXPECT_EQ(strstr(string, "not_existing"), NULL);
+    EXPECT_EQ(strstr(string, ""), string);
+    EXPECT_EQ(strstr(string, "test_string_est"), string);
+    EXPECT_EQ(strstr(string, "test_string_esta"), NULL);
+    EXPECT_EQ(strstr(string, "string"), string + 5);
+}
+
 TEST(atoi)
 {
     EXPECT_EQ(atoi("154"), 154);
