@@ -1,5 +1,4 @@
 #include <mnent.h>
-#include <errno.h>
 
 struct mntent* getmntent(FILE* stream)
 {

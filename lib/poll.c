@@ -1,6 +1,4 @@
 #include <sys/poll.h>
-
-#include <errno.h>
 #include <kernel/bitset.h>
 
 void FD_SET(int fd, fd_set* fdset)

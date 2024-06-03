@@ -4,6 +4,7 @@
 
 #ifndef __ASSEMBLER__
 
+#include <errno.h>
 #include <stdint.h>
 #include "magic.h"
 

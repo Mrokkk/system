@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <stddef.h>
 
 extern int LIBC(getcwd)(char*, size_t);

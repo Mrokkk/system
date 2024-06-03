@@ -1,5 +1,4 @@
 #include <pwd.h>
-#include <errno.h>
 #include <string.h>
 
 static struct passwd passwd = {

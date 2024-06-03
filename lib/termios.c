@@ -1,5 +1,4 @@
 #include <termios.h>
-#include <errno.h>
 
 int tcgetattr(int fd, struct termios* termios_p)
 {

@@ -1,5 +1,4 @@
 #include <unistd.h>
-#include <errno.h>
 
 int pipe(int pipefd[2])
 {
