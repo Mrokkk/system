@@ -5,9 +5,9 @@ set(TESTS
 
 list(LENGTH TESTS TESTS_LEN)
 
-add_executable(
-    test
+add_executable(test
     ${TESTS}
+    argparse.c
     main.c
     test.c
     $<TARGET_OBJECTS:common>

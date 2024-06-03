@@ -1,8 +1,15 @@
 #include "test.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+#include "argparse.h"
+
+#define RED                 "\033[31m"
+#define GREEN               "\033[32m"
+#define YELLOW              "\033[33m"
+#define BLUE                "\033[34m"
+#define RESET               "\033[0m"
 
 #define VERDICT(p, f)       (((p) << 16) | (f))
 #define PASSED_GET(v)       ((v) >> 16)
@@ -14,50 +21,31 @@ static const char* const RUN_MSG           = GREEN  "[ RUN  ]" RESET;
 static const char* const FAIL_MSG          = RED    "[ FAIL ]" RESET;
 static const char* const PASS_MSG          = GREEN  "[ PASS ]" RESET;
 static const char* const GEN_GREEN_MSG     = GREEN  "[======]" RESET;
-static const char* const GEN_YELLOW_MSG    = YELLOW "[======]" RESET;
 static const char* const GEN_RED_MSG       = RED    "[======]" RESET;
 
 static test_suite_t* suites[TEST_SUITES_COUNT];
 static size_t suites_count;
 
-static void config_read(int argc, char* argv[], config_t* config)
+static void verbose_set(config_t* config)
 {
-    __builtin_memset(config, 0, sizeof(*config));
-
-    for (int i = 1; i < argc; ++i)
-    {
-        char* token;
-
-        if (UNLIKELY(!(token = strtok(argv[i], "-"))))
-        {
-            printf("%s Empty argument passed: \"%s\"\n", GEN_YELLOW_MSG, argv[i]);
-            exit(EXIT_FAILURE);
-        }
-
-        if (!strcmp(token, "f") || !strcmp(token, "forever"))
-        {
-            config->run_until_failure = true;
-        }
-        else if (!strcmp(token, "v") || !strcmp(token, "verbose"))
-        {
-            config->verbose = true;
-        }
-        else if (!strncmp(token, "test=", 5))
-        {
-            if (!(token = strtok(token + 5, "=")))
-            {
-                printf("%s No test name given after --test=: \"%s\"\n", GEN_YELLOW_MSG, argv[i]);
-                exit(EXIT_FAILURE);
-            }
-            config->test_to_run = token;
-        }
-        else
-        {
-            printf("%s Unrecognized option: \"%s\"\n", GEN_YELLOW_MSG, argv[i]);
-            exit(EXIT_FAILURE);
-        }
-    }
+    config->verbose = true;
 }
+
+static void forever_set(config_t* config)
+{
+    config->run_until_failure = true;
+}
+
+static void test_set(config_t* config, const char* test)
+{
+    config->test_to_run = test;
+}
+
+static option_t options[] = {
+    {"-f", "--forever", OPT_BOOL,  "Loop test until failure", &forever_set},
+    {"-v", "--verbose", OPT_BOOL,  "Turn on verbose logging", &verbose_set},
+    {"-t", "--test",    OPT_VALUE, "Select test to run",      &test_set},
+};
 
 static int test_run(test_case_t* test, test_suite_t* suite)
 {
@@ -103,7 +91,7 @@ static verdict_t suite_run(test_suite_t* suite, list_head_t* failed_tests, confi
             assert_failed = test_run(test, suite);
         }
 
-        if (!assert_failed)
+        if (LIKELY(!assert_failed))
         {
             ++passed;
         }
@@ -212,20 +200,9 @@ int __test_suites_run(int argc, char* argv[])
     config_t config;
     list_head_t failed_tests = LIST_INIT(failed_tests);
 
-    config_read(argc, argv, &config);
+    __builtin_memset(&config, 0, sizeof(config));
 
-    if (config.verbose)
-    {
-        printf("%s config.verbose: %s\n"
-            "%s config.run_until_failure: %s\n"
-            "%s config.test_to_run: %s\n",
-            GEN_GREEN_MSG,
-            config.verbose ? "true" : "false",
-            GEN_GREEN_MSG,
-            config.run_until_failure ? "true" : "false",
-            GEN_GREEN_MSG,
-            config.test_to_run ? config.test_to_run : "all");
-    }
+    args_parse(argc, argv, options, sizeof(options) / sizeof(*options), &config);
 
     for (size_t i = 0; i < suites_count; ++i)
     {

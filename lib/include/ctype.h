@@ -58,7 +58,17 @@ static inline int isupper(int c)
 }
 
 #ifndef tolower
-#define tolower __builtin_tolower
+static inline int tolower(int c)
+{
+    return c + ('a' - 'A');
+}
+#endif
+
+#ifndef toupper
+static inline int toupper(int c)
+{
+    return c - ('a' - 'A');
+}
 #endif
 
 #ifndef isprint
