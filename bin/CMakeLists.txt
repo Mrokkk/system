@@ -6,7 +6,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_OPTIMIZATION} \
     ${C_FLAGS_WARNINGS} \
     ${C_FLAGS_DEBUG} \
-    -m32 -msse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
+    -m32 -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
 
 file(GLOB bin_common_src "*.c")
 

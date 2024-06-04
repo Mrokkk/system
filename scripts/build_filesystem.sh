@@ -5,7 +5,7 @@ base_dir=$(dirname $0)
 . "${base_dir}/utils.sh"
 
 disk_image="disk.img"
-disk_size=2
+disk_size=3
 mountpoint=mnt
 boot_dir="${mountpoint}/boot"
 grub_cfg="${boot_dir}/grub/grub.cfg"

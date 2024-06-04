@@ -110,16 +110,16 @@ int __test_suites_run(int argc, char* argv[]);
 int expect_exit_with(int pid, int expected_error_code);
 int expect_killed_by(int pid, int signal);
 
+void string_check(
+    value_t* actual,
+    value_t* expected,
+    const char* file,
+    size_t line);
+
 void failure_print(
     value_t* actual,
     value_t* expected,
     comp_t comp,
-    const char* file,
-    size_t line);
-
-void string_failure_print(
-    value_t* actual,
-    value_t* expected,
     const char* file,
     size_t line);
 
@@ -200,30 +200,19 @@ void string_failure_print(
 #define EXPECT_STR_EQ(A, E) \
     do \
     { \
-        const char* actual = (const char*)A; \
-        const char* expected = (const char*)E; \
-        if (!actual || !expected) \
-        { \
-            EXPECT_EQ(A, E); \
-        } \
-        else \
-        { \
-            if (UNLIKELY(strcmp(actual, expected))) \
-            { \
-                value_t expected_value = { \
-                    .value = (void*)&expected, \
-                    .name = #E, \
-                    .type = TYPE_CHAR_PTR, \
-                }; \
-                value_t actual_value = { \
-                    .value = (void*)&actual, \
-                    .name = #A, \
-                    .type = TYPE_CHAR_PTR, \
-                }; \
-                string_failure_print(&actual_value, &expected_value, __FILE__, __LINE__); \
-                ++(*__assert_failed); \
-            } \
-        } \
+        const char* actual = (const char*)(A); \
+        const char* expected = (const char*)(E); \
+        value_t expected_value = { \
+            .value = (void*)&expected, \
+            .name = #E, \
+            .type = TYPE_CHAR_PTR, \
+        }; \
+        value_t actual_value = { \
+            .value = (void*)&actual, \
+            .name = #A, \
+            .type = TYPE_CHAR_PTR, \
+        }; \
+        string_check(&actual_value, &expected_value, __FILE__, __LINE__); \
     } \
     while (0)
 

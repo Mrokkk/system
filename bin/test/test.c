@@ -178,7 +178,7 @@ void failure_print(
     fputs(buf, stdout);
 }
 
-void string_failure_print(
+static void string_failure_print(
     value_t* actual,
     value_t* expected,
     const char* file,
@@ -188,12 +188,55 @@ void string_failure_print(
     char* it = buf;
     it += sprintf(it, FAILED_EXPECTATION_MSG, file, line);
     it += sprintf(it, "    expected: %s\n"
-                      "        which is \"%s\"\n"
-                      "    to be equal to %s\n"
-                      "        which is \"%s\"",
-                      actual->name, *(char**)actual->value, expected->name, *(char**)expected->value);
+                      "        which is ",
+                      actual->name);
+
+    if (*(char**)actual->value)
+    {
+        it += sprintf(it, "\"%s\"\n", *(char**)actual->value);
+    }
+    else
+    {
+        it += print_value(it, actual->value, actual->type);
+    }
+
+    it += sprintf(it, "    to be equal to %s\n"
+                      "        which is ",
+                      expected->name);
+
+    if (*(char**)expected->value)
+    {
+        it += sprintf(it, "\"%s\"\n", *(char**)expected->value);
+    }
+    else
+    {
+        it += print_value(it, expected->value, expected->type);
+    }
+
     sprintf(it, "\n");
     fputs(buf, stdout);
+}
+
+void string_check(
+    value_t* actual,
+    value_t* expected,
+    const char* file,
+    size_t line)
+{
+    const char* a = *(char**)actual->value;
+    const char* e = *(char**)expected->value;
+
+    if (!a || !e)
+    {
+        if (UNLIKELY(a != e))
+        {
+            string_failure_print(actual, expected, file, line);
+        }
+    }
+    else if (UNLIKELY(strcmp(a, e)))
+    {
+        string_failure_print(actual, expected, file, line);
+    }
 }
 
 int expect_exit_with(int pid, int expected_error_code)
@@ -214,6 +257,7 @@ int expect_killed_by(int pid, int signal)
     int* __assert_failed = &assert_failed;
     int status;
     waitpid(pid, &status, 0);
+    EXPECT_EQ(WIFEXITED(status), 0);
     EXPECT_GT(WIFSIGNALED(status), 0);
     EXPECT_EQ(WTERMSIG(status), signal);
     return assert_failed;
