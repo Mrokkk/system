@@ -15,12 +15,12 @@ KERNEL_MODULE(ext2);
 module_init(ext2_init);
 module_exit(ext2_deinit);
 
-int ext2_lookup(inode_t* parent, const char* name, inode_t** result);
-int ext2_open(file_t* file);
-int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add);
-int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset);
-int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
-int ext2_read(file_t* file, char* buffer, size_t count);
+static int ext2_lookup(inode_t* parent, const char* name, inode_t** result);
+static int ext2_open(file_t* file);
+static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add);
+static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset);
+static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
+static int ext2_read(file_t* file, char* buffer, size_t count);
 
 static file_system_t ext2 = {
     .name = "ext2",
@@ -52,21 +52,43 @@ static inline void* block(ext2_data_t* data, size_t block)
     return b->data;
 }
 
-static ext2_inode_t* ext2_inode_get(ext2_data_t* data, uint32_t ino)
+static ext2_bgd_t* ext2_bgd_get(ext2_data_t* data, uint32_t ino)
 {
-    int errno;
-    uint32_t index = (ino - 1) % data->inodes_per_group;
-    uint32_t block_nr = (index * sizeof(ext2_inode_t)) / data->block_size;
-    uint32_t off = index % data->inodes_per_block;
-    ext2_bgd_t* bgd = ptr(addr(data->sb) + sizeof(ext2_sb_t));
-    ext2_inode_t* inode = block(data, bgd->inode_table + block_nr);
+    uint32_t group_index = (ino - 1) / data->inodes_per_group;
+    uint32_t group_block_nr = (group_index * sizeof(ext2_bgd_t)) / data->block_size + 2;
 
-    if ((errno = errno_get(inode)))
+    group_index %= data->block_size / sizeof(ext2_bgd_t);
+
+    ext2_bgd_t* bgd = block(data, group_block_nr);
+
+    if (unlikely(errno_get(bgd)))
     {
         return NULL;
     }
 
-    return inode + off;
+    return bgd + group_index;
+}
+
+static ext2_inode_t* ext2_inode_get(ext2_data_t* data, uint32_t ino)
+{
+    uint32_t inode_in_group_index = (ino - 1) % data->inodes_per_group;
+    uint32_t block_nr = inode_in_group_index / data->inodes_per_block;
+    uint32_t block_off = inode_in_group_index % data->inodes_per_block;
+    ext2_bgd_t* bgd = ext2_bgd_get(data, ino);
+
+    if (unlikely(!bgd))
+    {
+        return NULL;
+    }
+
+    ext2_inode_t* inode = block(data, bgd->inode_table + block_nr);
+
+    if (unlikely(errno_get(inode)))
+    {
+        return NULL;
+    }
+
+    return inode + block_off;
 }
 
 static int ext2_lookup_raw(
@@ -79,24 +101,34 @@ static int ext2_lookup_raw(
     ext2_dir_entry_t* dirent;
     size_t name_len = strlen(name);
 
-    log_debug(DEBUG_EXT2FS, "name=%s", name);
+    log_debug(DEBUG_EXT2FS, "name=%s, parent: %u", name, parent_inode->size);
 
-    for (dirent = block(data, parent_inode->block[0]);
-        dirent->rec_len && dirent->name_len;
-        dirent = ptr(addr(dirent) + dirent->rec_len))
+    size_t total_len;
+    for (dirent = block(data, parent_inode->block[0]), total_len = 0;
+        total_len < parent_inode->size;
+        total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len))
     {
-        if (name_len == dirent->name_len && !strncmp(dirent->name, name, dirent->name_len))
+        if (name_len != dirent->name_len || strncmp(dirent->name, name, dirent->name_len))
         {
-            *child_inode = ext2_inode_get(data, dirent->inode);
-            *ino = dirent->inode;
-
-            log_debug(DEBUG_EXT2FS, "found inode; ino=%u, size=%u, name=%S",
-                dirent->inode,
-                (*child_inode)->size,
-                dirent->name);
-
-            return 0;
+            continue;
         }
+
+        *child_inode = ext2_inode_get(data, dirent->inode);
+
+        if (!*child_inode)
+        {
+            log_debug(DEBUG_EXT2FS, "cannot read inode %u", dirent->inode);
+            return -EIO;
+        }
+
+        *ino = dirent->inode;
+
+        log_debug(DEBUG_EXT2FS, "found inode; ino=%u, size=%u, name=%S",
+            dirent->inode,
+            (*child_inode)->size,
+            dirent->name);
+
+        return 0;
     }
 
     log_debug(DEBUG_EXT2FS, "no inode with name = %s", name);
@@ -104,7 +136,7 @@ static int ext2_lookup_raw(
     return -ENOENT;
 }
 
-int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
+static int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
 {
     int errno;
     uint16_t ino;
@@ -137,14 +169,14 @@ int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
     return 0;
 }
 
-int ext2_open(file_t*)
+static int ext2_open(file_t*)
 {
     return 0;
 }
 
 #define in_range(v, first, last)    ((v) >= (first) && (v) <= (last))
 
-int ext2_read(file_t* file, char* buffer, size_t count)
+static int ext2_read(file_t* file, char* buffer, size_t count)
 {
     int errno;
     char* block_data;
@@ -208,7 +240,7 @@ int ext2_read(file_t* file, char* buffer, size_t count)
     return count;
 }
 
-int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
+static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
 {
     int errno;
     ext2_inode_t* raw_inode = file->inode->fs_data;
@@ -317,12 +349,11 @@ static inline char ext2_file_type_convert(uint16_t type)
     }
 }
 
-int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
+static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
-    int i = 0;
-    int over;
+    int i, over;
+    size_t total_len;
     ext2_dir_entry_t* dirent;
-    ext2_dir_entry_t* end;
     ext2_data_t* data = file->inode->sb->fs_data;
     ext2_inode_t* raw_inode = file->inode->fs_data;
 
@@ -336,11 +367,9 @@ int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
         return 0;
     }
 
-    end = block(data, raw_inode->block[0] + 1);
-
-    for (dirent = block(data, raw_inode->block[0]);
-        dirent < end;
-        dirent = ptr(addr(dirent) + dirent->rec_len), ++i)
+    for (dirent = block(data, raw_inode->block[0]), total_len = 0, i = 0;
+        total_len < raw_inode->size;
+        total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len), ++i)
     {
         log_debug(DEBUG_EXT2FS, "dirent: type=%x, inode=%u, type=%x, name=%S, rec_len=%u, len=%u",
             dirent->file_type,
@@ -361,7 +390,7 @@ int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     return i;
 }
 
-int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
+static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
 {
     int errno;
     buffer_t* b;
