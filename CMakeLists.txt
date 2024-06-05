@@ -106,7 +106,7 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh ${CMAKE_BINARY_DIR}/debugcon
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/rungdb.py ${CMAKE_BINARY_DIR}/rungdb
     COMMAND ./runqemu -k
-    DEPENDS iso
+    DEPENDS rootfs
     COMMENT "Running qemu"
 )
 

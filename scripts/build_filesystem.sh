@@ -5,7 +5,7 @@ base_dir=$(dirname $0)
 . "${base_dir}/utils.sh"
 
 disk_image="disk.img"
-disk_size=3
+disk_size=300
 mountpoint=mnt
 boot_dir="${mountpoint}/boot"
 grub_cfg="${boot_dir}/grub/grub.cfg"
@@ -14,6 +14,7 @@ create_partition=
 mount_loopback=
 rebuild=
 font=/usr/share/kbd/consolefonts/Lat2-Terminus16.psfu.gz
+grub=$(command -v grub-install 2>/dev/null) || die "No grub-install"
 
 while [[ $# -gt 0 ]]; do
     arg="$1"
@@ -65,7 +66,7 @@ partition_number="p1"
 
 if [[ ! -z "${create_partition}" ]]
 then
-    execute_cmd "creating ext2 partition... "   sudo parted -s "${dev}" mklabel msdos mkpart primary ext2 512B 100%
+    execute_cmd "creating ext2 partition... "   sudo parted -s "${dev}" mklabel msdos mkpart primary ext2 1MiB 100%
     execute_cmd "destroying old filesystem... " sudo dd if=/dev/zero of="${dev}${partition_number}" bs=1M count=1 status=none
     execute_cmd "creating new filesystem... "   sudo mke2fs -q -I 128 "${dev}${partition_number}"
 fi
@@ -93,6 +94,7 @@ create_dir "${mountpoint}/usr/share"
 create_dir "${mountpoint}/lib"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/proc"
+create_dir "${boot_dir}/grub"
 
 for binary in $(find bin -type f -executable)
 do
@@ -105,6 +107,23 @@ copy ../cursor.tga ${mountpoint}
 copy ../close.tga ${mountpoint}
 copy ../close_pressed.tga ${mountpoint}
 copy font.psf ${mountpoint}/usr/share
+
+grub_cfg_content="set timeout=0
+set default=0
+menuentry "system" {
+    if ! multiboot /boot/system console=/dev/tty0 syslog=/dev/debug0; then reboot; fi
+    module /boot/kernel.map kernel.map
+    boot
+}"
+
+write_to "${grub_cfg_content}" "${grub_cfg}"
+copy kernel.map "${boot_dir}"
+copy system "${boot_dir}"
+
+if [[ ! -d ${boot_dir}/grub/i386-pc ]]
+then
+    sudo ${grub} --boot-directory=${boot_dir} --target=i386-pc --modules="ext2 part_msdos" "${dev}"
+fi
 
 sync -f ${mountpoint}
 

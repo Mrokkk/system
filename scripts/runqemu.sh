@@ -6,11 +6,12 @@ base_dir="$(dirname `readlink -f ${0}`)"
 
 . "${base_dir}/utils.sh"
 
-use_ide=1
+use_ide=
 use_kvm=
+use_cdrom=
 use_nographic=
 args="\
--boot once=d \
+-boot once=c \
 -no-reboot \
 -rtc base=localtime,clock=host \
 -device isa-debugcon,chardev=char0 \
@@ -41,6 +42,9 @@ while [[ $# -gt 0 ]]; do
         --ahci)
             use_ide=
             ;;
+        --cdrom)
+            use_cdrom=1
+            ;;
         *)
             args="${args} ${1}"
             ;;
@@ -59,10 +63,10 @@ if [[ -z "${use_ide}" ]]
 then
     args="${args} -device ahci,id=ahci"
     [[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,id=disk0,media=disk,if=none -device ide-hd,drive=disk0,bus=ahci.0"
-    args="${args} -drive file=system.iso,format=raw,id=cdrom0,media=cdrom,if=none -device ide-cd,drive=cdrom0,bus=ahci.1"
+    [[ -n "${use_cdrom}" ]] && [[ -f "system.iso" ]] && args="${args} -drive file=system.iso,format=raw,id=cdrom0,media=cdrom,if=none -device ide-cd,drive=cdrom0,bus=ahci.1"
 else
     [[ -f disk.img ]] && args="${args} -drive file=disk.img,format=raw,id=disk0,media=disk"
-    args="${args} -cdrom system.iso"
+    [[ -n "${use_cdrom}" ]] && [[ -f "system.iso" ]] && args="${args} -cdrom system.iso"
 fi
 
 if [[ -z ${use_nographic} ]]
