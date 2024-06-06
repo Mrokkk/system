@@ -466,6 +466,18 @@ int fprintf(FILE* file, const char* fmt, ...)
     return write(file->fd, printf_buf, printed);
 }
 
+int vfprintf(FILE* restrict stream, const char* restrict format, va_list ap)
+{
+    int printed;
+    // FIXME: get rid of those static buffers and implement proper buffering
+    char printf_buf[PRINTF_BUFFER];
+
+    VALIDATE_INPUT(FILE_CHECK(stream) && format, EOF);
+
+    printed = vsprintf(printf_buf, format, ap);
+    return write(stream->fd, printf_buf, printed);
+}
+
 FILE* fopen(const char* pathname, const char* mode)
 {
     int fd;

@@ -48,6 +48,7 @@ int vscanf(const char* restrict format, va_list ap);
 int vfscanf(FILE* restrict stream, const char* restrict format, va_list ap);
 
 int vsprintf(char* buf, const char* fmt, va_list args);
+int vfprintf(FILE* restrict stream, const char* restrict format, va_list ap);
 int sprintf(char* buf, const char* fmt, ...);
 int fprintf(FILE* file, const char* fmt, ...);
 int printf(const char* fmt, ...);
