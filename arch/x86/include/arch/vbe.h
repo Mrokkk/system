@@ -101,5 +101,3 @@ struct vbe_mode_info_block
 } PACKED;
 
 int vbe_initialize(void);
-char* video_mode_print(char* buf, mode_info_t* m);
-void video_modes_print(void);

@@ -19,6 +19,10 @@ char* strcpy(char* __restrict, const char* __restrict);
 char* strncpy(char* __restrict, const char* __restrict, size_t count);
 #endif
 
+size_t strspn(const char* str, const char* accept);
+size_t strcspn(const char* str, const char* reject);
+char* strtok_r(char* str, const char* delim, char** saveptr);
+
 int strcmp(const char*, const char*);
 
 int strncmp(const char*, const char*, size_t);

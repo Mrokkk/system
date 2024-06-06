@@ -4,6 +4,7 @@
 #include <arch/i8259.h>
 #include <arch/earlycon.h>
 #include <arch/multiboot.h>
+#include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
 
@@ -92,6 +93,22 @@ static mode_info_t standard_modes[] = {
 
 #define default_text_mode (&standard_modes[DEFAULT_TEXT_MODE])
 
+static char* video_mode_print(char* buf, mode_info_t* m)
+{
+    int i;
+    i = sprintf(buf, "%x: %ux%ux%u ", m->mode, m->resx, m->resy, m->bits);
+    i += sprintf(buf + i, "%s %s",
+        m->type == VBE_MODE_GRAPHICS ? "graphics" : "text",
+        m->color_support ? "color" : "mono");
+
+    if (m->framebuffer)
+    {
+        sprintf(buf + i, " fb=%x", m->framebuffer);
+    }
+
+    return buf;
+}
+
 static inline int video_mode_set(mode_info_t* mode)
 {
     char buf[48];
@@ -130,23 +147,7 @@ static inline uint16_t vbe_mode_read(void)
     return regs.bx & 0x7fff;
 }
 
-char* video_mode_print(char* buf, mode_info_t* m)
-{
-    int i;
-    i = sprintf(buf, "%x: %ux%ux%u ", m->mode, m->resx, m->resy, m->bits);
-    i += sprintf(buf + i, "%s %s",
-        m->type == VBE_MODE_GRAPHICS ? "graphics" : "text",
-        m->color_support ? "color" : "mono");
-
-    if (m->framebuffer)
-    {
-        sprintf(buf + i, " fb=%x", m->framebuffer);
-    }
-
-    return buf;
-}
-
-void video_modes_print(void)
+static int video_modes_print(void)
 {
     mode_info_t* v;
     char buf[64];
@@ -155,6 +156,7 @@ void video_modes_print(void)
     {
         log_notice("%s", video_mode_print(buf, v));
     }
+    return 0;
 }
 
 void max_resolution_read(int* x, int* y)
@@ -294,6 +296,8 @@ int vbe_initialize(void)
     }
 
     log_notice("supported modes: %u", index);
+
+    param_call_if_set(KERNEL_PARAM("vbeprint"), &video_modes_print);
 
     if (current_mode)
     {

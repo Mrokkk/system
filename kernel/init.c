@@ -23,19 +23,9 @@ static int init(const char* cmdline);
 
 unsigned init_in_progress = INIT_IN_PROGRESS;
 char cmdline[128];
+static param_t* params;
 
-typedef struct options
-{
-    char syslog[32];
-    char init[64];
-} options_t;
-
-static options_t options = {
-    .syslog = "/dev/tty0",
-    .init = "/bin/init",
-};
-
-NOINLINE static void NORETURN(run_init_and_go_idle())
+NOINLINE static void NORETURN(run_init_and_go_idle(void))
 {
     sti();
     kernel_process_spawn(&init, cmdline, NULL, SPAWN_KERNEL);
@@ -44,32 +34,115 @@ NOINLINE static void NORETURN(run_init_and_go_idle())
     for (;; halt());
 }
 
-UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
+UNMAP_AFTER_INIT static void params_read(char* tmp_cmdline, param_t* output)
 {
-    bss_zero();
+    strcpy(tmp_cmdline, cmdline);
 
-    va_list args;
-    va_start(args, data);
-    const char* temp_cmdline = multiboot_read(args);
-    va_end(args);
+    char* save_ptr;
+    char* tmp = tmp_cmdline;
+    char* previous_token = NULL;
+    char* new_token = NULL;
+    size_t count = 0;
 
-    strcpy(cmdline, temp_cmdline);
+    do
+    {
+        new_token = strtok_r(tmp, "= ", &save_ptr);
+        if (previous_token)
+        {
+            bool value_param = cmdline[new_token - tmp_cmdline - 1] == '=';
+            output[count].name      = previous_token;
+            output[count++].value   = value_param ? new_token : NULL;
+            previous_token          = value_param ? NULL : new_token;
+        }
+        else
+        {
+            previous_token = new_token;
+        }
+        tmp = NULL;
+    }
+    while (new_token);
+}
 
+param_t* param_get(const char* name)
+{
+    for (param_t* p = params; p->name; ++p)
+    {
+        if (!strcmp(p->name, name))
+        {
+            return p;
+        }
+    }
+    return NULL;
+}
+
+const char* param_value_get(const char* name)
+{
+    param_t* param = param_get(name);
+    return param ? param->value : NULL;
+}
+
+const char* param_value_or_get(const char* name, const char* def)
+{
+    param_t* param = param_get(name);
+    return param ? param->value : def;
+}
+
+int param_bool_get(const char* name)
+{
+    return !!param_get(name);
+}
+
+void param_call_if_set(const char* name, int (*action)())
+{
+    param_t* p;
+    int error;
+    if ((p = param_get(name)))
+    {
+        if ((error = action(p)))
+        {
+            log_warning("action associated with %s failed with %d", name, error);
+        }
+    }
+}
+
+UNMAP_AFTER_INIT void boot_params_print(void)
+{
     log_notice("bootloader: %s", bootloader_name);
     log_notice("cmdline: %s", cmdline);
+}
 
-    if (strstr(cmdline, "earlycon"))
-    {
-        earlycon_init();
-    }
-
-    arch_setup();
-
+UNMAP_AFTER_INIT void ram_print(void)
+{
     uint32_t ram_hi = addr(full_ram >> 32);
     uint32_t ram_low = addr(full_ram & ~0UL);
     uint32_t mib = 4096 * ram_hi + ram_low / MiB;
     log_notice("RAM: %u MiB", mib);
     log_notice("RAM end: %u MiB (%u B)", ram / MiB, ram);
+}
+
+UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
+{
+    bss_zero();
+
+    char tmp_cmdline[128];
+    param_t parameters[32];
+    params = parameters;
+
+    {
+        va_list args;
+        va_start(args, data);
+        const char* temp_cmdline = multiboot_read(args);
+        va_end(args);
+        strcpy(cmdline, temp_cmdline);
+    }
+
+    params_read(tmp_cmdline, parameters);
+
+    boot_params_print();
+
+    arch_setup();
+
+    ram_print();
     memory_areas_print();
     sections_print();
 
@@ -116,7 +189,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 //
 // When this is non-inline, compiler will generate new frame, thus argv will be properly filled
 
-static inline void rootfs_prepare()
+UNMAP_AFTER_INIT static int root_mount(void)
 {
     int errno;
     const char* sources[] = {"/dev/hdc", "/dev/sda0", "/dev/hda0", "/dev/img0"};
@@ -133,13 +206,19 @@ static inline void rootfs_prepare()
             }
             else
             {
-                goto mounted;
+                return 0;
             }
         }
     }
 
-mounted:
-    if (unlikely(errno))
+    return errno;
+}
+
+UNMAP_AFTER_INIT static void rootfs_prepare(void)
+{
+    int errno;
+
+    if (unlikely((errno = root_mount())))
     {
         panic("cannot mount root: %d", errno);
     }
@@ -170,58 +249,15 @@ mounted:
     }
 }
 
-static const char* parse_key_value(char* dest, const char* src, const char* key)
-{
-    size_t len;
-    char* string;
-    const char* next;
-
-    if (!strncmp(key, src, strlen(key)))
-    {
-        src = strchr(src, '=') + 1;
-        next = strchr(src, ' ');
-        len = strlen(src);
-
-        string = strncpy(
-            dest,
-            src,
-            next ? (size_t)(next - src) : len);
-
-        if (next)
-        {
-            src = next + 1;
-        }
-        else
-        {
-            src += len;
-        }
-        *string = 0;
-    }
-
-    return src;
-}
-
-static inline void cmdline_parse(const char* cmdline)
-{
-    const char* temp = cmdline;
-
-    while (*temp)
-    {
-        temp = parse_key_value(options.syslog, temp, "syslog=");
-        temp = parse_key_value(options.init, temp, "init=");
-        ++temp;
-    }
-}
-
-static inline void syslog_configure()
+UNMAP_AFTER_INIT static void syslog_configure(void)
 {
     int errno;
     file_t* file;
-    const char* device = options.syslog;
+    const char* device = param_value_get("syslog");
 
-    log_notice("syslog output: %s", device);
+    log_notice("syslog output: %s", device ? device : "none");
 
-    if (!strcmp(device, "none"))
+    if (!device || !strcmp(device, "none"))
     {
         return;
     }
@@ -234,7 +270,35 @@ static inline void syslog_configure()
     printk_register(file);
 }
 
-static inline void unmap_sections()
+UNMAP_AFTER_INIT static void read_some_data(void)
+{
+    int errno;
+    scoped_file_t* file = NULL;
+    char* buf = single_page();
+    const char* dev = "/dev/sda";
+
+    memset(buf, 0, PAGE_SIZE);
+
+    if ((errno = do_open(&file, dev, O_RDONLY, 0)))
+    {
+        if ((errno = do_open(&file, dev = "/dev/hda", O_RDONLY, 0)))
+        {
+            log_warning("cannot open any disk");
+        }
+    }
+
+    if (!errno)
+    {
+        log_info("reading data from %s", dev);
+        do_read(file, 0, buf, PAGE_SIZE);
+        memory_dump(log_info, buf, 5);
+        memory_dump(log_info, buf + 508, 1);
+    }
+
+    page_free(buf);
+}
+
+static void unmap_sections(void)
 {
     for (section_t* section = sections; section->name; ++section)
     {
@@ -249,57 +313,26 @@ static inline void unmap_sections()
 
 static int NORETURN(init(const char* cmdline))
 {
-    cmdline_parse(cmdline);
     rootfs_prepare();
     syslog_configure();
+    read_some_data();
 
+    if (param_bool_get(KERNEL_PARAM("debugmon")))
     {
-        int errno;
-        scoped_file_t* file = NULL;
-        char* buf = single_page();
-        const char* dev = "/dev/sda";
-
-        memset(buf, 0, PAGE_SIZE);
-
-        if ((errno = do_open(&file, dev, O_RDONLY, 0)))
-        {
-            if ((errno = do_open(&file, dev = "/dev/hda", O_RDONLY, 0)))
-            {
-                log_warning("cannot open any disk");
-            }
-        }
-
-        if (!errno)
-        {
-            log_info("reading data from %s", dev);
-            do_read(file, 0, buf, PAGE_SIZE);
-            memory_dump(log_info, buf, 5);
-            memory_dump(log_info, buf + 508, 1);
-        }
-
-        page_free(buf);
+        extern int debug_monitor();
+        kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
     }
 
     unmap_sections();
 
-#if 0
-    pci_devices_list();
-#endif
+    const char* init_path = param_value_or_get(KERNEL_PARAM("init"), "/bin/init");
 
-#if 0
-    video_modes_print();
-#endif
-#if 0
-    extern int debug_monitor();
-    kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
-#endif
-
-    const char* const argv[] = {options.init, ptr(cmdline), NULL, };
+    const char* const argv[] = {init_path, ptr(cmdline), NULL, };
     const char* const envp[] = {"PHOENIX=TRUE", NULL};
 
-    if (unlikely(do_exec(options.init, argv, envp)))
+    if (unlikely(do_exec(init_path, argv, envp)))
     {
-        panic("cannot run %s", options.init);
+        panic("cannot run %s", init_path);
     }
 
     ASSERT_NOT_REACHED();

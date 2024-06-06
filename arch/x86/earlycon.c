@@ -1,6 +1,7 @@
 #define log_fmt(fmt) "earlycon: " fmt
 #include <arch/io.h>
 #include <arch/bios.h>
+#include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
 
@@ -48,7 +49,7 @@ static void earlycon_char_print(size_t row, size_t col, char c);
 static uint8_t curx, cury;
 static bool disabled;
 
-UNMAP_AFTER_INIT int earlycon_init(void)
+UNMAP_AFTER_INIT int earlycon_init(param_t*)
 {
     regs_t regs;
 

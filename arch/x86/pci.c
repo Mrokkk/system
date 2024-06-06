@@ -1,6 +1,7 @@
 #include <arch/io.h>
 #include <arch/pci.h>
 #include <arch/bios32.h>
+#include <kernel/init.h>
 #include <kernel/kernel.h>
 
 static void pci_device_add(uint32_t vendor, uint8_t bus, uint8_t slot, uint8_t func);
@@ -25,6 +26,17 @@ static LIST_DECLARE(pci_devices);
     })
 
 bios32_entry_t pci_bios_entry;
+
+static int pci_devices_list(void)
+{
+    pci_device_t* device;
+
+    list_for_each_entry(device, &pci_devices, list_entry)
+    {
+        pci_device_print(device);
+    }
+    return 0;
+}
 
 UNMAP_AFTER_INIT void pci_scan(void)
 {
@@ -81,9 +93,8 @@ skip_pci_bios:
             }
         }
     }
-#if 0
-    pci_devices_list();
-#endif
+
+    param_call_if_set(KERNEL_PARAM("pciprint"), &pci_devices_list);
 }
 
 uint16_t pci_config_read_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
@@ -468,16 +479,6 @@ void pci_device_print(pci_device_t* device)
             }
             log_notice("\tBAR%u: %s", i, pci_bar_description(description, bar));
         }
-    }
-}
-
-void pci_devices_list(void)
-{
-    pci_device_t* device;
-
-    list_for_each_entry(device, &pci_devices, list_entry)
-    {
-        pci_device_print(device);
     }
 }
 

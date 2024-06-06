@@ -24,6 +24,7 @@
 
 #include <kernel/cpu.h>
 #include <kernel/irq.h>
+#include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
@@ -56,6 +57,8 @@ UNMAP_AFTER_INIT void arch_setup(void)
     ASSERT(ds_get() == KERNEL_DS);
     ASSERT(gs_get() == KERNEL_DS);
     ASSERT(ss_get() == KERNEL_DS);
+
+    param_call_if_set(KERNEL_PARAM("earlycon"), &earlycon_init);
 
     reboot_fn = &reboot_by_8042;
     shutdown_fn = &shutdown_dummy;
