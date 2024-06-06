@@ -1,6 +1,7 @@
 #include "test.h"
 
 #include <stdio.h>
+#include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -235,6 +236,25 @@ TEST(env)
 
         exit(FAILED_EXPECTATIONS());
     }
+}
+
+static int i = 0;
+
+TEST(jmp)
+{
+    jmp_buf buf;
+    int ret = setjmp(buf);
+
+    if (ret == 1)
+    {
+        ++i;
+    }
+    else
+    {
+        longjmp(buf, 1);
+    }
+
+    EXPECT_EQ(i, 1);
 }
 
 TEST_SUITE_END(libc);

@@ -24,6 +24,7 @@ add_library(c STATIC
     pipe.c
     poll.c
     pwd.c
+    setjmp.c
     signal.c
     sleep.c
     stdio.c

@@ -1,3 +1,4 @@
+#include "libc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +48,7 @@ static int var_find_empty(char*** empty)
     return -1;
 }
 
-char* getenv(const char* name)
+char* LIBC(getenv)(const char* name)
 {
     var_t var;
 
@@ -58,13 +59,15 @@ char* getenv(const char* name)
 
     return var.value;
 }
+WEAK_ALIAS(LIBC(getenv), getenv)
 
-char* secure_getenv(const char* name)
+char* LIBC(secure_getenv)(const char* name)
 {
     return getenv(name);
 }
+WEAK_ALIAS(LIBC(secure_getenv), secure_getenv)
 
-int var_allocate(const char* name, const char* value, size_t name_len, size_t value_len, char** var)
+static int var_allocate(const char* name, const char* value, size_t name_len, size_t value_len, char** var)
 {
     char* new_var = SAFE_ALLOC(malloc(name_len + value_len + 2), -1);
     sprintf(new_var, "%s=%s", name, value);
@@ -89,7 +92,7 @@ static int var_reallocate(var_t* var, const char* value, size_t value_len)
     return 0;
 }
 
-int env_reallocate(char*** empty_env)
+static int env_reallocate(char*** empty_env)
 {
     size_t new_size = environ_size ? environ_size * 2 : 32;
     char** new_environ = SAFE_ALLOC(malloc((new_size + 1) * sizeof(char*)), -1);
@@ -115,7 +118,7 @@ int env_reallocate(char*** empty_env)
     return 0;
 }
 
-int setenv(const char* name, const char* value, int overwrite)
+int LIBC(setenv)(const char* name, const char* value, int overwrite)
 {
     VALIDATE_INPUT(name, -1);
 
@@ -166,3 +169,4 @@ int setenv(const char* name, const char* value, int overwrite)
 
     return 0;
 }
+WEAK_ALIAS(LIBC(setenv), setenv)
