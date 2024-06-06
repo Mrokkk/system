@@ -257,4 +257,82 @@ TEST(jmp)
     EXPECT_EQ(i, 1);
 }
 
+static int compar(const void* lhs, const void* rhs)
+{
+    return *(int*)lhs - *(int*)rhs;
+}
+
+static int compar2(const void* lhs, const void* rhs)
+{
+    return *(uint64_t*)lhs - *(uint64_t*)rhs;
+}
+
+struct packed_data
+{
+    uint8_t a;
+    uint8_t b;
+    uint8_t c;
+} __attribute__((packed));
+
+typedef struct packed_data packed_t;
+
+static int compar3(const void* lhs, const void* rhs)
+{
+    const packed_t* a = lhs;
+    const packed_t* b = rhs;
+    uint32_t lhsv = (uint32_t)a->a << 16 | (uint32_t)a->b << 8 | (uint32_t)a->c;
+    uint32_t rhsv = (uint32_t)b->a << 16 | (uint32_t)b->b << 8 | (uint32_t)b->c;
+    return lhsv - rhsv;
+}
+
+TEST(qsort)
+{
+    // 3-bytes data
+    {
+        packed_t table[] = {{0xff, 0x02, 0xb3}, {0x00, 0x03, 0xff}, {0x23, 0x22, 0x01}, {0x00, 0x00, 0x01}};
+
+        qsort(table, 4, sizeof(*table), &compar3);
+
+        EXPECT_EQ(table[0].a, 0x00);
+        EXPECT_EQ(table[0].b, 0x00);
+        EXPECT_EQ(table[0].c, 0x01);
+        EXPECT_EQ(table[1].a, 0x00);
+        EXPECT_EQ(table[1].b, 0x03);
+        EXPECT_EQ(table[1].c, 0xff);
+        EXPECT_EQ(table[2].a, 0x23);
+        EXPECT_EQ(table[2].b, 0x22);
+        EXPECT_EQ(table[2].c, 0x01);
+        EXPECT_EQ(table[3].a, 0xff);
+        EXPECT_EQ(table[3].b, 0x02);
+        EXPECT_EQ(table[3].c, 0xb3);
+    }
+
+    // 4-bytes data
+    {
+        int table[] = {205, 2, 5, 203, -2, 29, 4};
+
+        qsort(table, 7, sizeof(*table), &compar);
+
+        EXPECT_EQ(table[0], -2);
+        EXPECT_EQ(table[1], 2);
+        EXPECT_EQ(table[2], 4);
+        EXPECT_EQ(table[3], 5);
+        EXPECT_EQ(table[4], 29);
+        EXPECT_EQ(table[5], 203);
+        EXPECT_EQ(table[6], 205);
+    }
+    // 8-bytes data
+    {
+        uint64_t table[] = {1294, 49532, 23, 456, 30495930294LL};
+
+        qsort(table, 5, sizeof(*table), &compar2);
+
+        EXPECT_EQ(table[0], 23);
+        EXPECT_EQ(table[1], 456);
+        EXPECT_EQ(table[2], 1294);
+        EXPECT_EQ(table[3], 49532);
+        EXPECT_EQ(table[4], 30495930294LL);
+    }
+}
+
 TEST_SUITE_END(libc);
