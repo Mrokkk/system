@@ -11,7 +11,6 @@
 
 #include "input.h"
 #include "macro.h"
-#include "random.h"
 
 #define GRID_SIZE 20
 
@@ -351,7 +350,7 @@ int main()
                 struct cell* food_cell;
                 do
                 {
-                    food_cell = CELL(random() % xgrids, random() % ygrids);
+                    food_cell = CELL(rand() % xgrids, rand() % ygrids);
                 }
                 while (food_cell->flags & FLAGS_SNAKE);
 

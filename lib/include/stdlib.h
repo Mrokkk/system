@@ -32,6 +32,9 @@ void qsort_r(
     int (*compar)(const void*, const void*, void *),
     void* arg);
 
+int rand(void);
+void srand(unsigned int seed);
+
 #define EXIT_SUCCESS    0
 #define EXIT_FAILURE    -1
 

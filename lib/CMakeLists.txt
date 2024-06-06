@@ -25,6 +25,7 @@ add_library(c STATIC
     poll.c
     pwd.c
     qsort.c
+    rand.c
     setjmp.c
     signal.c
     sleep.c

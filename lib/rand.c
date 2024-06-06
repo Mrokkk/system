@@ -1,8 +1,8 @@
-#include "random.h"
+#include <stdlib.h>
 
 int last = 1032;
 
-int random()
+int rand(void)
 {
     int x = last;
     x ^= x << 13;
