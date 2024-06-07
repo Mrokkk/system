@@ -53,7 +53,7 @@ int shell_run()
 
         setenv("PATH", "/bin", 0);
         setenv("SHELL", pathname, 0);
-        setenv("HOME", "/", 0);
+        setenv("HOME", "/root", 0);
 
         if (execvp(pathname, argv))
         {
