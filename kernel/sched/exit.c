@@ -43,15 +43,39 @@ int sys_waitpid(int pid, int* status, int wait_flags)
 {
     struct process* proc;
 
-    log_debug(DEBUG_EXIT, "called for %u; flags = %d", pid, wait_flags);
+    log_debug(DEBUG_EXIT, "called for %d; flags = %d", pid, wait_flags);
 
     if (pid == -1)
     {
-        // TODO: implement this case
+        while (!list_empty(&process_current->children))
+        {
+            list_for_each_entry(proc, &process_current->children, siblings)
+            {
+                if (process_is_zombie(proc))
+                {
+                    goto dont_wait;
+                }
+                else if (process_is_stopped(proc) && wait_flags & WUNTRACED)
+                {
+                    goto dont_wait;
+                }
+            }
+
+            if (wait_flags & WNOHANG)
+            {
+                return 0;
+            }
+
+            WAIT_QUEUE_DECLARE(temp, process_current);
+
+            temp.flags = wait_flags;
+            process_wait(&process_current->wait_child, &temp);
+
+            log_debug(DEBUG_EXIT, "woken %u", process_current->pid);
+        }
         return 0;
     }
-
-    if (process_find(pid, &proc))
+    else if (process_find(pid, &proc))
     {
         return -ESRCH;
     }
@@ -62,7 +86,7 @@ int sys_waitpid(int pid, int* status, int wait_flags)
     {
         goto dont_wait;
     }
-    else if (process_is_stopped(proc) && wait_flags == WUNTRACED)
+    else if (process_is_stopped(proc) && wait_flags & WUNTRACED)
     {
         goto dont_wait;
     }
@@ -72,7 +96,7 @@ int sys_waitpid(int pid, int* status, int wait_flags)
     while (process_is_running(proc) || proc->stat == PROCESS_WAITING)
     {
         temp.flags = wait_flags;
-        process_wait(&proc->wait_child, &temp);
+        process_wait(&process_current->wait_child, &temp);
 
         log_debug(DEBUG_EXIT, "woken %u; proc %u state = %c", process_current->pid, proc->pid, process_state_char(proc->stat));
     }
@@ -92,22 +116,27 @@ dont_wait:
         process_delete(proc);
     }
 
-    return 0;
+    return proc->pid;
 }
 
 void process_wake_waiting(struct process* proc)
 {
     struct process* parent = proc->parent;
 
-    if (wait_queue_empty(&proc->wait_child))
+    if (unlikely(!parent))
     {
         return;
     }
 
-    wait_queue_t* q = list_front(&proc->wait_child.queue, wait_queue_t, processes);
+    if (wait_queue_empty(&parent->wait_child))
+    {
+        return;
+    }
+
+    wait_queue_t* q = list_front(&parent->wait_child.queue, wait_queue_t, processes);
     if (q->flags == WUNTRACED || proc->stat == PROCESS_ZOMBIE)
     {
-        wait_queue_pop(&proc->wait_child);
+        wait_queue_pop(&parent->wait_child);
         log_debug(DEBUG_EXIT, "waking %u", parent->pid);
         process_wake(parent);
         return;
