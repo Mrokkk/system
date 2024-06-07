@@ -5,6 +5,7 @@ BRANCH=
 function build()
 {
     export CC="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
+    export CFLAGS="-ggdb3"
     export PATH="${NATIVE_SYSROOT}/bin:${PATH}"
 
     [[ ! -f "${CC}" ]] && die "Toolchain not built"
@@ -18,6 +19,7 @@ function build()
             --host=i686-pc-phoenix \
             --target=i686-pc-phoenix \
             --enable-minimal-config \
+            --enable-alias \
             --disable-largefile \
             --disable-nls \
             --disable-threads \

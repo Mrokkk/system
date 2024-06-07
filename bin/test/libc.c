@@ -150,6 +150,14 @@ TEST(strstr)
     EXPECT_EQ(strstr(string, "string"), string + 5);
 }
 
+TEST(strcat)
+{
+    char buf[128];
+    strcpy(buf, "test");
+    EXPECT_EQ(strcat(buf, "_test"), buf);
+    EXPECT_STR_EQ(buf, "test_test");
+}
+
 TEST(memmove)
 {
     char buf[16] = {0, };
@@ -161,6 +169,18 @@ TEST(memmove)
     memcpy(buf, data1, 8);
     EXPECT_EQ(memmove(buf + 2, buf, 6), buf + 2);
     EXPECT_STR_EQ(buf, "tetest12");
+}
+
+TEST(memchr)
+{
+    const char* string = "test123";
+    EXPECT_EQ(memchr(string, 't', 7), string);
+    EXPECT_EQ(memchr(string, 'e', 7), string + 1);
+    EXPECT_EQ(memchr(string, '2', 7), string + 5);
+    EXPECT_EQ(memchr(string, 'w', 7), NULL);
+    EXPECT_EQ(memchr(string, 't', 0), NULL);
+    EXPECT_EQ(memrchr(string, 't', 7), string + 3);
+    EXPECT_EQ(memrchr(string, 't', 0), NULL);
 }
 
 TEST(atoi)

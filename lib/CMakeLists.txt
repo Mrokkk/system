@@ -15,6 +15,7 @@ add_library(c STATIC
     fcntl.c
     getcwd.c
     gethostname.c
+    inttypes.c
     isatty.c
     libc_main.c
     locale.c
@@ -35,10 +36,12 @@ add_library(c STATIC
     time.c
     ttyname.c
 
+    string/memchr.c
     string/memcmp.c
     string/memcpy.c
     string/memmove.c
     string/memset.c
+    string/strcat.c
     string/strchr.c
     string/strcmp.c
     string/strcpy.c

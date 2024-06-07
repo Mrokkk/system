@@ -85,4 +85,19 @@ static inline int iscntrl(int c)
 }
 #endif
 
+#ifndef ispunct
+static inline int ispunct(int c)
+{
+    const char* chars = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+    for (unsigned i = 0; i < __builtin_strlen(chars); ++i)
+    {
+        if (c == chars[i])
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
 #endif

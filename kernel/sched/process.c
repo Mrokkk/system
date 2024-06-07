@@ -1,5 +1,6 @@
 #include <kernel/debug.h>
 #include <kernel/procfs.h>
+#include <kernel/signal.h>
 #include <kernel/process.h>
 
 PROCESS_DECLARE(init_process);
@@ -84,6 +85,12 @@ int sys_setuid(uid_t)
 
 int sys_setgid(gid_t)
 {
+    return 0;
+}
+
+unsigned int sys_alarm(unsigned int)
+{
+    do_kill(process_current, SIGALRM);
     return 0;
 }
 

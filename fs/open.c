@@ -389,3 +389,45 @@ int sys_fstatvfs(int fd, struct statvfs* buf)
 
     return 0;
 }
+
+int sys_unlink(const char* path)
+{
+    (void)path;
+    return -ENOSYS;
+}
+
+mode_t sys_umask(mode_t cmask)
+{
+    (void)cmask;
+    return -ENOSYS;
+}
+
+int sys_fchmod(int fd, mode_t)
+{
+    file_t* file;
+
+    if (fd_check_bounds(fd)) return -EBADF;
+    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    return -ENOSYS;
+}
+
+int sys_access(const char* path, int amode)
+{
+    int errno;
+    dentry_t* dentry;
+
+    (void)amode;
+
+    if ((errno = path_validate(path)))
+    {
+        return errno;
+    }
+
+    if ((dentry = lookup(path)) == NULL)
+    {
+        return -ENOENT;
+    }
+
+    return 0;
+}

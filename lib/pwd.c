@@ -5,6 +5,7 @@ static struct passwd passwd = {
     .pw_name = "root",
     .pw_uid = 0,
     .pw_gid = 0,
+    .pw_dir = "/root",
     .pw_shell = "/bin/sh"
 };
 

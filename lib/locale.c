@@ -1,6 +1,7 @@
 #include <locale.h>
 #include <stdlib.h>
 
+#if 0
 locale_t duplocale(locale_t locobj)
 {
     UNUSED(locobj);
@@ -34,3 +35,4 @@ locale_t uselocale(locale_t locobj)
     UNUSED(locobj);
     return NULL;
 }
+#endif

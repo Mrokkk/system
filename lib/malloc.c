@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <kernel/bitset.h>
 
-#define MALLOC_AREA         0x14000
+#define MALLOC_AREA         (0x14000 * 2)
 #define MALLOC_BLOCK_SIZE   8
 
 BITSET_DECLARE(bitset, MALLOC_AREA / MALLOC_BLOCK_SIZE);
@@ -43,6 +43,12 @@ void* calloc(size_t nmemb, size_t size)
         memset(data, 0, size * nmemb);
     }
     return data;
+}
+
+void* realloc(void* ptr, size_t size)
+{
+    UNUSED(ptr);
+    return malloc(size);
 }
 
 void free(void*)

@@ -6,6 +6,7 @@ import subprocess
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--app', action='store')
+    parser.add_argument('-p', '--port', action='store')
     return parser.parse_args()
 
 def build_gdb_args(args):
@@ -17,6 +18,8 @@ def build_gdb_args(args):
     ]
     if args.app:
         a.extend(['-ex', f'add-symbol-file bin/{args.app}/{args.app}'])
+    if args.port:
+        a.extend(['-ex', f'add-symbol-file sysroot/bin/{args.port}'])
     return a
 
 def main():

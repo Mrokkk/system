@@ -45,6 +45,12 @@ int sys_waitpid(int pid, int* status, int wait_flags)
 
     log_debug(DEBUG_EXIT, "called for %u; flags = %d", pid, wait_flags);
 
+    if (pid == -1)
+    {
+        // TODO: implement this case
+        return 0;
+    }
+
     if (process_find(pid, &proc))
     {
         return -ESRCH;

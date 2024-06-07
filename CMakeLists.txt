@@ -95,7 +95,6 @@ add_custom_target(
            "-o" "${PROJECT_NAME}"
            "--args" "console=/dev/tty0 syslog=/dev/debug0 earlycon"
            "--module" "${CMAKE_BINARY_DIR}/kernel.map"
-           "--module" "${CMAKE_BINARY_DIR}/disk.img"
    DEPENDS rootfs
    COMMENT "Building ISO image"
 )

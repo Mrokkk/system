@@ -7,6 +7,9 @@ void* memcpy(void* dest, const void* src, size_t n);
 void* memmove(void* dest, const void* src, size_t n);
 int memcmp(const void* s1, const void* s2, size_t n);
 
+void* memchr(const void* s, int c, size_t n);
+void* memrchr(const void* s, int c, size_t n);
+
 size_t strlen(const char* s);
 size_t strnlen(const char* s, size_t count);
 char* strcpy(char* restrict, const char* restrict);
@@ -21,5 +24,6 @@ char* strtok_r(char* restrict str, const char* restrict delim, char** restrict s
 size_t strspn(const char* s, const char* accept);
 size_t strcspn(const char* s, const char* reject);
 char* strstr(const char* haystack, const char* needle);
+char* strcat(char* restrict dst, const char* restrict src);
 
 char* strerror(int errnum);

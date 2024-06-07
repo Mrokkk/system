@@ -1,9 +1,26 @@
-commit cd90f1bf625f5e36cf648733f8cbc38980f8a9ae
+commit a344fb8ffcc4c9b737858531ba0c0e306d2fbc1a
 Author: Mrokkk <mrokk@protonmail.com>
 Date:   Mon Jun 3 23:09:42 2024 +0200
 
     Some hacks to make it compile
 
+diff --git a/config-top.h b/config-top.h
+index db4ab6e..ecbad8c 100644
+--- a/config-top.h
++++ b/config-top.h
+@@ -179,9 +179,9 @@
+ #define SOURCENEST_MAX 0
+ 
+ /* Define to use libc mktemp/mkstemp instead of replacements in lib/sh/tmpfile.c */
+-#define USE_MKTEMP
+-#define USE_MKSTEMP
+-#define USE_MKDTEMP
++#undef USE_MKTEMP
++#undef USE_MKSTEMP
++#undef USE_MKDTEMP
+ 
+ /* Define to force the value of OLDPWD inherited from the environment to be a
+    directory */
 diff --git a/include/posixstat.h b/include/posixstat.h
 index b607786..6457101 100644
 --- a/include/posixstat.h

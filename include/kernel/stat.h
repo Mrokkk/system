@@ -59,3 +59,5 @@ struct stat
 
 int stat(const char* restrict pathname, struct stat* restrict statbuf);
 int fstat(int fd, struct stat* statbuf);
+int fchmod(int fd, mode_t mode);
+mode_t umask(mode_t cmask);

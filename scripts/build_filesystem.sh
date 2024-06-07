@@ -94,9 +94,15 @@ create_dir "${mountpoint}/usr/share"
 create_dir "${mountpoint}/lib"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/proc"
+create_dir "${mountpoint}/root"
 create_dir "${boot_dir}/grub"
 
 for binary in $(find bin -type f -executable)
+do
+    copy ${binary} ${mountpoint}/bin
+done
+
+for binary in $(find sysroot -type f -executable)
 do
     copy ${binary} ${mountpoint}/bin
 done
