@@ -32,6 +32,9 @@
 #define FILE_CHECK(file) \
     ({ (file) && (file)->magic == FILE_MAGIC; })
 
+#define DIR_CHECK(dir) \
+    ({ (dir) && (dir)->magic == DIR_MAGIC; })
+
 #define NOT_IMPLEMENTED(ret) \
     return ERRNO_SET(ENOSYS, ret);
 
