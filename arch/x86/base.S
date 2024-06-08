@@ -40,11 +40,15 @@ ENTRY(syscall_handler)
     SAVE_ALL(0)
     cmp $__NR_syscalls, %eax
     jg bad_syscall
+    push %eax
+    call trace_syscall
+    pop %eax
     mov SYMBOL_NAME(syscalls)(, %eax, 4), %eax
     cmp $0, %eax
     jz bad_syscall
     call *%eax
     mov %eax, REGS_EAX(%esp) // Put value returned by syscall in pt_regs
+    call trace_syscall_end
     call syscall_regs_check
     jmp exit_kernel
 ENDPROC(syscall_handler)

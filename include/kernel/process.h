@@ -100,6 +100,7 @@ struct process
     list_head_t running;
     unsigned need_resched;
     pid_t pid, ppid;
+    int trace;
     int exit_code;
     uid_t uid;
     gid_t gid;

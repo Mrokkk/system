@@ -2,8 +2,9 @@
 
 import os
 import re
+import sys
 import jinja2
-from typing import List, Tuple, TextIO, Set
+from typing import List, Tuple, TextIO, Set, Dict
 
 
 syscall_h_template : str = """#ifndef __SYSCALL_H
@@ -33,6 +34,24 @@ syscall_h_template : str = """#ifndef __SYSCALL_H
 {% endfor -%}"""
 
 
+trace_syscall_template : str = """#include <kernel/trace.h>
+#include <kernel/types.h>
+#include <kernel/kernel.h>
+
+syscall_t trace_syscalls[] = {
+    { },
+{% for syscall in syscalls %}
+    {
+        .name   = "{{ syscall.name }}",
+        .ret    = {{ syscall.ret_enum }},
+        .nargs  = {{ syscall.arg_types.__len__() }},
+        .args   = { {{ syscall.arg_enums|join(', ')  }} },
+    },
+{% endfor -%}
+};
+"""
+
+
 syscall_regex : str = r'(__syscall.*)\(\s*([a-z0-9_]*),\s(.*)\)'
 
 
@@ -40,14 +59,18 @@ class Syscall:
     name        : str
     variant     : str
     ret_type    : str
+    ret_enum    : str
     arg_types   : List[str]
+    arg_enums   : List[str]
     line        : str
 
     def __init__(self, name=None, variant=None, ret_type=None, arg_types=None, line=None):
         self.name       = name
         self.variant    = variant
         self.ret_type   = ret_type
+        self.ret_enum   = type_convert(ret_type)
         self.arg_types  = arg_types
+        self.arg_enums  = [type_convert(x) for x in arg_types]
         self.line       = line
 
 
@@ -80,10 +103,26 @@ def read_data(lines : List[bytes]) -> Tuple[List[Syscall], List[str], List[str]]
     return (sorted(syscalls, key=lambda x: x.name), sorted(variants), sorted(structs))
 
 
+def type_convert(t : str):
+    if 'char*' in t: return 'TYPE_CHAR_PTR'
+    elif '*' in t: return 'TYPE_VOID_PTR'
+    elif t in ('int', 'long', 'gid_t'): return 'TYPE_LONG'
+    elif t == 'short': return 'TYPE_SHORT'
+    elif t == 'char': return 'TYPE_CHAR'
+    elif t in ('unsigned long', 'unsigned int', 'size_t', 'off_t', 'uint32_t', 'time_t'): return 'TYPE_UNSIGNED_LONG'
+    elif t in ('unsigned short', 'mode_t', 'uid_t', 'dev_t'): return 'TYPE_UNSIGNED_SHORT'
+    elif t == 'void': return 'TYPE_VOID'
+    else:
+        print(f'Unknown type: {t}')
+        sys.exit(-1)
+
+
 def main():
     include_dir : str = f'{os.path.dirname(os.path.realpath(__file__))}/../include/kernel'
+    trace_dir : str = f'{os.path.dirname(os.path.realpath(__file__))}/../kernel/trace'
     input_file  : str = f'{include_dir}/syscall.h.in'
-    output_file : str = f'{include_dir}/syscall.h'
+    syscall_h_path : str = f'{include_dir}/syscall.h'
+    trace_gen_c_path : str = f'{trace_dir}/trace_gen.c'
 
     with open(input_file, mode='r') as f:
         f : TextIO
@@ -94,9 +133,16 @@ def main():
         structs=structs,
         syscall_variants=variants)
 
-    with open(output_file, mode='w') as f:
+    trace_gen_c = jinja2.Template(trace_syscall_template).render(
+        syscalls=syscalls)
+
+    with open(syscall_h_path, mode='w') as f:
         f : TextIO
         f.write(syscall_h)
+
+    with open(trace_gen_c_path, mode='w') as f:
+        f : TextIO
+        f.write(trace_gen_c)
 
 
 if __name__ == '__main__':

@@ -311,6 +311,7 @@ int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
     process_parent_child_link(parent, child);
     process_forked(parent);
 
+    child->trace = 0;
     child->stat = PROCESS_RUNNING;
     list_add_tail(&child->running, &running);
 
@@ -352,6 +353,7 @@ int kernel_process_spawn(int (*entry)(), void* args, void*, int flags)
     process_parent_child_link(parent, child);
     process_forked(parent);
 
+    child->trace = 0;
     child->stat = PROCESS_RUNNING;
     list_add_tail(&child->running, &running);
 
@@ -378,6 +380,13 @@ int sys_fork(struct pt_regs regs)
 {
     log_debug(DEBUG_PROCESS, "");
     return process_clone(process_current, &regs, 0);
+}
+
+// dtrace for dummy trace
+int sys_dtrace(void)
+{
+    process_current->trace = 1;
+    return 0;
 }
 
 void processes_stats_print(void)

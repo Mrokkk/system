@@ -8,53 +8,54 @@
 #define __NR_clone          5
 #define __NR_close          6
 #define __NR_creat          7
-#define __NR_dup            8
-#define __NR_dup2           9
-#define __NR_execve         10
-#define __NR_exit           11
-#define __NR_fchmod         12
-#define __NR_fork           13
-#define __NR_fstat          14
-#define __NR_fstatvfs       15
-#define __NR_getcwd         16
-#define __NR_getdents       17
-#define __NR_getegid        18
-#define __NR_geteuid        19
-#define __NR_getgid         20
-#define __NR_getpid         21
-#define __NR_getppid        22
-#define __NR_getuid         23
-#define __NR_ioctl          24
-#define __NR_kill           25
-#define __NR_lseek          26
-#define __NR_mkdir          27
-#define __NR_mknod          28
-#define __NR_mmap           29
-#define __NR_mount          30
-#define __NR_open           31
-#define __NR_poll           32
-#define __NR_read           33
-#define __NR_reboot         34
-#define __NR_rename         35
-#define __NR_sbrk           36
-#define __NR_select         37
-#define __NR_setgid         38
-#define __NR_setsid         39
-#define __NR_setuid         40
-#define __NR_sigaction      41
-#define __NR_signal         42
-#define __NR_sigreturn      43
-#define __NR_stat           44
-#define __NR_statvfs        45
-#define __NR_time           46
-#define __NR_umask          47
-#define __NR_umount         48
-#define __NR_umount2        49
-#define __NR_unlink         50
-#define __NR_waitpid        51
-#define __NR_write          52
+#define __NR_dtrace         8
+#define __NR_dup            9
+#define __NR_dup2           10
+#define __NR_execve         11
+#define __NR_exit           12
+#define __NR_fchmod         13
+#define __NR_fork           14
+#define __NR_fstat          15
+#define __NR_fstatvfs       16
+#define __NR_getcwd         17
+#define __NR_getdents       18
+#define __NR_getegid        19
+#define __NR_geteuid        20
+#define __NR_getgid         21
+#define __NR_getpid         22
+#define __NR_getppid        23
+#define __NR_getuid         24
+#define __NR_ioctl          25
+#define __NR_kill           26
+#define __NR_lseek          27
+#define __NR_mkdir          28
+#define __NR_mknod          29
+#define __NR_mmap           30
+#define __NR_mount          31
+#define __NR_open           32
+#define __NR_poll           33
+#define __NR_read           34
+#define __NR_reboot         35
+#define __NR_rename         36
+#define __NR_sbrk           37
+#define __NR_select         38
+#define __NR_setgid         39
+#define __NR_setsid         40
+#define __NR_setuid         41
+#define __NR_sigaction      42
+#define __NR_signal         43
+#define __NR_sigreturn      44
+#define __NR_stat           45
+#define __NR_statvfs        46
+#define __NR_time           47
+#define __NR_umask          48
+#define __NR_umount         49
+#define __NR_umount2        50
+#define __NR_unlink         51
+#define __NR_waitpid        52
+#define __NR_write          53
 
-#define __NR_syscalls       53
+#define __NR_syscalls       54
 
 #ifndef __ASSEMBLER__
 
@@ -98,6 +99,7 @@ __syscall1(chroot, int, const char*)
 __syscall2(clone, int, unsigned int, void *)
 __syscall1(close, int, int)
 __syscall2(creat, int, const char*, int)
+__syscall0(dtrace, int)
 __syscall1(dup, int, int)
 __syscall2(dup2, int, int, int)
 __syscall3(execve, int, const char*, char* const[], char* const[])
