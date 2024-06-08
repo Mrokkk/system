@@ -15,6 +15,7 @@ add_library(c STATIC
     fcntl.c
     getcwd.c
     gethostname.c
+    grp.c
     inttypes.c
     isatty.c
     libc_main.c
@@ -46,6 +47,7 @@ add_library(c STATIC
     string/strcmp.c
     string/strcpy.c
     string/strlen.c
+    string/strpbrk.c
     string/strspn.c
     string/strstr.c
     string/strtok.c

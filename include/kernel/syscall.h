@@ -28,31 +28,33 @@
 #define __NR_kill           25
 #define __NR_lseek          26
 #define __NR_mkdir          27
-#define __NR_mmap           28
-#define __NR_mount          29
-#define __NR_open           30
-#define __NR_poll           31
-#define __NR_read           32
-#define __NR_reboot         33
-#define __NR_sbrk           34
-#define __NR_select         35
-#define __NR_setgid         36
-#define __NR_setsid         37
-#define __NR_setuid         38
-#define __NR_sigaction      39
-#define __NR_signal         40
-#define __NR_sigreturn      41
-#define __NR_stat           42
-#define __NR_statvfs        43
-#define __NR_time           44
-#define __NR_umask          45
-#define __NR_umount         46
-#define __NR_umount2        47
-#define __NR_unlink         48
-#define __NR_waitpid        49
-#define __NR_write          50
+#define __NR_mknod          28
+#define __NR_mmap           29
+#define __NR_mount          30
+#define __NR_open           31
+#define __NR_poll           32
+#define __NR_read           33
+#define __NR_reboot         34
+#define __NR_rename         35
+#define __NR_sbrk           36
+#define __NR_select         37
+#define __NR_setgid         38
+#define __NR_setsid         39
+#define __NR_setuid         40
+#define __NR_sigaction      41
+#define __NR_signal         42
+#define __NR_sigreturn      43
+#define __NR_stat           44
+#define __NR_statvfs        45
+#define __NR_time           46
+#define __NR_umask          47
+#define __NR_umount         48
+#define __NR_umount2        49
+#define __NR_unlink         50
+#define __NR_waitpid        51
+#define __NR_write          52
 
-#define __NR_syscalls       51
+#define __NR_syscalls       53
 
 #ifndef __ASSEMBLER__
 
@@ -116,12 +118,14 @@ __syscall3(ioctl, int, int, unsigned long, unsigned long)
 __syscall2(kill, int, int, int)
 __syscall3(lseek, off_t, int, off_t, int)
 __syscall2(mkdir, int, const char*, mode_t)
+__syscall3(mknod, int, const char*, mode_t, dev_t)
 __syscall6(mmap, void*, void*, size_t, int, int, int , size_t)
 __syscall5(mount, int, const char*, const char*, const char*, int, void*)
 __syscall3(open, int, const char*, int, int)
 __syscall3(poll, int, struct pollfd*, unsigned long, int)
 __syscall3(read, int, int, char*, size_t)
 __syscall3(reboot, int, int, int, int)
+__syscall2(rename, int, const char*, const char*)
 __syscall1(sbrk, void*, size_t)
 __syscall5(select, int, int, struct fd_set*, struct fd_set*, struct fd_set*, struct timeval*)
 __syscall1(setgid, int, gid_t)

@@ -11,3 +11,9 @@ int tcsetattr(int fd, int optional_actions, const struct termios* termios_p)
     UNUSED(fd); UNUSED(optional_actions); UNUSED(termios_p);
     NOT_IMPLEMENTED(-1);
 }
+
+int tcflow(int fd, int action)
+{
+    UNUSED(fd); UNUSED(action);
+    NOT_IMPLEMENTED(-1);
+}

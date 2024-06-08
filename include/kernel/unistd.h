@@ -46,3 +46,4 @@ off_t lseek(int fildes, off_t offset, int whence);
 int unlink(const char* path);
 int access(const char* path, int amode);
 unsigned int alarm(unsigned int seconds);
+int rename(const char* oldpath, const char* newpath);

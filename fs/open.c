@@ -431,3 +431,15 @@ int sys_access(const char* path, int amode)
 
     return 0;
 }
+
+int sys_rename(const char* oldpath, const char* newpath)
+{
+    (void)oldpath; (void)newpath;
+    return -ENOSYS;
+}
+
+int sys_mknod(const char* pathname, mode_t mode, dev_t dev)
+{
+    (void)pathname, (void)mode; (void)dev;
+    return -ENOSYS;
+}
