@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#if 0
 int getopt(int argc, char* const* argv, const char* optstring);
 
 extern char* optarg;
@@ -28,3 +29,4 @@ int getopt_long_only(
     const char* optstring,
     const struct option* longopts,
     int* longindex);
+#endif

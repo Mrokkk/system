@@ -11,15 +11,17 @@
 
 struct file
 {
-    int fd;
-    uint32_t magic;
-    bool error;
+    int         fd;
+    uint32_t    magic;
+    bool        error;
+    char*       buffer;
+    char*       it;
 };
 
 static FILE files[] = {
-    { STDIN_FILENO, FILE_MAGIC, false },
-    { STDOUT_FILENO, FILE_MAGIC, false },
-    { STDERR_FILENO, FILE_MAGIC, false }
+    { STDIN_FILENO, FILE_MAGIC, false, NULL, NULL },
+    { STDOUT_FILENO, FILE_MAGIC, false, NULL, NULL },
+    { STDERR_FILENO, FILE_MAGIC, false, NULL, NULL }
 };
 
 FILE* stdin = &files[STDIN_FILENO];
@@ -610,4 +612,14 @@ int fflush(FILE* stream)
 {
     VALIDATE_INPUT(FILE_CHECK(stream), EOF);
     return 0;
+}
+
+int fpurge(FILE* stream)
+{
+    VALIDATE_INPUT(stream, -1);
+    return 0;
+}
+
+void stdio_init(void)
+{
 }

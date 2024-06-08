@@ -22,7 +22,7 @@ add_library(c STATIC
     locale.c
     malloc.c
     math.c
-    mnent.c
+    mntent.c
     pipe.c
     poll.c
     pwd.c

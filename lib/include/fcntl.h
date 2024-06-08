@@ -22,3 +22,4 @@
 #define F_SETFL             4 // Set file status flags
 
 int fcntl(int fildes, int cmd, ...);
+int open(const char*, int, ...);

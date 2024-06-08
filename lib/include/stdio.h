@@ -8,7 +8,11 @@
 #define STDOUT_FILENO   1
 #define STDERR_FILENO   2
 
-#define BUFSIZ          0
+#define BUFSIZ          1024
+
+#define _IONBF 0    // unbuffered
+#define _IOLBF 1    // line buffered
+#define _IOFBF 2    // fully buffered
 
 #define EOF             (-1)
 
@@ -17,6 +21,12 @@ typedef struct file FILE;
 extern FILE* stdin;
 extern FILE* stdout;
 extern FILE* stderr;
+
+int setvbuf(
+    FILE* restrict stream,
+    char* buf,
+    int mode,
+    size_t size);
 
 int fgetc(FILE* stream);
 int getc(FILE* stream);
@@ -58,5 +68,5 @@ void perror(const char* s);
 void clearerr(FILE* stream);
 int feof(FILE* stream);
 int ferror(FILE* stream);
-
 int fflush(FILE* stream);
+int fpurge(FILE *stream);
