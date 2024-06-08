@@ -158,6 +158,17 @@ TEST(strcat)
     EXPECT_STR_EQ(buf, "test_test");
 }
 
+TEST(strpbrk)
+{
+    const char* string = "test_string";
+    EXPECT_EQ(strpbrk(string, "string"), string);
+    EXPECT_EQ(strpbrk(string, "sing"), string + 2);
+    EXPECT_EQ(strpbrk(string, "ig"), string + 8);
+    EXPECT_EQ(strpbrk(string, "xyz"), NULL);
+    EXPECT_EQ(strpbrk(string, ""), NULL);
+    EXPECT_EQ(strpbrk("", ""), NULL);
+}
+
 TEST(memmove)
 {
     char buf[16] = {0, };
@@ -198,6 +209,9 @@ TEST(atoi)
 
 TEST(env)
 {
+    EXPECT_EQ(setenv("PHOENIX", "TEST", 1), 0);
+    EXPECT_STR_EQ(getenv("PHOENIX"), "TEST");
+
     EXPECT_EXIT_WITH(0)
     {
         extern char** environ;

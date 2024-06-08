@@ -81,7 +81,7 @@ static inline int isprint(int c)
 #ifndef iscntrl
 static inline int iscntrl(int c)
 {
-    return c & (' ' - 1);
+    return c < 0x20 || c == 0x7f;
 }
 #endif
 

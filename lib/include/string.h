@@ -25,5 +25,6 @@ size_t strspn(const char* s, const char* accept);
 size_t strcspn(const char* s, const char* reject);
 char* strstr(const char* haystack, const char* needle);
 char* strcat(char* restrict dst, const char* restrict src);
+char* strpbrk(const char* s, const char* accept);
 
 char* strerror(int errnum);
