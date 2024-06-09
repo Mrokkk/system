@@ -20,6 +20,10 @@ function build()
             --target=i686-pc-phoenix \
             --enable-minimal-config \
             --enable-alias \
+            --enable-job-control \
+            --enable-prompt-string-decoding \
+            --enable-directory-stack \
+            --enable-extended-glob \
             --disable-largefile \
             --disable-nls \
             --disable-threads \
