@@ -28,5 +28,3 @@ typedef uint16_t    uid_t;
 // Additional types
 typedef uint8_t     pgid_t;
 typedef size_t      daddr_t;
-typedef size_t      socklen_t;
-typedef uint32_t    sa_family_t;

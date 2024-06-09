@@ -12,6 +12,7 @@ add_library(c STATIC
     dirent.c
     env.c
     errno.c
+    error.c
     fcntl.c
     getcwd.c
     gethostname.c
@@ -28,6 +29,7 @@ add_library(c STATIC
     pwd.c
     qsort.c
     rand.c
+    resource.c
     setjmp.c
     signal.c
     sleep.c

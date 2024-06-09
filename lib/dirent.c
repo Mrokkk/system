@@ -96,3 +96,12 @@ struct dirent* readdir(DIR* dirp)
 
     return dirp->current;
 }
+
+void rewinddir(DIR* dirp)
+{
+    if (dirp)
+    {
+        dirp->current = dirp->buf;
+        dirp->index = 0;
+    }
+}

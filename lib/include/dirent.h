@@ -10,3 +10,4 @@ DIR* fdopendir(int fd);
 int closedir(DIR* dirp);
 
 struct dirent* readdir(DIR* dirp);
+void rewinddir(DIR* dirp);

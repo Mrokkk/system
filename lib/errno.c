@@ -3,6 +3,8 @@
 #include <stdlib.h>
 
 int errno;
+char* program_invocation_name;
+char* program_invocation_short_name;
 
 const char* errors[] = {
     [EPERM]           = "Operation not permitted",
@@ -156,7 +158,7 @@ char* strerror(int errnum)
 {
     if (errnum < 0 || errnum > ERRNO_MAX)
     {
-        return NULL;
+        return "Unknown error";
     }
 
     return (char*)errors[errnum];

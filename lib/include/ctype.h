@@ -56,6 +56,7 @@ static inline int isupper(int c)
 {
     return (c > 96 && c < 123);
 }
+#endif
 
 #ifndef tolower
 static inline int tolower(int c)
@@ -98,6 +99,4 @@ static inline int ispunct(int c)
     }
     return 0;
 }
-#endif
-
 #endif

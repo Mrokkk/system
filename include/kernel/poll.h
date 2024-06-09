@@ -7,6 +7,7 @@
 #define POLLPRI     0x0002
 #define POLLOUT     0x0004
 
+#define FD_SETSIZE  32
 #define FD_SIZE     32
 #define FD_BITS     (8 * sizeof(long))
 #define FD_LONGS    (FD_SIZE / FD_BITS)

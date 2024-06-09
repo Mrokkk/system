@@ -1,6 +1,6 @@
-#include "kernel/time.h"
 #include <time.h>
 #include <sys/time.h>
+#include <sys/utime.h>
 
 long    timezone;
 long    altzone;
@@ -57,4 +57,10 @@ time_t mktime(struct tm* tm)
 clock_t clock(void)
 {
     return 0;
+}
+
+int utime(char const* pathname, const struct utimbuf* times)
+{
+    UNUSED(pathname); UNUSED(times);
+    NOT_IMPLEMENTED(-1);
 }
