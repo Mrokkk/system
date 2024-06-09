@@ -5,6 +5,10 @@
 
 // https://pubs.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
 
+#define NSEC_PER_SEC    1000000000L // Nanoseconds per second
+#define USEC_PER_SEC    1000000L    // Microseconds per second
+#define NSEC_PER_USEC   1000L       // Nanoseconds per microsecond
+
 struct timespec
 {
     time_t  tv_sec;     // Seconds

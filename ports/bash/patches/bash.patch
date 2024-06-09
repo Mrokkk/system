@@ -1,4 +1,4 @@
-commit a344fb8ffcc4c9b737858531ba0c0e306d2fbc1a
+commit bc894f323dbfafcf442a5c667b1bf59bf3d4c549
 Author: Mrokkk <mrokk@protonmail.com>
 Date:   Mon Jun 3 23:09:42 2024 +0200
 
@@ -36,6 +36,19 @@ index b607786..6457101 100644
 +#endif
  
  #endif /* _POSIXSTAT_H_ */
+diff --git a/lib/readline/terminal.c b/lib/readline/terminal.c
+index 9997161..9f2f76e 100644
+--- a/lib/readline/terminal.c
++++ b/lib/readline/terminal.c
+@@ -106,7 +106,7 @@ static int tcap_initialized;
+ #  if defined (__EMX__) || defined (NEED_EXTERN_PC)
+ extern 
+ #  endif /* __EMX__ || NEED_EXTERN_PC */
+-char PC, *BC, *UP;
++extern char PC, *BC, *UP;
+ #endif /* !__linux__ && !NCURSES_VERSION */
+ 
+ /* Some strings to control terminal actions.  These are output by tputs (). */
 diff --git a/lib/sh/strtod.c b/lib/sh/strtod.c
 index 55e1154..46c3dad 100644
 --- a/lib/sh/strtod.c
@@ -49,6 +62,18 @@ index 55e1154..46c3dad 100644
  #endif
  
  /* Convert NPTR to a double.  If ENDPTR is not NULL, a pointer to the
+diff --git a/parse.y b/parse.y
+index 8fd24a1..f921b19 100644
+--- a/parse.y
++++ b/parse.y
+@@ -222,6 +222,7 @@ static char *shell_input_line_property = NULL;
+ static size_t shell_input_line_propsize = 0;
+ #else
+ #  define set_line_mbstate()
++static char *shell_input_line_property = NULL;
+ #endif
+ 
+ extern int yyerror PARAMS((const char *));
 diff --git a/y.tab.c b/y.tab.c
 index 78c7930..c8d30ba 100644
 --- a/y.tab.c
