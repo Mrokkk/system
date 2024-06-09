@@ -5,6 +5,7 @@
 #include <kernel/types.h>
 #include <kernel/compiler.h>
 
+#define EXT2_BLOCK_SIZE         1024
 #define EXT2_SUPERBLOCK_OFFSET  1024
 #define EXT2_NDIR_BLOCKS        12
 #define EXT2_IND_BLOCK          EXT2_NDIR_BLOCKS
@@ -16,6 +17,12 @@
 #define EXT2_SIGNATURE          0xef53
 
 struct file;
+
+typedef struct ext2_data ext2_data_t;
+typedef struct ext2_superblock ext2_sb_t;
+typedef struct ext2fs_inode ext2_inode_t;
+typedef struct ext2_dir_entry ext2_dir_entry_t;
+typedef struct ext2_block_group_desc ext2_bgd_t;
 
 struct ext2fs_inode
 {
@@ -44,8 +51,6 @@ struct ext2fs_inode
     uint32_t    reserved2;
 };
 
-typedef struct ext2fs_inode ext2_inode_t;
-
 struct ext2_dir_entry
 {
     uint32_t    inode;          /* Inode number */
@@ -54,8 +59,6 @@ struct ext2_dir_entry
     uint8_t     file_type;
     char        name[EXT2_NAME_LEN]; /* File name */
 };
-
-typedef struct ext2_dir_entry ext2_dir_entry_t;
 
 struct ext2_block_group_desc
 {
@@ -68,8 +71,6 @@ struct ext2_block_group_desc
     uint16_t    pad;
     uint32_t    reserved[3];
 };
-
-typedef struct ext2_block_group_desc ext2_bgd_t;
 
 struct ext2_superblock
 {
@@ -124,11 +125,8 @@ struct ext2_superblock
     uint32_t    reserved[190];      /* Padding to the end of the block */
 };
 
-typedef struct ext2_superblock ext2_sb_t;
-
 struct ext2_data
 {
-    uint32_t    block_size;
     uint32_t    last_ind_block;
     uint32_t    first_dind_block;
     uint32_t    last_dind_block;
@@ -140,4 +138,3 @@ struct ext2_data
     struct file* file;
 };
 
-typedef struct ext2_data ext2_data_t;

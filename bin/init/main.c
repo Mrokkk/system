@@ -1,3 +1,4 @@
+#include "kernel/stat.h"
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -37,9 +38,33 @@ static inline void parse_cmdline(options_t* options, const char* cmdline)
     }
 }
 
+const char* shell_find(void)
+{
+    const char* shells[] = {"/bin/bash", "/bin/sh"};
+    struct stat buf;
+
+    for (size_t i = 0; i < sizeof(shells) / sizeof(*shells); ++i)
+    {
+        if (!stat(shells[i], &buf))
+        {
+            return shells[i];
+        }
+    }
+
+    return NULL;
+}
+
 int shell_run()
 {
     int child_pid, status;
+    const char* pathname = shell_find();
+    char* const argv[] = {(char*)pathname, NULL};
+
+    if (!pathname)
+    {
+        printf("cannot find shell to run!\n");
+        return EXIT_FAILURE;
+    }
 
     if ((child_pid = fork()) < 0)
     {
@@ -48,9 +73,6 @@ int shell_run()
     }
     else if (child_pid == 0)
     {
-        char* pathname = "/bin/sh";
-        char* const argv[] = {pathname, NULL, };
-
         if (setsid())
         {
             perror("setsid");
@@ -66,6 +88,7 @@ int shell_run()
             perror(pathname);
             return EXIT_FAILURE;
         }
+
         while (1);
     }
 

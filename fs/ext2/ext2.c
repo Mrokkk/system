@@ -9,8 +9,6 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 
-#include <arch/multiboot.h>
-
 KERNEL_MODULE(ext2);
 module_init(ext2_init);
 module_exit(ext2_deinit);
@@ -22,8 +20,42 @@ static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset);
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int ext2_read(file_t* file, char* buffer, size_t count);
 
+enum traverse_command
+{
+    TRAVERSE_CONTINUE,
+    TRAVERSE_STOP,
+};
+
+typedef enum traverse_command cmd_t;
+
+typedef struct level level_t;
+typedef cmd_t (*block_cb_t)(void*, size_t, void*);
+
+static int ext2_traverse_blocks(
+    ext2_data_t* data,
+    ext2_inode_t* raw_inode,
+    size_t offset,
+    size_t count,
+    void* cb_data,
+    block_cb_t cb);
+
+// Each block can be addressed using leve[4], each for each
+// level of indirection
+
+#define LVL_DIRECT              0
+#define LVL_SINGLY_INDIRECT     1
+#define LVL_DOUBLY_INDIRECT     2
+#define LVL_TRIPLY_INDIRECT     3
+
+struct level
+{
+    int         lvl;
+    uint32_t    cur;     // list element index
+    uint32_t*   cur_ptr; // ptr to list element
+};
+
 static file_system_t ext2 = {
-    .name = "ext2",
+    .name  = "ext2",
     .mount = &ext2_mount,
 };
 
@@ -31,49 +63,43 @@ static super_operations_t ext2_sb_ops = {
 };
 
 static file_operations_t ext2_fops = {
-    .open = &ext2_open,
-    .read = &ext2_read,
+    .open    = &ext2_open,
+    .read    = &ext2_read,
     .readdir = &ext2_readdir,
-    .mmap = &ext2_mmap,
+    .mmap    = &ext2_mmap,
 };
 
 static inode_operations_t ext2_inode_ops = {
     .lookup = &ext2_lookup,
 };
 
-static inline void* block(ext2_data_t* data, size_t block)
-{
-    int errno;
-    buffer_t* b = block_read(data->dev, data->file, block);
-    if ((errno = errno_get(b)))
-    {
-        return ptr(errno);
-    }
-    return b->data;
-}
-
 static ext2_bgd_t* ext2_bgd_get(ext2_data_t* data, uint32_t ino)
 {
+    buffer_t* b;
+    ext2_bgd_t* bgd;
     uint32_t group_index = (ino - 1) / data->inodes_per_group;
-    uint32_t group_block_nr = (group_index * sizeof(ext2_bgd_t)) / data->block_size + 2;
+    uint32_t group_block_nr = (group_index * sizeof(ext2_bgd_t)) / EXT2_BLOCK_SIZE + 2;
 
-    group_index %= data->block_size / sizeof(ext2_bgd_t);
+    group_index %= EXT2_BLOCK_SIZE / sizeof(ext2_bgd_t);
 
-    ext2_bgd_t* bgd = block(data, group_block_nr);
+    b = block_read(data->dev, data->file, group_block_nr);
 
-    if (unlikely(errno_get(bgd)))
+    if (unlikely(errno_get(b)))
     {
         return NULL;
     }
 
-    return bgd + group_index;
+    return (bgd = b->data) + group_index;
 }
 
 static ext2_inode_t* ext2_inode_get(ext2_data_t* data, uint32_t ino)
 {
+    buffer_t* b;
+    ext2_inode_t* inode;
     uint32_t inode_in_group_index = (ino - 1) % data->inodes_per_group;
     uint32_t block_nr = inode_in_group_index / data->inodes_per_block;
     uint32_t block_off = inode_in_group_index % data->inodes_per_block;
+
     ext2_bgd_t* bgd = ext2_bgd_get(data, ino);
 
     if (unlikely(!bgd))
@@ -81,14 +107,61 @@ static ext2_inode_t* ext2_inode_get(ext2_data_t* data, uint32_t ino)
         return NULL;
     }
 
-    ext2_inode_t* inode = block(data, bgd->inode_table + block_nr);
+    b = block_read(data->dev, data->file, bgd->inode_table + block_nr);
 
-    if (unlikely(errno_get(inode)))
+    if (unlikely(errno_get(b)))
     {
         return NULL;
     }
 
-    return inode + block_off;
+    return (inode = b->data) + block_off;
+}
+
+typedef struct lookup_context lookup_context_t;
+
+struct lookup_context
+{
+    ext2_data_t* data;
+    const char* name;
+    size_t name_len;
+    ext2_inode_t* res;
+    ino_t ino;
+};
+
+static cmd_t ext2_lookup_block(void* block, size_t to_copy, void* data)
+{
+    lookup_context_t* ctx = data;
+    ext2_dir_entry_t* dirent;
+    size_t total_len;
+
+    for (dirent = block, total_len = 0;
+        total_len < to_copy;
+        total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len))
+    {
+        if (ctx->name_len != dirent->name_len || strncmp(dirent->name, ctx->name, dirent->name_len))
+        {
+            continue;
+        }
+
+        ctx->res = ext2_inode_get(ctx->data, dirent->inode);
+
+        if (unlikely(!ctx->res))
+        {
+            log_debug(DEBUG_EXT2FS, "cannot read inode %u", dirent->inode);
+            return -EIO;
+        }
+
+        ctx->ino = dirent->inode;
+
+        log_debug(DEBUG_EXT2FS, "found inode; ino=%u, size=%u, name=%S",
+            dirent->inode,
+            ctx->res->size,
+            dirent->name);
+
+        return TRAVERSE_STOP;
+    }
+
+    return TRAVERSE_CONTINUE;
 }
 
 static int ext2_lookup_raw(
@@ -96,50 +169,36 @@ static int ext2_lookup_raw(
     ext2_inode_t* parent_inode,
     const char* name,
     ext2_inode_t** child_inode,
-    uint16_t* ino)
+    ino_t* ino)
 {
-    ext2_dir_entry_t* dirent;
-    size_t name_len = strlen(name);
+    int res, errno;
+    lookup_context_t ctx = {.data = data, .name = name, .name_len = strlen(name), .ino = 0, .res = NULL};
 
-    log_debug(DEBUG_EXT2FS, "name=%s, parent: %u", name, parent_inode->size);
+    log_debug(DEBUG_EXT2FS, "name=%s", name);
 
-    size_t total_len;
-    for (dirent = block(data, parent_inode->block[0]), total_len = 0;
-        total_len < parent_inode->size;
-        total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len))
+    res = ext2_traverse_blocks(data, parent_inode, 0, parent_inode->size, &ctx, &ext2_lookup_block);
+
+    if (unlikely(errno = errno_get(res)))
     {
-        if (name_len != dirent->name_len || strncmp(dirent->name, name, dirent->name_len))
-        {
-            continue;
-        }
-
-        *child_inode = ext2_inode_get(data, dirent->inode);
-
-        if (!*child_inode)
-        {
-            log_debug(DEBUG_EXT2FS, "cannot read inode %u", dirent->inode);
-            return -EIO;
-        }
-
-        *ino = dirent->inode;
-
-        log_debug(DEBUG_EXT2FS, "found inode; ino=%u, size=%u, name=%S",
-            dirent->inode,
-            (*child_inode)->size,
-            dirent->name);
-
-        return 0;
+        return errno;
     }
 
-    log_debug(DEBUG_EXT2FS, "no inode with name = %s", name);
+    if (unlikely(!ctx.res))
+    {
+        log_debug(DEBUG_EXT2FS, "no inode with name = %s", name);
+        return -ENOENT;
+    }
 
-    return -ENOENT;
+    *child_inode = ctx.res;
+    *ino = ctx.ino;
+
+    return 0;
 }
 
 static int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
 {
     int errno;
-    uint16_t ino;
+    ino_t ino;
     ext2_inode_t* child_inode;
     ext2_inode_t* parent_inode = parent->fs_data;
     ext2_data_t* data = parent->sb->fs_data;
@@ -174,84 +233,301 @@ static int ext2_open(file_t*)
     return 0;
 }
 
-#define in_range(v, first, last)    ((v) >= (first) && (v) <= (last))
+static int level_escalate(ext2_data_t* data, level_t** level)
+{
+    buffer_t* b;
+    level_t* cur = *level;
 
-static int ext2_read(file_t* file, char* buffer, size_t count)
+    b = block_read(data->dev, data->file, *cur->cur_ptr);
+
+    if (unlikely(errno_get(b)))
+    {
+        return errno_get(b);
+    }
+
+    ++cur;
+    cur->cur = 0;
+    cur->cur_ptr = b->data;
+    *level = cur;
+
+    return 0;
+}
+
+static int prev_level_forward(ext2_data_t* data, level_t* cur_lvl)
+{
+    buffer_t* b;
+    level_t* prev_lvl = cur_lvl - 1;
+
+    ++prev_lvl->cur;
+    ++prev_lvl->cur_ptr;
+
+    b = block_read(data->dev, data->file, *prev_lvl->cur_ptr);
+
+    if (unlikely(errno_get(b)))
+    {
+        return errno_get(b);
+    }
+
+    cur_lvl->cur = 0;
+    cur_lvl->cur_ptr = b->data;
+
+    return 0;
+}
+
+static int ext2_next_block(ext2_data_t* data, level_t** cur_lvl, buffer_t** cur_block)
 {
     int errno;
-    char* block_data;
-    size_t to_copy, left;
-    uint32_t* ind_block_nr = NULL;
-    ext2_data_t* data = file->inode->sb->fs_data;
-    ext2_inode_t* raw_inode = file->inode->fs_data;
+    buffer_t* b;
+    level_t* cur = *cur_lvl;
 
-    uint32_t block_size = data->block_size;
-    size_t block_nr = file->offset / block_size;
-    size_t block_offset = file->offset & (block_size - 1);
+    ++cur->cur;
+    ++cur->cur_ptr;
 
-    left = count = min(count, raw_inode->size - file->offset);
-
-    while (left)
+    switch (cur->lvl)
     {
-        to_copy = min(block_size - block_offset, left);
-        if (block_nr < EXT2_NDIR_BLOCKS)
-        {
-            block_data = block(data, raw_inode->block[block_nr]);
-        }
-        else if (in_range(block_nr, EXT2_IND_BLOCK, data->last_ind_block))
-        {
-            if (!ind_block_nr)
+        case LVL_DIRECT:
+            if (cur->cur == 12)
             {
-                ind_block_nr = block(data, raw_inode->block[EXT2_IND_BLOCK]);
-                ind_block_nr += block_nr - EXT2_IND_BLOCK;
+                if ((errno = level_escalate(data, &cur)))
+                {
+                    return errno;
+                }
             }
-            block_data = block(data, *ind_block_nr++);
-        }
-        else if (in_range(block_nr, data->first_dind_block, data->last_dind_block))
-        {
-            size_t dind_block_nr = block_nr - data->first_dind_block;
-            size_t lvl1_block_nr = dind_block_nr >> 8;
-            size_t lvl2_block_nr = dind_block_nr & 0xff;
-            uint32_t* temp = block(data, raw_inode->block[EXT2_DIND_BLOCK]);
-            temp = block(data, temp[lvl1_block_nr]);
-            block_data = block(data, temp[lvl2_block_nr]);
-        }
-        else
-        {
             break;
+        case LVL_SINGLY_INDIRECT:
+            if (cur->cur == 256)
+            {
+                if ((errno = prev_level_forward(data, cur)) ||
+                    (errno = level_escalate(data, &cur)))
+                {
+                    return errno;
+                }
+            }
+            break;
+        case LVL_DOUBLY_INDIRECT:
+            if (cur->cur == 256)
+            {
+                if ((cur - 1)->cur == 255)
+                {
+                    log_info("triply-indirect addressing not yet supported");
+                    return -EFBIG;
+                }
+
+                if ((errno = prev_level_forward(data, cur)))
+                {
+                    return errno;
+                }
+            }
+    }
+
+    *cur_lvl = cur;
+
+    b = block_read(data->dev, data->file, *cur->cur_ptr);
+
+    if (unlikely((errno = errno_get(b))))
+    {
+        return errno;
+    }
+
+    *cur_block = b;
+
+    return 0;
+}
+
+#define NDIR_BLOCKS     (12)
+#define IND_BLOCKS      (EXT2_BLOCK_SIZE / sizeof(uint32_t))
+#define DIND_BLOCKS     (IND_BLOCKS * IND_BLOCKS)
+
+static int ext2_traverse_blocks_init(
+    ext2_data_t* data,
+    ext2_inode_t* raw_inode,
+    uint32_t blocknr,
+    level_t* levels,
+    level_t** cur,
+    buffer_t** cur_block)
+{
+    buffer_t* b;
+
+    levels[0].lvl = 0;
+    levels[1].lvl = 1;
+    levels[2].lvl = 2;
+    levels[3].lvl = 3;
+
+    if (blocknr >= NDIR_BLOCKS + IND_BLOCKS + DIND_BLOCKS)
+    {
+        log_info("failed to setup; triply-indirect addressing not yet supported");
+        return -EFBIG;
+    }
+    else if (blocknr >= NDIR_BLOCKS + IND_BLOCKS) // doubly-indirect addressing
+    {
+        *cur = levels + 2;
+        blocknr -= NDIR_BLOCKS + IND_BLOCKS;
+
+        b = block_read(data->dev, data->file, raw_inode->block[EXT2_DIND_BLOCK]);
+
+        if (unlikely(errno_get(b)))
+        {
+            return errno_get(b);
         }
 
-        if ((errno = errno_get(block_data)))
+        levels[LVL_DIRECT].cur = EXT2_DIND_BLOCK;
+        levels[LVL_DIRECT].cur_ptr = raw_inode->block + EXT2_DIND_BLOCK;
+
+        levels[LVL_SINGLY_INDIRECT].cur = blocknr / IND_BLOCKS;
+        levels[LVL_SINGLY_INDIRECT].cur_ptr = (uint32_t*)b->data + blocknr / IND_BLOCKS;
+
+        b = block_read(data->dev, data->file, *levels[1].cur_ptr);
+
+        if (unlikely(errno_get(b)))
+        {
+            return errno_get(b);
+        }
+
+        levels[LVL_DOUBLY_INDIRECT].cur = blocknr % IND_BLOCKS;
+        levels[LVL_DOUBLY_INDIRECT].cur_ptr = (uint32_t*)b->data + blocknr % IND_BLOCKS;
+    }
+    else if (blocknr >= NDIR_BLOCKS) // indirect addressing
+    {
+        *cur = levels + 1;
+        blocknr -= NDIR_BLOCKS;
+
+        b = block_read(data->dev, data->file, raw_inode->block[EXT2_NDIR_BLOCKS]);
+
+        if (unlikely(errno_get(b)))
+        {
+            return errno_get(b);
+        }
+
+        levels[LVL_DIRECT].cur = EXT2_NDIR_BLOCKS;
+        levels[LVL_DIRECT].cur_ptr = raw_inode->block + EXT2_NDIR_BLOCKS;
+
+        levels[LVL_SINGLY_INDIRECT].cur = blocknr;
+        levels[LVL_SINGLY_INDIRECT].cur_ptr = (uint32_t*)b->data + blocknr;
+    }
+    else // direct addressing
+    {
+        *cur = levels;
+        levels[LVL_DIRECT].cur = blocknr;
+        levels[LVL_DIRECT].cur_ptr = raw_inode->block + blocknr;
+    }
+
+    b = block_read(data->dev, data->file, *(*cur)->cur_ptr);
+
+    if (unlikely(errno_get(b)))
+    {
+        return errno_get(b);
+    }
+
+    *cur_block = b;
+
+    return 0;
+}
+
+static int ext2_traverse_blocks(
+    ext2_data_t* data,
+    ext2_inode_t* raw_inode,
+    size_t offset,
+    size_t count,
+    void* cb_data,
+    block_cb_t cb)
+{
+    int errno;
+    buffer_t* cur_block;
+    level_t levels[4];
+    level_t* cur_lvl;
+
+    size_t left, to_copy;
+    size_t block_nr     = offset / EXT2_BLOCK_SIZE;
+    size_t block_offset = offset % EXT2_BLOCK_SIZE;
+
+    if (unlikely(errno = ext2_traverse_blocks_init(data, raw_inode, block_nr, levels, &cur_lvl, &cur_block)))
+    {
+        return errno;
+    }
+
+    for (left = count = min(count, raw_inode->size - offset);
+        left;
+        left -= to_copy, block_offset = 0, errno = ext2_next_block(data, &cur_lvl, &cur_block))
+    {
+        if (unlikely(errno))
         {
             return errno;
         }
 
-        block_data += block_offset;
-        log_debug(DEBUG_EXT2FS, "copying %u B from block %u at %x to %x", to_copy, block_nr, block_data, buffer);
-        memcpy(buffer, block_data, to_copy);
-        buffer += to_copy;
-        ++block_nr;
-        block_offset = 0;
-        left -= to_copy;
-    }
+        to_copy = min(EXT2_BLOCK_SIZE - block_offset, left);
 
-    file->offset += count - left;
+        if (cb(shift(cur_block->data, block_offset), to_copy, cb_data) == TRAVERSE_STOP)
+        {
+            break;
+        }
+    }
 
     return count;
 }
 
+static cmd_t ext2_read_block(void* block, size_t to_copy, void* data)
+{
+    char** buffer = data;
+    memcpy(*buffer, block, to_copy);
+    *buffer += to_copy;
+    return TRAVERSE_CONTINUE;
+}
+
+static int ext2_read(file_t* file, char* buffer, size_t count)
+{
+    int res, errno;
+    ext2_data_t* data = file->inode->sb->fs_data;
+    ext2_inode_t* raw_inode = file->inode->fs_data;
+
+    res = ext2_traverse_blocks(
+        data,
+        raw_inode,
+        file->offset,
+        count,
+        &buffer,
+        &ext2_read_block);
+
+    if (unlikely(errno = errno_get(res)))
+    {
+        return errno;
+    }
+
+    file->offset += res;
+
+    return res;
+}
+
+typedef struct mmap_context mmap_context_t;
+
+struct mmap_context
+{
+    size_t offset; // Offset within current page
+    page_t* current_page;
+};
+
+static cmd_t ext2_mmap_block(void* block, size_t to_copy, void* data)
+{
+    mmap_context_t* ctx = data;
+    page_t* current_page = ctx->current_page;
+    memcpy(shift(page_virt_ptr(current_page), ctx->offset), block, to_copy);
+
+    if ((ctx->offset += to_copy) == PAGE_SIZE)
+    {
+        ctx->current_page = list_next_entry(&current_page->list_entry, page_t, list_entry);
+        ctx->offset = 0;
+    }
+    return TRAVERSE_CONTINUE;
+}
+
 static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
 {
-    int errno;
+    int res, errno;
+    page_t* pages;
+    mmap_context_t ctx;
+
     ext2_inode_t* raw_inode = file->inode->fs_data;
     ext2_data_t* data = file->inode->sb->fs_data;
-    uint32_t cur = offset, pos = offset, data_size;
-    uint32_t block_size = data->block_size;
-    uint32_t block_nr = cur / block_size;
-    page_t* current_page;
-    page_t* pages;
     size_t size = vma->end - vma->start;
-
     pages = page_alloc(size / PAGE_SIZE, PAGE_ALLOC_DISCONT);
 
     if (unlikely(!pages))
@@ -260,79 +536,16 @@ static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
         return -ENOMEM;
     }
 
-    current_page = pages;
+    ctx.current_page = pages;
+    ctx.offset = 0;
 
-    log_debug(DEBUG_EXT2FS, "off = %x, size = %x", offset, size);
+    res = ext2_traverse_blocks(data, raw_inode, offset, size, &ctx, &ext2_mmap_block);
 
-    for (; block_nr < EXT2_NDIR_BLOCKS && pos < raw_inode->size && pos < size + offset; )
+    if (unlikely(errno = errno_get(res)))
     {
-        void* block_ptr = block(data, raw_inode->block[block_nr]);
-        void* data_ptr = shift(page_virt_ptr(current_page), pos % PAGE_SIZE);
-        data_size = min(block_size, raw_inode->size - pos);
-
-        if ((errno = errno_get(block_ptr)))
-        {
-            return errno;
-        }
-
-        log_debug(DEBUG_EXT2FS, "copying %u B from %x to %x", data_size, block_ptr, data_ptr);
-
-        memcpy(data_ptr, block_ptr, data_size);
-
-        ++block_nr;
-        cur += data_size;
-        pos += data_size;
-
-        if (block_nr % 4 == 0)
-        {
-            current_page = list_next_entry(&current_page->list_entry, page_t, list_entry);
-        }
-    }
-
-    block_nr = cur / block_size - EXT2_NDIR_BLOCKS;
-    log_debug(DEBUG_EXT2FS, "block_nr = %u", block_nr);
-    uint32_t* ind_block = block(data, raw_inode->block[EXT2_IND_BLOCK]);
-
-    if ((errno = errno_get(ind_block)))
-    {
+        pages_free(pages);
         return errno;
     }
-
-    ind_block += block_nr;
-    uint32_t* ind_block_end = shift(ind_block, block_size);
-
-    for (; ind_block < ind_block_end && pos < raw_inode->size && pos < size + offset; )
-    {
-        void* block_ptr = block(data, *ind_block);
-        void* data_ptr = shift(page_virt_ptr(current_page), pos % PAGE_SIZE);
-        data_size = min(block_size, raw_inode->size - pos);
-
-        if ((errno = errno_get(block_ptr)))
-        {
-            return errno;
-        }
-
-        log_debug(DEBUG_EXT2FS, "copying %u B from indirect block %u:%x to %x",
-            data_size,
-            *ind_block,
-            block_ptr,
-            data_ptr);
-
-        memcpy(data_ptr, block_ptr, data_size);
-
-        ++block_nr;
-        cur += data_size;
-        pos += data_size;
-
-        if (block_nr % 4 == 0)
-        {
-            current_page = list_next_entry(&current_page->list_entry, page_t, list_entry);
-        }
-
-        ++ind_block;
-    }
-
-    log_debug(DEBUG_EXT2FS, "read %u B", pos);
 
     list_merge(&vma->pages->head, &pages->list_entry);
 
@@ -349,13 +562,50 @@ static inline char ext2_file_type_convert(uint16_t type)
     }
 }
 
+typedef struct readdir_context readdir_context_t;
+
+struct readdir_context
+{
+    void* buf;
+    direntadd_t dirent_add;
+    int i;
+};
+
+static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
+{
+    int over;
+    readdir_context_t* ctx = data;
+    ext2_dir_entry_t* dirent;
+    size_t total_len;
+
+    for (dirent = block, total_len = 0;
+        total_len < to_copy;
+        total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len), ++ctx->i)
+    {
+        log_debug(DEBUG_EXT2FS, "dirent: type=%x, inode=%u, type=%x, name=%S, rec_len=%u, len=%u",
+            dirent->file_type,
+            dirent->inode,
+            dirent->file_type,
+            dirent->name,
+            dirent->rec_len,
+            dirent->name_len);
+
+        over = ctx->dirent_add(ctx->buf, dirent->name, dirent->name_len, dirent->inode, ext2_file_type_convert(dirent->file_type));
+
+        if (over)
+        {
+            return TRAVERSE_STOP;
+        }
+    }
+    return TRAVERSE_CONTINUE;
+}
+
 static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
-    int i, over;
-    size_t total_len;
-    ext2_dir_entry_t* dirent;
+    int res, errno;
     ext2_data_t* data = file->inode->sb->fs_data;
     ext2_inode_t* raw_inode = file->inode->fs_data;
+    readdir_context_t ctx = {.buf = buf, .dirent_add = dirent_add, .i = 0};
 
     if (!S_ISDIR(raw_inode->mode))
     {
@@ -367,27 +617,14 @@ static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
         return 0;
     }
 
-    for (dirent = block(data, raw_inode->block[0]), total_len = 0, i = 0;
-        total_len < raw_inode->size;
-        total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len), ++i)
+    res = ext2_traverse_blocks(data, raw_inode, 0, raw_inode->size, &ctx, &ext2_readdir_block);
+
+    if (unlikely(errno = errno_get(res)))
     {
-        log_debug(DEBUG_EXT2FS, "dirent: type=%x, inode=%u, type=%x, name=%S, rec_len=%u, len=%u",
-            dirent->file_type,
-            dirent->inode,
-            dirent->file_type,
-            dirent->name,
-            dirent->rec_len,
-            dirent->name_len);
-
-        over = dirent_add(buf, dirent->name, dirent->name_len, dirent->inode, ext2_file_type_convert(dirent->file_type));
-
-        if (over)
-        {
-            break;
-        }
+        return res;
     }
 
-    return i;
+    return ctx.i;
 }
 
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
@@ -415,7 +652,7 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
 
     if (raw_sb->magic != EXT2_SIGNATURE)
     {
-        log_warning("invalid signature!");
+        log_info("invalid signature: %x", raw_sb->magic);
         return -ENODEV;
     }
 
@@ -423,11 +660,16 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
     sb->module = this_module;
     sb->block_size = EXT2_SUPERBLOCK_OFFSET << raw_sb->log_block_size;
 
+    if (sb->block_size != EXT2_BLOCK_SIZE)
+    {
+        log_info("unsupported block size: %u", sb->block_size);
+        return -EINVAL;
+    }
+
     data->addr_per_block = sb->block_size / sizeof(uint32_t);
     data->last_ind_block = EXT2_IND_BLOCK + data->addr_per_block - 1;
     data->first_dind_block = data->last_ind_block + 1;
     data->last_dind_block = data->first_dind_block + data->addr_per_block * data->addr_per_block - 1;
-    data->block_size = sb->block_size;
     data->sb = raw_sb;
     data->dev = sb->dev;
     data->file = sb->device_file;
@@ -450,7 +692,7 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
     }
 
     data->inodes_per_group = inodes_per_group;
-    data->inodes_per_block = data->block_size / sizeof(ext2_inode_t);
+    data->inodes_per_block = EXT2_BLOCK_SIZE / sizeof(ext2_inode_t);
 
     root = ext2_inode_get(data, EXT2_ROOT_INO);
 
