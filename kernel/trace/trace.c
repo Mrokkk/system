@@ -163,6 +163,8 @@ static const char* format_get(type_t t, int value)
         case TYPE_UNSIGNED_LONG:
         case TYPE_VOID_PTR:
             return "%x";
+        case TYPE_VOID:
+            return "void";
         default: return "unrecognized{%x}";
     }
 }
@@ -172,18 +174,20 @@ static void* ptr_get(uint32_t i)
     return ptr(i + sizeof(uint32_t));
 }
 
-void trace_syscall(unsigned long nr, ...)
+int trace_syscall(unsigned long nr, ...)
 {
-    if (!process_current->trace || nr >= __NR_syscalls)
+    if (likely(!process_current->trace))
     {
-        return;
+        return 0;
     }
 
-    va_list args;
     const syscall_t* call = &trace_syscalls[nr];
+    va_list args;
     char buf[256];
     char* it = buf;
     *it = 0;
+
+    it += sprintf(it, "%s(", call->name);
 
     va_start(args, nr);
 
@@ -201,26 +205,31 @@ void trace_syscall(unsigned long nr, ...)
 
     va_end(args);
 
-    log_info("%s[%u]:   %s(%s)", process_current->name, process_current->pid, call->name, buf);
+    strcpy(it, ")");
+
+    log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
 
     if (DEBUG_BTUSER)
     {
         const pt_regs_t* regs = ptr_get(addr(&nr));
         backtrace_user(log_notice, regs, page_virt_ptr(process_current->bin->symbols_pages));
     }
+
+    return nr;
 }
 
-__attribute__((regparm(1))) void trace_syscall_end(int ret)
+__attribute__((regparm(1))) void trace_syscall_end(int ret, unsigned long nr)
 {
-    if (process_current->trace)
+    char buf[128];
+    char* it = buf;
+    it += sprintf(it, " = ");
+    if (ret < 0)
     {
-        if (ret < 0)
-        {
-            log_continue(" = %d %s", ret, errors[-ret]);
-        }
-        else
-        {
-            log_continue(" = %d", ret);
-        }
+        it += sprintf(it, "%d %s", ret, errors[-ret]);
     }
+    else
+    {
+        it += sprintf(it, format_get(trace_syscalls[nr].ret, ret), ret);
+    }
+    log_continue("%s", buf);
 }

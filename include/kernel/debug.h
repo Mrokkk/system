@@ -1,7 +1,9 @@
 #pragma once
 
+#ifndef __ASSEMBLER__
 #include <kernel/string.h>
 #include <kernel/backtrace.h>
+#endif
 
 #define DEBUG_VM            0
 #define DEBUG_VM_APPLY      0
@@ -22,6 +24,7 @@
 #define DEBUG_SEQFILE       0
 #define DEBUG_IRQ           0
 #define PARANOIA_SCHED      0
+#define PARANOIA_SYSCALL    0
 
 #define DEBUG_OPEN          0
 #define DEBUG_DENTRY        0

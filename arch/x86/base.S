@@ -3,6 +3,7 @@
 #include <arch/register.h>
 #include <arch/processor.h>
 
+#include <kernel/debug.h>
 #include <kernel/errno.h>
 
 #include <arch/isr.h>
@@ -38,19 +39,33 @@ ENDPROC(eip_get)
 
 ENTRY(syscall_handler)
     SAVE_ALL(0)
+
     cmp $__NR_syscalls, %eax
-    jg bad_syscall
+    jge bad_syscall
+
     push %eax
     call trace_syscall
+    mov %eax, %edi
     pop %eax
+
     mov SYMBOL_NAME(syscalls)(, %eax, 4), %eax
-    cmp $0, %eax
-    jz bad_syscall
     call *%eax
-    mov %eax, REGS_EAX(%esp) // Put value returned by syscall in pt_regs
-    call trace_syscall_end
+
+    // Put value returned by syscall in pt_regs
+    mov %eax, REGS_EAX(%esp)
+
+    cmp $0, %edi
+    jne 2f
+1:
+#if PARANOIA_SYSCALL
     call syscall_regs_check
+#endif
     jmp exit_kernel
+2:
+    push %edi
+    call trace_syscall_end
+    add $4, %esp
+    jmp 1b
 ENDPROC(syscall_handler)
 
 ENTRY(timer_handler)
