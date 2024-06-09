@@ -4,9 +4,12 @@ BRANCH=
 
 function build()
 {
-    export CC="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
+    local cross_gcc="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
+    export CC="ccache ${cross_gcc}"
     export CFLAGS="-Wno-error -fdiagnostics-color=always -ggdb3"
     export PATH="${NATIVE_SYSROOT}/bin:${PATH}"
+
+    [[ ! -f "${cross_gcc}" ]] && die "Toolchain not built"
 
     if [[ ! -f "${SRC_DIR}/configure" ]]
     then
@@ -14,8 +17,6 @@ function build()
         ${SRC_DIR}/bootstrap --skip-po
         popd_silent
     fi
-
-    #[[ -f "Makefile" ]] && make distclean
 
     if [[ ! -f "Makefile" ]]
     then

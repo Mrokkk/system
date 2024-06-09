@@ -4,13 +4,12 @@ BRANCH=
 
 function build()
 {
-    export CC="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
-    export CFLAGS="-ggdb3"
+    local cross_gcc="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
+    export CC="ccache ${cross_gcc}"
+    export CFLAGS="-fdiagnostics-color=always -ggdb3"
     export PATH="${NATIVE_SYSROOT}/bin:${PATH}"
 
-    [[ ! -f "${CC}" ]] && die "Toolchain not built"
-
-    #[[ -f "Makefile" ]] && make distclean
+    [[ ! -f "${cross_gcc}" ]] && die "Toolchain not built"
 
     if [[ ! -f "Makefile" ]]
     then
@@ -24,6 +23,13 @@ function build()
             --enable-prompt-string-decoding \
             --enable-directory-stack \
             --enable-extended-glob \
+            --enable-cond-command \
+            --enable-cond-regexp \
+            --enable-command-timing \
+            --enable-array-variables \
+            --enable-arith-for-command \
+            --enable-casemod-attributes \
+            --enable-casemod-expansions \
             --disable-largefile \
             --disable-nls \
             --disable-threads \

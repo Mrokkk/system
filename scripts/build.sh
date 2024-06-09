@@ -14,6 +14,7 @@ sysroot="${PWD}/sysroot"
 nproc=$(nproc)
 input=()
 dry_run=
+rebuild=
 
 function _recipe_read()
 {
@@ -31,8 +32,6 @@ function _recipe_close()
 function _prepare()
 {
     info "${PKG}: preparing..."
-
-    create_dir "${BUILD_DIR}"
 
     if [[ ! -d "${SRC_DIR}" ]]
     then
@@ -99,6 +98,7 @@ function _pkg_make()
     debug "${PKG}: SRC_DIR:   ${SRC_DIR}"
     debug "${PKG}: BUILD_DIR: ${BUILD_DIR}"
 
+    [[ -n "${rebuild}" ]] && rm -rf "${BUILD_DIR}"
     create_dir "${BUILD_DIR}"
 
     _recipe_read
@@ -119,6 +119,8 @@ function _args_parse()
                 verbose=1 ;;
             -n|--dry-run)
                 dry_run=1 ;;
+            -f|--rebuild)
+                rebuild=1 ;;
             *)
                 input+=("${1}") ;;
         esac
