@@ -61,10 +61,11 @@ int sys_signal(int signum, sighandler_t handler)
         process_current->signals->trapped |= (1 << signum);
     }
 
-    log_debug(DEBUG_SIGNAL, "%u:%x set handler for %s",
+    log_debug(DEBUG_SIGNAL, "%u:%x set handler for %s: %x",
         process_current->pid,
         process_current,
-        signame(signum));
+        signame(signum),
+        handler);
 
     process_current->signals->sighandler[signum] = handler;
 
@@ -122,7 +123,14 @@ int signal_deliver(struct process* proc, int signum)
 {
     if (proc->signals->trapped & (1 << signum))
     {
+        if (proc->signals->sighandler[signum] == SIG_IGN)
+        {
+            log_debug(DEBUG_SIGNAL, "ignoring %s in %u", signame(signum), proc->pid);
+            return 0;
+        }
+
         log_debug(DEBUG_SIGNAL, "calling custom handler for %s in %u", signame(signum), proc->pid);
+
         arch_process_execute_sighan(
             proc,
             addr(proc->signals->sighandler[signum]),
@@ -139,6 +147,7 @@ int signal_deliver(struct process* proc, int signum)
 
 int do_kill(struct process* proc, int signum)
 {
+    log_debug(DEBUG_SIGNAL, "%s to %s[%u]", signame(signum), proc->name, proc->pid);
     if (!signum_exists(signum))
     {
         return -EINVAL;
@@ -174,12 +183,27 @@ int sys_kill(int pid, int signum)
     return do_kill(p, signum);
 }
 
-int sys_sigaction(int, const struct sigaction* act, struct sigaction*)
+int sys_sigaction(int sig, const struct sigaction* act, struct sigaction* oact)
 {
-    if (!act->sa_restorer)
+    if (sig == 0 && act && act->sa_restorer)
     {
-        return -EINVAL;
+        process_current->signals->sigrestorer = act->sa_restorer;
+        return 0;
     }
-    process_current->signals->sigrestorer = act->sa_restorer;
+
+    if (oact)
+    {
+        oact->sa_flags = 0;
+        oact->sa_mask = 0;
+        oact->sa_sigaction = NULL;
+        oact->sa_restorer = process_current->signals->sigrestorer;
+        oact->sa_handler = process_current->signals->sighandler[sig];
+    }
+
+    if (act)
+    {
+        return sys_signal(sig, act->sa_handler);
+    }
+
     return 0;
 }

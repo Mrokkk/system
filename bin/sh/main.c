@@ -272,11 +272,6 @@ int main()
     char* arguments[ARGV_MAX_SIZE];
     char* argv[ARGV_MAX_SIZE];
 
-    if (setsid())
-    {
-        return EXIT_FAILURE;
-    }
-
     signal(SIGINT, sigint);
     signal(SIGTSTP, sigtstp);
 

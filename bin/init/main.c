@@ -43,7 +43,7 @@ int shell_run()
 
     if ((child_pid = fork()) < 0)
     {
-        printf("fork error in init!\n");
+        perror("fork");
         return EXIT_FAILURE;
     }
     else if (child_pid == 0)
@@ -51,13 +51,19 @@ int shell_run()
         char* pathname = "/bin/sh";
         char* const argv[] = {pathname, NULL, };
 
+        if (setsid())
+        {
+            perror("setsid");
+            return EXIT_FAILURE;
+        }
+
         setenv("PATH", "/bin", 0);
         setenv("SHELL", pathname, 0);
         setenv("HOME", "/root", 0);
 
         if (execvp(pathname, argv))
         {
-            printf("exec error in init!\n");
+            perror(pathname);
             return EXIT_FAILURE;
         }
         while (1);
