@@ -114,7 +114,7 @@ int ramfs_write(file_t* file, const char* buffer, size_t count)
     }
     memcpy(node->data, buffer, count);
     file->offset += count;
-    return 0;
+    return count;
 }
 
 int ramfs_open(file_t*)

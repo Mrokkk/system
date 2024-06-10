@@ -89,6 +89,7 @@ function _step_execute()
 function _pkg_make()
 {
     export PKG="${1}"
+    export NULL_DIR="${null_dir}"
     export CONF_DIR="${input_dir}/${PKG}"
     export SRC_DIR="${output_dir}/${PKG}"
     export NATIVE_SYSROOT="${prefix}"

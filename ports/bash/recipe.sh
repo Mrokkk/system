@@ -27,14 +27,20 @@ function build()
             --enable-cond-regexp \
             --enable-command-timing \
             --enable-array-variables \
+            --enable-brace-expansion \
             --enable-arith-for-command \
             --enable-casemod-attributes \
             --enable-casemod-expansions \
             --disable-largefile \
             --disable-nls \
             --disable-threads \
-            --without-bash-malloc \
-            --disable-multibyte || die "configuration failed"
+            --disable-multibyte \
+            --infodir="${NULL_DIR}" \
+            --localedir="${NULL_DIR}" \
+            --mandir="${NULL_DIR}" \
+            --docdir="${NULL_DIR}" \
+            --htmldir="${NULL_DIR}" \
+            || die "configuration failed"
     fi
 
     make bash -j${NPROC} || die "compilation failed"

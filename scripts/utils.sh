@@ -11,6 +11,7 @@ SUCCESS="[ SUCCESS ]"
 INFO="[  INFO   ]"
 DEBUG="[  DEBUG  ]"
 RESET="\e[0m"
+null_dir="/tmp/nulldir"
 
 function cleanup()
 {
@@ -19,6 +20,7 @@ function cleanup()
         [[ -n "${verbose}" ]] && echo "Removing ${modification_list}"
         rm -rf "${modification_list}"
     fi
+    rm -rf "${null_dir}"
 }
 
 function any_file_changed()

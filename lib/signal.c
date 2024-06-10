@@ -1,5 +1,6 @@
 #include <signal.h>
 #include <stddef.h>
+#include <string.h>
 #include <unistd.h>
 #include <kernel/syscall.h>
 
@@ -23,6 +24,13 @@ int sigsuspend(const sigset_t* sigmask)
 int sigemptyset(sigset_t* set)
 {
     UNUSED(set);
+    return 0;
+}
+
+int sigfillset(sigset_t *set)
+{
+    UNUSED(set);
+    memset(set, 0xff, sizeof(*set));
     return 0;
 }
 

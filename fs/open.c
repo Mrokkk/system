@@ -159,23 +159,21 @@ int do_close(file_t* file)
 
 int sys_dup2(int oldfd, int newfd)
 {
-    int errno;
     file_t* oldfile;
     file_t* newfile;
 
     if (fd_check_bounds(oldfd) || fd_check_bounds(newfd)) return -EBADF;
     if (process_fd_get(process_current, oldfd, &oldfile)) return -EBADF;
-    if (process_fd_get(process_current, newfd, &newfile)) return -EBADF;
 
-    if ((errno = do_close(oldfile)))
+    if (!process_fd_get(process_current, newfd, &newfile))
     {
-        return errno;
+        do_close(newfile);
     }
 
-    process_fd_set(process_current, oldfd, newfile);
-    newfile->count++;
+    process_fd_set(process_current, newfd, oldfile);
+    oldfile->count++;
 
-    return 0;
+    return newfd;
 }
 
 int sys_close(int fd)
