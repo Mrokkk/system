@@ -212,7 +212,7 @@ int trace_syscall(unsigned long nr, ...)
     if (DEBUG_BTUSER)
     {
         const pt_regs_t* regs = ptr_get(addr(&nr));
-        backtrace_user(log_notice, regs, page_virt_ptr(process_current->bin->symbols_pages));
+        backtrace_user(log_info, regs, page_virt_ptr(process_current->bin->symbols_pages), "\t");
     }
 
     return nr;
@@ -222,7 +222,15 @@ __attribute__((regparm(1))) void trace_syscall_end(int ret, unsigned long nr)
 {
     char buf[128];
     char* it = buf;
-    it += sprintf(it, " = ");
+
+    if (DEBUG_BTUSER)
+    {
+        it += sprintf(it, "%s returned ", trace_syscalls[nr].name);
+    }
+    else
+    {
+        it += sprintf(it, " = ");
+    }
     if (ret < 0)
     {
         it += sprintf(it, "%d %s", ret, errors[-ret]);
@@ -231,5 +239,12 @@ __attribute__((regparm(1))) void trace_syscall_end(int ret, unsigned long nr)
     {
         it += sprintf(it, format_get(trace_syscalls[nr].ret, ret), ret);
     }
-    log_continue("%s", buf);
+    if (DEBUG_BTUSER)
+    {
+        log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
+    }
+    else
+    {
+        log_continue("%s", buf);
+    }
 }

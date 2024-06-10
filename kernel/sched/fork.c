@@ -311,7 +311,9 @@ int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
     process_parent_child_link(parent, child);
     process_forked(parent);
 
-    child->trace = 0;
+    child->trace = parent->trace & DTRACE_FOLLOW_FORK
+        ? parent->trace
+        : 0;
     child->stat = PROCESS_RUNNING;
     list_add_tail(&child->running, &running);
 
@@ -383,9 +385,9 @@ int sys_fork(struct pt_regs regs)
 }
 
 // dtrace for dummy trace
-int sys_dtrace(void)
+int sys_dtrace(int flag)
 {
-    process_current->trace = 1;
+    process_current->trace = 1 | flag;
     return 0;
 }
 

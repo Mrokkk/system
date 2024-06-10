@@ -57,8 +57,8 @@ syscall_t trace_syscalls[] = {
     {
         .name   = "dtrace",
         .ret    = TYPE_LONG,
-        .nargs  = 0,
-        .args   = {  },
+        .nargs  = 1,
+        .args   = { TYPE_LONG },
     },
 
     {

@@ -47,4 +47,7 @@ int unlink(const char* path);
 int access(const char* path, int amode);
 unsigned int alarm(unsigned int seconds);
 int rename(const char* oldpath, const char* newpath);
-int dtrace(void); // FIXME: replace later with ptrace
+
+// FIXME: replace later with ptrace
+#define DTRACE_FOLLOW_FORK 2
+int dtrace(int flag);

@@ -62,18 +62,18 @@ void backtrace_exception(struct pt_regs* regs);
         } \
     } while (0)
 
-#define backtrace_user(log_fn, regs, syms) \
+#define backtrace_user(log_fn, regs, syms, ...) \
     do \
     { \
         char buffer[BACKTRACE_SYMNAME_LEN]; \
         void* data = backtrace_user_start(process_current, (regs)->eip, (regs)->esp, (regs)->ebp); \
         void* ret; \
         unsigned depth = 0; \
-        log_fn("backtrace: "); \
+        log_fn(__VA_ARGS__ "backtrace: "); \
         while ((ret = backtrace_user_next(&data)) && depth < BACKTRACE_MAX_RECURSION) \
         { \
             usym_string(buffer, addr(ret), syms); \
-            log_fn("%s", buffer); \
+            log_fn(__VA_ARGS__ "%s", buffer); \
             ++depth; \
         } \
     } while (0)
