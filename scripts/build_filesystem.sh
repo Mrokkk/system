@@ -103,7 +103,7 @@ menuentry "system" {
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
 create_dir "${mountpoint}/usr/share"
-create_dir "${mountpoint}/lib"
+create_dir "${mountpoint}/lib/modules"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/proc"
 create_dir "${mountpoint}/root"
@@ -118,6 +118,8 @@ for binary in $(find sysroot -type f -executable)
 do
     copy ${binary} ${mountpoint}/bin
 done
+
+copy_dir_content "modules" "${mountpoint}/lib/modules"
 
 copy ../arch/x86/cpuid.c ${mountpoint}
 copy ../tux.tga ${mountpoint}

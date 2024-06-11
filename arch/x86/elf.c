@@ -1,7 +1,9 @@
 #include <kernel/vm.h>
 #include <kernel/elf.h>
+#include <kernel/ksyms.h>
 #include <kernel/usyms.h>
 #include <kernel/kernel.h>
+#include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/backtrace.h>
 
@@ -318,5 +320,229 @@ free:
     }
 free_sht:
     ASSERT(pages_free(sht_pages));
+    return errno;
+}
+
+int elf_locate_common_sections(
+    elf32_header_t* header,
+    const char** symstr,
+    const char** shstr,
+    elf32_sym** symbols)
+{
+    elf32_shdr_t* shdrt = shift_as(elf32_shdr_t*, header, header->e_shoff);
+    int count = 0;
+    for (size_t i = 0; i < header->e_shnum; ++i)
+    {
+        elf32_shdr_t* shdr = &shdrt[i];
+        void* section_data = shift_as(char*, header, shdr->sh_offset);
+
+        switch (shdr->sh_type)
+        {
+            case SHT_STRTAB:
+                if (i == header->e_shstrndx)
+                {
+                    *shstr = section_data;
+                }
+                else
+                {
+                    *symstr = section_data;
+                }
+                ++count;
+                break;
+            case SHT_SYMTAB:
+                *symbols = section_data;
+                ++count;
+                break;
+        }
+    }
+
+    return count != 3;
+}
+
+#define GOT_ENTRIES 32
+
+typedef struct elf_module_data elf_module_data_t;
+
+struct elf_module_data
+{
+    page_t* module_pages;
+    uint32_t* got;
+};
+
+int elf_module_load(const char* name, file_t* file, kmod_t** module)
+{
+    int errno;
+    elf32_header_t* header;
+    const char* symstr = NULL;
+    const char* shstr = NULL;
+    elf32_sym* symbols = NULL;
+    uint32_t* got = NULL;
+    size_t size = file->inode->size;
+    page_t* module_pages = page_alloc(page_align(size) / PAGE_SIZE, PAGE_ALLOC_CONT);
+
+    if (unlikely(!module_pages))
+    {
+        log_debug(DEBUG_ELF, "%s: no memory to load module", name);
+        return -ENOMEM;
+    }
+
+    if ((errno = do_read(file, 0, page_virt_ptr(module_pages), size)))
+    {
+        log_debug(DEBUG_ELF, "%s: cannot read module: %d", name, errno);
+        goto error;
+    }
+
+    *module = NULL;
+    header = page_virt_ptr(module_pages);
+
+    if (elf_validate(name, header))
+    {
+        log_debug(DEBUG_ELF, "%s: not an ELF", name);
+        errno = -ENOEXEC;
+        goto error;
+    }
+
+    elf32_shdr_t* shdrt = shift_as(elf32_shdr_t*, header, header->e_shoff);
+
+    if (elf_locate_common_sections(header, &symstr, &shstr, &symbols))
+    {
+        log_debug(DEBUG_ELF, "%s: missing sections", name);
+        errno = -ENOEXEC;
+        goto error;
+    }
+
+    got = alloc_array(uint32_t, GOT_ENTRIES);
+    uint32_t* got_ptr = got;
+
+    for (size_t i = 0; i < header->e_shnum; ++i)
+    {
+        elf32_shdr_t* shdr = &shdrt[i];
+
+        if (shdr->sh_type == SHT_PROGBITS && !strcmp(".modules_data", shstr + shdr->sh_name))
+        {
+            *module = shift_as(kmod_t*, header, shdr->sh_offset);
+            continue;
+        }
+        else if (shdr->sh_type != SHT_REL)
+        {
+            continue;
+        }
+
+        elf32_shdr_t* real = &shdrt[shdr->sh_info];
+        uint32_t real_addr = shift_as(uint32_t, header, real->sh_offset);
+        elf32_shdr_t* symbol_section;
+
+        log_debug(DEBUG_ELF, "REL: sh_name=%s for %s",
+            shstr + shdr->sh_name,
+            shstr + real->sh_name);
+
+        elf32_rel_t* rel = shift_as(elf32_rel_t*, header, shdr->sh_offset);
+
+        for (size_t i = 0; i < shdr->sh_size / shdr->sh_entsize; ++i, ++rel)
+        {
+            elf32_sym* s = &symbols[ELF32_R_SYM(rel->r_info)];
+            symbol_section = &shdrt[s->st_shndx];
+
+            uint32_t relocated;
+            int type = ELF32_R_TYPE(rel->r_info);
+            const char* type_str = NULL;
+            uint32_t P = real_addr + rel->r_offset;
+            uint32_t A = *(uint32_t*)P + s->st_value; // FIXME: should it be like that?
+            uint32_t GOT = addr(got);
+            uint32_t S = shift_as(uint32_t, header, symbol_section->sh_offset);
+            uint32_t G = addr(got_ptr) - addr(got);
+            ksym_t* kernel_symbol;
+
+            if (unlikely(G >= GOT_ENTRIES * sizeof(uint32_t)))
+            {
+                log_warning("%s: no more entries in GOT", name);
+                break;
+            }
+
+            switch (type)
+            {
+                case R_386_32: // S + A
+                    type_str = "R_386_32";
+                    relocated = S + A;
+                    break;
+                case R_386_PC32: // S + A - P
+                    type_str = "R_386_PC32";
+                    relocated = S + A - P;
+                    break;
+                case R_386_GOTPC: // GOT + A - P
+                    type_str = "R_386_GOTPC";
+                    relocated = GOT + A - P;
+                    break;
+                case R_386_GOTOFF: // S + A - GOT
+                    type_str = "R_386_GOTOFF";
+                    relocated = S + A - GOT;
+                    break;
+                case R_386_PLT32: // L + A - P
+                    type_str = "R_386_PLT32";
+                    kernel_symbol = ksym_find_by_name(symstr + s->st_name);
+
+                    if (unlikely(!kernel_symbol))
+                    {
+                        log_info("%s: undefined reference to %s", name, symstr + s->st_name);
+                        errno = -ENOEXEC;
+                        goto error;
+                    }
+
+                    relocated = kernel_symbol->address + A - P;
+                    break;
+                case R_386_GOT32X: // G + A
+                case R_386_GOT32:
+                    type_str = "R_386_GOT32";
+                    kernel_symbol = ksym_find_by_name(symstr + s->st_name);
+
+                    if (unlikely(!kernel_symbol))
+                    {
+                        log_info("%s: undefined reference to %s", name, symstr + s->st_name);
+                        errno = -ENOEXEC;
+                        goto error;
+                    }
+
+                    *got_ptr++ = kernel_symbol->address;
+                    relocated = G + A;
+                    break;
+                default:
+                    log_debug(DEBUG_ELF, "  unsupported relocation type: %u; symbol %s", type, symstr + s->st_name);
+                    continue;
+            }
+
+            log_debug(DEBUG_ELF, "  %-16s %02x, off: %04x: %s: relocated %x", type_str, type, rel->r_offset,
+                s->st_name ? symstr + s->st_name : shstr + symbol_section->sh_name,
+                relocated);
+
+            *(uint32_t*)(real_addr + rel->r_offset) = relocated;
+        }
+    }
+
+    if (unlikely(!*module))
+    {
+        log_warning("%s: not a module", name);
+        errno = -ENOEXEC;
+        goto error;
+    }
+
+    elf_module_data_t* data = alloc(typeof(*data), ({ this->module_pages = module_pages; this->got = got; }));
+
+    if (unlikely(!data))
+    {
+        log_debug(DEBUG_ELF, "cannot allocate memory for elf_module_data_t");
+        errno = -ENOMEM;
+        goto error;
+    }
+
+    (*module)->data = data;
+
+    return 0;
+
+error:
+    if (got)
+    {
+        delete_array(got, GOT_ENTRIES);
+    }
+    pages_free(module_pages);
     return errno;
 }

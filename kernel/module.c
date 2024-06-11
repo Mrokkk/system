@@ -1,3 +1,5 @@
+#include <kernel/fs.h>
+#include <kernel/elf.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
@@ -59,4 +61,51 @@ void modules_shutdown()
     {
         temp->deinit();
     }
+}
+
+int module_register(kmod_t* module)
+{
+    log_info("registered module: %s", module->name);
+    module->init();
+    return 0;
+}
+
+int sys_init_module(const char* name)
+{
+    int errno;
+    scoped_file_t* file = NULL;
+    kmod_t* module = NULL;
+    kmod_t* temp;
+
+    if ((errno = do_open(&file, name, O_RDONLY, 0)))
+    {
+        log_warning("no module found!");
+        return -ENOENT;
+    }
+
+    if ((errno = elf_module_load(name, file, &module)))
+    {
+        log_warning("failed to load module: %d", errno);
+        return errno;
+    }
+
+    list_for_each_entry(temp, &modules, modules)
+    {
+        if (!strcmp(temp->name, module->name))
+        {
+            return -EEXIST;
+        }
+    }
+
+    log_info("%s: initializing", name);
+
+    if ((errno = module->init()))
+    {
+        log_info("%s: failed with %d", errno);
+        return errno;
+    }
+
+    list_add_tail(&module->modules, &modules);
+
+    return 0;
 }

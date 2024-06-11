@@ -4,6 +4,7 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
 #include <kernel/binary.h>
+#include <kernel/module.h>
 
 #define ELF_NIDENT    16
 
@@ -145,8 +146,42 @@ typedef struct
     uint16_t    st_shndx;
 } elf32_sym;
 
+#define ELF32_R_SYM(val)        ((val) >> 8)
+#define ELF32_R_TYPE(val)       ((val) & 0xff)
+#define ELF32_R_INFO(sym, type) (((sym) << 8) + ((type) & 0xff))
+
+#define R_386_NONE          0       /* No reloc */
+#define R_386_32            1       /* Direct 32 bit  */
+#define R_386_PC32          2       /* PC relative 32 bit */
+#define R_386_GOT32         3       /* 32 bit GOT entry */
+#define R_386_PLT32         4       /* 32 bit PLT address */
+#define R_386_COPY          5       /* Copy symbol at runtime */
+#define R_386_GLOB_DAT      6       /* Create GOT entry */
+#define R_386_JMP_SLOT      7       /* Create PLT entry */
+#define R_386_RELATIVE      8       /* Adjust by program base */
+#define R_386_GOTOFF        9       /* 32 bit offset to GOT */
+#define R_386_GOTPC         10      /* 32 bit PC relative offset to GOT */
+#define R_386_32PLT         11
+#define R_386_GOT32X        43
+
+typedef struct
+{
+    uint32_t    r_offset;
+    uint32_t    r_info;
+} elf32_rel_t;
+
+typedef struct
+{
+    uint32_t      r_offset;
+    uint32_t      r_info;
+    uint32_t     r_addend;
+} elf32_rela_t;
+
 int elf_check_file(struct elf32_header* hdr);
+
 int elf_load(
     const char* name,
     file_t* file,
     binary_t* bin);
+
+int elf_module_load(const char* name, file_t* file, kmod_t** module);

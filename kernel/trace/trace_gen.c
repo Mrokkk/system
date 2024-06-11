@@ -174,6 +174,13 @@ syscall_t trace_syscalls[] = {
     },
 
     {
+        .name   = "init_module",
+        .ret    = TYPE_LONG,
+        .nargs  = 1,
+        .args   = { TYPE_CHAR_PTR },
+    },
+
+    {
         .name   = "ioctl",
         .ret    = TYPE_LONG,
         .nargs  = 3,

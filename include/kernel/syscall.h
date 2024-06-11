@@ -25,37 +25,38 @@
 #define __NR_getpid         22
 #define __NR_getppid        23
 #define __NR_getuid         24
-#define __NR_ioctl          25
-#define __NR_kill           26
-#define __NR_lseek          27
-#define __NR_mkdir          28
-#define __NR_mknod          29
-#define __NR_mmap           30
-#define __NR_mount          31
-#define __NR_open           32
-#define __NR_poll           33
-#define __NR_read           34
-#define __NR_reboot         35
-#define __NR_rename         36
-#define __NR_sbrk           37
-#define __NR_select         38
-#define __NR_setgid         39
-#define __NR_setsid         40
-#define __NR_setuid         41
-#define __NR_sigaction      42
-#define __NR_signal         43
-#define __NR_sigreturn      44
-#define __NR_stat           45
-#define __NR_statvfs        46
-#define __NR_time           47
-#define __NR_umask          48
-#define __NR_umount         49
-#define __NR_umount2        50
-#define __NR_unlink         51
-#define __NR_waitpid        52
-#define __NR_write          53
+#define __NR_init_module    25
+#define __NR_ioctl          26
+#define __NR_kill           27
+#define __NR_lseek          28
+#define __NR_mkdir          29
+#define __NR_mknod          30
+#define __NR_mmap           31
+#define __NR_mount          32
+#define __NR_open           33
+#define __NR_poll           34
+#define __NR_read           35
+#define __NR_reboot         36
+#define __NR_rename         37
+#define __NR_sbrk           38
+#define __NR_select         39
+#define __NR_setgid         40
+#define __NR_setsid         41
+#define __NR_setuid         42
+#define __NR_sigaction      43
+#define __NR_signal         44
+#define __NR_sigreturn      45
+#define __NR_stat           46
+#define __NR_statvfs        47
+#define __NR_time           48
+#define __NR_umask          49
+#define __NR_umount         50
+#define __NR_umount2        51
+#define __NR_unlink         52
+#define __NR_waitpid        53
+#define __NR_write          54
 
-#define __NR_syscalls       54
+#define __NR_syscalls       55
 
 #ifndef __ASSEMBLER__
 
@@ -116,6 +117,7 @@ __syscall0(getgid, int)
 __syscall0(getpid, int)
 __syscall0(getppid, int)
 __syscall0(getuid, int)
+__syscall1(init_module, int, const char*)
 __syscall3(ioctl, int, int, unsigned long, unsigned long)
 __syscall2(kill, int, int, int)
 __syscall3(lseek, off_t, int, off_t, int)

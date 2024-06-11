@@ -17,8 +17,11 @@
 
 #define DEREFERENCE 0x1
 
+KERNEL_MODULE(debugmon);
+module_init(debugmon_init);
+module_exit(debugmon_deinit);
+
 static int fd;
-file_t* file;
 static char* printf_buf;
 
 static int initialize(void);
@@ -70,6 +73,7 @@ static int c_ps()
 
 static int c_cpu()
 {
+
     print_string(cpu_info.vendor);
     print_string(cpu_info.producer);
     print_string(cpu_info.name);
@@ -99,7 +103,7 @@ static int c_page()
 static int c_crash()
 {
     ASSERT(cr3_get() == phys_addr(process_current->mm->pgd));
-    uint32_t* a = ptr(&initialize);
+    uint32_t* a = ptr(0);
     *a = 234;
     return 0;
 }
@@ -178,7 +182,7 @@ struct process* process_get(int pid)
     return NULL;
 }
 
-NOINLINE static int initialize(void)
+static int initialize(void)
 {
     page_t* page = page_alloc(1, PAGE_ALLOC_DISCONT);
 
@@ -203,7 +207,7 @@ NOINLINE static int initialize(void)
     return 0;
 }
 
-void line_handle(const char* line)
+static void line_handle(const char* line)
 {
     int i, pid, flags = 0;
     ksym_t* sym;
@@ -272,7 +276,7 @@ void line_handle(const char* line)
     }
 }
 
-int debug_monitor()
+static int debug_monitor()
 {
     char line[32];
 
@@ -288,5 +292,16 @@ int debug_monitor()
         line_handle(line);
     }
 
+    return 0;
+}
+
+static int debugmon_init(void)
+{
+    kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
+    return 0;
+}
+
+static int debugmon_deinit(void)
+{
     return 0;
 }

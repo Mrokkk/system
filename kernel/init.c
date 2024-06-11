@@ -317,12 +317,6 @@ static int NORETURN(init(const char* cmdline))
     syslog_configure();
     read_some_data();
 
-    if (param_bool_get(KERNEL_PARAM("debugmon")))
-    {
-        extern int debug_monitor();
-        kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
-    }
-
     unmap_sections();
 
     const char* init_path = param_value_or_get(KERNEL_PARAM("init"), "/bin/init");

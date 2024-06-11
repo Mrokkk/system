@@ -8,11 +8,12 @@ typedef int (*kmodule_deinit_t)();
 
 struct kernel_module
 {
-    kmodule_init_t init;
+    kmodule_init_t   init;
     kmodule_deinit_t deinit;
-    const char* name;
-    unsigned int this_module;
-    list_head_t modules;
+    const char*      name;
+    unsigned int     this_module;
+    list_head_t      modules;
+    void*            data;
 };
 
 typedef struct kernel_module kmod_t;
@@ -26,9 +27,10 @@ typedef struct kernel_module kmod_t;
         .deinit = kmodule_deinit, \
         .name = #n, \
         .this_module = addr(&km_##n), \
-        .modules = LIST_INIT(km_##n.modules) \
+        .modules = LIST_INIT(km_##n.modules), \
+        .data = NULL, \
     }; \
-    static unsigned int MAYBE_UNUSED(this_module) = addr(&km_##n); \
+    static unsigned int MAYBE_UNUSED(this_module) = addr(&km_##n)
 
 #define module_init(init) \
     static int kmodule_init() ALIAS(init)
@@ -42,3 +44,5 @@ void modules_shutdown();
 void module_add(kmod_t* new);
 void module_remove(kmod_t* module);
 kmod_t* module_find(unsigned int this_module);
+
+int module_register(kmod_t* module);

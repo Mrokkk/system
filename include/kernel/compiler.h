@@ -33,8 +33,8 @@
 #define cptr(a)                 ((const void*)(a))
 #define ptr(a)                  ((void*)(a))
 #define addr(a)                 ((unsigned int)(a))
-#define shift(ptr, off)         ((typeof(ptr))(addr(ptr) + off))
-#define shift_as(t, ptr, off)   ((t)(addr(ptr) + off))
+#define shift(ptr, off)         ((typeof(ptr))(addr(ptr) + (off)))
+#define shift_as(t, ptr, off)   ((t)(addr(ptr) + (off)))
 #define array_size(a)           (sizeof(a) / sizeof((a)[0]))
 
 #define align(address, size) \
