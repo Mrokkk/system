@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include "magic.h"
 
+extern int libc_debug;
+
 #define UNUSED(x)   (void)x
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 
@@ -36,7 +38,19 @@
     ({ (dir) && (dir)->magic == DIR_MAGIC; })
 
 #define NOT_IMPLEMENTED(ret) \
-    return ERRNO_SET(ENOSYS, ret);
+    { \
+        if (libc_debug) \
+        { \
+            extern void error_at_line( \
+                int status, \
+                int errnum, \
+                const char* filename, \
+                unsigned int linenum, \
+                const char* format, ...); \
+            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s", __func__); \
+        } \
+        return ERRNO_SET(ENOSYS, ret); \
+    }
 
 #define RETURN_ERROR_IF(condition, err, ret) \
     if (UNLIKELY((condition))) return ERRNO_SET(err, ret)
