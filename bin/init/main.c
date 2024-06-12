@@ -1,9 +1,10 @@
-#include "kernel/stat.h"
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <kernel/reboot.h>
 
 #define MAX_CMDLINE_LEN 128
@@ -14,7 +15,7 @@ typedef struct options
     char console_device[MAX_CMDLINE_LEN];
 } options_t;
 
-static inline void parse_cmdline(options_t* options, const char* cmdline)
+static void parse_cmdline(options_t* options, const char* cmdline)
 {
     char* token;
     char* temp = malloc(strlen(cmdline) + 1);
@@ -38,7 +39,7 @@ static inline void parse_cmdline(options_t* options, const char* cmdline)
     }
 }
 
-const char* shell_find(void)
+static const char* shell_find(void)
 {
     const char* shells[] = {"/bin/bash", "/bin/sh"};
     struct stat buf;
@@ -54,29 +55,22 @@ const char* shell_find(void)
     return NULL;
 }
 
-int shell_run()
+static int shell_run(const char* pathname)
 {
-    int child_pid, status;
-    const char* pathname = shell_find();
+    int child_pid;
     char* const argv[] = {(char*)pathname, NULL};
-
-    if (!pathname)
-    {
-        printf("cannot find shell to run!\n");
-        return EXIT_FAILURE;
-    }
 
     if ((child_pid = fork()) < 0)
     {
         perror("fork");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     else if (child_pid == 0)
     {
         if (setsid())
         {
             perror("setsid");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
 
         setenv("PATH", "/bin", 0);
@@ -86,19 +80,13 @@ int shell_run()
         if (execvp(pathname, argv))
         {
             perror(pathname);
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
 
         while (1);
     }
 
-    waitpid(child_pid, &status, 0);
-
-    printf("shell exited with %d, performing reboot\n", status);
-
-    reboot(REBOOT_MAGIC1, REBOOT_MAGIC2, REBOOT_CMD_RESTART);
-
-    while (1);
+    return child_pid;
 }
 
 #define RED         "\e[31m"
@@ -110,7 +98,7 @@ int shell_run()
 #define BG          "\e[30;44m"
 #define RESET       "\e[0m"
 
-int main(int argc, char* argv[])
+[[noreturn]] int main(int argc, char* argv[])
 {
     options_t options = {
         .cmdline = NULL,
@@ -123,21 +111,72 @@ int main(int argc, char* argv[])
     }
 
     int fd = open(options.console_device, O_RDWR, 0);
+
     if (fd != 0 || dup(0) || dup(0))
     {
         printf("cannot open console, fd = %d\n", fd);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     printf(RED "W" GREEN "e" YELLOW "l" BLUE "c" MAGENTA "o" CYAN "m" MAGENTA "e!\n" RESET);
     printf(BG"Have fun..."RESET"\n");
     printf("\e[38;2;35;135;39m...with colors :)"RESET"\n");
 
-    if (shell_run())
+    const char* shell = shell_find();
+
+    if (!shell)
     {
-        printf("cannot run shell\n");
-        return EXIT_FAILURE;
+        printf("cannot find shell to run!\n");
+        exit(EXIT_FAILURE);
     }
 
-    return 0;
+    int child_pid, status, rerun;
+
+    while (1)
+    {
+        rerun = 0;
+
+        child_pid = shell_run(shell);
+
+        waitpid(child_pid, &status, 0);
+
+        if (WIFSIGNALED(status))
+        {
+            printf("shell killed by %u", WTERMSIG(status));
+        }
+        else
+        {
+            printf("shell exited with %d", WEXITSTATUS(status));
+        }
+
+        char tmp[128] = {0, };
+        int count;
+
+        printf("; type sh to rerun, press CTRL+D to reboot\n");
+
+        while (printf("> ") && (count = read(STDIN_FILENO, tmp, 128)))
+        {
+            if (count > 0)
+            {
+                tmp[count - 1] = 0;
+            }
+            if (!strcmp(tmp, "sh"))
+            {
+                rerun = 1;
+                break;
+            }
+            else
+            {
+                printf("unrecognized command: %s\n", tmp);
+            }
+        }
+
+        if (!rerun)
+        {
+            printf("performing reboot\n");
+            reboot(REBOOT_MAGIC1, REBOOT_MAGIC2, REBOOT_CMD_RESTART);
+        }
+    }
+
+    while (1);
 }
