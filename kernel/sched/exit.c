@@ -24,18 +24,22 @@ static inline void process_space_free(struct process* proc)
     delete(proc->mm);
 }
 
-void process_delete(struct process* proc)
+static void process_delete(struct process* proc)
 {
     log_debug(DEBUG_EXIT, "");
     list_del(&proc->siblings);
     list_del(&proc->children);
     list_del(&proc->processes);
-    process_space_free(proc);
-    arch_process_free(proc);
-    process_fs_exit(proc);
-    process_files_exit(proc);
-    process_signals_exit(proc);
-    process_bin_exit(proc);
+
+    // FIXME: perhaps those should be called directly in process_exit as well
+    {
+        process_space_free(proc);
+        arch_process_free(proc);
+        process_fs_exit(proc);
+        process_signals_exit(proc);
+        process_bin_exit(proc);
+    }
+
     delete(proc);
 }
 
@@ -143,6 +147,19 @@ void process_wake_waiting(struct process* proc)
     }
 
     log_debug(DEBUG_EXIT, "not waking %u", parent->pid);
+}
+
+void process_exit(struct process* p)
+{
+    flags_t flags;
+    irq_save(flags);
+    log_debug(DEBUG_EXIT, "%u exiting", p->pid);
+    list_del(&p->running);
+    process_files_exit(p);
+    p->stat = PROCESS_ZOMBIE;
+    process_wake_waiting(p);
+    p->need_resched = true;
+    irq_restore(flags);
 }
 
 int sys_exit(int return_value)

@@ -34,29 +34,30 @@
 #define __NR_mmap           31
 #define __NR_mount          32
 #define __NR_open           33
-#define __NR_poll           34
-#define __NR_read           35
-#define __NR_reboot         36
-#define __NR_rename         37
-#define __NR_sbrk           38
-#define __NR_select         39
-#define __NR_setgid         40
-#define __NR_setsid         41
-#define __NR_setuid         42
-#define __NR_sigaction      43
-#define __NR_signal         44
-#define __NR_sigreturn      45
-#define __NR_stat           46
-#define __NR_statvfs        47
-#define __NR_time           48
-#define __NR_umask          49
-#define __NR_umount         50
-#define __NR_umount2        51
-#define __NR_unlink         52
-#define __NR_waitpid        53
-#define __NR_write          54
+#define __NR_pipe           34
+#define __NR_poll           35
+#define __NR_read           36
+#define __NR_reboot         37
+#define __NR_rename         38
+#define __NR_sbrk           39
+#define __NR_select         40
+#define __NR_setgid         41
+#define __NR_setsid         42
+#define __NR_setuid         43
+#define __NR_sigaction      44
+#define __NR_signal         45
+#define __NR_sigreturn      46
+#define __NR_stat           47
+#define __NR_statvfs        48
+#define __NR_time           49
+#define __NR_umask          50
+#define __NR_umount         51
+#define __NR_umount2        52
+#define __NR_unlink         53
+#define __NR_waitpid        54
+#define __NR_write          55
 
-#define __NR_syscalls       55
+#define __NR_syscalls       56
 
 #ifndef __ASSEMBLER__
 
@@ -126,6 +127,7 @@ __syscall3(mknod, int, const char*, mode_t, dev_t)
 __syscall6(mmap, void*, void*, size_t, int, int, int , size_t)
 __syscall5(mount, int, const char*, const char*, const char*, int, void*)
 __syscall3(open, int, const char*, int, int)
+__syscall1(pipe, int, int*)
 __syscall3(poll, int, struct pollfd*, unsigned long, int)
 __syscall3(read, int, int, char*, size_t)
 __syscall3(reboot, int, int, int, int)

@@ -24,7 +24,6 @@ add_library(c STATIC
     malloc.c
     math.c
     mntent.c
-    pipe.c
     poll.c
     pwd.c
     qsort.c

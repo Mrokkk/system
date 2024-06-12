@@ -237,6 +237,13 @@ syscall_t trace_syscalls[] = {
     },
 
     {
+        .name   = "pipe",
+        .ret    = TYPE_LONG,
+        .nargs  = 1,
+        .args   = { TYPE_VOID_PTR },
+    },
+
+    {
         .name   = "poll",
         .ret    = TYPE_LONG,
         .nargs  = 3,

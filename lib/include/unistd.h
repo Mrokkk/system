@@ -21,6 +21,5 @@ static inline int execvp(const char* path, char* const argv[])
 
 unsigned int sleep(unsigned int seconds);
 int gethostname(char* name, size_t namelen);
-int pipe(int pipefd[2]);
 
 #endif // __ASSEMBLER__

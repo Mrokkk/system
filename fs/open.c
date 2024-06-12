@@ -178,13 +178,20 @@ int sys_dup2(int oldfd, int newfd)
 
 int sys_close(int fd)
 {
+    int errno;
     file_t* file;
 
     if (fd_check_bounds(fd)) return -EBADF;
     if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    if ((errno = do_close(file)))
+    {
+        return errno;
+    }
+
     process_fd_set(process_current, fd, 0);
 
-    return do_close(file);
+    return 0;
 }
 
 int sys_mkdir(const char* __user path, int mode)

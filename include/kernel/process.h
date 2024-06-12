@@ -173,7 +173,7 @@ extern unsigned int context_switches;
 
 int processes_init();
 int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags);
-void process_delete(struct process* p);
+void process_exit(struct process* p);
 int kernel_process_spawn(int (*entry)(), void* args, void* stack, int flags);
 int process_find(int pid, struct process** p);
 void process_wake_waiting(struct process* p);
@@ -212,18 +212,6 @@ static inline int process_is_stopped(struct process* p)
 static inline int process_is_zombie(struct process* p)
 {
     return p->stat == PROCESS_ZOMBIE;
-}
-
-static inline void process_exit(struct process* p)
-{
-    flags_t flags;
-    irq_save(flags);
-    log_debug(DEBUG_EXIT, "%u exiting", p->pid);
-    list_del(&p->running);
-    p->stat = PROCESS_ZOMBIE;
-    process_wake_waiting(p);
-    p->need_resched = true;
-    irq_restore(flags);
 }
 
 static inline void process_stop(struct process* p)
@@ -357,15 +345,15 @@ static inline void process_signals_exit(struct process* p)
 
 static inline void process_files_exit(struct process* p)
 {
+    for (int i = 0; i < PROCESS_FILES; ++i)
+    {
+        if (p->files->files[i])
+        {
+            do_close(p->files->files[i]);
+        }
+    }
     if (!--p->files->count)
     {
-        for (int i = 0; i < PROCESS_FILES; ++i)
-        {
-            if (p->files->files[i])
-            {
-                do_close(p->files->files[i]);
-            }
-        }
         delete(p->files);
     }
 }
