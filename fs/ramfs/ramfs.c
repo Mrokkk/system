@@ -1,21 +1,23 @@
 #include "ramfs.h"
 
 #include <kernel/fs.h>
+#include <kernel/list.h>
 #include <kernel/page.h>
+#include <kernel/minmax.h>
 #include <kernel/module.h>
 
 KERNEL_MODULE(ramfs);
 module_init(ramfs_init);
 module_exit(ramfs_deinit);
 
-int ramfs_lookup(inode_t* parent, const char* name, inode_t** result);
-int ramfs_read(file_t* file, char* buffer, size_t count);
-int ramfs_write(file_t* file, const char* buffer, size_t count);
-int ramfs_open(file_t* file);
-int ramfs_mkdir(inode_t* parent, const char* name, int, int, inode_t** result);
-int ramfs_create(inode_t* parent, const char* name, int, int, inode_t** result);
-int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add);
-int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int);
+static int ramfs_lookup(inode_t* parent, const char* name, inode_t** result);
+static int ramfs_read(file_t* file, char* buffer, size_t count);
+static int ramfs_write(file_t* file, const char* buffer, size_t count);
+static int ramfs_open(file_t* file);
+static int ramfs_mkdir(inode_t* parent, const char* name, int, int, inode_t** result);
+static int ramfs_create(inode_t* parent, const char* name, int, int, inode_t** result);
+static int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add);
+static int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int);
 
 static file_system_t ramfs = {
     .name = "ramfs",
@@ -37,34 +39,102 @@ static inode_operations_t ramfs_inode_ops = {
     .create = &ramfs_create
 };
 
-static inline ram_node_t* find_node_in_dir(const char* name, const ram_dirent_t* dirent)
+static page_t* ramfs_starting_page(ram_node_t* node, size_t offset)
 {
-    ram_node_t* temp;
-    ram_node_t* file = NULL;
+    size_t page_id = offset / PAGE_SIZE;
+    page_t* head = node->pages;
+    page_t* current = node->pages;
 
-    while (dirent)
+    for (; page_id--;)
     {
-        temp = dirent->entry;
-        if (strcmp(name, temp->name) == 0)
+        current = list_next_entry(&current->list_entry, page_t, list_entry);
+
+        if (unlikely(current == head))
         {
-            file = temp;
-            break;
+            log_error("bug: %s(node=%x, offset=%u): fewer pages than asked offset; missing: %u",
+                __func__, node, offset, page_id + 1);
+            return NULL;
         }
-        dirent = dirent->next;
     }
 
-    return file;
+    return current;
 }
 
-int ramfs_lookup(inode_t* parent, const char* name, inode_t** result)
+typedef enum command cmd_t;
+
+enum command
 {
-    ram_dirent_t* dirent;
-    ram_node_t* child_node;
+    TRAVERSE_CONTINUE,
+    TRAVERSE_STOP,
+};
+
+typedef cmd_t (*block_cb_t)(void* data, size_t count, void* cb_data);
+
+static int ramfs_traverse_blocks(
+    ram_node_t* node,
+    size_t offset,
+    size_t count,
+    void* cb_data,
+    block_cb_t cb)
+{
+    size_t page_offset = offset % PAGE_SIZE;
+    page_t* current = ramfs_starting_page(node, offset);
+    size_t left, to_copy;
+
+    if (unlikely(!current))
+    {
+        return -ESPIPE;
+    }
+
+    for (left = count = min(count, node->size - offset);
+        left;
+        left -= to_copy, page_offset = 0, current = list_next_entry(&current->list_entry, page_t, list_entry))
+    {
+        to_copy = min(PAGE_SIZE - page_offset, left);
+
+        if (cb(shift(page_virt_ptr(current), page_offset), to_copy, cb_data) == TRAVERSE_STOP)
+        {
+            break;
+        }
+    }
+
+    return count;
+}
+
+typedef struct lookup_context lookup_context_t;
+
+struct lookup_context
+{
+    const char* name;
+    ram_node_t* res;
+};
+
+static cmd_t ramfs_lookup_block(void* data, size_t count, void* cb_data)
+{
+    lookup_context_t* ctx = cb_data;
+    ram_node_t* nodes = data;
+
+    for (size_t i = 0; i < count / sizeof(ram_node_t); ++i)
+    {
+        if (!strcmp(nodes[i].name, ctx->name))
+        {
+            ctx->res = &nodes[i];
+            return TRAVERSE_STOP;
+        }
+    }
+
+    return TRAVERSE_CONTINUE;
+}
+
+static int ramfs_lookup(inode_t* parent, const char* name, inode_t** result)
+{
+    int res, errno;
     ram_node_t* parent_node = parent->fs_data;
+    lookup_context_t ctx = {.name = name, .res = NULL};
 
     if (unlikely(!parent_node))
     {
-        log_debug(DEBUG_RAMFS, "no node for parent");
+        log_error("no node for parent inode: %x, ino: %u", parent, parent->ino);
         return -ENOENT;
     }
 
@@ -74,66 +144,128 @@ int ramfs_lookup(inode_t* parent, const char* name, inode_t** result)
         return -ENOTDIR;
     }
 
-    if (unlikely(!(dirent = parent_node->data)))
+    res = ramfs_traverse_blocks(parent_node, 0, parent_node->size, &ctx, &ramfs_lookup_block);
+
+    if (unlikely(errno = errno_get(res)))
     {
-        log_debug(DEBUG_RAMFS, "no dirent for parent");
+        return errno;
+    }
+
+    if (unlikely(!ctx.res))
+    {
         return -ENOENT;
     }
 
-    if (!(child_node = find_node_in_dir(name, dirent)))
-    {
-        log_debug(DEBUG_RAMFS, "cannot find %S on dirent", name);
-        return -ENOENT;
-    }
-
-    *result = child_node->inode;
+    *result = ctx.res->inode;
 
     return 0;
 }
 
-int ramfs_read(file_t* file, char* buffer, size_t count)
+static cmd_t ramfs_read_block(void* data, size_t count, void* cb_data)
 {
-    ram_node_t* node = file->inode->fs_data;
-    memcpy(buffer, node->data, count);
-    file->offset += count;
-    return count;
+    char** buffer = cb_data;
+    memcpy(*buffer, data, count);
+    *buffer += count;
+    return TRAVERSE_CONTINUE;
 }
 
-int ramfs_write(file_t* file, const char* buffer, size_t count)
+static int ramfs_read(file_t* file, char* buffer, size_t count)
 {
-    page_t* page;
+    int res, errno;
+    size_t offset = file->offset;
     ram_node_t* node = file->inode->fs_data;
-    if (!node->data)
+
+    log_debug(DEBUG_RAMFS, "reading %u B at offset %u from %s", count, offset, node->name);
+
+    res = ramfs_traverse_blocks(node, offset, count, &buffer, &ramfs_read_block);
+
+    if (unlikely(errno = errno_get(res)))
     {
-        page = page_alloc1();
-        if (!page)
+        log_debug(DEBUG_RAMFS, "traversal failed with: %d", errno);
+        return errno;
+    }
+
+    file->offset += res;
+
+    return res;
+}
+
+static cmd_t ramfs_write_block(void* data, size_t count, void* cb_data)
+{
+    char** buffer = cb_data;
+    memcpy(data, *buffer, count);
+    *buffer += count;
+    return TRAVERSE_CONTINUE;
+}
+
+static int ramfs_write(file_t* file, const char* buffer, size_t count)
+{
+    int res, errno;
+    page_t* pages;
+    size_t offset = file->offset;
+    size_t page_count;
+    ram_node_t* node = file->inode->fs_data;
+
+    log_debug(DEBUG_RAMFS, "writing %u B at offset %u to %s", count, offset, node->name);
+
+    if (offset + count > node->max_capacity)
+    {
+        page_count = page_align(offset + count + node->max_capacity) / PAGE_SIZE;
+        pages = page_alloc(page_count, PAGE_ALLOC_DISCONT);
+
+        if (unlikely(!pages))
         {
+            log_debug(DEBUG_RAMFS, "cannot allocate %u pages for file: %s", node->name);
             return -ENOMEM;
         }
-        node->data = page_virt_ptr(page);
+
+        node->max_capacity += page_count * PAGE_SIZE;
+        if (node->pages)
+        {
+            list_merge(&node->pages->list_entry, &pages->list_entry);
+            node->pages->pages_count += pages->pages_count;
+        }
+        else
+        {
+            node->pages = pages;
+        }
     }
-    memcpy(node->data, buffer, count);
-    file->offset += count;
-    return count;
+
+    node->size = offset + count;
+
+    res = ramfs_traverse_blocks(node, offset, count, &buffer, &ramfs_write_block);
+
+    if (unlikely(errno = errno_get(res)))
+    {
+        log_debug(DEBUG_RAMFS, "traversal failed with: %d", errno);
+        return errno;
+    }
+
+    file->offset += res;
+    file->inode->size = node->size;
+
+    return res;
 }
 
-int ramfs_open(file_t*)
+static int ramfs_open(file_t*)
 {
     return 0;
 }
 
-static inline void ram_node_init(ram_node_t* this, mode_t mode, const char* name)
+static void ram_node_init(ram_node_t* this, mode_t mode, const char* name)
 {
     this->mode = mode | S_IRUGO | S_IWUGO | S_IXUGO;
-    this->data = NULL;
+    this->pages = NULL;
     this->inode = NULL;
+    this->size = 0;
+    this->max_capacity = 0;
     strcpy(this->name, name);
 }
 
-static inline int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t** result, mode_t mode)
+static int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t** result, mode_t mode)
 {
+    page_t* page;
     ram_node_t* new_node;
-    ram_dirent_t* dirent;
     ram_node_t* parent_node = parent->fs_data;
 
     if (unlikely(!parent_node))
@@ -147,40 +279,36 @@ static inline int ramfs_create_raw_node(inode_t* parent, const char* name, ram_n
         return -EBADF;
     }
 
-    new_node = alloc(ram_node_t, ram_node_init(this, mode, name));
-
-    if (unlikely(!new_node))
+    if (parent_node->size + sizeof(*new_node) > parent_node->max_capacity)
     {
-        return -ENOMEM;
-    }
-
-    if (!parent_node->data)
-    {
-        parent_node->data = alloc(ram_dirent_t);
-        dirent = parent_node->data;
-        dirent->next = NULL;
-        dirent->entry = new_node;
-    }
-    else
-    {
-        dirent = parent_node->data;
-
-        while (dirent->next)
-        {
-            dirent = dirent->next;
-        }
-
-        dirent->next = alloc(ram_dirent_t);
-
-        if (unlikely(!dirent->next))
+        if (unlikely(!(page = page_alloc1())))
         {
             return -ENOMEM;
         }
 
-        ram_dirent_t* new_dirent = dirent->next;
-        new_dirent->next = NULL;
-        new_dirent->entry = new_node;
+        new_node = page_virt_ptr(page);
+        parent_node->max_capacity += PAGE_SIZE;
+
+        if (parent_node->pages)
+        {
+            list_add_tail(&page->list_entry, &parent_node->pages->list_entry);
+            parent_node->pages->pages_count += 1;
+        }
+        else
+        {
+            parent_node->pages = page;
+        }
     }
+    else
+    {
+        page = ramfs_starting_page(parent_node, parent_node->size);
+        new_node = shift_as(ram_node_t*, page_virt_ptr(page), parent_node->size % PAGE_SIZE);
+    }
+
+    parent_node->size += sizeof(*new_node);
+    parent->size = parent_node->size;
+
+    ram_node_init(new_node, mode, name);
 
     log_debug(DEBUG_RAMFS, "added %x:\"%s\" to parent node %x", new_node, new_node->name, parent_node);
 
@@ -188,7 +316,7 @@ static inline int ramfs_create_raw_node(inode_t* parent, const char* name, ram_n
     return 0;
 }
 
-int ramfs_create_node(
+static int ramfs_create_node(
     inode_t* parent,
     const char* name,
     inode_t** result_inode,
@@ -226,7 +354,7 @@ int ramfs_create_node(
     return 0;
 }
 
-int ramfs_mkdir(inode_t* parent, const char* name, int, int, inode_t** result)
+static int ramfs_mkdir(inode_t* parent, const char* name, int, int, inode_t** result)
 {
     int errno;
     ram_node_t* dot;
@@ -259,47 +387,70 @@ free_parent:
     return errno;
 }
 
-int ramfs_create(inode_t* parent, const char* name, int, int, inode_t** result)
+static int ramfs_create(inode_t* parent, const char* name, int, int, inode_t** result)
 {
     return ramfs_create_node(parent, name, result, S_IFREG);
 }
 
-int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
-{
-    int i = 0;
-    int over;
-    size_t len;
-    char type;
-
-    log_debug(DEBUG_RAMFS, "inode=%O fs_data=%O", file->inode, file->inode->fs_data);
-
-    ram_node_t* ram_node = file->inode->fs_data;
-    ram_dirent_t* ram_dirent = ram_node->data;
-
-    for (; ram_dirent; ram_dirent = ram_dirent->next, ++i)
-    {
-        log_debug(DEBUG_RAMFS, "node: %s", ram_dirent->entry->name);
-
-        type = mode_to_type(ram_dirent->entry->mode);
-        len = strlen(ram_dirent->entry->name);
-
-        over = dirent_add(buf, ram_dirent->entry->name, len, file->inode->ino, type);
-        if (over)
-        {
-            break;
-        }
-    }
-
-    return i;
-}
-
-static inline void ram_sb_init(ram_sb_t* sb, ram_node_t* root)
+static void ram_sb_init(ram_sb_t* sb, ram_node_t* root)
 {
     sb->root = root;
     sb->last_ino = 1;
 }
 
-int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int)
+typedef struct readdir_context readdir_context_t;
+
+struct readdir_context
+{
+    direntadd_t dirent_add;
+    void*       buf;
+    size_t      count;
+};
+
+static cmd_t ramfs_readdir_block(void* data, size_t count, void* cb_data)
+{
+    int over;
+    readdir_context_t* ctx = cb_data;
+    ram_node_t* nodes = data;
+
+    for (size_t i = 0; i < count / sizeof(ram_node_t); ++i)
+    {
+        over = ctx->dirent_add(
+            ctx->buf,
+            nodes[i].name,
+            strlen(nodes[i].name),
+            nodes[i].inode ? nodes[i].inode->ino : 0,
+            mode_to_type(nodes[i].mode));
+
+        if (over)
+        {
+            return TRAVERSE_STOP;
+        }
+
+        ctx->count++;
+    }
+
+    return TRAVERSE_CONTINUE;
+}
+
+static int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
+{
+    int res, errno;
+    ram_node_t* parent = file->inode->fs_data;
+
+    readdir_context_t ctx = {.dirent_add = dirent_add, .buf = buf, .count = 0};
+
+    res = ramfs_traverse_blocks(parent, 0, parent->size, &ctx, &ramfs_readdir_block);
+
+    if (unlikely(errno = errno_get(res)))
+    {
+        return errno;
+    }
+
+    return ctx.count;
+}
+
+static int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int)
 {
     int errno;
     ram_node_t* root;

@@ -35,6 +35,8 @@ int seq_close(file_t* file)
     {
         page_free(s->buffer);
         page_free(ptr(addr(s->buffer) + PAGE_SIZE));
+        page_free(ptr(addr(s->buffer) + 2 * PAGE_SIZE));
+        page_free(ptr(addr(s->buffer) + 3 * PAGE_SIZE));
     }
 
     return 0;

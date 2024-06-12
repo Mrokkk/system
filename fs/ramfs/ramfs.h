@@ -1,17 +1,16 @@
 #pragma once
 
+#include <kernel/page.h>
 #include <kernel/types.h>
 
 struct inode;
-struct ram_sb;
-struct ram_node;
-struct ram_dirent;
 
 typedef struct ram_sb ram_sb_t;
 typedef struct ram_node ram_node_t;
 typedef struct ram_dirent ram_dirent_t;
 
-#define RAMFS_NAME_MAX_LEN 32
+// Len selected to have ram_node_t with size 64 B
+#define RAMFS_NAME_MAX_LEN 44
 
 struct ram_sb
 {
@@ -24,11 +23,7 @@ struct ram_node
     char name[RAMFS_NAME_MAX_LEN];
     mode_t mode;
     struct inode* inode;
-    void* data;
-};
-
-struct ram_dirent
-{
-    ram_node_t* entry;
-    ram_dirent_t* next;
+    page_t* pages;
+    size_t size;
+    size_t max_capacity;
 };

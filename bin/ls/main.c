@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 
 #define MAX_ENTRIES 100
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 
 #define DEVICE      "\033[35m"
 #define DIRECTORY   "\033[34m"
