@@ -369,4 +369,14 @@ TEST(qsort)
     }
 }
 
+TEST(isatty)
+{
+    EXPECT_GE(isatty(0), 1);
+    EXPECT_GE(isatty(1), 1);
+    EXPECT_GE(isatty(2), 1);
+    int fd = open("/proc/uptime", O_RDONLY);
+    EXPECT_GT(fd, 0);
+    EXPECT_EQ(isatty(fd), 0);
+}
+
 TEST_SUITE_END(libc);

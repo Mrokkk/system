@@ -7,6 +7,7 @@
 #define     KD_GRAPHICS 0x01
 #define KDGETMODE       0x4b3b  // get current mode
 
+#define TIOCGETA            0x4500
 #define FBIOGET_VSCREENINFO 0x4600
 #define FBIOPUT_VSCREENINFO 0x4601
 #define FBIOGET_FSCREENINFO 0x4602

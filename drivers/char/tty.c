@@ -3,15 +3,12 @@
 #include <kernel/fs.h>
 #include <kernel/irq.h>
 #include <kernel/devfs.h>
+#include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/process.h>
 
-#include "fbcon.h"
-#include "egacon.h"
-#include "serial.h"
 #include "console.h"
 #include "tty_ldisc.h"
-#include "framebuffer.h"
 
 #undef log_fmt
 #define log_fmt(fmt) "tty: " fmt
@@ -164,6 +161,12 @@ static int tty_write(file_t* file, const char* buffer, size_t count)
 static int tty_ioctl(file_t* file, unsigned long request, void* arg)
 {
     tty_t* tty = file->private;
+
+    if (request == TIOCGETA)
+    {
+        memcpy(arg, &tty->termios, sizeof(tty->termios));
+        return 0;
+    }
 
     if (!tty->driver->ioctl)
     {

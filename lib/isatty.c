@@ -1,7 +1,9 @@
 #include <unistd.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 int isatty(int fd)
 {
-    UNUSED(fd);
-    return 1; // FIXME: write proper implementation
+    struct termios t;
+    return ioctl(fd, TIOCGETA, &t) == 0;
 }
