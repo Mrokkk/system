@@ -107,29 +107,29 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
         e0 = 1;
         return;
     }
-    else if (e0 && scan_code == 0x49)
+    else if (e0)
     {
-        log_debug(DEBUG_KEYBOARD, "tty insert: \\e[5~");
-        tty_string_insert(kb_tty, "\e[5~", 0);
-        e0 = 0;
-        return;
-    }
-    else if (e0 && scan_code == 0x51)
-    {
-        log_debug(DEBUG_KEYBOARD, "tty insert: \\e[6~");
-        tty_string_insert(kb_tty, "\e[6~", 0);
-        e0 = 0;
-        return;
-    }
-    else if (e0 && scan_code == 0x48)
-    {
-        tty_string_insert(kb_tty, "\e[A", 0);
-        e0 = 0;
-        return;
-    }
-    else if (e0 && scan_code == 0x50)
-    {
-        tty_string_insert(kb_tty, "\e[B", 0);
+        switch (scan_code)
+        {
+            case 0x49:
+                tty_string_insert(kb_tty, "\e[5~");
+                break;
+            case 0x51:
+                tty_string_insert(kb_tty, "\e[6~");
+                break;
+            case 0x48:
+                tty_string_insert(kb_tty, "\e[A");
+                break;
+            case 0x50:
+                tty_string_insert(kb_tty, "\e[B");
+                break;
+            case 0x4b:
+                tty_string_insert(kb_tty, "\e[D");
+                break;
+            case 0x4d:
+                tty_string_insert(kb_tty, "\e[C");
+                break;
+        }
         e0 = 0;
         return;
     }
@@ -140,31 +140,20 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
         return;
     }
 
-    c = scancodes[scan_code][shift];
-    if (!c)
+    if (!(c = scancodes[scan_code][shift]))
     {
         return;
     }
+
+    c = ctrl ? c & 0x1f : c;
 
     if (c == '\b')
     {
         c = kb_tty->termios.c_cc[VERASE];
     }
 
-    char buffer[3];
-
-    if (c == '\n')
-    {
-        strcpy(buffer, "\n");
-    }
-    else
-    {
-        buffer[0] = c;
-        buffer[1] = 0;
-    }
-
-    log_debug(DEBUG_KEYBOARD, "tty insert: \"%s\"", buffer);
-    tty_char_insert(kb_tty, ctrl && c ? c & 0x1f : c, 0);
+    log_debug(DEBUG_KEYBOARD, "tty insert: %u", c);
+    tty_char_insert(kb_tty, ctrl && c ? c & 0x1f : c);
 }
 
 void keyboard_irs()

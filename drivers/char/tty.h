@@ -17,6 +17,8 @@ typedef struct tty
     dev_t major;
     tty_driver_t* driver;
     termios_t termios;
+    int driver_special_key;
+    int disabled;
     wait_queue_head_t wq;
     BUFFER_MEMBER_DECLARE(buf, TTY_BUFFER_SIZE);
     list_head_t list_entry;
@@ -28,12 +30,13 @@ typedef struct tty
 #define I_ICRNL(tty)    ((tty)->termios.c_iflag & ICRNL)
 #define L_ECHO(tty)     ((tty)->termios.c_lflag & ECHO)
 #define L_ISIG(tty)     ((tty)->termios.c_lflag & ISIG)
+#define L_ICANON(tty)   ((tty)->termios.c_lflag & ICANON)
 
 #define C_VINTR(tty)    ((tty)->termios.c_cc[VINTR])
 #define C_VSUSP(tty)    ((tty)->termios.c_cc[VSUSP])
-
-#define TTY_DONT_PUT_TO_USER 1
+#define C_VEOF(tty)     ((tty)->termios.c_cc[VEOF])
+#define C_VERASE(tty)   ((tty)->termios.c_cc[VERASE])
 
 int tty_driver_register(tty_driver_t* drv);
-void tty_char_insert(tty_t* tty, char c, int flag);
-void tty_string_insert(tty_t* tty, const char* string, int flag);
+void tty_char_insert(tty_t* tty, char c);
+void tty_string_insert(tty_t* tty, const char* string);

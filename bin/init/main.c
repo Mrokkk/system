@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <kernel/reboot.h>
@@ -149,8 +150,16 @@ static int shell_run(const char* pathname)
             printf("shell exited with %d", WEXITSTATUS(status));
         }
 
-        char tmp[128] = {0, };
         int count;
+        char tmp[128] = {0, };
+        struct termios t;
+
+        if (!tcgetattr(0, &t))
+        {
+            t.c_lflag |= ECHO | ICANON | ISIG | IEXTEN | ECHOE| ECHOKE | ECHOCTL;
+            t.c_cc[VEOF] = 4;
+            tcsetattr(0, 0, &t);
+        }
 
         printf("; type sh to rerun, press CTRL+D to reboot\n");
 

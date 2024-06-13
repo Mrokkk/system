@@ -1,10 +1,9 @@
 #include "input.h"
 
-#include <errno.h>
-#include <stddef.h>
 #include <stdio.h>
-#include <sys/ioctl.h>
+#include <stddef.h>
 #include <unistd.h>
+#include <termios.h>
 
 #include "macro.h"
 
@@ -13,17 +12,20 @@ static char input_buffer[1];
 
 void input_initialize()
 {
-    input_fd = open("/dev/tty0", O_RDONLY | O_NONBLOCK, 0);
-
-    if (!input_fd)
+    struct termios t;
+    if (!(input_fd = open("/dev/tty0", O_RDONLY | O_NONBLOCK, 0)))
     {
-        die_perror("open");
+        die_perror("/dev/tty0");
     }
 
-    if (ioctl(input_fd, 2137))
+    if (tcgetattr(input_fd, &t))
     {
-        die_perror("ioctl");
+        die("cannot get termios");
     }
+
+    t.c_lflag &= ~ICANON;
+
+    tcsetattr(input_fd, 0, &t);
 }
 
 char* input_read()

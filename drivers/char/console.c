@@ -34,7 +34,7 @@ static int console_write(tty_t* tty, file_t* file, const char* buffer, size_t si
 static int console_ioctl(tty_t* tty, unsigned long request, void* arg);
 static void console_putch(tty_t* tty, uint8_t c);
 
-static command_t control(console_t* console, char c);
+static command_t control(console_t* console, tty_t* tty, char c);
 static int allocate(console_t* console);
 
 static tty_driver_t tty_driver = {
@@ -196,10 +196,9 @@ static inline void line_nr_print(console_t* console, size_t nr)
     }
 }
 
-static inline void scroll_up(console_t* console)
+static inline void scroll_up(console_t* console, size_t count)
 {
     line_t* line;
-    size_t count = console->resy;
 
     log_debug(DEBUG_CON_SCROLL, "scrolling up by %d lines", count);
 
@@ -222,10 +221,9 @@ static inline void scroll_up(console_t* console)
     line_nr_print(console, line->index);
 }
 
-static inline void scroll_down(console_t* console)
+static inline void scroll_down(console_t* console, size_t count)
 {
     line_t* line;
-    size_t count = console->resy;
 
     if (!console->scrolling)
     {
@@ -247,23 +245,42 @@ static inline void scroll(console_t* console)
     switch (console->params[0])
     {
         case 5:
-            scroll_up(console);
+            scroll_up(console, console->resy);
             break;
         case 6:
-            scroll_down(console);
+            scroll_down(console, console->resy);
             break;
     }
 }
 
-static command_t control(console_t* console, char c)
+static inline void scroll_line(console_t* console, int dir)
+{
+    switch (dir)
+    {
+        case 'A':
+            scroll_up(console, 1);
+            break;
+        case 'B':
+            scroll_down(console, 1);
+            break;
+    }
+}
+
+static command_t control(console_t* console, tty_t* tty, char c)
 {
     switch (c)
     {
         case 0:
+        case 1:
         case 3:
         case 4:
         case 7:
         case 26:
+            return C_DROP;
+        case 2:
+            console->tmux_mode = 1;
+            console->orig_visible_line = console->visible_line;
+            tty->disabled = 1;
             return C_DROP;
         case '\b':
         case 0x7f:
@@ -276,6 +293,17 @@ static command_t control(console_t* console, char c)
         case '\n':
             position_newline(console);
             return C_DROP;
+        case 'q':
+            tty->disabled = 0;
+            if (console->tmux_mode)
+            {
+                console->scrolling = 0;
+                console->tmux_mode = 0;
+                console->visible_line = console->orig_visible_line;
+                console->orig_visible_line = NULL;
+                redraw_lines_full(console);
+                return C_DROP;
+            }
     }
 
     switch (console->state)
@@ -290,6 +318,11 @@ static command_t control(console_t* console, char c)
             }
             return C_DROP;
         case ES_SQUARE:
+            if (console->tmux_mode && (c == 'A' || c == 'B'))
+            {
+                scroll_line(console, c);
+                return C_DROP;
+            }
             memset(console->params, 0, sizeof(uint32_t) * PARAMS_SIZE);
             console->params_nr = 0;
             console->state = ES_GETPARAM;
@@ -316,14 +349,17 @@ static command_t control(console_t* console, char c)
                     colors_set(console);
                     return C_DROP;
                 case '~':
-                    scroll(console);
+                    if (console->tmux_mode)
+                    {
+                        scroll(console);
+                    }
                     return C_DROP;
             }
         case ES_NORMAL:
             break;
     }
 
-    return C_PRINT;
+    return console->tmux_mode ? C_DROP : C_PRINT;
 }
 
 static inline void console_putc(console_t* console, uint8_t c)
@@ -348,16 +384,9 @@ static void console_putch(tty_t* tty, uint8_t c)
     {
         return;
     }
-    switch (control(console, c))
+    switch (control(console, tty, c))
     {
         case C_PRINT:
-            if (console->scrolling)
-            {
-                console->scrolling = 0;
-                console->visible_line = console->orig_visible_line;
-                console->orig_visible_line = NULL;
-                redraw_lines_full(console);
-            }
             if (c == '\t')
             {
                 console_putc(console, ' ');
@@ -411,6 +440,8 @@ static int console_open(tty_t* tty, file_t*)
         log_error("cannot initialize tty video driver");
         goto error;
     }
+
+    tty->driver_special_key = 2; // ctrl+b
 
     return errno;
 
@@ -473,6 +504,7 @@ static int console_setup(console_driver_t* driver)
     console->visible_line = lines;
     console->orig_visible_line = NULL;
     console->scrolling = 0;
+    console->tmux_mode = 0;
     console->current_index = 0;
     console->capacity = INITIAL_CAPACITY;
     console->driver = driver;
@@ -519,14 +551,8 @@ static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
                     console->disabled = true;
                     console_refresh(console);
                     return 0;
-
                 default: return -EINVAL;
             }
-        }
-        case 2137:
-        {
-            tty->termios.c_lflag &= ~ICANON;
-            return 0;
         }
     }
     return -EINVAL;

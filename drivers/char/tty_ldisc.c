@@ -86,23 +86,29 @@ int tty_ldisc_poll(tty_t* tty, file_t*, short events, short* revents, wait_queue
     return 0;
 }
 
-void tty_ldisc_putch(tty_t* tty, char c, int flag)
+void tty_ldisc_putch(tty_t* tty, char c)
 {
     int signal = 0;
     struct process* p;
-    termios_t* termios = &tty->termios;
+    int disabled = tty->disabled;
 
     if (c == '\r' && I_ICRNL(tty))
     {
         c = '\n';
     }
+    else if (c == tty->driver_special_key)
+    {
+        disabled = 1;
+    }
 
-    if (L_ECHO(tty))
+    // FIXME: this is a misleading code - rename disabled to
+    // something more meaningful
+    if (L_ECHO(tty) || disabled)
     {
         tty->driver->putch(tty, c);
     }
 
-    if (flag == TTY_DONT_PUT_TO_USER)
+    if (disabled)
     {
         return;
     }
@@ -135,7 +141,7 @@ void tty_ldisc_putch(tty_t* tty, char c, int flag)
         return;
     }
 
-    if (c == termios->c_cc[VERASE] && (termios->c_lflag & ICANON))
+    if (c == C_VERASE(tty) && L_ICANON(tty))
     {
         if (tty->ldisc_current > tty->ldisc_buf)
         {
@@ -146,7 +152,7 @@ void tty_ldisc_putch(tty_t* tty, char c, int flag)
 
     *tty->ldisc_current++ = c;
 
-    if (c == '\n' || c == termios->c_cc[VEOF] || !(termios->c_lflag & ICANON))
+    if (c == '\n' || c == C_VEOF(tty) || !L_ICANON(tty))
     {
         for (char* buf = tty->ldisc_buf; buf < tty->ldisc_current; ++buf)
         {

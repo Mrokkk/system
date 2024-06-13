@@ -155,33 +155,31 @@ void serial_irs(void)
 
     if (c == '\r')
     {
-        tty_char_insert(tty, '\n', 0);
+        tty_char_insert(tty, '\n');
     }
     else if (c < 32)
     {
         if (c == 4) // ctrl+d
         {
-            tty_char_insert(tty, c, 0);
+            tty_char_insert(tty, c);
         }
         else if (c == 3)
         {
-            tty_char_insert(tty, c, 0);
+            tty_char_insert(tty, c);
         }
         else if (c == '\n')
         {
-            tty_char_insert(tty, c, 0);
+            tty_char_insert(tty, c);
         }
         // TODO: handle other chars
     }
     else if (c == 0x7f) // backspace
     {
-        tty_char_insert(tty, '\b', 0);
-        tty_char_insert(tty, ' ', TTY_DONT_PUT_TO_USER);
-        tty_char_insert(tty,'\b', TTY_DONT_PUT_TO_USER);
+        tty_char_insert(tty, '\b');
     }
     else
     {
-        tty_char_insert(tty, c, 0);
+        tty_char_insert(tty, c);
     }
 }
 

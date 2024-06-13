@@ -17,7 +17,7 @@
 #define DEFAULT_C_CC \
     "\003"  /* VINTR    ^C */ \
     "\034"  /* VQUIT    ^\ */ \
-    "\b"    /* VERASE   DEL */ \
+    "\b"    /* VERASE  DEL */ \
     "\025"  /* VKILL    ^U */ \
     "\004"  /* VEOF     ^D */ \
     "\0"    /* VTIME    \0 */ \
@@ -91,6 +91,8 @@ int tty_driver_register(tty_driver_t* drv)
 
     new_tty->driver = drv;
     new_tty->major = drv->major;
+    new_tty->driver_special_key = -1;
+    new_tty->disabled = 0;
     new_tty->termios.c_iflag = DEFAULT_C_IFLAG;
     new_tty->termios.c_oflag = DEFAULT_C_OFLAG;
     new_tty->termios.c_cflag = DEFAULT_C_CFLAG;
@@ -187,17 +189,17 @@ static int tty_poll(file_t* file, short events, short* revents, wait_queue_head_
     return tty_ldisc_poll(file->private, file, events, revents, head);
 }
 
-void tty_char_insert(tty_t* tty, char c, int flag)
+void tty_char_insert(tty_t* tty, char c)
 {
-    tty_ldisc_putch(tty, c, flag);
+    tty_ldisc_putch(tty, c);
 }
 
-void tty_string_insert(tty_t* tty, const char* string, int flag)
+void tty_string_insert(tty_t* tty, const char* string)
 {
     for (; *string; ++string)
     {
         char c = *string;
-        tty_ldisc_putch(tty, c, flag);
+        tty_ldisc_putch(tty, c);
     }
 }
 
