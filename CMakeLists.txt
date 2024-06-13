@@ -85,7 +85,7 @@ add_custom_target(
 add_custom_target(
     rootfs
     COMMAND "${PROJECT_SOURCE_DIR}/scripts/build_filesystem.sh"
-    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init display date snake strace insmod pipe kernel_symbols
+    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init display date snake strace insmod pipe mkdir env kernel_symbols
     COMMENT "Preparing rootfs"
 )
 
