@@ -31,6 +31,8 @@ function build()
             --enable-arith-for-command \
             --enable-casemod-attributes \
             --enable-casemod-expansions \
+            --enable-process-substitution \
+            --enable-readline \
             --disable-largefile \
             --disable-nls \
             --disable-threads \

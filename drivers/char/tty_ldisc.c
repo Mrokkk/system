@@ -135,7 +135,7 @@ void tty_ldisc_putch(tty_t* tty, char c, int flag)
         return;
     }
 
-    if (c == termios->c_cc[VERASE])
+    if (c == termios->c_cc[VERASE] && (termios->c_lflag & ICANON))
     {
         if (tty->ldisc_current > tty->ldisc_buf)
         {

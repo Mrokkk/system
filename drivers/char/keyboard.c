@@ -6,6 +6,7 @@
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/termios.h>
 #include <kernel/spinlock.h>
 
 #include "tty.h"
@@ -109,14 +110,26 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
     else if (e0 && scan_code == 0x49)
     {
         log_debug(DEBUG_KEYBOARD, "tty insert: \\e[5~");
-        tty_string_insert(kb_tty, "\e[5~", TTY_DONT_PUT_TO_USER);
+        tty_string_insert(kb_tty, "\e[5~", 0);
         e0 = 0;
         return;
     }
     else if (e0 && scan_code == 0x51)
     {
         log_debug(DEBUG_KEYBOARD, "tty insert: \\e[6~");
-        tty_string_insert(kb_tty, "\e[6~", TTY_DONT_PUT_TO_USER);
+        tty_string_insert(kb_tty, "\e[6~", 0);
+        e0 = 0;
+        return;
+    }
+    else if (e0 && scan_code == 0x48)
+    {
+        tty_string_insert(kb_tty, "\e[A", 0);
+        e0 = 0;
+        return;
+    }
+    else if (e0 && scan_code == 0x50)
+    {
+        tty_string_insert(kb_tty, "\e[B", 0);
         e0 = 0;
         return;
     }
@@ -131,6 +144,11 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
     if (!c)
     {
         return;
+    }
+
+    if (c == '\b')
+    {
+        c = kb_tty->termios.c_cc[VERASE];
     }
 
     char buffer[3];

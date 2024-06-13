@@ -48,12 +48,20 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
         }
         else
         {
+            // FIXME: There's a bug here - parent_dentry shouldn't be cwd. E.g. if
+            // cwd is / and filename is tmp/test and tmp is mounted as different fs,
+            // then create is called on root fs
             parent_dentry = process_current->fs->cwd;
             basename = filename;
         }
     }
 
     parent_inode = parent_dentry->inode;
+
+    if (!parent_inode->ops->create)
+    {
+        return -ENOSYS;
+    }
 
     if ((errno = parent_inode->ops->create(parent_inode, basename, flags, mode, &inode)))
     {
@@ -468,6 +476,10 @@ int sys_fcntl(int fd, int cmd, ...)
             return sys_dup2(fd, va_arg(args, int));
         }
         case F_GETFD:
+        {
+            return 0;
+        }
+        case F_GETFL:
         {
             return file->mode;
         }

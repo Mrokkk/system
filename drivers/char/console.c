@@ -262,9 +262,11 @@ static command_t control(console_t* console, char c)
         case 0:
         case 3:
         case 4:
+        case 7:
         case 26:
             return C_DROP;
         case '\b':
+        case 0x7f:
             backspace(console);
             return C_DROP;
         case '\e':

@@ -27,7 +27,7 @@ sbrk: void*, size_t
 select: int, int, struct fd_set*, struct fd_set*, struct fd_set*, struct timeval*
 setsid: int
 sigaction: int, int, const struct sigaction*, struct sigaction*
-signal: int, int, int (*)(int)
+signal: int, int, void (*)(int)
 sigreturn: int, int
 stat: int, const char*, struct stat*
 time: time_t, void*
@@ -55,3 +55,4 @@ dtrace: int, int
 init_module: int, const char*
 pipe: int, int*
 fcntl: int, int, int, int
+pselect: int, int, fd_set*, fd_set*, fd_set*, const struct timespec*, const sigset_t*

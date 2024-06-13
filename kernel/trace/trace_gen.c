@@ -258,6 +258,13 @@ syscall_t trace_syscalls[] = {
     },
 
     {
+        .name   = "pselect",
+        .ret    = TYPE_LONG,
+        .nargs  = 6,
+        .args   = { TYPE_LONG, TYPE_VOID_PTR, TYPE_VOID_PTR, TYPE_VOID_PTR, TYPE_VOID_PTR, TYPE_VOID_PTR },
+    },
+
+    {
         .name   = "read",
         .ret    = TYPE_LONG,
         .nargs  = 3,

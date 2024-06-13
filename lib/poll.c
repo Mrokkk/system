@@ -20,14 +20,3 @@ int FD_ISSET(int fd, fd_set* fdset)
 {
     return bitset_test((uint32_t*)&fdset->fd_bits, fd);
 }
-
-int pselect(
-    int nfds,
-    fd_set* readfds,
-    fd_set* writefds,
-    fd_set* errorfds,
-    const struct timespec* timeout,
-    const sigset_t* sigmask)
-{
-    NOT_IMPLEMENTED(-1, "%d, %p, %p, %p, %p", nfds, readfds, writefds, errorfds, timeout, sigmask);
-}

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/stat.h>
+#include <sys/poll.h>
 
 int syscall(int nr, ...)
 {

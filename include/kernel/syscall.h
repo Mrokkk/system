@@ -37,28 +37,29 @@
 #define __NR_open           34
 #define __NR_pipe           35
 #define __NR_poll           36
-#define __NR_read           37
-#define __NR_reboot         38
-#define __NR_rename         39
-#define __NR_sbrk           40
-#define __NR_select         41
-#define __NR_setgid         42
-#define __NR_setsid         43
-#define __NR_setuid         44
-#define __NR_sigaction      45
-#define __NR_signal         46
-#define __NR_sigreturn      47
-#define __NR_stat           48
-#define __NR_statvfs        49
-#define __NR_time           50
-#define __NR_umask          51
-#define __NR_umount         52
-#define __NR_umount2        53
-#define __NR_unlink         54
-#define __NR_waitpid        55
-#define __NR_write          56
+#define __NR_pselect        37
+#define __NR_read           38
+#define __NR_reboot         39
+#define __NR_rename         40
+#define __NR_sbrk           41
+#define __NR_select         42
+#define __NR_setgid         43
+#define __NR_setsid         44
+#define __NR_setuid         45
+#define __NR_sigaction      46
+#define __NR_signal         47
+#define __NR_sigreturn      48
+#define __NR_stat           49
+#define __NR_statvfs        50
+#define __NR_time           51
+#define __NR_umask          52
+#define __NR_umount         53
+#define __NR_umount2        54
+#define __NR_unlink         55
+#define __NR_waitpid        56
+#define __NR_write          57
 
-#define __NR_syscalls       57
+#define __NR_syscalls       58
 
 #ifndef __ASSEMBLER__
 
@@ -67,6 +68,7 @@ struct pollfd;
 struct sigaction;
 struct stat;
 struct statvfs;
+struct timespec;
 struct timeval;
 
 #endif  // __ASSEMBLER__
@@ -131,6 +133,7 @@ __syscall5(mount, int, const char*, const char*, const char*, int, void*)
 __syscall3(open, int, const char*, int, int)
 __syscall1(pipe, int, int*)
 __syscall3(poll, int, struct pollfd*, unsigned long, int)
+__syscall6(pselect, int, int, fd_set*, fd_set*, fd_set*, const struct timespec*, const sigset_t*)
 __syscall3(read, int, int, char*, size_t)
 __syscall3(reboot, int, int, int, int)
 __syscall2(rename, int, const char*, const char*)
@@ -140,7 +143,7 @@ __syscall1(setgid, int, gid_t)
 __syscall0(setsid, int)
 __syscall1(setuid, int, uid_t)
 __syscall3(sigaction, int, int, const struct sigaction*, struct sigaction*)
-__syscall2(signal, int, int, int (*)(int))
+__syscall2(signal, int, int, void (*)(int))
 __syscall1(sigreturn, int, int)
 __syscall2(stat, int, const char*, struct stat*)
 __syscall2(statvfs, int, const char*, struct statvfs*)

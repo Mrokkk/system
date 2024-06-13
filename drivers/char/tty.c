@@ -2,6 +2,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/irq.h>
+#include <kernel/ctype.h>
 #include <kernel/devfs.h>
 #include <kernel/ioctl.h>
 #include <kernel/device.h>
@@ -162,10 +163,15 @@ static int tty_ioctl(file_t* file, unsigned long request, void* arg)
 {
     tty_t* tty = file->private;
 
-    if (request == TIOCGETA)
+    switch (request)
     {
-        memcpy(arg, &tty->termios, sizeof(tty->termios));
-        return 0;
+        case TCGETA:
+        case TIOCGETA:
+            memcpy(arg, &tty->termios, sizeof(tty->termios));
+            return 0;
+        case TCSETA:
+            memcpy(&tty->termios, arg, sizeof(tty->termios));
+            return 0;
     }
 
     if (!tty->driver->ioctl)
