@@ -52,36 +52,46 @@ syscall_t trace_syscalls[] = {
 """
 
 
-syscall_regex : str = r'(__syscall.*)\(\s*([a-z0-9_]*),\s(.*)\)'
+syscall_regex : str = r'(.*)\: (.*)'
 
 
 class Syscall:
     name        : str
-    variant     : str
     ret_type    : str
     ret_enum    : str
     arg_types   : List[str]
     arg_enums   : List[str]
-    line        : str
 
-    def __init__(self, name=None, variant=None, ret_type=None, arg_types=None, line=None):
+    def __init__(self, name=None, variant=None, ret_type=None, arg_types=None):
         self.name       = name
-        self.variant    = variant
         self.ret_type   = ret_type
         self.ret_enum   = type_convert(ret_type)
         self.arg_types  = arg_types
+        self.headers    = []
         self.arg_enums  = [type_convert(x) for x in arg_types]
-        self.line       = line
+
+    @property
+    def variant(self) -> str:
+        variant : str = f'__syscall{len(self.arg_types)}'
+        if self.ret_type == 'void':
+            return f'{variant}_noret'
+        else:
+            return variant
+
+    @property
+    def line(self) -> str:
+        if len(self.arg_types) == 0:
+            return f'{self.variant}({self.name}, {self.ret_type})'
+        else:
+            return f'{self.variant}({self.name}, {self.ret_type}, {', '.join(self.arg_types)})'
 
 
 def syscall_create(match : re.Match, line : str) -> Syscall:
-    signature = match.group(3).split(',')
+    signature = match.group(2).split(',')
     return Syscall(
-        name        = match.group(2),
-        variant     = match.group(1),
+        name        = match.group(1),
         ret_type    = signature[0].strip(),
-        arg_types   = [x.strip() for x in signature[1:]],
-        line        = line)
+        arg_types   = [x.strip() for x in signature[1:]])
 
 
 def read_data(lines : List[bytes]) -> Tuple[List[Syscall], List[str], List[str]]:
@@ -90,7 +100,14 @@ def read_data(lines : List[bytes]) -> Tuple[List[Syscall], List[str], List[str]]
     structs     : Set[str] = set()
 
     for line in [l.strip() for l in lines]:
+        if line[0] == '#':
+            continue
+
         match   = re.search(syscall_regex, line)
+
+        if not match:
+            continue
+
         syscall = syscall_create(match, line)
 
         syscalls.append(syscall)
@@ -120,7 +137,7 @@ def type_convert(t : str):
 def main():
     include_dir : str = f'{os.path.dirname(os.path.realpath(__file__))}/../include/kernel'
     trace_dir : str = f'{os.path.dirname(os.path.realpath(__file__))}/../kernel/trace'
-    input_file  : str = f'{include_dir}/syscall.h.in'
+    input_file  : str = f'{include_dir}/syscall.in'
     syscall_h_path : str = f'{include_dir}/syscall.h'
     trace_gen_c_path : str = f'{trace_dir}/trace_gen.c'
 

@@ -1,0 +1,57 @@
+# vim: syntax=yaml
+chdir: int, const char*
+chroot: int, const char*
+clone: int, unsigned int, void *
+close: int, int
+creat: int, const char*, int
+dup: int, int
+dup2: int, int, int
+execve: int, const char*, char* const[], char* const[]
+exit: void, int
+fork: int
+fstat: int, int, struct stat*
+getcwd: int, char*, size_t
+getdents: int, unsigned int, void*, size_t
+getpid: int
+getppid: int
+ioctl: int, int, unsigned long, unsigned long
+kill: int, int, int
+mkdir: int, const char*, mode_t
+mmap: void*, void*, size_t, int, int, int , size_t
+mount: int, const char*, const char*, const char*, int, void*
+open: int, const char*, int, int
+poll: int, struct pollfd*, unsigned long, int
+read: int, int, char*, size_t
+reboot: int, int, int, int
+sbrk: void*, size_t
+select: int, int, struct fd_set*, struct fd_set*, struct fd_set*, struct timeval*
+setsid: int
+sigaction: int, int, const struct sigaction*, struct sigaction*
+signal: int, int, int (*)(int)
+sigreturn: int, int
+stat: int, const char*, struct stat*
+time: time_t, void*
+waitpid: int, int, int*, int
+write: int, int, const char*, size_t
+fstatvfs: int, int, struct statvfs*
+statvfs: int, const char*, struct statvfs*
+umount: int, const char*
+umount2: int, const char*, int
+getuid: int
+geteuid: int
+getgid: int
+getegid: int
+setgid: int, gid_t
+setuid: int, uid_t
+lseek: off_t, int, off_t, int
+unlink: int, const char*
+umask: mode_t, mode_t
+fchmod: int, int, mode_t
+access: int, const char*, int
+alarm: unsigned int, unsigned int
+rename: int, const char*, const char*
+mknod: int, const char*, mode_t, dev_t
+dtrace: int, int
+init_module: int, const char*
+pipe: int, int*
+fcntl: int, int, int, int
