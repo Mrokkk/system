@@ -29,7 +29,5 @@ int pselect(
     const struct timespec* timeout,
     const sigset_t* sigmask)
 {
-    UNUSED(nfds); UNUSED(readfds); UNUSED(writefds); UNUSED(errorfds);
-    UNUSED(timeout); UNUSED(sigmask);
-    NOT_IMPLEMENTED(-1);
+    NOT_IMPLEMENTED(-1, "%d, %p, %p, %p, %p", nfds, readfds, writefds, errorfds, timeout, sigmask);
 }

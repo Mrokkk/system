@@ -2,18 +2,15 @@
 
 int tcgetattr(int fd, struct termios* termios_p)
 {
-    UNUSED(fd); UNUSED(termios_p);
-    NOT_IMPLEMENTED(-1);
+    NOT_IMPLEMENTED(-1, "%d, %p", fd, termios_p);
 }
 
 int tcsetattr(int fd, int optional_actions, const struct termios* termios_p)
 {
-    UNUSED(fd); UNUSED(optional_actions); UNUSED(termios_p);
-    NOT_IMPLEMENTED(-1);
+    NOT_IMPLEMENTED(-1, "%d, %d, %p", fd, optional_actions, termios_p);
 }
 
 int tcflow(int fd, int action)
 {
-    UNUSED(fd); UNUSED(action);
-    NOT_IMPLEMENTED(-1);
+    NOT_IMPLEMENTED(-1, "%d, %d", fd, action);
 }

@@ -4,6 +4,7 @@
 
 #ifndef __ASSEMBLER__
 
+#include <error.h>
 #include <errno.h>
 #include <stdint.h>
 #include "magic.h"
@@ -37,17 +38,11 @@ extern int libc_debug;
 #define DIR_CHECK(dir) \
     ({ (dir) && (dir)->magic == DIR_MAGIC; })
 
-#define NOT_IMPLEMENTED(ret) \
+#define NOT_IMPLEMENTED(ret, fmt, ...) \
     { \
-        if (libc_debug) \
+        if (UNLIKELY(libc_debug)) \
         { \
-            extern void error_at_line( \
-                int status, \
-                int errnum, \
-                const char* filename, \
-                unsigned int linenum, \
-                const char* format, ...); \
-            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s", __func__); \
+            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__, __VA_ARGS__); \
         } \
         return ERRNO_SET(ENOSYS, ret); \
     }

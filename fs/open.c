@@ -1,6 +1,8 @@
+#include <stdarg.h>
 #include <kernel/fs.h>
 #include <kernel/path.h>
 #include <kernel/stat.h>
+#include <kernel/fcntl.h>
 #include <kernel/dentry.h>
 #include <kernel/process.h>
 #include <kernel/statvfs.h>
@@ -446,5 +448,40 @@ int sys_rename(const char* oldpath, const char* newpath)
 int sys_mknod(const char* pathname, mode_t mode, dev_t dev)
 {
     (void)pathname, (void)mode; (void)dev;
+    return -ENOSYS;
+}
+
+int sys_fcntl(int fd, int cmd, ...)
+{
+    va_list args;
+    file_t* file;
+
+    if (fd_check_bounds(fd)) return -EBADF;
+    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    va_start(args, cmd);
+
+    switch (cmd)
+    {
+        case F_DUPFD:
+        {
+            return sys_dup2(fd, va_arg(args, int));
+        }
+        case F_GETFD:
+        {
+            return file->mode;
+        }
+        // FIXME: Bash calls it for stdout and tries to set O_WRONLY, which
+        // breaks stdin, as stdin, stdout and stderr are using same file_t;
+        // currently it's better to return error, as apparently it does not
+        // cause any problem for Bash
+        case F_SETFD:
+        {
+            break;
+        }
+    }
+
+    va_end(args);
+
     return -ENOSYS;
 }

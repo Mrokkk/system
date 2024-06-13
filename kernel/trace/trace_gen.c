@@ -97,6 +97,13 @@ syscall_t trace_syscalls[] = {
     },
 
     {
+        .name   = "fcntl",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_LONG, TYPE_LONG, TYPE_LONG },
+    },
+
+    {
         .name   = "fork",
         .ret    = TYPE_LONG,
         .nargs  = 0,

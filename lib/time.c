@@ -61,6 +61,5 @@ clock_t clock(void)
 
 int utime(char const* pathname, const struct utimbuf* times)
 {
-    UNUSED(pathname); UNUSED(times);
-    NOT_IMPLEMENTED(-1);
+    NOT_IMPLEMENTED(-1, "\"%s\", %p", pathname, times);
 }

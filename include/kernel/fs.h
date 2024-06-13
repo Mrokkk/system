@@ -8,23 +8,12 @@
 #include <kernel/poll.h>
 #include <kernel/stat.h>
 #include <kernel/wait.h>
+#include <kernel/fcntl.h>
 #include <kernel/magic.h>
 #include <kernel/dentry.h>
 #include <kernel/dirent.h>
 #include <kernel/kernel.h>
 #include <kernel/compiler.h>
-
-#define O_ACCMODE           3
-#define O_RDONLY            0
-#define O_WRONLY            1
-#define O_RDWR              2
-#define O_CREAT          0x40
-#define O_EXCL           0x80
-#define O_NOCTTY        0x100
-#define O_TRUNC         0x200
-#define O_APPEND        0x400
-#define O_NONBLOCK      0x800
-#define O_DIRECTORY   0x10000
 
 #define BLOCK_SIZE       1024
 

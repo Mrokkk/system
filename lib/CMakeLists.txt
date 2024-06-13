@@ -13,7 +13,6 @@ add_library(c STATIC
     env.c
     errno.c
     error.c
-    fcntl.c
     getcwd.c
     gethostname.c
     grp.c

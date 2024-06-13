@@ -178,24 +178,24 @@ static char* number(
     return str;
 }
 
-int scanf(const char*, ...)
+int scanf(const char* format, ...)
 {
-    NOT_IMPLEMENTED(EOF);
+    NOT_IMPLEMENTED(EOF, "\"%s\"", format);
 }
 
-int fscanf(FILE*, const char*, ...)
+int fscanf(FILE* stream, const char* format, ...)
 {
-    NOT_IMPLEMENTED(EOF);
+    NOT_IMPLEMENTED(EOF, "%p, \"%s\"", stream, format);
 }
 
-int vscanf(const char*, va_list)
+int vscanf(const char* format, va_list ap)
 {
-    NOT_IMPLEMENTED(EOF);
+    NOT_IMPLEMENTED(EOF, "\"%s\", %p", format, ap);
 }
 
-int vfscanf(FILE*, const char*, va_list)
+int vfscanf(FILE* stream, const char* format, va_list ap)
 {
-    NOT_IMPLEMENTED(EOF);
+    NOT_IMPLEMENTED(EOF, "%p, \"%s\", %p", stream, format, ap);
 }
 
 int vsprintf(char* buf, const char* fmt, va_list args)
@@ -525,14 +525,14 @@ int fgetc(FILE* stream)
     return (int)data[0];
 }
 
-char* fgets(char*, int, FILE*)
+char* fgets(char* s, int size, FILE* stream)
 {
-    NOT_IMPLEMENTED(NULL);
+    NOT_IMPLEMENTED(NULL, "%p, %u, %p", s, size, stream);
 }
 
-int ungetc(int, FILE*)
+int ungetc(int c, FILE* stream)
 {
-    NOT_IMPLEMENTED(EOF);
+    NOT_IMPLEMENTED(EOF, "%u, %p", c, stream);
 }
 
 int fputc(int c, FILE* stream)
