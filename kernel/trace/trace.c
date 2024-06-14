@@ -3,6 +3,7 @@
 #include <kernel/trace.h>
 #include <kernel/types.h>
 #include <kernel/kernel.h>
+#include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/syscall.h>
 
@@ -144,6 +145,30 @@ static const char* errors[] = {
     ERRNO(EHWPOISON),
 };
 
+static int string_print(char* buffer, const char* string)
+{
+    char* it = buffer;
+    size_t len = strlen(string);
+    size_t to_print = min(len, 64);
+
+    *it++ = '\"';
+
+    for (size_t i = 0; i < to_print; ++i)
+    {
+        it += sprintf(it, isprint(string[i]) ? "%c" : "\\%u", string[i]);
+    }
+
+    if (len > to_print)
+    {
+        it += sprintf(it, "...");
+    }
+
+    *it++ = '\"';
+    *it = 0;
+
+    return it - buffer;
+}
+
 static const char* format_get(type_t t, int value)
 {
     switch (t)
@@ -153,11 +178,6 @@ static const char* format_get(type_t t, int value)
         case TYPE_SHORT:
         case TYPE_LONG: return "%d";
         case TYPE_CHAR_PTR:
-            if (!vm_verify(VERIFY_READ, (void*)value, 1, process_current->mm->vm_areas))
-            {
-                return "\"%s\"";
-            }
-            fallthrough;
         case TYPE_UNSIGNED_CHAR:
         case TYPE_UNSIGNED_SHORT:
         case TYPE_UNSIGNED_LONG:
@@ -174,6 +194,19 @@ static void* ptr_get(uint32_t i)
     return ptr(i + sizeof(uint32_t));
 }
 
+static int* parameters_get(int* buf, va_list args, size_t count)
+{
+    if (count > 5)
+    {
+        return va_arg(args, int*);
+    }
+    for (size_t i = 0; i < count; ++i)
+    {
+        buf[i] = va_arg(args, int);
+    }
+    return buf;
+}
+
 int trace_syscall(unsigned long nr, ...)
 {
     if (likely(!process_current->trace))
@@ -181,31 +214,50 @@ int trace_syscall(unsigned long nr, ...)
         return 0;
     }
 
+    flags_t flags;
     const syscall_t* call = &trace_syscalls[nr];
     va_list args;
     char buf[256];
     char* it = buf;
     *it = 0;
-
-    it += sprintf(it, "%s(", call->name);
+    int* params;
+    int params_buf[8];
 
     va_start(args, nr);
+    params = parameters_get(params_buf, args, call->nargs);
+    va_end(args);
+
+    it += sprintf(it, "%s(", call->name);
 
     for (size_t i = 0; i < call->nargs; ++i)
     {
         type_t arg = call->args[i];
-        int value = va_arg(args, int);
-        const char* fmt = format_get(arg, value);
-        it += sprintf(it, fmt, value);
+        int value = params[i];
+
+        switch (arg)
+        {
+            case TYPE_CONST_CHAR_PTR:
+            {
+                it += string_print(it, (const char*)value);
+                break;
+            }
+            default:
+            {
+                const char* fmt = format_get(arg, value);
+                it += sprintf(it, fmt, value);
+                break;
+            }
+        }
+
         if (i + 1 < call->nargs)
         {
             it += sprintf(it, ", ");
         }
     }
 
-    va_end(args);
-
     strcpy(it, ")");
+
+    irq_save(flags);
 
     log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
 
@@ -215,13 +267,24 @@ int trace_syscall(unsigned long nr, ...)
         backtrace_user(log_info, regs, page_virt_ptr(process_current->bin->symbols_pages), "\t");
     }
 
+    irq_restore(flags);
+
     return nr;
 }
 
-__attribute__((regparm(1))) void trace_syscall_end(int ret, unsigned long nr)
+__attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 {
     char buf[128];
     char* it = buf;
+    flags_t flags;
+    int errno;
+
+    if (trace_syscalls[nr].ret == TYPE_VOID)
+    {
+        return;
+    }
+
+    irq_save(flags);
 
     if (DEBUG_BTUSER)
     {
@@ -231,14 +294,16 @@ __attribute__((regparm(1))) void trace_syscall_end(int ret, unsigned long nr)
     {
         it += sprintf(it, " = ");
     }
-    if (ret < 0)
+
+    if ((errno = errno_get(retval)))
     {
-        it += sprintf(it, "%d %s", ret, errors[-ret]);
+        it += sprintf(it, "%d %s", retval, errors[-errno]);
     }
     else
     {
-        it += sprintf(it, format_get(trace_syscalls[nr].ret, ret), ret);
+        it += sprintf(it, format_get(trace_syscalls[nr].ret, retval), retval);
     }
+
     if (DEBUG_BTUSER)
     {
         log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
@@ -247,4 +312,6 @@ __attribute__((regparm(1))) void trace_syscall_end(int ret, unsigned long nr)
     {
         log_continue("%s", buf);
     }
+
+    irq_restore(flags);
 }

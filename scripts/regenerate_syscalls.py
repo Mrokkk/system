@@ -121,7 +121,8 @@ def read_data(lines : List[bytes]) -> Tuple[List[Syscall], List[str], List[str]]
 
 
 def type_convert(t : str):
-    if 'char*' in t: return 'TYPE_CHAR_PTR'
+    if t == 'char*': return 'TYPE_CHAR_PTR'
+    elif t == 'const char*': return 'TYPE_CONST_CHAR_PTR'
     elif '*' in t: return 'TYPE_VOID_PTR'
     elif t in ('int', 'long', 'gid_t'): return 'TYPE_LONG'
     elif t == 'short': return 'TYPE_SHORT'

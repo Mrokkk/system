@@ -9,7 +9,7 @@ syscall_t trace_syscalls[] = {
         .name   = "access",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_LONG },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_LONG },
     },
 
     {
@@ -23,14 +23,14 @@ syscall_t trace_syscalls[] = {
         .name   = "chdir",
         .ret    = TYPE_LONG,
         .nargs  = 1,
-        .args   = { TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR },
     },
 
     {
         .name   = "chroot",
         .ret    = TYPE_LONG,
         .nargs  = 1,
-        .args   = { TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR },
     },
 
     {
@@ -51,7 +51,7 @@ syscall_t trace_syscalls[] = {
         .name   = "creat",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_LONG },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_LONG },
     },
 
     {
@@ -79,7 +79,7 @@ syscall_t trace_syscalls[] = {
         .name   = "execve",
         .ret    = TYPE_LONG,
         .nargs  = 3,
-        .args   = { TYPE_CHAR_PTR, TYPE_CHAR_PTR, TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_VOID_PTR, TYPE_VOID_PTR },
     },
 
     {
@@ -184,7 +184,7 @@ syscall_t trace_syscalls[] = {
         .name   = "init_module",
         .ret    = TYPE_LONG,
         .nargs  = 1,
-        .args   = { TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR },
     },
 
     {
@@ -212,14 +212,14 @@ syscall_t trace_syscalls[] = {
         .name   = "mkdir",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_UNSIGNED_SHORT },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_SHORT },
     },
 
     {
         .name   = "mknod",
         .ret    = TYPE_LONG,
         .nargs  = 3,
-        .args   = { TYPE_CHAR_PTR, TYPE_UNSIGNED_SHORT, TYPE_UNSIGNED_SHORT },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_SHORT, TYPE_UNSIGNED_SHORT },
     },
 
     {
@@ -233,14 +233,14 @@ syscall_t trace_syscalls[] = {
         .name   = "mount",
         .ret    = TYPE_LONG,
         .nargs  = 5,
-        .args   = { TYPE_CHAR_PTR, TYPE_CHAR_PTR, TYPE_CHAR_PTR, TYPE_LONG, TYPE_VOID_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_CONST_CHAR_PTR, TYPE_CONST_CHAR_PTR, TYPE_LONG, TYPE_VOID_PTR },
     },
 
     {
         .name   = "open",
         .ret    = TYPE_LONG,
         .nargs  = 3,
-        .args   = { TYPE_CHAR_PTR, TYPE_LONG, TYPE_LONG },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_LONG, TYPE_LONG },
     },
 
     {
@@ -282,7 +282,7 @@ syscall_t trace_syscalls[] = {
         .name   = "rename",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_CONST_CHAR_PTR },
     },
 
     {
@@ -345,14 +345,14 @@ syscall_t trace_syscalls[] = {
         .name   = "stat",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_VOID_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_VOID_PTR },
     },
 
     {
         .name   = "statvfs",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_VOID_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_VOID_PTR },
     },
 
     {
@@ -373,21 +373,21 @@ syscall_t trace_syscalls[] = {
         .name   = "umount",
         .ret    = TYPE_LONG,
         .nargs  = 1,
-        .args   = { TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR },
     },
 
     {
         .name   = "umount2",
         .ret    = TYPE_LONG,
         .nargs  = 2,
-        .args   = { TYPE_CHAR_PTR, TYPE_LONG },
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_LONG },
     },
 
     {
         .name   = "unlink",
         .ret    = TYPE_LONG,
         .nargs  = 1,
-        .args   = { TYPE_CHAR_PTR },
+        .args   = { TYPE_CONST_CHAR_PTR },
     },
 
     {
@@ -401,6 +401,6 @@ syscall_t trace_syscalls[] = {
         .name   = "write",
         .ret    = TYPE_LONG,
         .nargs  = 3,
-        .args   = { TYPE_LONG, TYPE_CHAR_PTR, TYPE_UNSIGNED_LONG },
+        .args   = { TYPE_LONG, TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_LONG },
     },
 };

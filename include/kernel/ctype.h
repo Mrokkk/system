@@ -44,5 +44,5 @@ static inline int isupper(int c)
 
 static inline int isprint(int c)
 {
-    return isalnum(c) || isblank(c);
+    return c > 0x1f && c < 0x7f;
 }

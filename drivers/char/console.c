@@ -114,11 +114,6 @@ static void console_refresh(void* data)
 
 static inline void position_newline(console_t* console)
 {
-    if (console->scrolling)
-    {
-        return;
-    }
-
     size_t previous = console->visible_line->pos - console->visible_line->line;
     console->current_line = console->current_line->next;
     console->current_line->pos = console->current_line->line;
@@ -172,12 +167,6 @@ static inline void position_prev(console_t* console)
     --console->x;
 }
 
-static inline void backspace(console_t* console)
-{
-    position_prev(console);
-    console->driver->putch(console->driver, console->y, console->x, ' ', console->current_fgcolor, console->current_bgcolor);
-}
-
 static inline void colors_set(console_t* console)
 {
     console_driver_t* drv = console->driver;
@@ -209,11 +198,6 @@ static inline void scroll_up(console_t* console, size_t count)
         return;
     }
 
-    if (!console->scrolling)
-    {
-        console->orig_visible_line = console->visible_line;
-    }
-
     console->scrolling = 1;
     console->visible_line = line;
 
@@ -224,11 +208,6 @@ static inline void scroll_up(console_t* console, size_t count)
 static inline void scroll_down(console_t* console, size_t count)
 {
     line_t* line;
-
-    if (!console->scrolling)
-    {
-        return;
-    }
 
     log_debug(DEBUG_CON_SCROLL, "scrolling down by %d lines", count);
 
@@ -266,8 +245,47 @@ static inline void scroll_line(console_t* console, int dir)
     }
 }
 
+static inline void console_putc(console_t* console, uint8_t c)
+{
+    console->current_line->pos->c = c;
+    console->current_line->pos->fgcolor = console->current_fgcolor;
+    console->current_line->pos->bgcolor = console->current_bgcolor;
+    ++console->current_line->pos;
+
+    if (!console->redraw)
+    {
+        console->driver->putch(console->driver, console->y, console->x, c, console->current_fgcolor, console->current_bgcolor);
+    }
+
+    position_next(console);
+}
+
 static command_t control(console_t* console, tty_t* tty, char c)
 {
+    int tmux_mode = console->tmux_mode;
+
+    if (unlikely(tmux_mode))
+    {
+        switch (c)
+        {
+            case 'q':
+                tty->disabled = 0;
+                console->scrolling = 0;
+                console->tmux_mode = 0;
+                console->visible_line = console->orig_visible_line;
+                console->orig_visible_line = NULL;
+                redraw_lines_full(console);
+                return C_DROP;
+            case '\e':
+                break;
+            default:
+                if (console->state == ES_NORMAL)
+                {
+                    return C_DROP;
+                }
+        }
+    }
+
     switch (c)
     {
         case 0:
@@ -284,26 +302,21 @@ static command_t control(console_t* console, tty_t* tty, char c)
             return C_DROP;
         case '\b':
         case 0x7f:
-            backspace(console);
+            position_prev(console);
             return C_DROP;
         case '\e':
             log_debug(DEBUG_CONSOLE, "switch to ESC");
             console->state = ES_ESC;
             return C_DROP;
+        case '\t':
+            console_putc(console, ' ');
+            console_putc(console, ' ');
+            console_putc(console, ' ');
+            console_putc(console, ' ');
+            return C_DROP;
         case '\n':
             position_newline(console);
             return C_DROP;
-        case 'q':
-            tty->disabled = 0;
-            if (console->tmux_mode)
-            {
-                console->scrolling = 0;
-                console->tmux_mode = 0;
-                console->visible_line = console->orig_visible_line;
-                console->orig_visible_line = NULL;
-                redraw_lines_full(console);
-                return C_DROP;
-            }
     }
 
     switch (console->state)
@@ -362,21 +375,6 @@ static command_t control(console_t* console, tty_t* tty, char c)
     return console->tmux_mode ? C_DROP : C_PRINT;
 }
 
-static inline void console_putc(console_t* console, uint8_t c)
-{
-    console->current_line->pos->c = c;
-    console->current_line->pos->fgcolor = console->current_fgcolor;
-    console->current_line->pos->bgcolor = console->current_bgcolor;
-    ++console->current_line->pos;
-
-    if (!console->redraw)
-    {
-        console->driver->putch(console->driver, console->y, console->x, c, console->current_fgcolor, console->current_bgcolor);
-    }
-
-    position_next(console);
-}
-
 static void console_putch(tty_t* tty, uint8_t c)
 {
     console_t* console = tty->driver->driver_data;
@@ -384,22 +382,9 @@ static void console_putch(tty_t* tty, uint8_t c)
     {
         return;
     }
-    switch (control(console, tty, c))
+    if (control(console, tty, c) == C_PRINT)
     {
-        case C_PRINT:
-            if (c == '\t')
-            {
-                console_putc(console, ' ');
-                console_putc(console, ' ');
-                console_putc(console, ' ');
-                console_putc(console, ' ');
-            }
-            else
-            {
-                console_putc(console, c);
-            }
-            break;
-        default:
+        console_putc(console, c);
     }
 }
 
