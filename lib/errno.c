@@ -1,12 +1,11 @@
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int errno;
 char* program_invocation_name;
 char* program_invocation_short_name;
 
-const char* errors[] = {
+static const char* errors[] = {
     [EPERM]           = "Operation not permitted",
     [ENOENT]          = "No such file or directory",
     [ESRCH]           = "No such process",
@@ -140,7 +139,7 @@ const char* errors[] = {
     [EHWPOISON]       = "Memory page has hardware error",
 };
 
-void perror(const char* s)
+void LIBC(perror)(const char* s)
 {
     int e = errno;
     const char* error = errors[e];
@@ -154,7 +153,7 @@ void perror(const char* s)
     fprintf(stderr, "%s: %s\n", s, error);
 }
 
-char* strerror(int errnum)
+char* LIBC(strerror)(int errnum)
 {
     if (errnum < 0 || errnum > ERRNO_MAX)
     {
@@ -163,3 +162,6 @@ char* strerror(int errnum)
 
     return (char*)errors[errnum];
 }
+
+LIBC_ALIAS(perror);
+LIBC_ALIAS(strerror);

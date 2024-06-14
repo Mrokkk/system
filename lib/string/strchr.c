@@ -1,6 +1,6 @@
 #include <string.h>
 
-char* strchr(const char* string, int c)
+char* LIBC(strchr)(const char* string, int c)
 {
     int i, len;
 
@@ -17,7 +17,7 @@ char* strchr(const char* string, int c)
     return 0;
 }
 
-char* strrchr(const char* string, int c)
+char* LIBC(strrchr)(const char* string, int c)
 {
     int i, len, last = -1;
 
@@ -36,4 +36,5 @@ char* strrchr(const char* string, int c)
     return 0;
 }
 
-
+LIBC_ALIAS(strchr);
+LIBC_ALIAS(strrchr);

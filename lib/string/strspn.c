@@ -1,6 +1,6 @@
 #include <string.h>
 
-size_t strspn(const char* str, const char* accept)
+size_t LIBC(strspn)(const char* str, const char* accept)
 {
     const char* s = str;
     char buf[256];
@@ -20,7 +20,7 @@ size_t strspn(const char* str, const char* accept)
     return s - str;
 }
 
-size_t strcspn(const char* str, const char* reject)
+size_t LIBC(strcspn)(const char* str, const char* reject)
 {
     const char* s = str;
     char buf[256];
@@ -40,3 +40,6 @@ size_t strcspn(const char* str, const char* reject)
 
     return s - str;
 }
+
+LIBC_ALIAS(strspn);
+LIBC_ALIAS(strcspn);

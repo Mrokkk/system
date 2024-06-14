@@ -1,6 +1,6 @@
 #include <string.h>
 
-char* strpbrk(const char* s, const char* accept)
+char* LIBC(strpbrk)(const char* s, const char* accept)
 {
     size_t al = strlen(accept);
     while (*s)
@@ -16,3 +16,5 @@ char* strpbrk(const char* s, const char* accept)
     }
     return NULL;
 }
+
+LIBC_ALIAS(strpbrk);

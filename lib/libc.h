@@ -21,10 +21,13 @@ extern int libc_debug;
 #define PTR(a)          ((void*)(a))
 
 #define STRONG_ALIAS(name, aliasname) \
-  extern __typeof(name) aliasname __attribute__((alias(STRINGIFY(name))));
+    extern __typeof(name) aliasname __attribute__((alias(STRINGIFY(name))))
 
 #define WEAK_ALIAS(name, aliasname) \
-  extern __typeof(name) aliasname __attribute__((weak, alias(STRINGIFY(name))));
+    extern __typeof(name) aliasname __attribute__((weak, alias(STRINGIFY(name))))
+
+#define LIBC_ALIAS(name) \
+    WEAK_ALIAS(LIBC(name), name)
 
 #define ERRNO_SET(e, v) \
     ({ errno = e; v; })
@@ -39,13 +42,27 @@ extern int libc_debug;
     ({ (dir) && (dir)->magic == DIR_MAGIC; })
 
 #define NOT_IMPLEMENTED(ret, fmt, ...) \
-    { \
+    ({ \
         if (UNLIKELY(libc_debug)) \
         { \
             error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__, __VA_ARGS__); \
         } \
         return ERRNO_SET(ENOSYS, ret); \
-    }
+    })
+
+#define NOT_IMPLEMENTED_NO_ARGS(ret) \
+    NOT_IMPLEMENTED(ret, "", 0)
+
+#define NOT_IMPLEMENTED_NO_RET(fmt, ...) \
+    ({ \
+        if (UNLIKELY(libc_debug)) \
+        { \
+            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__, __VA_ARGS__); \
+        } \
+    })
+
+#define NOT_IMPLEMENTED_NO_RET_NO_ARGS() \
+    NOT_IMPLEMENTED_NO_RET("", 0)
 
 #define RETURN_ERROR_IF(condition, err, ret) \
     if (UNLIKELY((condition))) return ERRNO_SET(err, ret)

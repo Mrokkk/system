@@ -1,6 +1,6 @@
 #include <string.h>
 
-void* memchr(const void* s, int c, size_t n)
+void* LIBC(memchr)(const void* s, int c, size_t n)
 {
     while (n--)
     {
@@ -14,7 +14,7 @@ void* memchr(const void* s, int c, size_t n)
     return NULL;
 }
 
-void* memrchr(const void* s, int c, size_t n)
+void* LIBC(memrchr)(const void* s, int c, size_t n)
 {
     if (UNLIKELY(n == 0))
     {
@@ -33,3 +33,6 @@ void* memrchr(const void* s, int c, size_t n)
 
     return NULL;
 }
+
+LIBC_ALIAS(memchr);
+LIBC_ALIAS(memrchr);

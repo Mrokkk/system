@@ -2,7 +2,7 @@
 
 _Static_assert(sizeof(struct __jmp_buf) == 24);
 
-__attribute__((naked)) void longjmp(jmp_buf, int)
+__attribute__((naked)) void LIBC(longjmp)(jmp_buf, int)
 {
     asm volatile(
         "mov 4(%esp), %ecx;"
@@ -16,7 +16,7 @@ __attribute__((naked)) void longjmp(jmp_buf, int)
         "jmp *%edx");
 }
 
-__attribute__((naked)) int setjmp(jmp_buf)
+__attribute__((naked)) int LIBC(setjmp)(jmp_buf)
 {
     asm volatile(
         "mov 4(%esp), %ecx;"
@@ -32,12 +32,17 @@ __attribute__((naked)) int setjmp(jmp_buf)
 }
 
 // FIXME: implement those properly
-__attribute__((naked)) void siglongjmp(sigjmp_buf, int)
+__attribute__((naked)) void LIBC(siglongjmp)(sigjmp_buf, int)
 {
     asm volatile("jmp longjmp;");
 }
 
-__attribute__((naked)) int sigsetjmp(sigjmp_buf, int)
+__attribute__((naked)) int LIBC(sigsetjmp)(sigjmp_buf, int)
 {
     asm volatile("jmp setjmp;");
 }
+
+LIBC_ALIAS(longjmp);
+LIBC_ALIAS(setjmp);
+LIBC_ALIAS(sigsetjmp);
+LIBC_ALIAS(siglongjmp);

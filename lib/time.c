@@ -8,42 +8,39 @@ char*   tzname[2];
 int     daylight;
 static struct tm __tm;
 
-size_t strftime(
+size_t LIBC(strftime)(
     char* s,
     size_t max,
     const char* restrict format,
     const struct tm* restrict tm)
 {
-    UNUSED(s); UNUSED(max); UNUSED(format); UNUSED(tm);
-    return 0;
+    NOT_IMPLEMENTED(0, "%p, %u, \"%s\", %p", s, max, format, tm);
 }
 
-size_t strftime_l(
+size_t LIBC(strftime_l)(
     char* s,
     size_t max,
     const char* restrict format,
     const struct tm* restrict tm,
     locale_t locale)
 {
-    UNUSED(s); UNUSED(max); UNUSED(format); UNUSED(tm); UNUSED(locale);
-    return 0;
+    NOT_IMPLEMENTED(0, "%p, %u, \"%s\", %p, %p", s, max, format, tm, locale);
 }
 
-int gettimeofday(struct timeval* restrict tp, void* restrict tzp)
+int LIBC(gettimeofday)(struct timeval* restrict tp, void* restrict tzp)
 {
-    UNUSED(tp); UNUSED(tzp);
     tp->tv_sec = 0;
     tp->tv_usec = 0;
-    return 0;
+    NOT_IMPLEMENTED(0, "%p, %p", tp, tzp);
 }
 
-struct tm* localtime(const time_t* timep)
+struct tm* LIBC(localtime)(const time_t* timep)
 {
     UNUSED(timep);
     return &__tm;
 }
 
-time_t mktime(struct tm* tm)
+time_t LIBC(mktime)(struct tm* tm)
 {
     return mktime_raw(
         tm->tm_year,
@@ -54,12 +51,20 @@ time_t mktime(struct tm* tm)
         tm->tm_sec);
 }
 
-clock_t clock(void)
+clock_t LIBC(clock)(void)
 {
     return 0;
 }
 
-int utime(char const* pathname, const struct utimbuf* times)
+int LIBC(utime)(char const* pathname, const struct utimbuf* times)
 {
     NOT_IMPLEMENTED(-1, "\"%s\", %p", pathname, times);
 }
+
+LIBC_ALIAS(strftime);
+LIBC_ALIAS(strftime_l);
+LIBC_ALIAS(gettimeofday);
+LIBC_ALIAS(localtime);
+LIBC_ALIAS(mktime);
+LIBC_ALIAS(clock);
+LIBC_ALIAS(utime);

@@ -1,14 +1,20 @@
 #include <grp.h>
 
-struct group* getgrent(void)
+struct group* LIBC(getgrent)(void)
 {
-    return NULL;
+    NOT_IMPLEMENTED_NO_ARGS(NULL);
 }
 
-void setgrent(void)
+void LIBC(setgrent)(void)
 {
+    NOT_IMPLEMENTED_NO_RET_NO_ARGS();
 }
 
-void endgrent(void)
+void LIBC(endgrent)(void)
 {
+    NOT_IMPLEMENTED_NO_RET_NO_ARGS();
 }
+
+LIBC_ALIAS(getgrent);
+LIBC_ALIAS(setgrent);
+LIBC_ALIAS(endgrent);

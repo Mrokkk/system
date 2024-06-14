@@ -1,7 +1,8 @@
 #include <stdlib.h>
 
-int atexit(void (*function)(void))
+int LIBC(atexit)(void (*function)(void))
 {
-    UNUSED(function);
-    return -1;
+    NOT_IMPLEMENTED(-1, "%p", function);
 }
+
+LIBC_ALIAS(atexit);

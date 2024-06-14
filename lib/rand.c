@@ -2,7 +2,7 @@
 
 int last = 1032;
 
-int rand(void)
+int LIBC(rand)(void)
 {
     int x = last;
     x ^= x << 13;
@@ -11,7 +11,10 @@ int rand(void)
     return last = x;
 }
 
-void srand(unsigned int seed)
+void LIBC(srand)(unsigned int seed)
 {
     last = (int)seed;
 }
+
+LIBC_ALIAS(rand);
+LIBC_ALIAS(srand);

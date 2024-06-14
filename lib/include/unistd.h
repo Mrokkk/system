@@ -22,4 +22,6 @@ static inline int execvp(const char* path, char* const argv[])
 unsigned int sleep(unsigned int seconds);
 int gethostname(char* name, size_t namelen);
 
+[[noreturn]] void _exit(int retcode);
+
 #endif // __ASSEMBLER__

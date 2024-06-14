@@ -9,18 +9,18 @@ static struct passwd passwd = {
     .pw_shell = "/bin/sh"
 };
 
-struct passwd* getpwnam(const char* name)
+struct passwd* LIBC(getpwnam)(const char* name)
 {
     VALIDATE_INPUT(name, NULL);
     return &passwd;
 }
 
-struct passwd* getpwuid(uid_t)
+struct passwd* LIBC(getpwuid)(uid_t)
 {
     return &passwd;
 }
 
-int getpwnam_r(
+int LIBC(getpwnam_r)(
     const char* restrict name,
     struct passwd* restrict pwd,
     char* buf,
@@ -33,7 +33,7 @@ int getpwnam_r(
     return 0;
 }
 
-int getpwuid_r(
+int LIBC(getpwuid_r)(
     uid_t,
     struct passwd* restrict pwd,
     char* buf,
@@ -46,15 +46,25 @@ int getpwuid_r(
     return 0;
 }
 
-void endpwent(void)
+void LIBC(endpwent)(void)
 {
+    NOT_IMPLEMENTED_NO_RET_NO_ARGS();
 }
 
-struct passwd* getpwent(void)
+struct passwd* LIBC(getpwent)(void)
 {
     return &passwd;
 }
 
-void setpwent(void)
+void LIBC(setpwent)(void)
 {
+    NOT_IMPLEMENTED_NO_RET_NO_ARGS();
 }
+
+LIBC_ALIAS(getpwnam);
+LIBC_ALIAS(getpwuid);
+LIBC_ALIAS(getpwnam_r);
+LIBC_ALIAS(getpwuid_r);
+LIBC_ALIAS(endpwent);
+LIBC_ALIAS(getpwent);
+LIBC_ALIAS(setpwent);

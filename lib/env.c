@@ -1,4 +1,3 @@
-#include "libc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,13 +58,13 @@ char* LIBC(getenv)(const char* name)
 
     return var.value;
 }
-WEAK_ALIAS(LIBC(getenv), getenv)
+LIBC_ALIAS(getenv);
 
 char* LIBC(secure_getenv)(const char* name)
 {
     return getenv(name);
 }
-WEAK_ALIAS(LIBC(secure_getenv), secure_getenv)
+LIBC_ALIAS(secure_getenv);
 
 static int var_allocate(const char* name, const char* value, size_t name_len, size_t value_len, char** var)
 {
@@ -169,4 +168,4 @@ int LIBC(setenv)(const char* name, const char* value, int overwrite)
 
     return 0;
 }
-WEAK_ALIAS(LIBC(setenv), setenv)
+LIBC_ALIAS(setenv);

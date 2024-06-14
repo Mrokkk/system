@@ -3,14 +3,13 @@
 
 intmax_t LIBC(strtoimax)(const char* restrict nptr, char** restrict endptr, int base)
 {
-    UNUSED(nptr); UNUSED(endptr); UNUSED(base);
-    return 0;
+    NOT_IMPLEMENTED(0, "\"%s\", %p, %d", nptr, endptr, base);
 }
-WEAK_ALIAS(LIBC(strtoimax), strtoimax);
 
 uintmax_t LIBC(strtoumax)(const char* restrict nptr, char** restrict endptr, int base)
 {
-    UNUSED(nptr); UNUSED(endptr); UNUSED(base);
-    return 0;
+    NOT_IMPLEMENTED(0, "\"%s\", %p, %d", nptr, endptr, base);
 }
-WEAK_ALIAS(LIBC(strtoumax), strtoumax);
+
+LIBC_ALIAS(strtoimax);
+LIBC_ALIAS(strtoumax);

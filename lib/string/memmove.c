@@ -1,6 +1,6 @@
 #include <string.h>
 
-void* memmove(void* dest, const void* src, size_t n)
+void* LIBC(memmove)(void* dest, const void* src, size_t n)
 {
     if (ADDR(dest) - ADDR(src) >= n)
     {
@@ -18,3 +18,5 @@ void* memmove(void* dest, const void* src, size_t n)
 
     return dest;
 }
+
+LIBC_ALIAS(memmove);

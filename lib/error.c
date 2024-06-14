@@ -38,7 +38,7 @@ static void error_impl(
     }
 }
 
-void error(int status, int errnum, const char* format, ...)
+void LIBC(error)(int status, int errnum, const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -46,7 +46,7 @@ void error(int status, int errnum, const char* format, ...)
     va_end(args);
 }
 
-void error_at_line(
+void LIBC(error_at_line)(
     int status,
     int errnum,
     const char* filename,
@@ -61,3 +61,6 @@ void error_at_line(
     error_impl(status, errnum, short_file, linenum, format, args);
     va_end(args);
 }
+
+LIBC_ALIAS(error);
+LIBC_ALIAS(error_at_line);

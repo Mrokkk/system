@@ -1,7 +1,7 @@
 #include <signal.h>
 #include <stdlib.h>
 
-[[noreturn]] void abort(void)
+[[noreturn]] void LIBC(abort)(void)
 {
     if (raise(SIGABRT))
     {
@@ -12,3 +12,5 @@
 
     __builtin_unreachable();
 }
+
+LIBC_ALIAS(abort);

@@ -1,6 +1,6 @@
 #include <string.h>
 
-char* strtok_r(char* str, const char* delim, char** saveptr)
+char* LIBC(strtok_r)(char* str, const char* delim, char** saveptr)
 {
     if (str)
     {
@@ -26,8 +26,11 @@ char* strtok_r(char* str, const char* delim, char** saveptr)
     return begin;
 }
 
-char* strtok(char* str, const char* delim)
+char* LIBC(strtok)(char* str, const char* delim)
 {
     static char* buf;
     return strtok_r(str, delim, &buf);
 }
+
+LIBC_ALIAS(strtok_r);
+LIBC_ALIAS(strtok);

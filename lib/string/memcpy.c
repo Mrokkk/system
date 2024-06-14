@@ -1,6 +1,6 @@
 #include <string.h>
 
-void* memcpy(void* dest, const void* src, size_t size)
+void* LIBC(memcpy)(void* dest, const void* src, size_t size)
 {
     size_t size4;
     uint32_t* d4;
@@ -18,3 +18,5 @@ void* memcpy(void* dest, const void* src, size_t size)
 
     return dest;
 }
+
+LIBC_ALIAS(memcpy);

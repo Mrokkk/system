@@ -98,7 +98,7 @@ static inline swap_type_t get_swap_type(void* base, size_t size)
     return SWAP_BYTES;
 }
 
-void qsort(
+void LIBC(qsort)(
     void* base,
     size_t nmemb,
     size_t size,
@@ -107,7 +107,7 @@ void qsort(
     return qsort_impl(base, 0, nmemb - 1, size, get_swap_type(base, size), (comp_d_t)((void*)compar), NULL);
 }
 
-void qsort_r(
+void LIBC(qsort_r)(
     void* base,
     size_t nmemb,
     size_t size,
@@ -116,3 +116,6 @@ void qsort_r(
 {
     return qsort_impl(base, 0, nmemb - 1, size, get_swap_type(base, size), compar, arg);
 }
+
+LIBC_ALIAS(qsort);
+LIBC_ALIAS(qsort_r);

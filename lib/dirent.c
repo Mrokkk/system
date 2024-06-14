@@ -10,11 +10,11 @@
 struct directory
 {
     int fd;
+    uint32_t magic;
     struct dirent* buf;
     struct dirent* current;
     size_t count;
     size_t index;
-    uint32_t magic;
 };
 
 DIR* opendir(const char* name)

@@ -10,9 +10,8 @@ int getopt_long(
     const struct option* longopts,
     int* longindex)
 {
-    UNUSED(argc); UNUSED(argv); UNUSED(optstring);
-    UNUSED(longopts); UNUSED(longindex);
-    return -1;
+    NOT_IMPLEMENTED(-1, "%d, %p, \"%s\", %p, %p",
+        argc, argv, optstring, longopts, longindex);
 }
 
 int getopt_long_only(
@@ -22,7 +21,6 @@ int getopt_long_only(
     const struct option* longopts,
     int* longindex)
 {
-    UNUSED(argc); UNUSED(argv); UNUSED(optstring);
-    UNUSED(longopts); UNUSED(longindex);
-    return -1;
+    NOT_IMPLEMENTED(-1, "%d, %p, \"%s\", %p, %p",
+        argc, argv, optstring, longopts, longindex);
 }

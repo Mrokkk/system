@@ -8,6 +8,7 @@ void* realloc(void* ptr, size_t size);
 void free(void* ptr);
 
 [[noreturn]] void exit(int retcode);
+[[noreturn]] void _Exit(int retcode);
 [[noreturn]] void abort(void);
 
 int setenv(const char* name, const char* value, int overwrite);

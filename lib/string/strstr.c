@@ -1,6 +1,6 @@
 #include <string.h>
 
-char* strstr(const char* haystack, const char* needle)
+char* LIBC(strstr)(const char* haystack, const char* needle)
 {
     if (!*needle)
     {
@@ -25,3 +25,5 @@ char* strstr(const char* haystack, const char* needle)
 
     return NULL;
 }
+
+LIBC_ALIAS(strstr);

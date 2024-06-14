@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-int atoi(const char* nptr)
+int LIBC(atoi)(const char* nptr)
 {
     int digit;
     int value = 0;
@@ -25,3 +25,5 @@ int atoi(const char* nptr)
 
     return negative ? value : -value;
 }
+
+LIBC_ALIAS(atoi);

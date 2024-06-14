@@ -1,6 +1,6 @@
 #include <string.h>
 
-int strcmp(const char* s1, const char* s2)
+int LIBC(strcmp)(const char* s1, const char* s2)
 {
     int res;
     int val1, val2;
@@ -20,7 +20,7 @@ int strcmp(const char* s1, const char* s2)
     return res;
 }
 
-int strncmp(const char* s1, const char* s2, size_t count)
+int LIBC(strncmp)(const char* s1, const char* s2, size_t count)
 {
     int res;
     int val1, val2;
@@ -40,4 +40,7 @@ int strncmp(const char* s1, const char* s2, size_t count)
     return res;
 }
 
-STRONG_ALIAS(strcmp, strcoll);
+LIBC_ALIAS(strcmp);
+LIBC_ALIAS(strncmp);
+
+WEAK_ALIAS(strcmp, strcoll);
