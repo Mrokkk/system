@@ -74,3 +74,5 @@ static inline int signal_can_be_trapped(int s)
 {
     return (s != SIGKILL && s != SIGSTOP);
 }
+
+const char* signame(int sig);

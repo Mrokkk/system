@@ -1,10 +1,11 @@
 #include <kernel/signal.h>
 #include <kernel/process.h>
 
-static const char* signame(int sig)
+const char* signame(int sig)
 {
     switch (sig)
     {
+        case 0: return "0";
         case SIGHUP: return "SIGHUP";
         case SIGINT: return "SIGINT";
         case SIGQUIT: return "SIGQUIT";

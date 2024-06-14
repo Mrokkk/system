@@ -1,9 +1,12 @@
 #include <stdarg.h>
 #include <kernel/ctype.h>
+#include <kernel/ioctl.h>
 #include <kernel/trace.h>
 #include <kernel/types.h>
+#include <kernel/signal.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
+#include <kernel/process.h>
 #include <kernel/process.h>
 #include <kernel/syscall.h>
 
@@ -207,6 +210,117 @@ static int* parameters_get(int* buf, va_list args, size_t count)
     return buf;
 }
 
+#define FLAG(f) \
+    case f: *it += sprintf(*it, #f); return 1
+
+#define BITFLAG_EMPTY(v, c) \
+    if (!(v)) \
+    { \
+        *it += sprintf(*it, "%s", #c); \
+        continuation = 1; \
+    }
+
+#define BITFLAG(f) \
+    if (value & (f)) \
+    { \
+        if (continuation) *(*it)++ = '|'; \
+        *it += sprintf(*it, #f); \
+        value ^= f; \
+        continuation = 1; \
+    }
+
+#define BITFLAG_LEFT() \
+    if (value) \
+    { \
+        *it += sprintf(*it, "%s%x", continuation ? "|" : "", value); \
+    }
+
+static int special_parameter(int nr, size_t id, int value, char** it)
+{
+    int continuation = 0;
+    switch (nr)
+    {
+        case __NR_signal:
+        case __NR_sigaction:
+            if (id == 0)
+            {
+                *it += sprintf(*it, "%s", signame(value));
+                return 1;
+            }
+            break;
+        case __NR_kill:
+            if (id == 1)
+            {
+                *it += sprintf(*it, "%s", signame(value));
+                return 1;
+            }
+            break;
+        case __NR_ioctl:
+            if (id != 1)
+            {
+                return 0;
+            }
+            switch (value)
+            {
+                FLAG(KDSETMODE);
+                FLAG(KDGETMODE);
+                FLAG(TCGETA);
+                FLAG(TCSETA);
+                FLAG(TIOCGETA);
+                FLAG(TIOCGWINSZ);
+                FLAG(TIOCSWINSZ);
+                FLAG(FBIOGET_VSCREENINFO);
+                FLAG(FBIOPUT_VSCREENINFO);
+                FLAG(FBIOGET_FSCREENINFO);
+            }
+            break;
+        case __NR_open:
+            if (id != 1)
+            {
+                return 0;
+            }
+            BITFLAG_EMPTY(value & O_ACCMODE, O_RDONLY);
+            BITFLAG(O_WRONLY);
+            BITFLAG(O_RDWR);
+            BITFLAG(O_CREAT);
+            BITFLAG(O_EXCL);
+            BITFLAG(O_NOCTTY);
+            BITFLAG(O_TRUNC);
+            BITFLAG(O_APPEND);
+            BITFLAG(O_NONBLOCK);
+            BITFLAG(O_DIRECTORY);
+            BITFLAG_LEFT();
+            return 1;
+        case __NR_waitpid:
+            if (id != 2)
+            {
+                return 0;
+            }
+            BITFLAG_EMPTY(value, 0);
+            BITFLAG(WNOHANG);
+            BITFLAG(WUNTRACED);
+            BITFLAG(WCONTINUED);
+            BITFLAG_LEFT();
+            return 1;
+        case __NR_fcntl:
+            if (id != 1)
+            {
+                return 0;
+            }
+            switch (value)
+            {
+                FLAG(F_DUPFD);
+                FLAG(F_GETFD);
+                FLAG(F_SETFD);
+                FLAG(F_GETFL);
+                FLAG(F_SETFL);
+            }
+            return 0;
+    }
+
+    return 0;
+}
+
 int trace_syscall(unsigned long nr, ...)
 {
     if (likely(!process_current->trace))
@@ -229,10 +343,15 @@ int trace_syscall(unsigned long nr, ...)
 
     it += sprintf(it, "%s(", call->name);
 
-    for (size_t i = 0; i < call->nargs; ++i)
+    for (size_t i = 0; i < call->nargs; ++i, ({ i < call->nargs ? it += sprintf(it, ", ") : 0; }))
     {
         type_t arg = call->args[i];
         int value = params[i];
+
+        if (special_parameter(nr, i, value, &it))
+        {
+            continue;
+        }
 
         switch (arg)
         {
@@ -247,11 +366,6 @@ int trace_syscall(unsigned long nr, ...)
                 it += sprintf(it, fmt, value);
                 break;
             }
-        }
-
-        if (i + 1 < call->nargs)
-        {
-            it += sprintf(it, ", ");
         }
     }
 
