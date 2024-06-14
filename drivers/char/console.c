@@ -168,6 +168,12 @@ static inline void position_prev(console_t* console)
     --console->x;
 }
 
+static inline void carriage_return(console_t* console)
+{
+    console->current_line->pos = console->current_line->line;
+    console->x = 0;
+}
+
 static inline void colors_set(console_t* console)
 {
     console_driver_t* drv = console->driver;
@@ -373,6 +379,9 @@ static command_t normal_mode(console_t* console, tty_t* tty, int c)
             console_putc(console, ' ');
             console_putc(console, ' ');
             console_putc(console, ' ');
+            return C_DROP;
+        case '\r':
+            carriage_return(console);
             return C_DROP;
         case '\n':
             position_newline(console);
