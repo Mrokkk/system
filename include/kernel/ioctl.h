@@ -10,11 +10,13 @@
 #define TCGETA              0x4400
 #define TCSETA              0x4401
 #define TIOCGETA            0x4500
+#define TIOCGWINSZ          0x4501
+#define TIOCSWINSZ          0x4502
 #define FBIOGET_VSCREENINFO 0x4600
 #define FBIOPUT_VSCREENINFO 0x4601
 #define FBIOGET_FSCREENINFO 0x4602
 
-struct fb_var_screeninfo;
+typedef struct winsize winsize_t;
 typedef struct fb_var_screeninfo fb_var_screeninfo_t;
 
 struct fb_var_screeninfo
@@ -23,6 +25,12 @@ struct fb_var_screeninfo
     uint32_t yres;
     uint32_t bits_per_pixel;
     uint32_t pitch;
+};
+
+struct winsize
+{
+    unsigned short ws_row;
+    unsigned short ws_col;
 };
 
 int ioctl(int fd, unsigned long request, ...);

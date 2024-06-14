@@ -565,6 +565,21 @@ static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
                 default: return -EINVAL;
             }
         }
+        case TIOCGWINSZ:
+        {
+            winsize_t* w = arg;
+            w->ws_col = console->resx;
+            w->ws_row = console->resy;
+            return 0;
+        }
+        case TIOCSWINSZ:
+        {
+            winsize_t* w = arg;
+            if (w->ws_col == console->resx && w->ws_row == console->resy)
+            {
+                return 0;
+            }
+        }
     }
     return -EINVAL;
 }
