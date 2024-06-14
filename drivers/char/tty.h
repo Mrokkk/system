@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdint.h>
 #include <kernel/fifo.h>
 #include <kernel/list.h>
 #include <kernel/wait.h>
@@ -12,13 +11,15 @@
 #define TTY_BUFFER_SIZE 256
 #define TTY_INITIALIZED 0x4215
 
+#define TTY_SPECIAL_MODE -1
+
 typedef struct tty
 {
     dev_t major;
     tty_driver_t* driver;
     termios_t termios;
     int driver_special_key;
-    int disabled;
+    int special_mode;
     wait_queue_head_t wq;
     BUFFER_MEMBER_DECLARE(buf, TTY_BUFFER_SIZE);
     list_head_t list_entry;

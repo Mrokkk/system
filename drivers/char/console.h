@@ -4,10 +4,6 @@
 #include <kernel/fs.h>
 #include "console_driver.h"
 
-struct line;
-struct console;
-struct line_char;
-
 typedef struct line line_t;
 typedef struct console console_t;
 typedef struct line_char line_char_t;

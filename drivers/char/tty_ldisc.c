@@ -86,11 +86,11 @@ int tty_ldisc_poll(tty_t* tty, file_t*, short events, short* revents, wait_queue
     return 0;
 }
 
-void tty_ldisc_putch(tty_t* tty, char c)
+void tty_ldisc_putch(tty_t* tty, int c)
 {
     int signal = 0;
     struct process* p;
-    int disabled = tty->disabled;
+    int special_mode = tty->special_mode;
 
     if (c == '\r' && I_ICRNL(tty))
     {
@@ -98,17 +98,16 @@ void tty_ldisc_putch(tty_t* tty, char c)
     }
     else if (c == tty->driver_special_key)
     {
-        disabled = 1;
+        tty->driver->putch(tty, TTY_SPECIAL_MODE);
+        return;
     }
 
-    // FIXME: this is a misleading code - rename disabled to
-    // something more meaningful
-    if (L_ECHO(tty) || disabled)
+    if (L_ECHO(tty) || special_mode)
     {
         tty->driver->putch(tty, c);
     }
 
-    if (disabled)
+    if (special_mode)
     {
         return;
     }

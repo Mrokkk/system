@@ -24,7 +24,7 @@ void serial_send(char a, uint16_t port);
 static int serial_open(tty_t* tty, file_t* file);
 static int serial_close(tty_t* tty, file_t* file);
 static int serial_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
-static void serial_putch(tty_t* tty, uint8_t c);
+static void serial_putch(tty_t* tty, int c);
 static void serial_irs(void);
 
 static tty_driver_t serial_driver = {
@@ -194,7 +194,7 @@ static int serial_write(tty_t*, file_t* file, const char* buffer, size_t size)
     return old;
 }
 
-static void serial_putch(tty_t*, uint8_t c)
+static void serial_putch(tty_t*, int c)
 {
     serial_send(c, COM1);
 }

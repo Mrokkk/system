@@ -21,20 +21,21 @@
 
 #define INITIAL_CAPACITY 128
 
-typedef enum
-{
-    C_PRINT,
-    C_DROP,
-} command_t;
-
 static int console_open(tty_t* tty, file_t* file);
 static int console_setup(console_driver_t* driver);
 static int console_close(tty_t* tty, file_t* file);
 static int console_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
 static int console_ioctl(tty_t* tty, unsigned long request, void* arg);
-static void console_putch(tty_t* tty, uint8_t c);
+static void console_putch(tty_t* tty, int c);
 
-static command_t control(console_t* console, tty_t* tty, char c);
+typedef enum
+{
+    C_CONTINUE = 0,
+    C_PRINT    = 1,
+    C_DROP     = 2,
+} command_t;
+
+static command_t control(console_t* console, tty_t* tty, int c);
 static int allocate(console_t* console);
 
 static tty_driver_t tty_driver = {
@@ -260,65 +261,8 @@ static inline void console_putc(console_t* console, uint8_t c)
     position_next(console);
 }
 
-static command_t control(console_t* console, tty_t* tty, char c)
+static command_t escape_sequence(console_t* console, int c)
 {
-    int tmux_mode = console->tmux_mode;
-
-    if (unlikely(tmux_mode))
-    {
-        switch (c)
-        {
-            case 'q':
-                tty->disabled = 0;
-                console->scrolling = 0;
-                console->tmux_mode = 0;
-                console->visible_line = console->orig_visible_line;
-                console->orig_visible_line = NULL;
-                redraw_lines_full(console);
-                return C_DROP;
-            case '\e':
-                break;
-            default:
-                if (console->state == ES_NORMAL)
-                {
-                    return C_DROP;
-                }
-        }
-    }
-
-    switch (c)
-    {
-        case 0:
-        case 1:
-        case 3:
-        case 4:
-        case 7:
-        case 26:
-            return C_DROP;
-        case 2:
-            console->tmux_mode = 1;
-            console->orig_visible_line = console->visible_line;
-            tty->disabled = 1;
-            return C_DROP;
-        case '\b':
-        case 0x7f:
-            position_prev(console);
-            return C_DROP;
-        case '\e':
-            log_debug(DEBUG_CONSOLE, "switch to ESC");
-            console->state = ES_ESC;
-            return C_DROP;
-        case '\t':
-            console_putc(console, ' ');
-            console_putc(console, ' ');
-            console_putc(console, ' ');
-            console_putc(console, ' ');
-            return C_DROP;
-        case '\n':
-            position_newline(console);
-            return C_DROP;
-    }
-
     switch (console->state)
     {
         case ES_ESC:
@@ -331,7 +275,7 @@ static command_t control(console_t* console, tty_t* tty, char c)
             }
             return C_DROP;
         case ES_SQUARE:
-            if (console->tmux_mode && (c == 'A' || c == 'B'))
+            if (console->tmux_mode && (c == 'A' || c == 'B' || c == 'C' || c == 'D'))
             {
                 scroll_line(console, c);
                 return C_DROP;
@@ -372,10 +316,92 @@ static command_t control(console_t* console, tty_t* tty, char c)
             break;
     }
 
-    return console->tmux_mode ? C_DROP : C_PRINT;
+    return C_CONTINUE;
 }
 
-static void console_putch(tty_t* tty, uint8_t c)
+static command_t tmux_mode(console_t* console, tty_t* tty, int c)
+{
+    if (likely(!console->tmux_mode))
+    {
+        return C_CONTINUE;
+    }
+
+    switch (c)
+    {
+        case 'q':
+            tty->special_mode = 0;
+            console->scrolling = 0;
+            console->tmux_mode = 0;
+            console->visible_line = console->orig_visible_line;
+            console->orig_visible_line = NULL;
+            redraw_lines_full(console);
+            return C_DROP;
+        case '\e':
+            log_debug(DEBUG_CONSOLE, "switch to ESC");
+            console->state = ES_ESC;
+            return C_DROP;
+        default:
+            if (console->state != ES_NORMAL)
+            {
+                escape_sequence(console, c);
+            }
+            return C_DROP;
+    }
+}
+
+static command_t normal_mode(console_t* console, tty_t* tty, int c)
+{
+    switch (c)
+    {
+        case 0:
+        case 1:
+        case 3:
+        case 4:
+        case 7:
+        case 26:
+            return C_DROP;
+        case '\b':
+        case 0x7f:
+            position_prev(console);
+            return C_DROP;
+        case '\e':
+            log_debug(DEBUG_CONSOLE, "switch to ESC");
+            console->state = ES_ESC;
+            return C_DROP;
+        case '\t':
+            console_putc(console, ' ');
+            console_putc(console, ' ');
+            console_putc(console, ' ');
+            console_putc(console, ' ');
+            return C_DROP;
+        case '\n':
+            position_newline(console);
+            return C_DROP;
+        case TTY_SPECIAL_MODE:
+            console->tmux_mode = 1;
+            console->orig_visible_line = console->visible_line;
+            tty->special_mode = 1;
+            return C_DROP;
+    }
+
+    return C_CONTINUE;
+}
+
+static command_t control(console_t* console, tty_t* tty, int c)
+{
+    command_t cmd;
+
+    if ((cmd = tmux_mode(console, tty, c)) ||
+        (cmd = normal_mode(console, tty, c)) ||
+        (cmd = escape_sequence(console, c)))
+    {
+        return cmd;
+    }
+
+    return C_PRINT;
+}
+
+static void console_putch(tty_t* tty, int c)
 {
     console_t* console = tty->driver->driver_data;
     if (console->disabled)

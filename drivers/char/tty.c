@@ -92,7 +92,7 @@ int tty_driver_register(tty_driver_t* drv)
     new_tty->driver = drv;
     new_tty->major = drv->major;
     new_tty->driver_special_key = -1;
-    new_tty->disabled = 0;
+    new_tty->special_mode = 0;
     new_tty->termios.c_iflag = DEFAULT_C_IFLAG;
     new_tty->termios.c_oflag = DEFAULT_C_OFLAG;
     new_tty->termios.c_cflag = DEFAULT_C_CFLAG;

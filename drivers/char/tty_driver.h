@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stddef.h>
-#include <stdint.h>
 #include <kernel/dev.h>
 #include <kernel/list.h>
 
@@ -19,7 +18,7 @@ struct tty_driver
     int (*close)(struct tty* tty, struct file* file);
     int (*write)(struct tty* tty, struct file* file, const char* buf, size_t count);
     int (*ioctl)(struct tty* tty, unsigned long request, void* arg);
-    void (*putch)(struct tty* tty, uint8_t c);
+    void (*putch)(struct tty* tty, int c);
     list_head_t drivers;
 };
 

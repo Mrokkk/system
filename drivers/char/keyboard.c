@@ -153,7 +153,7 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
     }
 
     log_debug(DEBUG_KEYBOARD, "tty insert: %u", c);
-    tty_char_insert(kb_tty, ctrl && c ? c & 0x1f : c);
+    tty_char_insert(kb_tty, c);
 }
 
 void keyboard_irs()
