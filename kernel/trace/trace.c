@@ -148,10 +148,10 @@ static const char* errors[] = {
     ERRNO(EHWPOISON),
 };
 
-static int string_print(char* buffer, const char* string)
+static int string_print(char* buffer, const char* string, int limit)
 {
     char* it = buffer;
-    size_t len = strlen(string);
+    size_t len = limit != -1 ? (size_t)limit : strlen(string);
     size_t to_print = min(len, 64);
 
     *it++ = '\"';
@@ -353,11 +353,15 @@ int trace_syscall(unsigned long nr, ...)
             continue;
         }
 
+        int size_limit = nr == __NR_write
+            ? params[2]
+            : -1;
+
         switch (arg)
         {
             case TYPE_CONST_CHAR_PTR:
             {
-                it += string_print(it, (const char*)value);
+                it += string_print(it, (const char*)value, size_limit);
                 break;
             }
             default:
