@@ -16,6 +16,7 @@ add_library(c STATIC
     error.c
     getcwd.c
     gethostname.c
+    getpagesize.c
     grp.c
     inttypes.c
     isatty.c

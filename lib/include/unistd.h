@@ -20,8 +20,12 @@ static inline int execvp(const char* path, char* const argv[])
 }
 
 unsigned int sleep(unsigned int seconds);
+
 int gethostname(char* name, size_t namelen);
+int getpagesize(void);
 
 [[noreturn]] void _exit(int retcode);
+
+extern char** environ;
 
 #endif // __ASSEMBLER__

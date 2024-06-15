@@ -1,6 +1,7 @@
 REPO="https://github.com/coreutils/coreutils.git"
 VERSION=
 BRANCH=
+APPS=("ls" "tty" "basename")
 
 function build()
 {
@@ -44,11 +45,17 @@ function build()
     fi
 
     make -O -j${NPROC}
-    make -O src/ls -j${NPROC} || die "ls compilation failed"
+
+    for app in "${APPS[@]}"
+    do
+        make -O src/${app} || die "${app} build failed"
+    done
 }
 
 function install()
 {
-    cp src/ls ${SYSROOT}/bin/ls
-    #make -O install -j${NPROC}
+    for app in "${APPS[@]}"
+    do
+        cp src/${app} ${SYSROOT}/bin
+    done
 }

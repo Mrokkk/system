@@ -20,6 +20,16 @@ int atoi(const char* nptr);
 
 int atexit(void (*function)(void));
 
+long strtol(
+    const char* restrict nptr,
+    char** restrict endptr,
+    int base);
+
+long long strtoll(
+    const char* restrict nptr,
+    char** restrict endptr,
+    int base);
+
 void qsort(
     void* base,
     size_t nmemb,

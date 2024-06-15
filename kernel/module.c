@@ -1,5 +1,6 @@
 #include <kernel/fs.h>
 #include <kernel/elf.h>
+#include <kernel/path.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
@@ -76,6 +77,11 @@ int sys_init_module(const char* name)
     scoped_file_t* file = NULL;
     kmod_t* module = NULL;
     kmod_t* temp;
+
+    if ((errno = path_validate(name)))
+    {
+        return errno;
+    }
 
     if ((errno = do_open(&file, name, O_RDONLY, 0)))
     {

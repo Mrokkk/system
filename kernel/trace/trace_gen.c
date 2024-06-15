@@ -97,6 +97,13 @@ syscall_t trace_syscalls[] = {
     },
 
     {
+        .name   = "fchown",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_LONG, TYPE_UNSIGNED_SHORT, TYPE_LONG },
+    },
+
+    {
         .name   = "fcntl",
         .ret    = TYPE_LONG,
         .nargs  = 3,
@@ -199,6 +206,13 @@ syscall_t trace_syscalls[] = {
         .ret    = TYPE_LONG,
         .nargs  = 2,
         .args   = { TYPE_LONG, TYPE_LONG },
+    },
+
+    {
+        .name   = "lchown",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_SHORT, TYPE_LONG },
     },
 
     {

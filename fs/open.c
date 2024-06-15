@@ -497,3 +497,15 @@ int sys_fcntl(int fd, int cmd, ...)
 
     return -ENOSYS;
 }
+
+int sys_lchown(const char* pathname, uid_t owner, gid_t group)
+{
+    (void)pathname; (void)owner; (void)group;
+    return -ENOSYS;
+}
+
+int sys_fchown(int fd, uid_t owner, gid_t group)
+{
+    (void)fd; (void)owner; (void)group;
+    return -ENOSYS;
+}

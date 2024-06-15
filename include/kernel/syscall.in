@@ -56,3 +56,5 @@ init_module: int, const char*
 pipe: int, int*
 fcntl: int, int, int, int
 pselect: int, int, fd_set*, fd_set*, fd_set*, const struct timespec*, const sigset_t*
+lchown: int, const char*, uid_t, gid_t
+fchown: int, int, uid_t, gid_t

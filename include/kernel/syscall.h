@@ -14,52 +14,54 @@
 #define __NR_execve         11
 #define __NR_exit           12
 #define __NR_fchmod         13
-#define __NR_fcntl          14
-#define __NR_fork           15
-#define __NR_fstat          16
-#define __NR_fstatvfs       17
-#define __NR_getcwd         18
-#define __NR_getdents       19
-#define __NR_getegid        20
-#define __NR_geteuid        21
-#define __NR_getgid         22
-#define __NR_getpid         23
-#define __NR_getppid        24
-#define __NR_getuid         25
-#define __NR_init_module    26
-#define __NR_ioctl          27
-#define __NR_kill           28
-#define __NR_lseek          29
-#define __NR_mkdir          30
-#define __NR_mknod          31
-#define __NR_mmap           32
-#define __NR_mount          33
-#define __NR_open           34
-#define __NR_pipe           35
-#define __NR_poll           36
-#define __NR_pselect        37
-#define __NR_read           38
-#define __NR_reboot         39
-#define __NR_rename         40
-#define __NR_sbrk           41
-#define __NR_select         42
-#define __NR_setgid         43
-#define __NR_setsid         44
-#define __NR_setuid         45
-#define __NR_sigaction      46
-#define __NR_signal         47
-#define __NR_sigreturn      48
-#define __NR_stat           49
-#define __NR_statvfs        50
-#define __NR_time           51
-#define __NR_umask          52
-#define __NR_umount         53
-#define __NR_umount2        54
-#define __NR_unlink         55
-#define __NR_waitpid        56
-#define __NR_write          57
+#define __NR_fchown         14
+#define __NR_fcntl          15
+#define __NR_fork           16
+#define __NR_fstat          17
+#define __NR_fstatvfs       18
+#define __NR_getcwd         19
+#define __NR_getdents       20
+#define __NR_getegid        21
+#define __NR_geteuid        22
+#define __NR_getgid         23
+#define __NR_getpid         24
+#define __NR_getppid        25
+#define __NR_getuid         26
+#define __NR_init_module    27
+#define __NR_ioctl          28
+#define __NR_kill           29
+#define __NR_lchown         30
+#define __NR_lseek          31
+#define __NR_mkdir          32
+#define __NR_mknod          33
+#define __NR_mmap           34
+#define __NR_mount          35
+#define __NR_open           36
+#define __NR_pipe           37
+#define __NR_poll           38
+#define __NR_pselect        39
+#define __NR_read           40
+#define __NR_reboot         41
+#define __NR_rename         42
+#define __NR_sbrk           43
+#define __NR_select         44
+#define __NR_setgid         45
+#define __NR_setsid         46
+#define __NR_setuid         47
+#define __NR_sigaction      48
+#define __NR_signal         49
+#define __NR_sigreturn      50
+#define __NR_stat           51
+#define __NR_statvfs        52
+#define __NR_time           53
+#define __NR_umask          54
+#define __NR_umount         55
+#define __NR_umount2        56
+#define __NR_unlink         57
+#define __NR_waitpid        58
+#define __NR_write          59
 
-#define __NR_syscalls       58
+#define __NR_syscalls       60
 
 #ifndef __ASSEMBLER__
 
@@ -110,6 +112,7 @@ __syscall2(dup2, int, int, int)
 __syscall3(execve, int, const char*, char* const[], char* const[])
 __syscall1_noret(exit, void, int)
 __syscall2(fchmod, int, int, mode_t)
+__syscall3(fchown, int, int, uid_t, gid_t)
 __syscall3(fcntl, int, int, int, int)
 __syscall0(fork, int)
 __syscall2(fstat, int, int, struct stat*)
@@ -125,6 +128,7 @@ __syscall0(getuid, int)
 __syscall1(init_module, int, const char*)
 __syscall3(ioctl, int, int, unsigned long, unsigned long)
 __syscall2(kill, int, int, int)
+__syscall3(lchown, int, const char*, uid_t, gid_t)
 __syscall3(lseek, off_t, int, off_t, int)
 __syscall2(mkdir, int, const char*, mode_t)
 __syscall3(mknod, int, const char*, mode_t, dev_t)

@@ -48,6 +48,8 @@ int access(const char* path, int amode);
 unsigned int alarm(unsigned int seconds);
 int rename(const char* oldpath, const char* newpath);
 int pipe(int pipefd[2]);
+int lchown(const char* pathname, uid_t owner, gid_t group);
+int fchown(int fd, uid_t owner, gid_t group);
 
 // FIXME: replace later with ptrace
 #define DTRACE_FOLLOW_FORK 2

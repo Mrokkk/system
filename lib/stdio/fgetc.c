@@ -25,3 +25,4 @@ int LIBC(ungetc)(int c, FILE* stream)
 LIBC_ALIAS(fgetc);
 LIBC_ALIAS(fgets);
 LIBC_ALIAS(ungetc);
+WEAK_ALIAS(fgetc, getc);
