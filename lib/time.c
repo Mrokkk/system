@@ -34,10 +34,14 @@ int LIBC(gettimeofday)(struct timeval* restrict tp, void* restrict tzp)
     NOT_IMPLEMENTED(0, "%p, %p", tp, tzp);
 }
 
+struct tm* LIBC(gmtime)(const time_t* timep)
+{
+    NOT_IMPLEMENTED(&__tm, "%p", timep);
+}
+
 struct tm* LIBC(localtime)(const time_t* timep)
 {
-    UNUSED(timep);
-    return &__tm;
+    NOT_IMPLEMENTED(&__tm, "%p", timep);
 }
 
 time_t LIBC(mktime)(struct tm* tm)
@@ -61,10 +65,16 @@ int LIBC(utime)(char const* pathname, const struct utimbuf* times)
     NOT_IMPLEMENTED(-1, "\"%s\", %p", pathname, times);
 }
 
+void LIBC(tzset)(void)
+{
+}
+
 LIBC_ALIAS(strftime);
 LIBC_ALIAS(strftime_l);
 LIBC_ALIAS(gettimeofday);
+LIBC_ALIAS(gmtime);
 LIBC_ALIAS(localtime);
 LIBC_ALIAS(mktime);
 LIBC_ALIAS(clock);
 LIBC_ALIAS(utime);
+LIBC_ALIAS(tzset);

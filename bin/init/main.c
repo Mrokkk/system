@@ -77,6 +77,7 @@ static int shell_run(const char* pathname)
         setenv("PATH", "/bin", 0);
         setenv("SHELL", pathname, 0);
         setenv("HOME", "/root", 0);
+        setenv("LC_ALL", "C", 0);
 
         if (execvp(pathname, argv))
         {

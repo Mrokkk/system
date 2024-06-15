@@ -4,10 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-unsigned int error_message_count;
-int error_one_per_line;
+unsigned int LIBC(error_message_count);
+int LIBC(error_one_per_line);
+void (*LIBC(error_print_progname))(void);
 
-void (*error_print_progname)(void);
+LIBC_ALIAS(error_message_count);
+LIBC_ALIAS(error_one_per_line);
+LIBC_ALIAS(error_print_progname);
 
 static void error_impl(
     int status,

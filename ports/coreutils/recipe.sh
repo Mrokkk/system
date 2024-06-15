@@ -18,6 +18,13 @@ function build()
         popd_silent
     fi
 
+    pushd_silent "${SRC_DIR}/gnulib"
+    if git diff --quiet
+    then
+        patch -p1 < "${CONF_DIR}/gnulib/gnulib.patch"
+    fi
+    popd_silent
+
     if [[ ! -f "Makefile" ]]
     then
         ${SRC_DIR}/configure \
@@ -37,9 +44,11 @@ function build()
     fi
 
     make -O -j${NPROC}
+    make -O src/ls -j${NPROC} || die "ls compilation failed"
 }
 
 function install()
 {
-    make -O install -j${NPROC}
+    cp src/ls ${SYSROOT}/bin/ls
+    #make -O install -j${NPROC}
 }

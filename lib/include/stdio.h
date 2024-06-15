@@ -62,6 +62,9 @@ FILE* fdopen(int fd, const char* mode);
 int fclose(FILE* stream);
 int fileno(FILE* stream);
 
+int fseek(FILE* stream, long offset, int whence);
+long ftell(FILE* stream);
+
 int scanf(const char* restrict format, ...);
 int fscanf(FILE* restrict stream, const char* restrict format, ...);
 

@@ -36,6 +36,7 @@ add_library(c STATIC
     termios.c
     time.c
     ttyname.c
+    wchar.c
 
     stdio/fclose.c
     stdio/fflush.c
@@ -48,6 +49,7 @@ add_library(c STATIC
     stdio/fputs.c
     stdio/fread.c
     stdio/fscanf.c
+    stdio/fseek.c
     stdio/fwrite.c
     stdio/setvbuf.c
     stdio/sprintf.c
@@ -63,6 +65,7 @@ add_library(c STATIC
     string/strchr.c
     string/strcmp.c
     string/strcpy.c
+    string/strdup.c
     string/strlen.c
     string/strpbrk.c
     string/strspn.c

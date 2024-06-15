@@ -7,15 +7,12 @@ size_t LIBC(fwrite)(const void* ptr, size_t size, size_t nmemb, FILE* stream)
 {
     VALIDATE_INPUT(FILE_CHECK(stream) && ptr, 0);
 
-    int count = write(stream->fd, ptr, size * nmemb);
-
-    if (UNLIKELY(count < 0))
+    for (size_t i = 0; i < size * nmemb; ++i)
     {
-        stream->error = true;
-        return 0;
+        stream->buffer.putc(&stream->buffer, ((char*)ptr)[i]);
     }
 
-    return count;
+    return nmemb;
 }
 
 LIBC_ALIAS(fwrite);

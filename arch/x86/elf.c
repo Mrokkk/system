@@ -292,9 +292,9 @@ static int elf_symbols_read(const elf32_header_t* header, file_t* file, page_t**
         goto free;
     }
 
-    // sym_count * 3 is the maximum padding which can be added to the usym_t
+    // sym_count * 4 is the maximum padding + '\0' which can be added to the usym_t
     usyms_pages = page_alloc(
-        page_align(sizeof(usym_t) * sym_count + strings_len + sym_count * 3) / PAGE_SIZE,
+        page_align(sizeof(usym_t) * sym_count + strings_len + sym_count * 4) / PAGE_SIZE,
         PAGE_ALLOC_CONT);
 
     if (unlikely(!usyms_pages))

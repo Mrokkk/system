@@ -90,7 +90,8 @@ fi
 
 bashrc_content='export PS1="\u \e[34m\w\e[0m # "
 alias ktest=/bin/test
-alias ..="cd .."'
+alias ..="cd .."
+alias l="ls -lah"'
 
 grub_cfg_content="set timeout=0
 set default=0

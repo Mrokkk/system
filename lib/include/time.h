@@ -43,12 +43,16 @@ size_t strftime_l(
 
 time_t time(time_t* time);
 
+struct tm* gmtime(const time_t* timep);
+
 struct tm* localtime(const time_t* timep);
 time_t mktime(struct tm* tm);
 
 clock_t clock(void);
 int clock_gettime(clockid_t clockid, struct timespec* tp);
 int clock_settime(clockid_t clockid, struct timespec* tp);
+
+void tzset(void);
 
 extern long     timezone;
 extern long     altzone;

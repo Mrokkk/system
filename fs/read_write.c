@@ -95,5 +95,5 @@ int sys_lseek(int fd, off_t offset, int whence)
             break;
     }
 
-    return 0;
+    return file->offset;
 }
