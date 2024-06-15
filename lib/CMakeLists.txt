@@ -32,11 +32,27 @@ add_library(c STATIC
     setjmp.c
     signal.c
     sleep.c
-    stdio.c
     syscall.c
     termios.c
     time.c
     ttyname.c
+
+    stdio/fclose.c
+    stdio/fflush.c
+    stdio/fgetc.c
+    stdio/file.c
+    stdio/fopen.c
+    stdio/fprintf.c
+    stdio/fpurge.c
+    stdio/fputc.c
+    stdio/fputs.c
+    stdio/fread.c
+    stdio/fscanf.c
+    stdio/fwrite.c
+    stdio/setvbuf.c
+    stdio/sprintf.c
+    stdio/stdio.c
+    stdio/vsprintf.c
 
     string/memchr.c
     string/memcmp.c

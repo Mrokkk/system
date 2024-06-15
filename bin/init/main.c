@@ -119,6 +119,8 @@ static int shell_run(const char* pathname)
         exit(EXIT_FAILURE);
     }
 
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     printf(RED "W" GREEN "e" YELLOW "l" BLUE "c" MAGENTA "o" CYAN "m" MAGENTA "e!\n" RESET);
     printf(BG"Have fun..."RESET"\n");
     printf("\e[38;2;35;135;39m...with colors :)"RESET"\n");
@@ -163,7 +165,7 @@ static int shell_run(const char* pathname)
 
         printf("; type sh to rerun, press CTRL+D to reboot\n");
 
-        while (printf("> ") && (count = read(STDIN_FILENO, tmp, 128)))
+        while (({ printf("> "); fflush(stdout); 1; }) && (count = read(STDIN_FILENO, tmp, 128)))
         {
             if (count > 0)
             {

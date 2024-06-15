@@ -35,9 +35,6 @@ extern int libc_debug;
 #define ALIGN_TO(address, size) \
     (((address) + (size) - 1) & (~((size) - 1)))
 
-#define FILE_CHECK(file) \
-    ({ (file) && (file)->magic == FILE_MAGIC; })
-
 #define DIR_CHECK(dir) \
     ({ (dir) && (dir)->magic == DIR_MAGIC; })
 
@@ -45,7 +42,7 @@ extern int libc_debug;
     ({ \
         if (UNLIKELY(libc_debug)) \
         { \
-            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__, __VA_ARGS__); \
+            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__ + 7, __VA_ARGS__); \
         } \
         return ERRNO_SET(ENOSYS, ret); \
     })
@@ -57,7 +54,7 @@ extern int libc_debug;
     ({ \
         if (UNLIKELY(libc_debug)) \
         { \
-            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__, __VA_ARGS__); \
+            error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s(" fmt ")", __func__ + 7, __VA_ARGS__); \
         } \
     })
 

@@ -85,6 +85,11 @@ int main()
     struct dirent* dirent;
     int dirfd, count;
 
+    if (setvbuf(stdout, NULL, _IOFBF, 0))
+    {
+        printf("failed to set _IOFBF\n");
+    }
+
     getcwd(buf, BUFFER_SIZE);
 
     dirfd = open(buf, O_RDONLY | O_DIRECTORY, 0);
@@ -109,6 +114,8 @@ int main()
         dirent_print(dirent, stats + i);
         dirent = (struct dirent*)((char*)dirent + dirent->d_reclen);
     }
+
+    fflush(stdout);
 
     return 0;
 }

@@ -8,7 +8,7 @@
 #define STDOUT_FILENO   1
 #define STDERR_FILENO   2
 
-#define BUFSIZ          1024
+#define BUFSIZ          (1024 - 64)
 
 #define _IONBF 0    // unbuffered
 #define _IOLBF 1    // line buffered
@@ -22,11 +22,22 @@ extern FILE* stdin;
 extern FILE* stdout;
 extern FILE* stderr;
 
-int setvbuf(
-    FILE* restrict stream,
-    char* buf,
-    int mode,
-    size_t size);
+int setvbuf(FILE* restrict stream, char* buf, int mode, size_t size);
+
+static inline void setbuf(FILE* restrict stream, char* buf)
+{
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
+}
+
+static inline void setbuffer(FILE* restrict stream, char* buf, size_t size)
+{
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
+}
+
+static inline void setlinebuf(FILE* stream)
+{
+    setvbuf(stream, NULL, _IOLBF, BUFSIZ);
+}
 
 int fgetc(FILE* stream);
 int getc(FILE* stream);
@@ -58,6 +69,7 @@ int vscanf(const char* restrict format, va_list ap);
 int vfscanf(FILE* restrict stream, const char* restrict format, va_list ap);
 
 int vsprintf(char* buf, const char* fmt, va_list args);
+int vsnprintf(char* buf, size_t size, const char* fmt, va_list args);
 int vfprintf(FILE* restrict stream, const char* restrict format, va_list ap);
 int sprintf(char* buf, const char* fmt, ...);
 int fprintf(FILE* file, const char* fmt, ...);

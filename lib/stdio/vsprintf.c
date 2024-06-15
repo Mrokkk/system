@@ -1,34 +1,11 @@
-#include <ctype.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
+#include <ctype.h>
 #include <string.h>
-#include <unistd.h>
-#include <stdbool.h>
 
-#define PRINTF_BUFFER   512
+#include "printf_buffer.h"
+#include "printf_buffer_string.h"
 
-struct file
-{
-    int         fd;
-    uint32_t    magic;
-    bool        error;
-    char*       buffer;
-    char*       it;
-};
-
-static FILE files[] = {
-    { STDIN_FILENO, FILE_MAGIC, false, NULL, NULL },
-    { STDOUT_FILENO, FILE_MAGIC, false, NULL, NULL },
-    { STDERR_FILENO, FILE_MAGIC, false, NULL, NULL }
-};
-
-FILE* stdin = &files[STDIN_FILENO];
-FILE* stdout = &files[STDOUT_FILENO];
-FILE* stderr = &files[STDERR_FILENO];
-
-static inline int skip_atoi(const char **s)
+static inline int skip_atoi(const char** s)
 {
     int i = 0;
 
@@ -58,8 +35,10 @@ static inline int skip_atoi(const char **s)
 // we are called with base 8, 10 or 16, only, thus don't need "G..."
 static const char digits[16] = "0123456789ABCDEF";
 
-static char* number(
-    char* str,
+#define PUTC(c) ({ if (UNLIKELY(buffer->putc(buffer, c))) return -1; 0; })
+
+static int number(
+    printf_buffer_t* buffer,
     long num,
     int base,
     int size,
@@ -79,7 +58,7 @@ static char* number(
     }
     if (base < 2 || base > 16)
     {
-        return NULL;
+        return -1;
     }
 
     c = (type & ZEROPAD) ? '0' : ' ';
@@ -135,75 +114,54 @@ static char* number(
     size -= precision;
     if (!(type & (ZEROPAD + LEFT)))
     {
-        for (; size-- > 0; *str++ = ' ');
+        for (; size-- > 0; PUTC(' '));
     }
 
     if (sign)
     {
-        *str++ = sign;
+        PUTC(sign);
     }
 
     if (type & SPECIAL)
     {
         if (base == 8)
         {
-            *str++ = '0';
+            PUTC('0');
         }
         else if (base == 16)
         {
-            *str++ = '0';
-            *str++ = ('X' | locase);
+            PUTC('0');
+            PUTC('X' | locase);
         }
     }
 
     if (!(type & LEFT))
     {
-        for (; size-- > 0; *str++ = c);
+        for (; size-- > 0; PUTC(c));
     }
 
     while (i < precision--)
     {
-        *str++ = '0';
+        PUTC('0');
     }
 
     while (i-- > 0)
     {
-        *str++ = tmp[i];
+        PUTC(tmp[i]);
     }
 
     while (size-- > 0)
     {
-        *str++ = ' ';
+        PUTC(' ');
     }
-    return str;
+    return 0;
 }
 
-int scanf(const char* format, ...)
-{
-    NOT_IMPLEMENTED(EOF, "\"%s\"", format);
-}
-
-int fscanf(FILE* stream, const char* format, ...)
-{
-    NOT_IMPLEMENTED(EOF, "%p, \"%s\"", stream, format);
-}
-
-int vscanf(const char* format, va_list ap)
-{
-    NOT_IMPLEMENTED(EOF, "\"%s\", %p", format, ap);
-}
-
-int vfscanf(FILE* stream, const char* format, va_list ap)
-{
-    NOT_IMPLEMENTED(EOF, "%p, \"%s\", %p", stream, format, ap);
-}
-
-int vsprintf(char* buf, const char* fmt, va_list args)
+int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
 {
     int len;
     unsigned long num;
     int i, base;
-    char* str;
     const char* s;
 
     int flags;          // flags to number()
@@ -211,11 +169,11 @@ int vsprintf(char* buf, const char* fmt, va_list args)
     int precision;      // min. # of digits for integers; max number of chars for from string
     int qualifier;      // 'h', 'l', or 'L' for integer fields
 
-    for (str = buf; *fmt; ++fmt)
+    for (; *fmt; ++fmt)
     {
         if (*fmt != '%')
         {
-            *str++ = *fmt;
+            PUTC(*fmt);
             continue;
         }
 
@@ -299,13 +257,13 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 {
                     while (--field_width > 0)
                     {
-                        *str++ = ' ';
+                        PUTC(' ');
                     }
                 }
-                *str++ = (unsigned char)va_arg(args, int);
+                PUTC((char)va_arg(args, int));
                 while (--field_width > 0)
                 {
-                    *str++ = ' ';
+                    PUTC(' ');
                 }
                 continue;
 
@@ -317,16 +275,16 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 {
                     while (len < field_width--)
                     {
-                        *str++ = ' ';
+                        PUTC(' ');
                     }
                 }
                 for (i = 0; i < len; ++i)
                 {
-                    *str++ = *s++;
+                    PUTC(*s++);
                 }
                 while (len < field_width--)
                 {
-                    *str++ = ' ';
+                    PUTC(' ');
                 }
                 continue;
 
@@ -336,30 +294,33 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                     field_width = 2 * sizeof(void*);
                     flags |= ZEROPAD | SMALL | SPECIAL;
                 }
-                str = number(
-                    str,
+                if (UNLIKELY(number(
+                    buffer,
                     va_arg(args, unsigned long),
                     16,
                     field_width,
                     precision,
-                    flags);
+                    flags)))
+                {
+                    return -1;
+                }
                 continue;
 
             case 'n':
                 if (qualifier == 'l')
                 {
                     long* ip = va_arg(args, long*);
-                    *ip = (str - buf);
+                    *ip = buffer->current - buffer->start;
                 }
                 else
                 {
                     int* ip = va_arg(args, int*);
-                    *ip = (str - buf);
+                    *ip = buffer->current - buffer->start;
                 }
                 continue;
 
             case '%':
-                *str++ = '%';
+                PUTC('%');
                 continue;
 
             case 'b':
@@ -385,10 +346,10 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 break;
 
             default:
-                *str++ = '%';
+                PUTC('%');
                 if (*fmt)
                 {
-                    *str++ = *fmt;
+                    PUTC(*fmt);
                 }
                 else
                 {
@@ -417,209 +378,60 @@ int vsprintf(char* buf, const char* fmt, va_list args)
         {
             num = va_arg(args, unsigned int);
         }
-        str = number(str, num, base, field_width, precision, flags);
+        if (UNLIKELY(number(buffer, num, base, field_width, precision, flags)))
+        {
+            return -1;
+        }
     }
 
-    *str = '\0';
-    return str - buf;
+    return buffer->current - buffer->start;
 }
 
-int sprintf(char* buf, const char* fmt, ...)
+int LIBC(vsprintf)(char* buf, const char* fmt, va_list args)
 {
-    va_list args;
-    int i;
+    int res;
 
-    VALIDATE_INPUT(buf && fmt, -1);
+    printf_buffer_t buffer = {
+        .start = buf,
+        .end = (char*)0xffffffff,
+        .current = buf,
+        .putc = &string_putc_no_bound,
+    };
 
-    va_start(args, fmt);
-    i = vsprintf(buf, fmt, args);
-    va_end(args);
+    res = vsprintf_internal(&buffer, fmt, args);
 
-    return i;
-}
-
-int printf(const char* fmt, ...)
-{
-    char printf_buf[PRINTF_BUFFER];
-    va_list args;
-    int printed;
-
-    VALIDATE_INPUT(fmt, -1);
-
-    va_start(args, fmt);
-    printed = vsprintf(printf_buf, fmt, args);
-    va_end(args);
-
-    return write(1, printf_buf, printed);
-}
-
-int fprintf(FILE* file, const char* fmt, ...)
-{
-    char printf_buf[PRINTF_BUFFER];
-    va_list args;
-    int printed;
-
-    VALIDATE_INPUT(file && fmt, -1);
-
-    va_start(args, fmt);
-    printed = vsprintf(printf_buf, fmt, args);
-    va_end(args);
-
-    return write(file->fd, printf_buf, printed);
-}
-
-int vfprintf(FILE* restrict stream, const char* restrict format, va_list ap)
-{
-    int printed;
-    // FIXME: get rid of those static buffers and implement proper buffering
-    char printf_buf[PRINTF_BUFFER];
-
-    VALIDATE_INPUT(FILE_CHECK(stream) && format, EOF);
-
-    printed = vsprintf(printf_buf, format, ap);
-    return write(stream->fd, printf_buf, printed);
-}
-
-FILE* fopen(const char* pathname, const char* mode)
-{
-    int fd;
-    FILE* file;
-
-    VALIDATE_INPUT(pathname && mode, NULL);
-    fd = SAFE_SYSCALL(open(pathname, O_RDONLY), NULL); // FIXME: parse mode
-    file = SAFE_ALLOC(malloc(sizeof(*file)), NULL);
-
-    file->fd = fd;
-    file->magic = FILE_MAGIC;
-
-    return file;
-}
-
-FILE* fdopen(int fd, const char* mode)
-{
-    FILE* file;
-    VALIDATE_INPUT(mode, NULL);
-    file = SAFE_ALLOC(malloc(sizeof(*file)), NULL);
-    file->fd = fd;
-    file->magic = FILE_MAGIC;
-    return file;
-}
-
-int fclose(FILE* stream)
-{
-    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
-    return close(stream->fd);
-}
-
-int fileno(FILE* stream)
-{
-    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
-    return stream->fd;
-}
-
-int fgetc(FILE* stream)
-{
-    char data[2];
-    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
-    SAFE_SYSCALL(read(stream->fd, data, 1), EOF);
-    return (int)data[0];
-}
-
-char* fgets(char* s, int size, FILE* stream)
-{
-    NOT_IMPLEMENTED(NULL, "%p, %u, %p", s, size, stream);
-}
-
-int ungetc(int c, FILE* stream)
-{
-    NOT_IMPLEMENTED(EOF, "%u, %p", c, stream);
-}
-
-int fputc(int c, FILE* stream)
-{
-    SAFE_SYSCALL(write(stream->fd, (const char*)&c, 1), EOF);
-    return c;
-}
-
-STRONG_ALIAS(fputc, putc);
-
-int putchar(int c)
-{
-    return fputc(c, stdout);
-}
-
-int fputs(const char* s, FILE* file)
-{
-    VALIDATE_INPUT(FILE_CHECK(file) && s, EOF);
-    return SAFE_SYSCALL(write(file->fd, s, strlen(s)), EOF);
-}
-
-int puts(const char* s)
-{
-    int len = fputs(s, stdout);
-    SAFE_SYSCALL(write(stdout->fd, "\n", 1), EOF);
-    return len + 1;
-}
-
-void clearerr(FILE* stream)
-{
-    if (stream)
+    if (UNLIKELY(res == -1))
     {
-        stream->error = false;
+        return res;
     }
+
+    string_putc_no_bound(&buffer, 0);
+
+    return res;
 }
 
-int feof(FILE*)
+int LIBC(vsnprintf)(char* buf, size_t size, const char* fmt, va_list args)
 {
-    return 0;
-}
+    int res;
 
-int ferror(FILE* stream)
-{
-    VALIDATE_INPUT(FILE_CHECK(stream), 1);
-    return stream->error;
-}
+    printf_buffer_t buffer = {
+        .start = buf,
+        .end = buf + size,
+        .current = buf,
+        .putc = &string_putc,
+    };
 
-size_t fread(void* ptr, size_t size, size_t nmemb, FILE* stream)
-{
-    VALIDATE_INPUT(FILE_CHECK(stream) && ptr, 0);
-    int count = read(stream->fd, ptr, size * nmemb);
+    res = vsprintf_internal(&buffer, fmt, args);
 
-    if (UNLIKELY(count < 0))
+    if (UNLIKELY(res == -1))
     {
-        stream->error = true;
-        return 0;
+        return res;
     }
 
-    return count;
+    string_putc(&buffer, 0);
+
+    return res;
 }
 
-size_t fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream)
-{
-    VALIDATE_INPUT(FILE_CHECK(stream) && ptr, 0);
-    int count = write(stream->fd, ptr, size * nmemb);
-
-    if (UNLIKELY(count < 0))
-    {
-        stream->error = true;
-        return 0;
-    }
-
-    return count;
-}
-
-int fflush(FILE* stream)
-{
-    VALIDATE_INPUT(FILE_CHECK(stream), EOF);
-    return 0;
-}
-
-int fpurge(FILE* stream)
-{
-    VALIDATE_INPUT(stream, -1);
-    return 0;
-}
-
-void stdio_init(void)
-{
-}
+LIBC_ALIAS(vsprintf);
+LIBC_ALIAS(vsnprintf);
