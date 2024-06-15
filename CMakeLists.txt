@@ -66,13 +66,10 @@ target_link_libraries(
     PRIVATE "-Wl,-Map=system.map ${LINKER_FLAGS_ARCH}"
 )
 
-add_subdirectory(lib)
-add_subdirectory(bin)
-
 add_custom_target(
     kernel_headers_install
     COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/include" sysroot/usr/include
-    COMMENT "Installing libc headers"
+    COMMENT "Installing kernel headers"
 )
 
 add_custom_target(
@@ -85,9 +82,12 @@ add_custom_target(
 add_custom_target(
     rootfs
     COMMAND "${PROJECT_SOURCE_DIR}/scripts/build_filesystem.sh"
-    DEPENDS ${PROJECT_NAME} test test2 loop sh cat reboot poweroff ls colors init display date snake strace insmod pipe mkdir env kernel_symbols
+    DEPENDS ${PROJECT_NAME} kernel_symbols
     COMMENT "Preparing rootfs"
 )
+
+add_subdirectory(lib)
+add_subdirectory(bin)
 
 add_custom_target(
    iso

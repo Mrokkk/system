@@ -1,13 +1,5 @@
-file(GLOB src "*.c")
+file(GLOB SRC "*.c")
 
-add_executable(
-    display
-    ${src}
-    $<TARGET_OBJECTS:common>
-)
-
-target_link_libraries(
-    display
-    PRIVATE
-        "-Wl,-Map=display.map"
+add_application(
+    ${SRC}
 )

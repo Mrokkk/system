@@ -1,13 +1,5 @@
 file(GLOB SRC "*.c")
 
-add_executable(
-    ls
+add_application(
     ${SRC}
-    $<TARGET_OBJECTS:common>
-)
-
-target_link_libraries(
-    ls
-    PRIVATE
-        "-Wl,-Map=ls.map"
 )

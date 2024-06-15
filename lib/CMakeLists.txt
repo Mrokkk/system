@@ -72,14 +72,16 @@ add_library(c STATIC
     ../kernel/lib/bitset.c
 )
 
-add_library(crt0 STATIC crt0.c)
+add_library(crt0 OBJECT crt0.c)
 
 add_custom_target(
     libc_headers_install
     COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/lib/include" ../sysroot/usr/include
-    COMMENT "Installing libc headers"
     DEPENDS kernel_headers_install
+    COMMENT "Installing libc headers"
 )
+
+add_dependencies(c libc_headers_install)
 
 add_custom_target(
     crt0_install

@@ -1,13 +1,5 @@
-file(GLOB bin_sh_src "*.c")
+file(GLOB SRC "*.c")
 
-add_executable(
-    sh
-    ${bin_sh_src}
-    $<TARGET_OBJECTS:common>
-)
-
-target_link_libraries(
-    sh
-    PRIVATE
-        "-Wl,-Map=sh.map"
+add_application(
+    ${SRC}
 )

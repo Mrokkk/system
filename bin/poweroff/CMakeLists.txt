@@ -1,13 +1,5 @@
 file(GLOB SRC "*.c")
 
-add_executable(
-    poweroff
+add_application(
     ${SRC}
-    $<TARGET_OBJECTS:common>
-)
-
-target_link_libraries(
-    poweroff
-    PRIVATE
-        "-Wl,-Map=poweroff.map"
 )

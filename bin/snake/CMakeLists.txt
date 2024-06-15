@@ -1,13 +1,5 @@
-file(GLOB src "*.c")
+file(GLOB SRC "*.c")
 
-add_executable(
-    snake
-    ${src}
-    $<TARGET_OBJECTS:common>
-)
-
-target_link_libraries(
-    snake
-    PRIVATE
-        "-Wl,-Map=snake.map"
+add_application(
+    ${SRC}
 )
