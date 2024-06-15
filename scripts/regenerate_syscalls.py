@@ -117,7 +117,7 @@ def read_data(lines : List[bytes]) -> Tuple[List[Syscall], List[str], List[str]]
             if 'struct' in t:
                 structs.add(t.replace('*', '').replace('const', '').strip())
 
-    return (sorted(syscalls, key=lambda x: x.name), sorted(variants), sorted(structs))
+    return (syscalls, sorted(variants), sorted(structs))
 
 
 def type_convert(t : str):
