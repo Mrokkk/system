@@ -48,7 +48,7 @@ struct console
     line_t* visible_line;
     line_t* orig_visible_line;
     int scrolling;
-    int tmux_mode;
+    int tmux_state;
     size_t current_index;
     uint32_t current_fgcolor, current_bgcolor;
     uint32_t default_fgcolor, default_bgcolor;

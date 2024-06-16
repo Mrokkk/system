@@ -8,6 +8,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/page.h>
+#include <kernel/ctype.h>
 #include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/kernel.h>
@@ -226,6 +227,14 @@ static inline void scroll_down(console_t* console, size_t count)
     line_nr_print(console, line->index);
 }
 
+static inline void scroll_to(console_t* console, line_t* line)
+{
+    console->visible_line = line;
+
+    redraw_lines_full(console);
+    line_nr_print(console, line->index);
+}
+
 static inline void scroll(console_t* console)
 {
     switch (console->params[0])
@@ -281,7 +290,8 @@ static command_t escape_sequence(console_t* console, int c)
             }
             return C_DROP;
         case ES_SQUARE:
-            if (console->tmux_mode && (c == 'A' || c == 'B' || c == 'C' || c == 'D'))
+            if (console->tmux_state == '[' &&
+                (c == 'A' || c == 'B' || c == 'C' || c == 'D'))
             {
                 scroll_line(console, c);
                 return C_DROP;
@@ -312,7 +322,7 @@ static command_t escape_sequence(console_t* console, int c)
                     colors_set(console);
                     return C_DROP;
                 case '~':
-                    if (console->tmux_mode)
+                    if (console->tmux_state == '[')
                     {
                         scroll(console);
                     }
@@ -325,34 +335,84 @@ static command_t escape_sequence(console_t* console, int c)
     return C_CONTINUE;
 }
 
+#define TMUX_TRANSITION(from, to, ...) \
+    do \
+    { \
+        if (console->tmux_state == (from)) \
+        { \
+            if (isprint(from) && isprint(to)) \
+            { \
+                log_debug(DEBUG_CONSOLE, "tmux_state: from \'%c\' to \'%c\'", from, to); \
+            } \
+            else if (isprint(from)) \
+            { \
+                log_debug(DEBUG_CONSOLE, "tmux_state: from \'%u\' to %d", from, to); \
+            } \
+            else if (isprint(to)) \
+            { \
+                log_debug(DEBUG_CONSOLE, "tmux_state: from %d to \'%c\'", from, to); \
+            } \
+            __VA_ARGS__; \
+            console->tmux_state = to; \
+            return C_DROP; \
+        } \
+    } \
+    while (0)
+
 static command_t tmux_mode(console_t* console, tty_t* tty, int c)
 {
-    if (likely(!console->tmux_mode))
+    if (likely(!console->tmux_state))
     {
         return C_CONTINUE;
     }
 
     switch (c)
     {
+        case 'g':
+            TMUX_TRANSITION('[', 'g', {});
+            TMUX_TRANSITION('g', '[',
+                {
+                    scroll_to(console, console->lines);
+                });
+            break;
+        case 'G':
+            TMUX_TRANSITION('[', '[',
+                {
+                    scroll_to(console, console->orig_visible_line);
+                });
+            break;
+        case '[':
+            if (console->state != ES_NORMAL)
+            {
+                escape_sequence(console, c);
+                break;
+            }
+            TMUX_TRANSITION(TTY_SPECIAL_MODE, '[',
+                {
+                    line_nr_print(console, console->current_line->index);
+                });
+            break;
         case 'q':
-            tty->special_mode = 0;
-            console->scrolling = 0;
-            console->tmux_mode = 0;
-            console->visible_line = console->orig_visible_line;
-            console->orig_visible_line = NULL;
-            redraw_lines_full(console);
-            return C_DROP;
+            TMUX_TRANSITION('[', 0,
+                {
+                    tty->special_mode = 0;
+                    console->scrolling = 0;
+                    console->visible_line = console->orig_visible_line;
+                    console->orig_visible_line = NULL;
+                    redraw_lines_full(console);
+                });
+            break;
         case '\e':
             log_debug(DEBUG_CONSOLE, "switch to ESC");
             console->state = ES_ESC;
-            return C_DROP;
+            break;
         default:
             if (console->state != ES_NORMAL)
             {
                 escape_sequence(console, c);
             }
-            return C_DROP;
     }
+    return C_DROP;
 }
 
 static command_t normal_mode(console_t* console, tty_t* tty, int c)
@@ -387,9 +447,12 @@ static command_t normal_mode(console_t* console, tty_t* tty, int c)
             position_newline(console);
             return C_DROP;
         case TTY_SPECIAL_MODE:
-            console->tmux_mode = 1;
-            console->orig_visible_line = console->visible_line;
-            tty->special_mode = 1;
+            TMUX_TRANSITION(0, TTY_SPECIAL_MODE,
+                {
+                    console->tmux_state = TTY_SPECIAL_MODE;
+                    console->orig_visible_line = console->visible_line;
+                    tty->special_mode = 1;
+                });
             return C_DROP;
     }
 
@@ -524,7 +587,7 @@ static int console_setup(console_driver_t* driver)
     console->visible_line = lines;
     console->orig_visible_line = NULL;
     console->scrolling = 0;
-    console->tmux_mode = 0;
+    console->tmux_state = 0;
     console->current_index = 0;
     console->capacity = INITIAL_CAPACITY;
     console->driver = driver;
