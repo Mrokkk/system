@@ -118,32 +118,6 @@ index bf5d61f387..f4ab445925 100644
  
  #endif
 +#endif
-diff --git a/lib/hard-locale.c b/lib/hard-locale.c
-index 653c580925..15da61f7d3 100644
---- a/lib/hard-locale.c
-+++ b/lib/hard-locale.c
-@@ -27,21 +27,5 @@
- bool
- hard_locale (int category)
- {
--  char locale[SETLOCALE_NULL_MAX];
--
--  if (setlocale_null_r (category, locale, sizeof (locale)))
--    return false;
--
--  if (!(strcmp (locale, "C") == 0 || strcmp (locale, "POSIX") == 0))
--    return true;
--
--#if defined __ANDROID__
--  /* On Android 5.0 or newer, it is possible to set a locale that has the same
--     name as the "C" locale but in fact uses UTF-8 encoding.  Cf. test case 2 in
--     <https://lists.gnu.org/archive/html/bug-gnulib/2023-01/msg00141.html>.  */
--  if (MB_CUR_MAX > 1)
--    return true;
--#endif
--
-   return false;
- }
 diff --git a/lib/inet_ntop.c b/lib/inet_ntop.c
 index 26089959da..32e9050678 100644
 --- a/lib/inet_ntop.c
@@ -321,28 +295,3 @@ index 97aa6d52c2..afabb7af79 100644
  # endif /* !Windows */
  #else /* HAVE_LINK */
  
-diff --git a/lib/putenv.c b/lib/putenv.c
-index 2ab6f248db..4f2c0f55b0 100644
---- a/lib/putenv.c
-+++ b/lib/putenv.c
-@@ -64,6 +64,7 @@ __libc_lock_define_initialized (static, envlock)
- # define SetEnvironmentVariable SetEnvironmentVariableA
- #endif
- 
-+extern char **environ;
- static int
- _unsetenv (const char *name)
- {
-diff --git a/lib/unsetenv.c b/lib/unsetenv.c
-index d8ada2aaed..1033389ec8 100644
---- a/lib/unsetenv.c
-+++ b/lib/unsetenv.c
-@@ -35,6 +35,8 @@
- # define __environ      environ
- #endif
- 
-+extern char** environ;
-+
- #if _LIBC
- /* This lock protects against simultaneous modifications of 'environ'.  */
- # include <bits/libc-lock.h>

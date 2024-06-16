@@ -22,7 +22,7 @@ function build()
     pushd_silent "${SRC_DIR}/gnulib"
     if git diff --quiet
     then
-        patch -p1 < "${CONF_DIR}/gnulib/gnulib.patch"
+        patch -p1 < "${CONF_DIR}/../gnulib/gnulib.patch"
     fi
     popd_silent
 
