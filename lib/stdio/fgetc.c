@@ -8,7 +8,13 @@ int LIBC(fgetc)(FILE* stream)
     VALIDATE_INPUT(FILE_CHECK(stream), EOF);
 
     char c;
-    SAFE_SYSCALL(read(stream->fd, &c, 1), EOF);
+    int ret = SAFE_SYSCALL(read(stream->fd, &c, 1), EOF);
+
+    if (ret == 0)
+    {
+        return EOF;
+    }
+
     return c;
 }
 
