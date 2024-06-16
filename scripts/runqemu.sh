@@ -101,4 +101,4 @@ fi
 
 echo "Command: ${qemu_path} ${args}"
 
-exec "${qemu_path}" ${args}
+exec ${base_dir}/runqemu_wrapper.py "${qemu_path}" ${args}
