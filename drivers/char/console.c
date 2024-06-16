@@ -92,9 +92,18 @@ static inline void redraw_lines_full(console_t* console)
     line_t* temp;
     size_t x, y, line_index;
     console_driver_t* drv = console->driver;
+    size_t prev = 0;
 
-    for (y = 0, temp = console->visible_line; y < console->resy; ++y)
+    for (y = 0, temp = console->visible_line; y < console->resy; ++y, temp = temp->next)
     {
+        if (prev > temp->index)
+        {
+            for (x = 0; x < console->resx; ++line_index, ++x)
+            {
+                drv->putch(console->driver, y, x, ' ', console->default_fgcolor, console->default_bgcolor);
+            }
+            continue;
+        }
         pos = temp->line;
         for (x = 0, line_index = 0; pos < temp->pos; ++line_index, ++pos)
         {
@@ -105,7 +114,7 @@ static inline void redraw_lines_full(console_t* console)
         {
             drv->putch(console->driver, y, x, ' ', console->default_fgcolor, console->default_bgcolor);
         }
-        temp = temp->next;
+        prev = temp->index;
     }
 }
 
@@ -239,6 +248,9 @@ static inline void scroll_up(console_t* console, size_t count)
         return;
     }
 
+    console->y -= count;
+    if (console->y > console->resy) console->y = 0;
+
     console->scrolling = 1;
     console->visible_line = line;
 
@@ -255,6 +267,8 @@ static inline void scroll_down(console_t* console, size_t count)
     for (line = console->visible_line; count && line != console->current_line; line = line->next, --count);
 
     console->visible_line = line;
+    console->y += count;
+    if (console->y >= console->resy) console->y = console->resy - 1;
 
     redraw_lines_full(console);
     line_nr_print(console, line->index);
@@ -279,6 +293,7 @@ static inline void scroll(console_t* console)
             scroll_down(console, console->resy);
             break;
     }
+    cursor_update(console);
 }
 
 static inline void scroll_line(console_t* console, int dir)
@@ -291,7 +306,16 @@ static inline void scroll_line(console_t* console, int dir)
         case 'B':
             scroll_down(console, 1);
             break;
+        case 'C':
+            console->x += 1;
+            if (console->x >= console->resx) console->x = console->resx - 1;
+            break;
+        case 'D':
+            console->x -= 1;
+            if (console->x >= console->resx) console->x = 0;
+            break;
     }
+    cursor_update(console);
 }
 
 static command_t escape_sequence(console_t* console, int c)
@@ -390,6 +414,7 @@ static command_t tmux_mode(console_t* console, tty_t* tty, int c)
             TMUX_TRANSITION('[', 'g', {});
             TMUX_TRANSITION('g', '[',
                 {
+                    console->y = console->x = 0;
                     scroll_to(console, console->lines);
                 });
             break;
@@ -397,7 +422,12 @@ static command_t tmux_mode(console_t* console, tty_t* tty, int c)
             TMUX_TRANSITION('[', '[',
                 {
                     scroll_to(console, console->orig_visible_line);
+                    console->y = console->x = 0;
                 });
+            break;
+        case '^':
+            console->x = 0;
+            cursor_update(console);
             break;
         case '[':
             if (console->state != ES_NORMAL)
@@ -407,6 +437,8 @@ static command_t tmux_mode(console_t* console, tty_t* tty, int c)
             }
             TMUX_TRANSITION(TTY_SPECIAL_MODE, '[',
                 {
+                    console->saved_x = console->x;
+                    console->saved_y = console->y;
                     line_nr_print(console, console->current_line->index);
                 });
             break;
@@ -417,6 +449,8 @@ static command_t tmux_mode(console_t* console, tty_t* tty, int c)
                     console->scrolling = 0;
                     console->visible_line = console->orig_visible_line;
                     console->orig_visible_line = NULL;
+                    console->x = console->saved_x;
+                    console->y = console->saved_y;
                     redraw_lines_full(console);
                     cursor_update(console);
                 });
@@ -628,6 +662,8 @@ static int console_setup(console_driver_t* driver)
     console->orig_visible_line = NULL;
     console->scrolling = 0;
     console->tmux_state = 0;
+    console->saved_x = 0;
+    console->saved_y = 0;
     console->current_index = 0;
     console->capacity = INITIAL_CAPACITY;
     console->driver = driver;
