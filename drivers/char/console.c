@@ -27,13 +27,15 @@ static int console_setup(console_driver_t* driver);
 static int console_close(tty_t* tty, file_t* file);
 static int console_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
 static int console_ioctl(tty_t* tty, unsigned long request, void* arg);
+static void console_putch_internal(tty_t* tty, int c, int* movecsr);
 static void console_putch(tty_t* tty, int c);
 
 typedef enum
 {
     C_CONTINUE = 0,
     C_PRINT    = 1,
-    C_DROP     = 2,
+    C_MOVECSR  = 2,
+    C_DROP     = 3,
 } command_t;
 
 static command_t control(console_t* console, tty_t* tty, int c);
@@ -52,6 +54,11 @@ static tty_driver_t tty_driver = {
     .putch = &console_putch,
     .initialized = 0,
 };
+
+static inline void cursor_update(console_t* console)
+{
+    console->driver->movecsr(console->driver, console->x, console->y);
+}
 
 static inline void redraw_lines(console_t* console)
 {
@@ -111,6 +118,7 @@ static void console_refresh(void* data)
         redraw_lines(console);
         console->redraw = false;
         console->prev_visible_line = NULL;
+        console->driver->movecsr(console->driver, console->x, console->y);
     }
 }
 
@@ -165,14 +173,39 @@ static inline void position_prev(console_t* console)
     {
         return;
     }
+
     --console->current_line->pos;
     --console->x;
+}
+
+static inline void console_write_char(console_t* console, uint8_t c)
+{
+    console->current_line->pos->c = c;
+    console->current_line->pos->fgcolor = console->current_fgcolor;
+    console->current_line->pos->bgcolor = console->current_bgcolor;
+    ++console->current_line->pos;
+
+    if (!console->redraw)
+    {
+        console->driver->putch(console->driver, console->y, console->x, c, console->current_fgcolor, console->current_bgcolor);
+    }
+
+    position_next(console);
 }
 
 static inline void carriage_return(console_t* console)
 {
     console->current_line->pos = console->current_line->line;
     console->x = 0;
+}
+
+static inline void tab(console_t* console)
+{
+    console_write_char(console, ' ');
+    console_write_char(console, ' ');
+    console_write_char(console, ' ');
+    console_write_char(console, ' ');
+    console->driver->movecsr(console->driver, console->x, console->y);
 }
 
 static inline void colors_set(console_t* console)
@@ -259,21 +292,6 @@ static inline void scroll_line(console_t* console, int dir)
             scroll_down(console, 1);
             break;
     }
-}
-
-static inline void console_putc(console_t* console, uint8_t c)
-{
-    console->current_line->pos->c = c;
-    console->current_line->pos->fgcolor = console->current_fgcolor;
-    console->current_line->pos->bgcolor = console->current_bgcolor;
-    ++console->current_line->pos;
-
-    if (!console->redraw)
-    {
-        console->driver->putch(console->driver, console->y, console->x, c, console->current_fgcolor, console->current_bgcolor);
-    }
-
-    position_next(console);
 }
 
 static command_t escape_sequence(console_t* console, int c)
@@ -400,6 +418,7 @@ static command_t tmux_mode(console_t* console, tty_t* tty, int c)
                     console->visible_line = console->orig_visible_line;
                     console->orig_visible_line = NULL;
                     redraw_lines_full(console);
+                    cursor_update(console);
                 });
             break;
         case '\e':
@@ -429,23 +448,20 @@ static command_t normal_mode(console_t* console, tty_t* tty, int c)
         case '\b':
         case 0x7f:
             position_prev(console);
-            return C_DROP;
+            return C_MOVECSR;
         case '\e':
             log_debug(DEBUG_CONSOLE, "switch to ESC");
             console->state = ES_ESC;
             return C_DROP;
         case '\t':
-            console_putc(console, ' ');
-            console_putc(console, ' ');
-            console_putc(console, ' ');
-            console_putc(console, ' ');
-            return C_DROP;
+            tab(console);
+            return C_MOVECSR;
         case '\r':
             carriage_return(console);
-            return C_DROP;
+            return C_MOVECSR;
         case '\n':
             position_newline(console);
-            return C_DROP;
+            return C_MOVECSR;
         case TTY_SPECIAL_MODE:
             TMUX_TRANSITION(0, TTY_SPECIAL_MODE,
                 {
@@ -473,16 +489,38 @@ static command_t control(console_t* console, tty_t* tty, int c)
     return C_PRINT;
 }
 
-static void console_putch(tty_t* tty, int c)
+static void console_putch_internal(tty_t* tty, int c, int* movecsr)
 {
+    command_t cmd;
     console_t* console = tty->driver->driver_data;
+
     if (console->disabled)
     {
         return;
     }
-    if (control(console, tty, c) == C_PRINT)
+
+    cmd = control(console, tty, c);
+
+    switch (cmd)
     {
-        console_putc(console, c);
+        case C_PRINT:
+            console_write_char(console, c);
+            fallthrough;
+        case C_MOVECSR:
+            *movecsr = 1;
+            break;
+        default:
+    }
+}
+
+static void console_putch(tty_t* tty, int c)
+{
+    int movecsr = 0;
+    console_putch_internal(tty, c, &movecsr);
+
+    if (movecsr)
+    {
+        cursor_update(tty->driver->driver_data);
     }
 }
 
@@ -503,12 +541,14 @@ static int console_open(tty_t* tty, file_t*)
             driver->putch = &fbcon_char_print;
             driver->setsgr = &fbcon_setsgr;
             driver->defcolor = &fbcon_defcolor;
+            driver->movecsr = &fbcon_movecsr;
             break;
         case FB_TYPE_TEXT:
             driver->init = &egacon_init;
             driver->putch = &egacon_char_print;
             driver->setsgr = &egacon_setsgr;
             driver->defcolor = &egacon_defcolor;
+            driver->movecsr = &egacon_movecsr;
             break;
         default:
             log_error("cannot initialize console");
@@ -609,10 +649,19 @@ static int console_close(tty_t*, file_t*)
 
 static int console_write(tty_t* tty, file_t*, const char* buffer, size_t size)
 {
+    int movecsr = 0;
+    console_t* console = tty->driver->driver_data;
     for (size_t i = 0; i < size; ++i)
     {
-        console_putch(tty, buffer[i]);
+        console_putch_internal(tty, buffer[i], &movecsr);
     }
+
+    // Don't move cursor if redraw is scheduled, it will be done there
+    if (movecsr && !console->redraw)
+    {
+        cursor_update(console);
+    }
+
     return size;
 }
 

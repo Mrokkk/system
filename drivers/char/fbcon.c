@@ -1,9 +1,10 @@
 #include "fbcon.h"
 
-#include "tty.h"
+#include <kernel/kernel.h>
+
 #include "font.h"
-#include "console.h"
 #include "framebuffer.h"
+#include "console_driver.h"
 
 enum palette
 {
@@ -38,6 +39,7 @@ typedef struct
     uint32_t pitch;
     uint32_t font_height_offset;
     uint32_t font_width_offset;
+    uint32_t cursor_offset;
 } data_t;
 
 static uint32_t lookup_table[] = {
@@ -82,6 +84,7 @@ int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
     data->pitch = framebuffer.pitch;
     data->font_height_offset = framebuffer.pitch * font.height;
     data->font_width_offset =  (framebuffer.bpp / 8) * font.width;
+    data->cursor_offset = 0;
     driver->data = data;
 
     *resy = framebuffer.height / font.height;
@@ -199,4 +202,31 @@ void fbcon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
 {
     *fgcolor = COLOR_WHITE;
     *bgcolor = COLOR_BLACK;
+}
+
+static void fbcon_draw_line(uint32_t* fb, uint32_t len, uint32_t fgcolor)
+{
+    for (uint32_t x = 0; x < len; x++)
+    {
+        uint32_t value = fgcolor;
+        uint32_t* pixel = fb;
+        *pixel = value;
+        ++fb;
+    }
+}
+
+void fbcon_movecsr(console_driver_t* drv, int x, int y)
+{
+    data_t* data = drv->data;
+    uint32_t old_offset = data->cursor_offset;
+    uint32_t new_offset = data->font_height_offset * y + data->font_width_offset * x + data->pitch * (font.height - 1);
+
+    fbcon_draw_line((uint32_t*)(data->fb + new_offset), font.width, COLOR_WHITE);
+
+    if (new_offset != old_offset)
+    {
+        fbcon_draw_line((uint32_t*)(data->fb + old_offset), font.width, COLOR_BLACK);
+    }
+
+    data->cursor_offset = new_offset;
 }

@@ -8,7 +8,6 @@
 #include <kernel/module.h>
 #include <kernel/device.h>
 
-#include "console.h"
 #include "framebuffer.h"
 
 enum palette
@@ -39,6 +38,7 @@ typedef struct
 {
     uint16_t* videomem;
     size_t resx, resy;
+    uint16_t cursor_offset;
     uint8_t default_attribute;
 } data_t;
 
@@ -94,7 +94,6 @@ void egacon_char_print(console_driver_t* drv, size_t row, size_t col, uint8_t c,
     data_t* data = drv->data;
     uint16_t off = row * data->resx + col;
     videomem_write(data->videomem, video_char_make(c, forecolor(fgcolor) | backcolor(bgcolor)), off);
-    csr_move(off + 1);
 }
 
 void egacon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
@@ -145,4 +144,18 @@ void egacon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
 {
     *fgcolor = forecolor(COLOR_GRAY);
     *bgcolor = backcolor(COLOR_BLACK);
+}
+
+void egacon_movecsr(console_driver_t* drv, int x, int y)
+{
+    data_t* data = drv->data;
+    uint16_t new_offset = y * data->resx + x;
+
+    if (new_offset == data->cursor_offset)
+    {
+        return;
+    }
+
+    csr_move(new_offset);
+    data->cursor_offset = new_offset;
 }
