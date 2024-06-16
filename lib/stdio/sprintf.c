@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int sprintf(char* buf, const char* fmt, ...)
+int LIBC(sprintf)(char* buf, const char* fmt, ...)
 {
     VALIDATE_INPUT(buf && fmt, -1);
 
@@ -12,3 +12,5 @@ int sprintf(char* buf, const char* fmt, ...)
 
     return i;
 }
+
+LIBC_ALIAS(sprintf);

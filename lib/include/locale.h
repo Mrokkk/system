@@ -16,6 +16,8 @@
 #define LC_MEASUREMENT      11
 #define LC_IDENTIFICATION   12
 
+#define LC_GLOBAL_LOCALE    ((locale_t) -1L)
+
 typedef struct locale* locale_t;
 
 struct lconv

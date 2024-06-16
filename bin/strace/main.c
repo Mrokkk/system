@@ -12,21 +12,29 @@ int main(int argc, char** argv)
     int pid, flag = 0;
     char pathname[MAX_PATH_LEN];
     const char* app = NULL;
+    char* app_argv[32] = {NULL};
+    size_t app_argc = 1;
 
     for (int i = 1; i < argc; ++i)
     {
-        if (!strcmp("-f", argv[i]))
+        if (!app && !strcmp("-f", argv[i]))
         {
             flag = DTRACE_FOLLOW_FORK;
         }
         else if (!strchr(argv[i], '-'))
         {
-            app = argv[i];
+            if (!app)
+            {
+                app = argv[i];
+            }
+            else
+            {
+                app_argv[app_argc++] = argv[i];
+            }
         }
         else
         {
-            printf("Unrecognized option: %s\n", argv[i]);
-            return EXIT_FAILURE;
+            app_argv[app_argc++] = argv[i];
         }
     }
 
@@ -52,8 +60,7 @@ int main(int argc, char** argv)
         strcat(pathname, app);
     }
 
-    char* args[] = {pathname, NULL};
-
+    app_argv[0] = pathname;
 
     struct sigaction sa;
     sa.sa_handler = SIG_IGN;
@@ -64,7 +71,7 @@ int main(int argc, char** argv)
     if ((pid = fork()) == 0)
     {
         dtrace(flag);
-        execvp(pathname, args);
+        execvp(pathname, app_argv);
         perror(pathname);
         exit(EXIT_FAILURE);
     }

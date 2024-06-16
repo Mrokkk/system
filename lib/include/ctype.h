@@ -100,3 +100,27 @@ static inline int ispunct(int c)
     return 0;
 }
 #endif
+
+#ifndef isxdigit
+static inline int isxdigit(int c)
+{
+    const char* chars = "0123456789abcdefABCDEF";
+    for (unsigned i = 0; i < __builtin_strlen(chars); ++i)
+    {
+        if (c == chars[i])
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
+#ifndef isgraph
+static inline int isgraph(int c)
+{
+    return c > 0x1f && c < 0x7f;
+}
+#endif
+
+#define iswgraph isgraph

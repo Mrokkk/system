@@ -32,6 +32,7 @@ int syslog_show(seq_file_t* s);
         .name = NAME, \
         .len = sizeof(NAME), \
         .mode = MODE, \
+        .ino = 0x1000 + __COUNTER__, \
         .iops = IOPS, \
         .fops = FOPS, \
     }
@@ -132,7 +133,7 @@ static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int)
     sb->ops = &procfs_sb_ops;
     sb->module = 0;
 
-    inode->ino = 0;
+    inode->ino = DEVFS_ROOT_INO;
     inode->ops = &procfs_root_iops;
     inode->fs_data = NULL;
     inode->file_ops = &procfs_root_fops;
@@ -201,7 +202,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
     new_inode->ops = entry->iops;
     new_inode->file_ops = entry->fops;
     new_inode->dev = 0;
-    new_inode->ino = 0;
+    new_inode->ino = entry->ino;
     new_inode->sb = dir->sb;
     new_inode->mode = entry->mode;
     new_inode->fs_data = entry;

@@ -433,5 +433,28 @@ int LIBC(vsnprintf)(char* buf, size_t size, const char* fmt, va_list args)
     return res;
 }
 
+int LIBC(snprintf)(char* str, size_t size, const char* format, ...)
+{
+    int res;
+    printf_buffer_t buffer = {
+        .start = str,
+        .end = str + size,
+        .current = str,
+        .putc = &string_putc,
+    };
+
+    string_putc(&buffer, 0);
+
+    va_list args;
+    va_start(args, format);
+    res = vsprintf_internal(&buffer, format, args);
+    va_end(args);
+
+    string_putc(&buffer, 0);
+
+    return res;
+}
+
 LIBC_ALIAS(vsprintf);
 LIBC_ALIAS(vsnprintf);
+LIBC_ALIAS(snprintf);
