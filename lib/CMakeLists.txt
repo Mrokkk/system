@@ -8,7 +8,6 @@ add_library(c STATIC
     abort.c
     assert.c
     atexit.c
-    atoi.c
     bss.c
     dirent.c
     env.c
@@ -33,6 +32,7 @@ add_library(c STATIC
     setjmp.c
     signal.c
     sleep.c
+    strtol.c
     syscall.c
     termios.c
     time.c

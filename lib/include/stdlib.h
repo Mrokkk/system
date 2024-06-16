@@ -16,9 +16,9 @@ int unsetenv(const char* name);
 char* getenv(const char* name);
 char* secure_getenv(const char* name);
 
-int atoi(const char* nptr);
-
 int atexit(void (*function)(void));
+
+int atoi(const char* nptr);
 
 long strtol(
     const char* restrict nptr,

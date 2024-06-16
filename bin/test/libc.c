@@ -1,6 +1,8 @@
 #include "test.h"
 
+#include <errno.h>
 #include <stdio.h>
+#include <limits.h>
 #include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
@@ -377,6 +379,49 @@ TEST(isatty)
     int fd = open("/proc/uptime", O_RDONLY);
     EXPECT_GT(fd, 0);
     EXPECT_EQ(isatty(fd), 0);
+}
+
+TEST(strtol)
+{
+    // Invalid bases
+    {
+        errno = 0;
+        EXPECT_EQ(strtol("932", NULL, 27), 0);
+        EXPECT_EQ(errno, EINVAL);
+
+        errno = 0;
+        EXPECT_EQ(strtol("932", NULL, 1), 0);
+        EXPECT_EQ(errno, EINVAL);
+
+        errno = 0;
+        EXPECT_EQ(strtol("932", NULL, -2), 0);
+        EXPECT_EQ(errno, EINVAL);
+    }
+
+    char* end;
+
+    EXPECT_EQ(strtol("73",         NULL, 0),  73);
+    EXPECT_EQ(strtol("-928",       NULL, 0), -928);
+    EXPECT_EQ(strtol("073",        NULL, 0),  073);
+    EXPECT_EQ(strtol("073",        NULL, 8),  073);
+    EXPECT_EQ(strtol("073",        NULL, 16), 0x73);
+    EXPECT_EQ(strtol("   0x203  ", NULL, 0),  0x203);
+    EXPECT_EQ(strtol(" 0x203",     NULL, 16), 0x203);
+    EXPECT_EQ(strtol("P5hC",       NULL, 26), 443234);
+    EXPECT_EQ(strtol("\t-0xfb43",  &end, 0), -0xfb43);
+    EXPECT_EQ(*end, 0);
+    EXPECT_EQ(strtol("  -0xfb43g", &end, 0), -0xfb43);
+    EXPECT_EQ(*end, 'g');
+    EXPECT_EQ(strtol("  +3953bsd", &end, 10), 3953);
+    EXPECT_EQ(*end, 'b');
+
+    errno = 0;
+    EXPECT_EQ(strtol("0xabd1045bdfe", NULL, 0), LONG_MAX);
+    EXPECT_EQ(errno, ERANGE);
+
+    errno = 0;
+    EXPECT_EQ(strtol("-0x9482bf92dda![", NULL, 0), LONG_MIN);
+    EXPECT_EQ(errno, ERANGE);
 }
 
 TEST_SUITE_END(libc);
