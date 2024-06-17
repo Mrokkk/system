@@ -54,9 +54,5 @@ struct locale
     const char* names[13];
 };
 
-locale_t duplocale(locale_t locobj);
-void freelocale(locale_t locobj);
 struct lconv* localeconv(void);
-locale_t newlocale(int category_mask, const char* locale, locale_t base);
 char* setlocale(int category, const char* locale);
-locale_t uselocale(locale_t);
