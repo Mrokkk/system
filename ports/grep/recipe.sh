@@ -36,7 +36,12 @@ function build()
             --disable-acl \
             --disable-xattr \
             --disable-libsmack \
-            --disable-libcap || die "configuration failed"
+            --disable-libcap \
+            --infodir="${NULL_DIR}" \
+            --localedir="${NULL_DIR}" \
+            --mandir="${NULL_DIR}" \
+            --docdir="${NULL_DIR}" \
+            --htmldir="${NULL_DIR}" || die "configuration failed"
     fi
 
     make -O -j${NPROC} || die "compilation failed"
@@ -44,5 +49,5 @@ function build()
 
 function install()
 {
-    make -O install -j${NPROC} || die "failed"
+    make -O install -j${NPROC} || die "installation failed"
 }

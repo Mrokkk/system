@@ -41,6 +41,11 @@ function build()
             --disable-libcap \
             --disable-werror \
             --disable-multibyte \
+            --infodir="${NULL_DIR}" \
+            --localedir="${NULL_DIR}" \
+            --mandir="${NULL_DIR}" \
+            --docdir="${NULL_DIR}" \
+            --htmldir="${NULL_DIR}" \
             --enable-no-install-program=arch,coreutils,hostname,chcon,runcon,df,pinky,users,who,nice || die "configuration failed"
     fi
 
