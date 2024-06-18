@@ -46,6 +46,7 @@ add_library(c STATIC
     stdio/fopen.c
     stdio/fprintf.c
     stdio/fpurge.c
+    stdio/fpending.c
     stdio/fputc.c
     stdio/fputs.c
     stdio/fread.c
