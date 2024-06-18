@@ -62,6 +62,7 @@ void backtrace_exception(struct pt_regs* regs);
         } \
     } while (0)
 
+// FIXME: there's a leak of struct bt_data when BACKTRACE_MAX_RECURSION is hit
 #define backtrace_user(log_fn, regs, syms, ...) \
     do \
     { \

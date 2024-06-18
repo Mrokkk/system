@@ -61,7 +61,7 @@ void* backtrace_user_next(void** data_ptr)
         return NULL;
     }
 
-    ret = data->frame->ret;
+    ret = data->frame->ret - 4;
 
     if (!is_within(addr(ret), data->code_start, data->code_end))
     {

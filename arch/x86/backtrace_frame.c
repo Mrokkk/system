@@ -17,12 +17,11 @@ void* backtrace_next(void** frame_ptr)
     void* ret;
     stack_frame_t* frame = *frame_ptr;
 
-    if (!kernel_address(addr(frame)) || !is_kernel_text(addr(frame->ret)))
+    if (!kernel_address(addr(frame)) || !is_kernel_text(addr(ret = frame->ret - 4)))
     {
         return NULL;
     }
 
-    ret = frame->ret;
     frame = frame->next;
     *frame_ptr = frame;
 
@@ -33,7 +32,7 @@ size_t do_backtrace_process(struct process* p, void** buffer, size_t count)
 {
     void* ret;
     unsigned depth = 0;
-    void* eip = ptr(p->context.eip);
+    void* eip = ptr(p->context.eip - 4);
     uint32_t* stack = ptr(p->context.esp);
 
     stack_frame_t frame;
@@ -76,17 +75,22 @@ void backtrace_exception(struct pt_regs* regs)
 {
     char buffer[BACKTRACE_SYMNAME_LEN];
 
-    stack_frame_t last = {.next = ptr(regs->ebp), .ret = ptr(regs->eip)};
+    // Normally, when doing stacktrace over frames, return address will contain next
+    // address after call. This is not true for exceptions - eip will be set to the
+    // instruction which triggered the exception. So to counteract subtraction of 4
+    // in below loop, 4 is added
+    stack_frame_t last = {.next = ptr(regs->ebp), .ret = ptr(regs->eip + 4)};
     stack_frame_t* frame = &last;
+    void* ret;
 
     log_exception("backtrace:");
     for (int i = 0; frame && i < BACKTRACE_MAX_RECURSION; ++i)
     {
-        if (!kernel_address(addr(frame)) || !is_kernel_text(addr(frame->ret)))
+        if (!kernel_address(addr(frame)) || !is_kernel_text(addr(ret = frame->ret - 4)))
         {
             break;
         }
-        ksym_string(buffer, addr(frame->ret));
+        ksym_string(buffer, addr(ret));
         log_exception("%s", buffer);
         frame = frame->next;
     }
