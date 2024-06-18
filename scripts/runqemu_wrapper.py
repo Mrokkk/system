@@ -53,8 +53,6 @@ class LineBuffer:
             reads, _, _ = select.select([self.input_stream], [], [], self.timeout)
 
             if not self.input_stream in reads:
-                if len(self.lines):
-                    return self.lines.popleft()
                 line = ''.join(self.buffer)
                 self.buffer.clear()
                 if line:
@@ -121,7 +119,7 @@ class Addr2Line:
         # Spawning new addr2line is faster than keeping it running in interactive
         # mode and polling for all data (as I don't know how many lines will addr2line
         # print - there might be only 1, there might be more if there are some inlined
-        # calls). It's still quite slow though
+        # calls)
         addr2line = subprocess.Popen(
             ['/bin/addr2line', '-e', self.binary, '-f', '-C', '-i', '-p', addr],
             stdout=subprocess.PIPE,
@@ -202,11 +200,26 @@ def exception_save(context : Context) -> int:
 
 
 def line_print(line : str) -> None:
-    print('\n', line, end='', sep='')
-    sys.stdout.flush()
+    line = f'\n{line}'.encode()
+    length = len(line)
+    index = 0
+
+    while True:
+        _, writes, _ = select.select([], [sys.stdout], [])
+
+        if sys.stdout in writes:
+            try:
+                res = os.write(sys.stdout.fileno(), line[index:])
+                length -= res
+                if length:
+                    index += res
+                    continue
+                break
+            except BlockingIOError:
+                pass
 
 
-def line_process(line : str, context : Context):
+def line_process(line : str, context : Context) -> None:
 
     if 'backtrace:' in line:
         context.bt_number = 0
@@ -239,6 +252,9 @@ def line_process(line : str, context : Context):
             timestamp = splitted[0][:-1]
             entries = addr2line.resolve(addr)
 
+            if len(entries) == 0:
+                raise Exception(f'No entries given for {binary} at {addr}')
+
             for func, file, linenr in entries:
                 context.bt_number += 1
 
@@ -247,7 +263,7 @@ def line_process(line : str, context : Context):
 
         except Exception as e:
             id = exception_save(context)
-            print(f'Internal exception #{id} encountered for address {addr}')
+            line_print(f'>> Internal exception #{id} encountered for {binary} at {addr}')
 
     elif '(qemu)' in line:
         line_print(line)
@@ -275,17 +291,12 @@ def args_parse() -> Tuple[argparse.Namespace, List[str]]:
     return parser.parse_known_args()
 
 
-def main():
+def main() -> None:
 
     args, qemu_args = args_parse()
 
     qemu = Qemu(qemu_args)
     context = Context(args)
-
-    sys.stdout = io.TextIOWrapper(
-        open(sys.stdout.fileno(), 'wb', buffering=io.DEFAULT_BUFFER_SIZE),
-        write_through=False,
-        line_buffering=False)
 
     while True:
         try:
@@ -294,7 +305,7 @@ def main():
             break
         except Exception as e:
             id = exception_save(context)
-            print(f'Internal exception #{id} encountered when reading line')
+            line_print(f'>> Internal exception #{id} encountered when reading line')
 
         if args.raw:
             line_print(line)
@@ -302,6 +313,7 @@ def main():
             line_process(line, context)
 
     qemu.communicate()
+    print()
 
     exceptions_print(context)
 
