@@ -29,3 +29,6 @@ char* strpbrk(const char* s, const char* accept);
 char* strdup(const char* s);
 
 char* strerror(int errnum);
+char* strsignal(int sig);
+const char *sigdescr_np(int sig);
+const char* sigabbrev_np(int sig);

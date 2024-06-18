@@ -70,6 +70,7 @@ add_library(c STATIC
     string/strdup.c
     string/strlen.c
     string/strpbrk.c
+    string/strsignal.c
     string/strspn.c
     string/strstr.c
     string/strtok.c
