@@ -1,5 +1,6 @@
 #include "test.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -239,28 +240,106 @@ void string_check(
     }
 }
 
-int expect_exit_with(int pid, int expected_error_code)
+enum
 {
-    int assert_failed = 0;
-    int* __assert_failed = &assert_failed;
-    int status;
-    waitpid(pid, &status, 0);
-    EXPECT_GT(WIFEXITED(status), 0);
-    EXPECT_EQ(WEXITSTATUS(status), expected_error_code);
-    EXPECT_EQ(WIFSIGNALED(status), 0);
-    return assert_failed;
+    EXPECTED_EXIT_WITH = 1,
+    EXPECTED_KILLED_BY = 2,
+    ACTUAL_EXIT_WITH = 4,
+    ACTUAL_KILLED_BY = 8,
+    ACTUAL_WAITPID_FAILED = 16,
+};
+
+static void exit_failure_print(int error, int expected_status, int status, const char* file, size_t line)
+{
+    char buffer[256];
+    char* it = buffer;
+
+    it += sprintf(it, FAILED_EXPECTATION_MSG, file, line);
+
+    switch (error & 3)
+    {
+        case EXPECTED_EXIT_WITH:
+            it += sprintf(it,
+                "    expected: process exit with %d\n",
+                expected_status);
+            break;
+        case EXPECTED_KILLED_BY:
+            it += sprintf(it,
+                "    expected: process killed by SIG%s\n",
+                sigabbrev_np(expected_status));
+            break;
+    }
+
+    switch (error & 0x1c)
+    {
+        case ACTUAL_WAITPID_FAILED:
+            it += sprintf(it,
+                "      actual: waitpid failed with %d\n",
+                errno);
+            break;
+        case ACTUAL_EXIT_WITH:
+            it += sprintf(it,
+                "      actual: process exit with %d\n",
+                WEXITSTATUS(status));
+            break;
+        case ACTUAL_KILLED_BY:
+            it += sprintf(it,
+                "      actual: process killed by SIG%s\n",
+                sigabbrev_np(WTERMSIG(status)));
+            break;
+    }
+
+    fputs(buffer, stdout);
 }
 
-int expect_killed_by(int pid, int signal)
+int expect_exit_with(int pid, int expected_error_code, const char* file, size_t line)
 {
-    int assert_failed = 0;
-    int* __assert_failed = &assert_failed;
-    int status;
-    waitpid(pid, &status, 0);
-    EXPECT_EQ(WIFEXITED(status), 0);
-    EXPECT_GT(WIFSIGNALED(status), 0);
-    EXPECT_EQ(WTERMSIG(status), signal);
-    return assert_failed;
+    int error = 0, status = 0;
+
+    if (UNLIKELY(waitpid(pid, &status, 0) < 0))
+    {
+        error = EXPECTED_EXIT_WITH | ACTUAL_WAITPID_FAILED;
+    }
+    else if (UNLIKELY(WIFEXITED(status) <= 0 || WIFSIGNALED(status)))
+    {
+        error = EXPECTED_EXIT_WITH | ACTUAL_KILLED_BY;
+    }
+    else if (UNLIKELY(WEXITSTATUS(status) != expected_error_code))
+    {
+        error = EXPECTED_EXIT_WITH | ACTUAL_EXIT_WITH;
+    }
+
+    if (UNLIKELY(error))
+    {
+        exit_failure_print(error, expected_error_code, status, file, line);
+    }
+
+    return !!error;
+}
+
+int expect_killed_by(int pid, int signal, const char* file, size_t line)
+{
+    int error = 0, status = 0;
+
+    if (UNLIKELY(waitpid(pid, &status, 0) < 0))
+    {
+        error = EXPECTED_KILLED_BY | ACTUAL_WAITPID_FAILED;
+    }
+    else if (UNLIKELY(WIFEXITED(status) != 0))
+    {
+        error = EXPECTED_KILLED_BY | ACTUAL_EXIT_WITH;
+    }
+    else if (WTERMSIG(status) != signal)
+    {
+        error = EXPECTED_KILLED_BY | ACTUAL_KILLED_BY;
+    }
+
+    if (UNLIKELY(error))
+    {
+        exit_failure_print(error, signal, status, file, line);
+    }
+
+    return !!error;
 }
 
 static void final_verdict_print(int passed, int failed, list_head_t* failed_tests)

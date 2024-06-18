@@ -107,8 +107,8 @@ struct test_suite
 void __test_suite_register(test_suite_t* suite);
 int __tcs_run(test_case_t* test_cases, int count, config_t* config);
 int __test_suites_run(int argc, char* argv[]);
-int expect_exit_with(int pid, int expected_error_code);
-int expect_killed_by(int pid, int signal);
+int expect_exit_with(int pid, int expected_error_code, const char* file, size_t line);
+int expect_killed_by(int pid, int signal, const char* file, size_t line);
 
 void string_check(
     value_t* actual,
@@ -227,7 +227,7 @@ void failure_print(
     int pid = fork(); \
     if (pid > 0) \
     { \
-        *__assert_failed += expect_exit_with(pid, expected_error_code); \
+        *__assert_failed += expect_exit_with(pid, expected_error_code, __FILE__, __LINE__); \
     } \
     else
 
@@ -235,7 +235,7 @@ void failure_print(
     int pid = fork(); \
     if (pid > 0) \
     { \
-        *__assert_failed += expect_killed_by(pid, signal); \
+        *__assert_failed += expect_killed_by(pid, signal, __FILE__, __LINE__); \
     } \
     else
 
