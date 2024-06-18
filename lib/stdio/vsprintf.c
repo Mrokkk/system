@@ -36,6 +36,7 @@ static inline int skip_atoi(const char** s)
 static const char digits[16] = "0123456789ABCDEF";
 
 #define PUTC(c) ({ if (UNLIKELY(buffer->putc(buffer, c))) return -1; 0; })
+#define PUTS(s) ({ const char* __str = s; for (; *__str; PUTC(*__str++)); 0; })
 
 static int number(
     printf_buffer_t* buffer,
@@ -269,8 +270,14 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
 
             case 's':
                 s = va_arg(args, char*);
-                len = strnlen(s, precision);
 
+                if (UNLIKELY(s == NULL))
+                {
+                    PUTS("(null)");
+                    continue;
+                }
+
+                len = strnlen(s, precision);
                 if (!(flags & LEFT))
                 {
                     while (len < field_width--)
