@@ -23,7 +23,15 @@ FILE* stderr;
 
 void stdio_init(void)
 {
-    INIT_MUST_SUCCEED(file_allocate(STDIN_FILENO, &stdin), stdin);
-    INIT_MUST_SUCCEED(file_allocate(STDOUT_FILENO, &stdout), stdout);
-    INIT_MUST_SUCCEED(file_allocate(STDERR_FILENO, &stderr), stderr);
+    INIT_MUST_SUCCEED(file_allocate(STDIN_FILENO, O_RDONLY, &stdin), stdin);
+    INIT_MUST_SUCCEED(file_allocate(STDOUT_FILENO, O_WRONLY, &stdout), stdout);
+    INIT_MUST_SUCCEED(file_allocate(STDERR_FILENO, O_WRONLY, &stderr), stderr);
 }
+
+// Temporary
+int LIBC(fsync)(int fd)
+{
+    NOT_IMPLEMENTED(0, "%d", fd);
+}
+
+LIBC_ALIAS(fsync);

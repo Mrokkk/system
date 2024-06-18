@@ -8,6 +8,7 @@ int LIBC(fgetc)(FILE* stream)
     VALIDATE_INPUT(FILE_CHECK(stream), EOF);
 
     char c;
+    stream->last = LAST_READ;
     int ret = SAFE_SYSCALL(read(stream->fd, &c, 1), EOF);
 
     if (ret == 0)

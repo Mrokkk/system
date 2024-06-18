@@ -46,16 +46,17 @@ add_library(c STATIC
     stdio/fopen.c
     stdio/fprintf.c
     stdio/fpurge.c
-    stdio/fpending.c
     stdio/fputc.c
     stdio/fputs.c
     stdio/fread.c
     stdio/fscanf.c
     stdio/fseek.c
     stdio/fwrite.c
+    stdio/gnulib.c
     stdio/setvbuf.c
     stdio/sprintf.c
     stdio/stdio.c
+    stdio/stdio_ext.c
     stdio/vsprintf.c
 
     string/memchr.c

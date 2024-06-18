@@ -12,7 +12,7 @@ static list_head_t files = LIST_INIT(files);
 static_assert(sizeof(FILE) == 64);
 static_assert(sizeof(FILE) + BUFSIZ == 1024);
 
-int file_allocate(int fd, FILE** output)
+int file_allocate(int fd, int mode, FILE** output)
 {
     FILE* file;
     char* buffer;
@@ -23,7 +23,9 @@ int file_allocate(int fd, FILE** output)
     buffer = PTR(ADDR(file) + sizeof(*file));
 
     file->fd = fd;
+    file->mode = mode;
     file->magic = FILE_MAGIC;
+    file->last = 0;
     list_init(&file->files);
 
     file_setbuf(file, flag, buffer, BUFSIZ);
@@ -70,7 +72,7 @@ int file_setbuf(FILE* file, int flag, char* buf, size_t bufsiz)
             return -1;
     }
 
-    file->flags = flag;
+    file->buftype = flag;
 
     if (buf)
     {

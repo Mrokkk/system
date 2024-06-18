@@ -50,6 +50,7 @@ int rename(const char* oldpath, const char* newpath);
 int pipe(int pipefd[2]);
 int lchown(const char* pathname, uid_t owner, gid_t group);
 int fchown(int fd, uid_t owner, gid_t group);
+int fsync(int fildes);
 
 // FIXME: replace later with ptrace
 #define DTRACE_FOLLOW_FORK 2

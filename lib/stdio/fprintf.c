@@ -9,6 +9,8 @@ int LIBC(printf)(const char* fmt, ...)
     va_list args;
     int printed;
 
+    stdout->last = LAST_WRITE;
+
     va_start(args, fmt);
     printed = vsprintf_internal(&stdout->buffer, fmt, args);
     va_end(args);
@@ -23,6 +25,8 @@ int LIBC(fprintf)(FILE* file, const char* fmt, ...)
     va_list args;
     int printed;
 
+    file->last = LAST_WRITE;
+
     va_start(args, fmt);
     printed = vsprintf_internal(&file->buffer, fmt, args);
     va_end(args);
@@ -34,6 +38,7 @@ int LIBC(vfprintf)(FILE* restrict stream, const char* restrict format, va_list a
 {
     VALIDATE_INPUT(FILE_CHECK(stream) && format, EOF);
 
+    stream->last = LAST_WRITE;
     return vsprintf_internal(&stream->buffer, format, ap);
 }
 

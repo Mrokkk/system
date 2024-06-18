@@ -6,6 +6,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio_ext.h>
 
 static int data;
 
@@ -422,6 +423,65 @@ TEST(strtol)
     errno = 0;
     EXPECT_EQ(strtol("-0x9482bf92dda![", NULL, 0), LONG_MIN);
     EXPECT_EQ(errno, ERANGE);
+}
+
+extern int __fmode(FILE* stream);
+
+TEST(fopen)
+{
+    FILE* f;
+    {
+        f = fopen("/dev/null", "w");
+        EXPECT_NE(f, NULL);
+        EXPECT_EQ(__fmode(f), O_WRONLY | O_CREAT | O_TRUNC);
+        fclose(f);
+    }
+    {
+        f = fopen("/dev/null", "r");
+        EXPECT_NE(f, NULL);
+        EXPECT_EQ(__fmode(f), O_RDONLY);
+        fclose(f);
+    }
+    {
+        f = fopen("/dev/null", "a");
+        EXPECT_NE(f, NULL);
+        EXPECT_EQ(__fmode(f), O_WRONLY | O_CREAT | O_APPEND);
+        fclose(f);
+    }
+    {
+        f = fopen("/dev/null", "a+");
+        EXPECT_NE(f, NULL);
+        EXPECT_EQ(__fmode(f), O_RDWR | O_CREAT | O_APPEND);
+        fclose(f);
+    }
+    {
+        f = fopen("/dev/null", "x");
+        EXPECT_EQ(f, NULL);
+        EXPECT_EQ(errno, EINVAL);
+    }
+}
+
+TEST(fdopen)
+{
+    FILE* f;
+    int fd = open("/dev/null", O_RDONLY);
+
+    {
+        f = fdopen(fd, "w");
+        EXPECT_EQ(f, NULL);
+        EXPECT_EQ(errno, EINVAL);
+    }
+    {
+        f = fdopen(fd, "r+");
+        EXPECT_EQ(f, NULL);
+        EXPECT_EQ(errno, EINVAL);
+    }
+    {
+        f = fdopen(fd, "r");
+        EXPECT_NE(f, NULL);
+        EXPECT_EQ(__fmode(f), O_RDONLY);
+        fclose(f);
+    }
 }
 
 TEST_SUITE_END(libc);
