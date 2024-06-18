@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/param.h>
 
 char** environ;
 size_t environ_size;
@@ -91,9 +92,20 @@ static int var_reallocate(var_t* var, const char* value, size_t value_len)
     return 0;
 }
 
+static size_t env_new_size_get(void)
+{
+    size_t current_size;
+    if (environ_size)
+    {
+        return environ_size * 2;
+    }
+    for (current_size = 0; environ[current_size]; ++current_size);
+    return MAX(current_size * 2, 32);
+}
+
 static int env_reallocate(char*** empty_env)
 {
-    size_t new_size = environ_size ? environ_size * 2 : 32;
+    size_t new_size = env_new_size_get();
     char** new_environ = SAFE_ALLOC(malloc((new_size + 1) * sizeof(char*)), -1);
     int i;
 
@@ -102,7 +114,7 @@ static int env_reallocate(char*** empty_env)
         new_environ[i] = environ[i];
     }
 
-    memset(new_environ + i, 0, (new_size - i) * sizeof(char*));
+    memset(new_environ + i, 0, (new_size - i + 1) * sizeof(char*));
 
     *empty_env = new_environ + i;
 
