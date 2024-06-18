@@ -124,10 +124,23 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
                 tty_string_insert(kb_tty, "\e[B");
                 break;
             case 0x4b:
-                tty_string_insert(kb_tty, "\e[D");
+                ctrl
+                    ? tty_string_insert(kb_tty, "\e[1;5D")
+                    : tty_string_insert(kb_tty, "\e[D");
                 break;
             case 0x4d:
-                tty_string_insert(kb_tty, "\e[C");
+                ctrl
+                    ? tty_string_insert(kb_tty, "\e[1;5C")
+                    : tty_string_insert(kb_tty, "\e[C");
+                break;
+            case 0x47:
+                tty_string_insert(kb_tty, "\e[1~");
+                break;
+            case 0x4f:
+                tty_string_insert(kb_tty, "\e[4~");
+                break;
+            case 0x53:
+                tty_string_insert(kb_tty, "\e[3~");
                 break;
         }
         e0 = 0;
@@ -152,7 +165,10 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
         c = kb_tty->termios.c_cc[VERASE];
     }
 
-    log_debug(DEBUG_KEYBOARD, "tty insert: %u", c);
+    if (alt)
+    {
+        tty_char_insert(kb_tty, '\e');
+    }
     tty_char_insert(kb_tty, c);
 }
 
