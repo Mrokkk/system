@@ -1,7 +1,7 @@
 #pragma once
 
 #include <arch/string.h>
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 #ifndef __HAVE_ARCH_STRLEN
 size_t strlen(const char* s);

@@ -1,3 +1,1 @@
-#pragma once
-
-#include <kernel/stat.h>
+#include <kernel/api/stat.h>

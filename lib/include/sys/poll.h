@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/poll.h>
+#include <kernel/api/poll.h>
 
 void FD_SET(int fd, fd_set* fdset);
 void FD_CLR(int fd, fd_set* fdset);

@@ -13,6 +13,7 @@ extern int libc_debug;
 
 #define UNUSED(x)   (void)x
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define FALLTHROUGH __attribute__((__fallthrough__))
 
 #define LIBC(name)      __libc_##name
 #define __STRINGIFY(x)  #x

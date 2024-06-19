@@ -1,6 +1,6 @@
 #include <kernel/vm.h>
-#include <kernel/sys.h>
 #include <kernel/process.h>
+#include <kernel/api/unistd.h>
 
 static inline void process_space_free(struct process* proc)
 {

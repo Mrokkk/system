@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <kernel/fs.h>
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 #include <kernel/byteorder.h>
 
 // References:

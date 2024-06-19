@@ -1,6 +1,6 @@
 #include <kernel/trace.h>
-#include <kernel/types.h>
 #include <kernel/kernel.h>
+#include <kernel/api/types.h>
 
 syscall_t trace_syscalls[] = {
     { },

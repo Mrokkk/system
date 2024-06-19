@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 #define SEEK_SET    1
 #define SEEK_CUR    2

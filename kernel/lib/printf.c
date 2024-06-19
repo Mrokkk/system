@@ -4,7 +4,6 @@
 
 #include <kernel/ctype.h>
 #include <kernel/string.h>
-#include <kernel/unistd.h>
 #include <kernel/kernel.h>
 
 int sprintf(char* buf, const char* fmt, ...);

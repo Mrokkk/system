@@ -9,10 +9,10 @@
 #include <kernel/memory.h>
 #include <kernel/module.h>
 #include <kernel/procfs.h>
-#include <kernel/unistd.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
 #include <kernel/backtrace.h>
+#include <kernel/api/unistd.h>
 
 #include <arch/pci.h>
 #include <arch/vbe.h>

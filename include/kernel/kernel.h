@@ -9,16 +9,16 @@
 #include <kernel/div.h>
 #include <kernel/list.h>
 #include <kernel/debug.h>
-#include <kernel/errno.h>
 #include <kernel/magic.h>
 #include <kernel/debug.h>
-#include <kernel/types.h>
 #include <kernel/limits.h>
 #include <kernel/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/string.h>
 #include <kernel/compiler.h>
 #include <kernel/sections.h>
+#include <kernel/api/types.h>
+#include <kernel/api/errno.h>
 
 int strtoi(const char* str);
 int sprintf(char*, const char*, ...);

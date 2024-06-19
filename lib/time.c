@@ -44,6 +44,26 @@ struct tm* LIBC(localtime)(const time_t* timep)
     NOT_IMPLEMENTED(&__tm, "%p", timep);
 }
 
+static inline time_t mktime_raw(
+    uint32_t year,
+    uint32_t month,
+    uint32_t day,
+    uint32_t hour,
+    uint32_t minute,
+    uint32_t second)
+{
+    if (0 >= (int)(month -= 2))
+    {   // 1..12 -> 11,12,1..10
+        month += 12; // put Feb last since it has a leap day
+        year -= 1;
+    }
+
+    return (((year / 4 - year / 100 + year / 400 + 367 * month / 12 + day + year * 365 - 719499 // days
+          ) * 24 + hour // hours
+        ) * 60 + minute // minutes
+      ) * 60 + second; // seconds
+}
+
 time_t LIBC(mktime)(struct tm* tm)
 {
     return mktime_raw(

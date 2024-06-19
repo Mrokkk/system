@@ -1,14 +1,14 @@
 #include <stdarg.h>
 #include <kernel/ctype.h>
-#include <kernel/ioctl.h>
 #include <kernel/trace.h>
-#include <kernel/types.h>
 #include <kernel/signal.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/process.h>
 #include <kernel/syscall.h>
+#include <kernel/api/ioctl.h>
+#include <kernel/api/types.h>
 
 extern syscall_t trace_syscalls[];
 

@@ -6,14 +6,14 @@
 #include <kernel/list.h>
 #include <kernel/page.h>
 #include <kernel/poll.h>
-#include <kernel/stat.h>
 #include <kernel/wait.h>
-#include <kernel/fcntl.h>
 #include <kernel/magic.h>
 #include <kernel/dentry.h>
-#include <kernel/dirent.h>
 #include <kernel/kernel.h>
 #include <kernel/compiler.h>
+#include <kernel/api/stat.h>
+#include <kernel/api/fcntl.h>
+#include <kernel/api/dirent.h>
 
 #define BLOCK_SIZE       1024
 

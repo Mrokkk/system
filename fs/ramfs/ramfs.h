@@ -1,7 +1,7 @@
 #pragma once
 
 #include <kernel/page.h>
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 struct inode;
 

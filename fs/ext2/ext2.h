@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 #include <kernel/dev.h>
-#include <kernel/types.h>
 #include <kernel/compiler.h>
+#include <kernel/api/types.h>
 
 #define EXT2_BLOCK_SIZE         1024
 #define EXT2_SUPERBLOCK_OFFSET  1024

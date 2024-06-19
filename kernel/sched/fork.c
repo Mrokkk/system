@@ -1,7 +1,7 @@
 #include <kernel/vm.h>
-#include <kernel/sys.h>
 #include <kernel/procfs.h>
 #include <kernel/process.h>
+#include <kernel/api/unistd.h>
 
 unsigned int total_forks;
 pid_t last_pid;

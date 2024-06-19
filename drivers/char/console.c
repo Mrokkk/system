@@ -9,9 +9,9 @@
 #include <kernel/fs.h>
 #include <kernel/page.h>
 #include <kernel/ctype.h>
-#include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/kernel.h>
+#include <kernel/api/ioctl.h>
 
 #include "tty.h"
 #include "fbcon.h"

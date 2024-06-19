@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 #define O_ACCMODE           3
 #define O_RDONLY            0

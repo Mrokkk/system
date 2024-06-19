@@ -2,7 +2,7 @@
 
 #include <sys/poll.h>
 #include <sys/types.h>
-#include <kernel/time.h>
+#include <kernel/api/time.h>
 
 // https://pubs.opengroup.org/onlinepubs/007904975/basedefs/sys/time.h.html
 

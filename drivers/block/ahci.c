@@ -6,7 +6,6 @@
 #include <kernel/irq.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
-#include <kernel/errno.h>
 #include <kernel/device.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>

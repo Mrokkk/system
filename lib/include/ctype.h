@@ -1,7 +1,5 @@
 #pragma once
 
-#include <kernel/compiler.h>
-
 #ifndef isalnum
 static inline int isalnum(int c)
 {

@@ -4,9 +4,9 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
-#include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/process.h>
+#include <kernel/api/ioctl.h>
 
 #include <arch/multiboot.h>
 

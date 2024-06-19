@@ -1,8 +1,8 @@
 #include "tty_ldisc.h"
 
-#include <kernel/errno.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
+#include <kernel/api/errno.h>
 
 int tty_ldisc_open(tty_t* tty, file_t* file)
 {

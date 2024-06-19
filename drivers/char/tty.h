@@ -3,8 +3,8 @@
 #include <kernel/fifo.h>
 #include <kernel/list.h>
 #include <kernel/wait.h>
-#include <kernel/types.h>
 #include <kernel/termios.h>
+#include <kernel/api/types.h>
 
 #include "tty_driver.h"
 

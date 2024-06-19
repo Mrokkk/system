@@ -3,7 +3,6 @@
 typedef float float_t;
 typedef double double_t;
 
-
 # define M_E        2.7182818284590452354	// e
 # define M_LOG2E    1.4426950408889634074	// log_2 e
 # define M_LOG10E   0.43429448190325182765	// log_10 e

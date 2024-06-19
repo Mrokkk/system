@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 #define MINOR(dev) ((dev) & 0xff)
 #define MAJOR(dev) ((dev) >> 8)

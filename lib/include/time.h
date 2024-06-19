@@ -1,7 +1,7 @@
 #pragma once
 
 #include <locale.h>
-#include <kernel/time.h>
+#include <kernel/api/time.h>
 
 // https://pubs.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
 

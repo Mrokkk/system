@@ -1,3 +1,5 @@
+#pragma once
+
 #include <kernel/fs.h>
 #include <kernel/procfs.h>
 #include <kernel/seq_file.h>

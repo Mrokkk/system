@@ -341,7 +341,7 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
 
             case 'x':
                 flags |= SMALL;
-                fallthrough;
+                FALLTHROUGH;
             case 'X':
                 base = 16;
                 break;

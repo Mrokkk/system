@@ -1,4 +1,2 @@
-#pragma once
-
 #include <sys/types.h>
-#include <kernel/fcntl.h>
+#include <kernel/api/fcntl.h>

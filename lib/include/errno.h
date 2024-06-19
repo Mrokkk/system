@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/errno.h>
+#include <kernel/api/errno.h>
 
 extern int errno;
 extern char* program_invocation_name;

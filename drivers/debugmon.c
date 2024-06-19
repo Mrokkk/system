@@ -3,7 +3,6 @@
 #include <kernel/fs.h>
 #include <kernel/cpu.h>
 #include <kernel/irq.h>
-#include <kernel/sys.h>
 #include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/ksyms.h>
@@ -11,6 +10,7 @@
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>
+#include <kernel/api/unistd.h>
 
 #include <arch/rtc.h>
 #include <arch/register.h>

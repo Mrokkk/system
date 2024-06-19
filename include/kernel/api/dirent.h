@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 #define DT_UNKNOWN  0
 #define DT_FIFO     1

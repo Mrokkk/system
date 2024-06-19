@@ -4,7 +4,7 @@
 #include <arch/processor.h>
 
 #include <kernel/debug.h>
-#include <kernel/errno.h>
+#include <kernel/api/errno.h>
 
 #include <arch/isr.h>
 #include <kernel/syscall.h>

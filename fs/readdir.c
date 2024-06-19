@@ -1,7 +1,7 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
-#include <kernel/stat.h>
 #include <kernel/process.h>
+#include <kernel/api/stat.h>
 
 struct readdir_data
 {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/signal.h>
+#include <kernel/api/signal.h>
 
 typedef int sig_atomic_t;
 

@@ -5,9 +5,9 @@
 #include <kernel/fifo.h>
 #include <kernel/wait.h>
 #include <kernel/devfs.h>
-#include <kernel/ioctl.h>
 #include <kernel/device.h>
 #include <kernel/process.h>
+#include <kernel/api/ioctl.h>
 
 static int mouse_open();
 static int mouse_read(file_t*, char* data, size_t size);

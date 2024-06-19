@@ -1,7 +1,7 @@
 #pragma once
 
 #include <kernel/dev.h>
-#include <kernel/types.h>
+#include <kernel/api/types.h>
 
 #define S_IFMT  00170000
 #define S_IFSOCK 0140000

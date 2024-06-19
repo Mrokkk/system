@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define LOWCASE 0x20
 

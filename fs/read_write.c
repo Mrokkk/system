@@ -1,7 +1,7 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
-#include <kernel/unistd.h>
 #include <kernel/process.h>
+#include <kernel/api/unistd.h>
 
 int sys_write(int fd, const char* buffer, size_t size)
 {

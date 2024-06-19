@@ -1,11 +1,11 @@
 #include <stdarg.h>
 #include <kernel/fs.h>
 #include <kernel/path.h>
-#include <kernel/stat.h>
-#include <kernel/fcntl.h>
 #include <kernel/dentry.h>
 #include <kernel/process.h>
-#include <kernel/statvfs.h>
+#include <kernel/api/stat.h>
+#include <kernel/api/fcntl.h>
+#include <kernel/api/statvfs.h>
 
 LIST_DECLARE(files);
 

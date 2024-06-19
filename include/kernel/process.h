@@ -10,6 +10,7 @@
 #include <kernel/dentry.h>
 #include <kernel/kernel.h>
 #include <kernel/signal.h>
+#include <kernel/api/wait.h>
 
 #define STACK_MAGIC 0xdeadc0de
 #define PROCESS_FILES       32
@@ -27,9 +28,6 @@ typedef enum a
 
 #define EXITCODE(ret, sig)  ((ret) << 8 | (sig))
 #define WSTOPPED            0x7f
-#define WNOHANG             1
-#define WUNTRACED           2
-#define WCONTINUED          4
 
 typedef enum
 {

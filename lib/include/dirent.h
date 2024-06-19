@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/dirent.h>
+#include <kernel/api/dirent.h>
 
 typedef struct directory DIR;
 

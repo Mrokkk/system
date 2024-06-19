@@ -1,7 +1,7 @@
 #pragma once
 
-#include <kernel/types.h>
 #include <kernel/compiler.h>
+#include <kernel/api/types.h>
 
 // Below functions are copied from Linux source
 

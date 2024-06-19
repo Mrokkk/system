@@ -1,9 +1,8 @@
 #pragma once
 
 #include <stdint.h>
-#include <kernel/types.h>
-
-#define HZ 100
+#include <kernel/api/time.h>
+#include <kernel/api/types.h>
 
 #define KHz             1000
 #define MHz             (1000 * KHz)
@@ -14,22 +13,10 @@
 #define USEC_IN_SEC     MHz
 #define USEC_IN_MSEC    KHz
 
-#define CLOCK_REALTIME          1
-#define CLOCK_MONOTONIC         2
-#define CLOCK_MONOTONIC_RAW     3
-#define CLOCK_REALTIME_COARSE   4
-#define CLOCK_ID_COUNT          5
-
 struct timestamp
 {
     uint32_t seconds;
     uint32_t useconds;
-};
-
-struct timeval
-{
-    time_t      tv_sec;
-    suseconds_t tv_usec;
 };
 
 typedef struct timestamp ts_t;
