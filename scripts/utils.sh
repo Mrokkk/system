@@ -17,7 +17,10 @@ function cleanup()
 {
     if [[ -n "${modification_list}" ]]
     then
-        [[ -n "${verbose}" ]] && echo "Removing ${modification_list}"
+        if [[ -n "${verbose}" ]]
+        then
+            echo "Removing ${modification_list}"
+        fi
         rm -rf "${modification_list}"
     fi
     rm -rf "${null_dir}"
@@ -43,7 +46,10 @@ function create_modification_list()
     if [[ -z "${modification_list}" ]]
     then
         modification_list=$(mktemp)
-        [[ -n "${verbose}" ]] && echo "Created ${modification_list}"
+        if [[ -n "${verbose}" ]]
+        then
+            echo "Created ${modification_list}"
+        fi
     fi
 }
 
@@ -55,7 +61,10 @@ function binary_from_native_sysroot()
 function resource_from_native_sysroot()
 {
     local file="$(find native-sysroot -name ${1} | head -n 1)"
-    [[ -n "${file}" ]] && echo $(readlink -f "${file}")
+    if [[ -n "${file}" ]]
+    then
+        echo $(readlink -f "${file}")
+    fi
 }
 
 function display_file()
@@ -71,7 +80,10 @@ function info()
 
 function debug()
 {
-    [[ -n "${verbose}" ]] && echo -e "${BLUE}${INFO}${RESET} ${@}"
+    if [[ -n "${verbose}" ]]
+    then
+        echo -e "${BLUE}${INFO}${RESET} ${@}"
+    fi
 }
 
 function success()
@@ -122,7 +134,10 @@ function execute_cmd()
 function create_dir()
 {
     local dest="${1}"
-    [[ ! -d "${dest}" ]] && execute_cmd "creating ${dest}... " mkdir -p "${dest}"
+    if [[ ! -d "${dest}" ]]
+    then
+        execute_cmd "creating ${dest}... " mkdir -p "${dest}"
+    fi
 }
 
 function copy()

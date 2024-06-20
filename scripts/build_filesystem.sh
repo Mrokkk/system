@@ -91,15 +91,8 @@ fi
 bashrc_content='export PS1="\u \e[34m\w\e[0m # "
 alias ktest=/bin/test
 alias ..="cd .."
-alias l="ls -lah"'
-
-grub_cfg_content="set timeout=0
-set default=0
-menuentry "system" {
-    if ! multiboot /boot/system console=/dev/tty0 syslog=/dev/debug0; then reboot; fi
-    module /boot/kernel.map kernel.map
-    boot
-}"
+alias l="ls -lah"
+alias dmesg="cat /proc/syslog"'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
@@ -129,7 +122,6 @@ copy ../close.tga ${mountpoint}
 copy ../close_pressed.tga ${mountpoint}
 copy font.psf ${mountpoint}/usr/share
 
-write_to "${grub_cfg_content}" "${grub_cfg}"
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"
 copy kernel.map "${boot_dir}"
 copy system "${boot_dir}"

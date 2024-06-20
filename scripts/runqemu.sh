@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-set -e
+#!/bin/bash
 
 base_dir="$(dirname `readlink -f ${0}`)"
 
@@ -20,6 +18,25 @@ args="\
 -mon chardev=char0 \
 -serial chardev:char1 \
 -usb"
+kernel_params=
+
+supported_kernel_params_value=(
+    "console"
+    "clock"
+    "init"
+    "syslog"
+    "systick"
+)
+
+supported_kernel_params_bool=(
+    "earlycon"
+    "pciprint"
+    "vbeprint"
+)
+
+declare -A kernel_params_dict
+kernel_params_dict["syslog"]="/dev/debug0"
+kernel_params_dict["console"]="/dev/tty0"
 
 while [[ $# -gt 0 ]]; do
     case "${1}" in
@@ -46,7 +63,17 @@ while [[ $# -gt 0 ]]; do
             use_cdrom=1
             ;;
         *)
-            args="${args} ${1}"
+            param="${1#--}"
+            if [[ ${supported_kernel_params_value[@]} =~ ${param} ]]
+            then
+                kernel_params_dict["${param}"]=${2}
+                shift
+            elif [[ ${supported_kernel_params_bool[@]} =~ ${param} ]]
+            then
+                kernel_params_dict["${param}"]=true
+            else
+                args="${args} ${1}"
+            fi
             ;;
     esac
     shift
@@ -99,6 +126,31 @@ then
     mkfifo ttyS0.out
 fi
 
-echo "Command: ${qemu_path} ${args}"
+for x in "${!kernel_params_dict[@]}"
+do
+    if [[ "${kernel_params_dict[$x]}" == "true" ]]
+    then
+        kernel_params="${kernel_params} ${x}"
+    else
+        kernel_params="${kernel_params} ${x}=${kernel_params_dict[$x]}"
+    fi
+done
 
-exec ${base_dir}/runqemu_wrapper.py "${qemu_path}" ${args}
+grub_cfg_content="set timeout=0
+set default=0
+menuentry \"system\" {
+    if ! multiboot /boot/system ${kernel_params}; then reboot; fi
+    module /boot/kernel.map kernel.map
+    boot
+}"
+
+grub_cfg="mnt/boot/grub/grub.cfg"
+write_to "${grub_cfg_content}" "${grub_cfg}"
+sync "${grub_cfg}"
+
+echo "Command: ${qemu_path} ${args}"
+echo "Kernel params:${kernel_params}"
+
+${base_dir}/runqemu_wrapper.py "${qemu_path}" ${args}
+
+cleanup
