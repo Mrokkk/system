@@ -37,7 +37,7 @@ KERNEL_MODULE(mouse);
 BUFFER_DECLARE(mouse_fifo, 12 * 3);
 WAIT_QUEUE_HEAD_DECLARE(mouse_wq);
 
-UNMAP_AFTER_INIT int mouse_init()
+UNMAP_AFTER_INIT static int mouse_init()
 {
     uint8_t byte;
 
@@ -77,7 +77,7 @@ UNMAP_AFTER_INIT int mouse_init()
     return 0;
 }
 
-int mouse_deinit()
+static int mouse_deinit()
 {
     return 0;
 }

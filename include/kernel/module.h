@@ -33,10 +33,12 @@ typedef struct kernel_module kmod_t;
     static unsigned int MAYBE_UNUSED(this_module) = addr(&km_##n)
 
 #define module_init(init) \
-    static int kmodule_init() ALIAS(init)
+    static int MAYBE_UNUSED(init)(); \
+    static int MAYBE_UNUSED(kmodule_init)() ALIAS(init)
 
 #define module_exit(exit) \
-    static int kmodule_deinit() ALIAS(exit)
+    static int MAYBE_UNUSED(exit)(); \
+    static int MAYBE_UNUSED(kmodule_deinit)() ALIAS(exit)
 
 int modules_init();
 void modules_shutdown();

@@ -6,9 +6,6 @@
 #include <kernel/device.h>
 #include <kernel/module.h>
 
-#include "tty.h"
-#include "tty_driver.h"
-
 #define MINOR_NULL 1
 
 KERNEL_MODULE(mem);

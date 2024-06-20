@@ -68,7 +68,7 @@ static inline int port_to_minor(uint16_t port)
 }
 #endif
 
-UNMAP_AFTER_INIT int serial_init()
+UNMAP_AFTER_INIT static int serial_init()
 {
     tty_driver_register(&serial_driver);
     irq_register(0x4, &serial_irs, "com1", IRQ_DEFAULT);
@@ -76,7 +76,7 @@ UNMAP_AFTER_INIT int serial_init()
     return 0;
 }
 
-int serial_deinit()
+static int serial_deinit()
 {
     return 0;
 }

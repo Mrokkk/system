@@ -6,9 +6,6 @@
 #include <kernel/module.h>
 #include <kernel/device.h>
 
-#include "tty.h"
-#include "tty_driver.h"
-
 #define PORT 0xe9
 #define debugcon_send(c) outb(c, PORT)
 

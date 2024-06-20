@@ -28,7 +28,7 @@ module_init(framebuffer_init);
 module_exit(framebuffer_deinit);
 KERNEL_MODULE(framebuffer);
 
-UNMAP_AFTER_INIT int framebuffer_init()
+UNMAP_AFTER_INIT static int framebuffer_init()
 {
     uint8_t* fb = ptr((uint32_t)framebuffer_ptr->addr);
     uint32_t pitch = framebuffer_ptr->pitch;
@@ -63,7 +63,7 @@ UNMAP_AFTER_INIT int framebuffer_init()
     return 0;
 }
 
-int framebuffer_deinit()
+static int framebuffer_deinit()
 {
     return 0;
 }

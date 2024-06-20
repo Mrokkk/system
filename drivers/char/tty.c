@@ -58,13 +58,13 @@ KERNEL_MODULE(tty);
 
 static LIST_DECLARE(tty_list);
 
-UNMAP_AFTER_INIT int tty_init()
+UNMAP_AFTER_INIT static int tty_init()
 {
     console_init();
     return 0;
 }
 
-int tty_deinit()
+static int tty_deinit()
 {
     return 0;
 }
