@@ -71,7 +71,7 @@ static inline void push_entry(char* buffer, int len, int* index, char* logger_bu
 
 void __printk(struct printk_entry* entry, const char *fmt, ...)
 {
-    ts_t ts;
+    timeval_t ts;
     char buffer[PRINTK_LINE_LEN];
     va_list args;
     int printed;
@@ -112,8 +112,8 @@ void __printk(struct printk_entry* entry, const char *fmt, ...)
     {
         case LOGLEVEL_DEBUG:
             printed = sprintf(buffer, "\n"JIFFIES"[%8u.%06u] %s%s:%u:%s: ",
-                ts.seconds,
-                ts.useconds,
+                ts.tv_sec,
+                ts.tv_usec,
                 log_color,
                 filename,
                 entry->line,
@@ -125,8 +125,8 @@ void __printk(struct printk_entry* entry, const char *fmt, ...)
             break;
         default:
             printed = sprintf(buffer, "\n"JIFFIES"[%8u.%06u] %s",
-                ts.seconds,
-                ts.useconds,
+                ts.tv_sec,
+                ts.tv_usec,
                 log_color);
             break;
     }

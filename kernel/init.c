@@ -161,12 +161,12 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     ASSERT(init_in_progress == INIT_IN_PROGRESS);
     init_in_progress = 0;
 
-    ts_t ts;
+    timeval_t ts;
     timestamp_get(&ts);
 
-    if (ts.seconds || ts.useconds)
+    if (ts.tv_sec || ts.tv_usec)
     {
-        log_notice("boot finished in %u.%06u s", ts.seconds, ts.useconds);
+        log_notice("boot finished in %u.%06u s", ts.tv_sec, ts.tv_usec);
     }
 
     run_init_and_go_idle();
@@ -253,7 +253,7 @@ UNMAP_AFTER_INIT static void syslog_configure(void)
 {
     int errno;
     file_t* file;
-    const char* device = param_value_get("syslog");
+    const char* device = param_value_get(KERNEL_PARAM("syslog"));
 
     log_notice("syslog output: %s", device ? device : "none");
 

@@ -57,4 +57,14 @@ void printk_early_register(void (*print)(const char* string));
 #define log_exception(fmt, ...)     printk(KERN_ERR     log_fmt(fmt),   ##__VA_ARGS__)
 #define log_critical(fmt, ...)      printk(KERN_CRIT    log_fmt(fmt),   ##__VA_ARGS__)
 #define log_continue(fmt, ...)      printk(KERN_CONT    fmt,            ##__VA_ARGS__)
-#define log_debug_continue(flag, fmt, ...) flag ? printk(KERN_CONT    fmt,            ##__VA_ARGS__) : 0
+#define log_debug_continue(flag, fmt, ...) flag ? printk(KERN_CONT fmt, ##__VA_ARGS__) : 0
+
+#define panic_if(condition, ...) \
+    do \
+    { \
+        if (unlikely(condition)) \
+        { \
+            panic(__VA_ARGS__); \
+        } \
+    } \
+    while (0)

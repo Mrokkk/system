@@ -70,7 +70,7 @@ UNMAP_AFTER_INIT void hpet_initialize(void)
         }
     }
 
-    clock_source_register(&hpet_clock);
+    clock_source_register_khz(&hpet_clock, hpet_freq);
 }
 
 uint32_t hpet_freq_get(void)

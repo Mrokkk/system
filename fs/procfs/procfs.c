@@ -440,8 +440,8 @@ static int cmdline_show(seq_file_t* s)
 
 static int uptime_show(seq_file_t* s)
 {
-    ts_t ts;
+    timeval_t ts;
     timestamp_get(&ts);
-    seq_printf(s, "%u.%u\n", ts.seconds, ts.useconds);
+    seq_printf(s, "%u.%u\n", ts.tv_sec, ts.tv_usec);
     return 0;
 }

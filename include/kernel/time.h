@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <kernel/clock.h>
 #include <kernel/api/time.h>
 #include <kernel/api/types.h>
 
@@ -12,44 +13,34 @@
 #define NSEC_IN_SEC     GHz
 #define USEC_IN_SEC     MHz
 #define USEC_IN_MSEC    KHz
+#define NSEC_IN_MSEC    MHz
 
-struct timestamp
-{
-    uint32_t seconds;
-    uint32_t useconds;
-};
-
-typedef struct timestamp ts_t;
 typedef struct timeval timeval_t;
+typedef struct timespec timespec_t;
 
-void timestamp_get(ts_t* ts);
+void timestamp_get(timeval_t* ts);
 void timestamp_update(void);
 void udelay(uint32_t useconds);
 void mdelay(uint32_t mseconds);
+uint64_t cycles2us(uint64_t cycles);
+uint64_t cycles2ns(uint64_t cycles);
 
-static inline void ts_align(ts_t* ts)
-{
-    ts->seconds += ts->useconds / MHz;
-    ts->useconds = ts->useconds % MHz;
-}
-
-// This one is from Linux 2.0
-static inline time_t mktime_raw(
+time_t mktime(
     uint32_t year,
     uint32_t month,
     uint32_t day,
     uint32_t hour,
     uint32_t minute,
-    uint32_t second)
-{
-    if (0 >= (int)(month -= 2))
-    {   // 1..12 -> 11,12,1..10
-        month += 12; // put Feb last since it has a leap day
-        year -= 1;
-    }
+    uint32_t second);
 
-    return (((year / 4 - year / 100 + year / 400 + 367 * month / 12 + day + year * 365 - 719499 // days
-          ) * 24 + hour // hours
-        ) * 60 + minute // minutes
-      ) * 60 + second; // seconds
-}
+void time_setup(void);
+
+#define MEASURE_OPERATION(unit, ...) \
+    ({ \
+        uint64_t __s = monotonic_clock->read(); \
+        mb(); \
+        __VA_ARGS__; \
+        mb(); \
+        uint64_t __e = monotonic_clock->read(); \
+        cycles2##unit(((__e - __s) & monotonic_clock->mask) - monotonic_clock->read_overhead); \
+    })

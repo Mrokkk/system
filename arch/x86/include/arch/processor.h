@@ -6,6 +6,7 @@
 #include <arch/segment.h>
 #include <kernel/compiler.h>
 
+#define CACHELINE_SIZE 64
 #define IO_BITMAP_SIZE 128
 #define IOMAP_OFFSET 104
 
@@ -120,6 +121,8 @@ typedef struct { uint16_t off, seg; } farptr_t;
 
 #define regs_print(...) \
     REAL_VAR_MACRO_3(PRINT_REGS_1, PRINT_REGS_1, PRINT_REGS_2, __VA_ARGS__)
+
+#define CACHELINE_ALIGN __attribute__((aligned(CACHELINE_SIZE)))
 
 #endif // __ASSEMBLER__
 

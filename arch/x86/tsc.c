@@ -38,7 +38,7 @@ UNMAP_AFTER_INIT void tsc_initialize(void)
     tsc_calibrate_by_i8253();
     tsc_calibrate_by_hpet();
 
-    clock_source_register(&tsc_clock);
+    clock_source_register_khz(&tsc_clock, tsc_clock.freq_khz * 1000);
 }
 
 static uint64_t tsc_read(void)

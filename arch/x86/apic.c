@@ -127,7 +127,7 @@ UNMAP_AFTER_INIT void apic_timer_initialize(void)
     uint32_t hpet_init_cnt = apic_timer_calibrate_by_hpet();
     init_cnt = hpet_init_cnt ? hpet_init_cnt : i8253_init_cnt;
 
-    clock_source_register(&apic_timer_clock);
+    clock_source_register_khz(&apic_timer_clock, apic_timer_clock.freq_khz * 1000);
 }
 
 void apic_eoi(uint32_t)

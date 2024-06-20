@@ -37,7 +37,7 @@ static clock_source_t i8253_clock = {
 
 UNMAP_AFTER_INIT void i8253_initialize(void)
 {
-    clock_source_register(&i8253_clock);
+    clock_source_register_hz(&i8253_clock, CLOCK_TICK_RATE);
 }
 
 UNMAP_AFTER_INIT static int i8253_irq_enable(void)

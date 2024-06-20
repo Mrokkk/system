@@ -110,12 +110,12 @@ static int c_crash()
 
 static int c_kstat()
 {
-    ts_t ts;
+    timeval_t ts;
     timestamp_get(&ts);
     int uptime = jiffies / HZ;
     print_ul(jiffies);
-    print_ul(ts.seconds);
-    print_ul(ts.useconds);
+    print_ul(ts.tv_sec);
+    print_ul(ts.tv_usec);
     print_ul(uptime);
     print_ul(context_switches);
     print_ul(total_forks);

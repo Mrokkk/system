@@ -106,8 +106,9 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
 
     irqs_initialize();
 
-    clock_sources_setup();
     rtc_enable();
+    clock_sources_setup();
+    time_setup();
 
     vbe_initialize();
 

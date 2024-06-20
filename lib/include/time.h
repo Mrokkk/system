@@ -9,12 +9,6 @@
 #define USEC_PER_SEC    1000000L    // Microseconds per second
 #define NSEC_PER_USEC   1000L       // Nanoseconds per microsecond
 
-struct timespec
-{
-    time_t  tv_sec;     // Seconds
-    long    tv_nsec;    // Nanoseconds
-};
-
 struct tm
 {
     int tm_sec;     // Seconds [0,60]
