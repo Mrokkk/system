@@ -85,16 +85,26 @@ class LineBuffer:
 class Qemu(subprocess.Popen):
     buffer : LineBuffer
 
-    def __init__(self, args) -> None:
+    def __init__(self, qemu_args : List[str], args : argparse.Namespace) -> None:
+        bufsize     : int = 1
+        qemu_stdout : int = None
+
+        if args.raw:
+            bufsize = -1
+        else:
+            bufsize = 1
+            qemu_stdout = subprocess.PIPE
+
         super().__init__ (
-            args,
+            qemu_args,
             errors='ignore',
-            stdout=subprocess.PIPE,
-            bufsize=1,
+            stdout=qemu_stdout,
+            bufsize=bufsize,
             shell=False,
             universal_newlines=True)
 
-        self.buffer = LineBuffer(self.stdout)
+        if not args.raw:
+            self.buffer = LineBuffer(self.stdout)
 
     def readline(self) -> str:
         return self.buffer.readline()
@@ -295,21 +305,19 @@ def main() -> None:
 
     args, qemu_args = args_parse()
 
-    qemu = Qemu(qemu_args)
+    qemu = Qemu(qemu_args, args)
     context = Context(args)
 
-    while True:
-        try:
-            line = qemu.readline()
-        except EOF:
-            break
-        except Exception as e:
-            id = exception_save(context)
-            line_print(f'>> Internal exception #{id} encountered when reading line')
+    if not args.raw:
+        while True:
+            try:
+                line = qemu.readline()
+            except EOF:
+                break
+            except Exception as e:
+                id = exception_save(context)
+                line_print(f'>> Internal exception #{id} encountered when reading line')
 
-        if args.raw:
-            line_print(line)
-        else:
             line_process(line, context)
 
     qemu.communicate()
