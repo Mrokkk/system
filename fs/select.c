@@ -200,5 +200,7 @@ int sys_pselect(struct pselect_params* params)
         }
     }
 
+    delete_array(fds, params->nfds);
+
     return res;
 }
