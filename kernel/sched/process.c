@@ -88,12 +88,6 @@ int sys_setgid(gid_t)
     return 0;
 }
 
-unsigned int sys_alarm(unsigned int)
-{
-    do_kill(process_current, SIGALRM);
-    return 0;
-}
-
 char* mm_print(const struct mm* mm, char* str)
 {
     str += sprintf(str,

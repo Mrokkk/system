@@ -21,6 +21,7 @@ ENTRY(__semaphore_wake)
     ret
 ENDPROC(__semaphore_wake)
 
+// Return address is in EAX
 ENTRY(__semaphore_sleep)
     push %eax
     push %edx
@@ -28,7 +29,6 @@ ENTRY(__semaphore_sleep)
     call __down_failed
     pop %ecx
     pop %edx
-    pop %eax
     ret
 ENDPROC(__semaphore_sleep)
 
@@ -73,6 +73,7 @@ ENTRY(timer_handler)
     incl jiffies
     SAVE_ALL(0)
     call SYMBOL_NAME(timestamp_update)
+    call SYMBOL_NAME(ktimer_run)
     push $0
     call SYMBOL_NAME(irq_eoi)
     sti

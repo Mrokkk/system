@@ -21,3 +21,5 @@ static inline void mutex_unlock(mutex_t* m)
 {
     semaphore_up((semaphore_t*)m);
 }
+
+#include <arch/mutex.h>

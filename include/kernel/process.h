@@ -12,6 +12,8 @@
 #include <kernel/signal.h>
 #include <kernel/api/wait.h>
 
+typedef struct process process_t;
+
 #define STACK_MAGIC 0xdeadc0de
 #define PROCESS_FILES       32
 #define PROCESS_NAME_LEN    32
@@ -110,8 +112,10 @@ struct process
     struct fs* fs;
     struct files* files;
     struct signals* signals;
-    struct process* parent;
+    int alarm;
+    process_t* parent;
     binary_t* bin;
+    list_head_t timers;
     wait_queue_head_t wait_child;
     list_head_t children;
     // Don't iterate over those lists

@@ -3,6 +3,7 @@
 #include <arch/rtc.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
+#include <kernel/timer.h>
 #include <kernel/kernel.h>
 
 volatile unsigned int jiffies;
@@ -29,16 +30,7 @@ time_t mktime(
       ) * 60 + second; // seconds
 }
 
-static inline void ts_normalize(timeval_t* ts)
-{
-    while (ts->tv_usec >= USEC_IN_SEC)
-    {
-        ++ts->tv_sec;
-        ts->tv_usec -= USEC_IN_SEC;
-    }
-}
-
-static inline void ts_update(uint64_t useconds)
+static void ts_update(uint64_t useconds)
 {
     timestamp.tv_usec += useconds;
     ts_normalize(&timestamp);

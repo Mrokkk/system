@@ -35,6 +35,28 @@ time_t mktime(
 
 void time_setup(void);
 
+static inline void ts_normalize(timeval_t* ts)
+{
+    while (ts->tv_usec >= USEC_IN_SEC)
+    {
+        ++ts->tv_sec;
+        ts->tv_usec -= USEC_IN_SEC;
+    }
+}
+
+static inline void ts_add(timeval_t* to, timeval_t* from)
+{
+    to->tv_sec += from->tv_sec;
+    to->tv_usec += from->tv_usec;
+    ts_normalize(to);
+}
+
+static inline int ts_gt(timeval_t* lhs, timeval_t* rhs)
+{
+    return lhs->tv_sec > rhs->tv_sec ||
+        (lhs->tv_sec == rhs->tv_sec && lhs->tv_usec > rhs->tv_usec);
+}
+
 #define MEASURE_OPERATION(unit, ...) \
     ({ \
         uint64_t __s = monotonic_clock->read(); \

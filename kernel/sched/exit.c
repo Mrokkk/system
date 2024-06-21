@@ -1,4 +1,5 @@
 #include <kernel/vm.h>
+#include <kernel/timer.h>
 #include <kernel/process.h>
 #include <kernel/api/unistd.h>
 
@@ -159,6 +160,7 @@ void process_exit(struct process* p)
     p->stat = PROCESS_ZOMBIE;
     process_wake_waiting(p);
     p->need_resched = true;
+    ktimers_stop(p);
     irq_restore(flags);
 }
 

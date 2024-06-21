@@ -5,6 +5,7 @@
 #include <kernel/time.h>
 #include <kernel/devfs.h>
 #include <kernel/ksyms.h>
+#include <kernel/timer.h>
 #include <kernel/kernel.h>
 #include <kernel/memory.h>
 #include <kernel/module.h>
@@ -311,6 +312,11 @@ static void unmap_sections(void)
     }
 }
 
+static void timer_callback(ktimer_t* timer)
+{
+    log_info("timer %u callback", timer->id);
+}
+
 static int NORETURN(init(const char* cmdline))
 {
     rootfs_prepare();
@@ -323,6 +329,30 @@ static int NORETURN(init(const char* cmdline))
 
     const char* const argv[] = {init_path, ptr(cmdline), NULL, };
     const char* const envp[] = {"PHOENIX=TRUE", NULL};
+
+    // 1
+    timeval_t t = {.tv_sec = 5, .tv_usec = 0};
+    ktimer_create(KTIMER_ONESHOT, t, &timer_callback, NULL);
+
+    // 2
+    t.tv_sec = 4;
+    ktimer_create(KTIMER_ONESHOT, t, &timer_callback, NULL);
+
+    // 3
+    t.tv_sec = 7;
+    ktimer_create(KTIMER_ONESHOT, t, &timer_callback, NULL);
+
+    // 4
+    t.tv_sec = 8;
+    ktimer_create(KTIMER_ONESHOT, t, &timer_callback, NULL);
+
+    // 5
+    t.tv_sec = 2;
+    ktimer_create(KTIMER_ONESHOT, t, &timer_callback, NULL);
+
+    // 6
+    t.tv_sec = 20;
+    ktimer_create(KTIMER_REPEATING, t, &timer_callback, NULL);
 
     if (unlikely(do_exec(init_path, argv, envp)))
     {

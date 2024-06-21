@@ -192,10 +192,12 @@ static inline void process_init(struct process* child, struct process* parent)
     child->forks = 0;
     child->sid = parent->sid;
     child->need_resched = false;
+    child->alarm = 0;
     strcpy(child->name, parent->name);
     wait_queue_head_init(&child->wait_child);
     list_init(&child->children);
     list_init(&child->siblings);
+    list_init(&child->timers);
 }
 
 static inline void process_parent_child_link(struct process* parent, struct process* child)
