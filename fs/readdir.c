@@ -45,7 +45,7 @@ int sys_getdents(unsigned int fd, void* dirp, size_t count)
     file_t *file;
     struct readdir_data data;
 
-    if (unlikely((errno = vm_verify(VERIFY_WRITE, dirp, count, process_current->mm->vm_areas))))
+    if (unlikely((errno = current_vm_verify_buf(VERIFY_WRITE, dirp, count))))
     {
         log_debug(DEBUG_READDIR, "invalid ptr passed: %x", dirp);
         return errno;

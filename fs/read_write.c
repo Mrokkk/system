@@ -8,7 +8,7 @@ int sys_write(int fd, const char* buffer, size_t size)
     int errno;
     file_t* file;
 
-    if ((errno = vm_verify(VERIFY_READ, buffer, size, process_current->mm->vm_areas)))
+    if ((errno = current_vm_verify_array(VERIFY_READ, buffer, size)))
     {
         return errno;
     }
@@ -30,7 +30,7 @@ int sys_read(int fd, char* buffer, size_t size)
     int errno;
     file_t* file;
 
-    if ((errno = vm_verify(VERIFY_WRITE, buffer, size, process_current->mm->vm_areas)))
+    if ((errno = current_vm_verify_array(VERIFY_WRITE, buffer, size)))
     {
         return errno;
     }

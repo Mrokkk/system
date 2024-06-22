@@ -270,8 +270,8 @@ int sys_timer_create(clockid_t clockid, sigevent_t* evp, timer_t* timerid)
         return -EINVAL;
     }
 
-    if ((errno = vm_verify(VERIFY_READ, timerid, sizeof(*timerid), process_current->mm->vm_areas)) ||
-        (evp && (errno = vm_verify(VERIFY_READ, evp, sizeof(*evp), process_current->mm->vm_areas))))
+    if ((errno = current_vm_verify(VERIFY_READ, timerid)) ||
+        (evp && (errno = current_vm_verify(VERIFY_READ, evp))))
     {
         return errno;
     }
@@ -338,8 +338,8 @@ int sys_timer_settime(
         return -EINVAL;
     }
 
-    if (unlikely(errno = vm_verify(VERIFY_READ, new_value, sizeof(*new_value), process_current->mm->vm_areas)) ||
-        (old_value && (errno = vm_verify(VERIFY_WRITE, old_value, sizeof(*old_value), process_current->mm->vm_areas))))
+    if (unlikely(errno = current_vm_verify(VERIFY_READ, new_value)) ||
+        (old_value && (errno = current_vm_verify(VERIFY_WRITE, old_value))))
     {
         return errno;
     }

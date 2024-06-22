@@ -172,7 +172,8 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         return errno;
     }
 
-    if ((errno = vm_verify(VERIFY_READ, argv, 4, p->mm->vm_areas)))
+    // FIXME: validate properly instead of checking only 4 bytes
+    if ((errno = vm_verify_array(VERIFY_READ, argv, 4, p->mm->vm_areas)))
     {
         return errno;
     }

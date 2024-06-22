@@ -148,7 +148,7 @@ int sys_poll(struct pollfd* fds, unsigned long nfds, int timeout)
     int errno;
     timeval_t t;
 
-    if ((errno = vm_verify(VERIFY_WRITE, fds, sizeof(struct pollfd) * nfds, process_current->mm->vm_areas)))
+    if ((errno = current_vm_verify_array(VERIFY_WRITE, fds, nfds)))
     {
         return errno;
     }

@@ -314,7 +314,7 @@ int sys_getcwd(char* __user buf, size_t size)
 {
     int errno;
 
-    if ((errno = vm_verify(VERIFY_READ, buf, size, process_current->mm->vm_areas)))
+    if ((errno = current_vm_verify_buf(VERIFY_READ, buf, size)))
     {
         return errno;
     }

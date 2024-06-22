@@ -89,7 +89,7 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
     int errno;
     fb_var_screeninfo_t* vinfo = arg;
 
-    if ((errno = vm_verify(VERIFY_WRITE, vinfo, sizeof(fb_var_screeninfo_t), process_current->mm->vm_areas)))
+    if ((errno = current_vm_verify(VERIFY_WRITE, vinfo)))
     {
         return errno;
     }

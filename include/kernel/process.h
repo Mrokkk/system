@@ -427,5 +427,16 @@ static inline vm_area_t* process_brk_vm_area(struct process* p)
     return NULL;
 }
 
+// For explanation of vm_verify* macros, check kernel/vm.h. Below only wraps those
+// macros to pass current process vm areas as vma parameter
+#define current_vm_verify(flag, data_ptr) \
+    vm_verify(flag, data_ptr, process_current->mm->vm_areas)
+
+#define current_vm_verify_array(flag, data_ptr, n) \
+    vm_verify_array(flag, data_ptr, n, process_current->mm->vm_areas)
+
+#define current_vm_verify_buf(flag, data_ptr, n) \
+    vm_verify_buf(flag, data_ptr, n, process_current->mm->vm_areas)
+
 #define for_each_process(p) \
     list_for_each_entry(p, &init_process.processes, processes)

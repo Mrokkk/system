@@ -6,7 +6,7 @@
 int path_validate(const char* path)
 {
     // FIXME: do proper validation
-    return vm_verify(VERIFY_READ, path, 1, process_current->mm->vm_areas);
+    return current_vm_verify(VERIFY_READ, path);
 }
 
 void dirname(const char* path, char* output)
