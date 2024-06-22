@@ -24,7 +24,7 @@ static void do_poll_timeout(ktimer_t* timer)
     process_wake(timer->process);
 }
 
-static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
+static int do_poll(struct pollfd* fds, unsigned long nfds, timeval_t* timeout)
 {
     int errno;
     flags_t flags;
@@ -33,7 +33,7 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
     int ready = 0;
     volatile bool timedout = false;
 
-    if (timeout == 0)
+    if (timeout && timeout->tv_sec == 0 && timeout->tv_usec == 0)
     {
         return 0;
     }
@@ -66,9 +66,9 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
         wait_queue_init(&data[i].queue, process_current);
     }
 
-    if (timeout != -1)
+    if (timeout != NULL)
     {
-        ktimer_create(KTIMER_ONESHOT, (timeval_t){.tv_sec = timeout, .tv_usec = 0}, &do_poll_timeout, (void*)&timedout);
+        ktimer_create(KTIMER_ONESHOT, *timeout, &do_poll_timeout, (void*)&timedout);
     }
 
     while (!ready)
@@ -146,13 +146,20 @@ error:
 int sys_poll(struct pollfd* fds, unsigned long nfds, int timeout)
 {
     int errno;
+    timeval_t t;
 
     if ((errno = vm_verify(VERIFY_WRITE, fds, sizeof(struct pollfd) * nfds, process_current->mm->vm_areas)))
     {
         return errno;
     }
 
-    return do_poll(fds, nfds, timeout);
+    if (timeout > 0)
+    {
+        t.tv_sec = timeout;
+        t.tv_usec = 0;
+    }
+
+    return do_poll(fds, nfds, timeout > 0 ? &t : NULL);
 }
 
 int sys_select(int nfds, fd_set_t* readfds, fd_set_t* writefds, fd_set_t* exceptfds, timeval_t* timeout)
@@ -179,6 +186,7 @@ int sys_pselect(struct pselect_params* params)
 {
     int errno, res, count = 0;
     struct pollfd* fds;
+    timeval_t t;
 
     if (params->writefds || params->errorfds)
     {
@@ -213,7 +221,13 @@ int sys_pselect(struct pselect_params* params)
         }
     }
 
-    res = do_poll(fds, count, params->timeout ? (int)params->timeout->tv_sec : -1);
+    if (params->timeout)
+    {
+        t.tv_sec = params->timeout->tv_sec;
+        t.tv_usec = params->timeout->tv_nsec / 1000;
+    }
+
+    res = do_poll(fds, count, params->timeout ? &t : NULL);
 
     if (unlikely(errno = errno_get(res)))
     {

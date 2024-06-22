@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 
 #include "input.h"
 #include "macro.h"
@@ -337,30 +338,29 @@ int main()
 
     int i = 0;
     srand(time(NULL));
+    struct timespec timeout = {.tv_sec = 0, .tv_nsec = 100000000};
     while (1)
     {
+        pselect(0, NULL, NULL, NULL, &timeout, NULL);
         snake_direction_set(input_read());
 
-        if (i % 500000 == 0)
+        snake_move();
+
+        if (i % 10 == 0)
         {
-            snake_move();
-
-            if (i % 8000000 == 0)
+            struct cell* food_cell;
+            do
             {
-                struct cell* food_cell;
-                do
-                {
-                    food_cell = CELL(rand() % xgrids, rand() % ygrids);
-                }
-                while (food_cell->flags & FLAGS_SNAKE);
-
-                food_cell->flags = FLAGS_FOOD;
-
-                cell_draw(food_cell, FOOD);
+                food_cell = CELL(rand() % xgrids, rand() % ygrids);
             }
+            while (food_cell->flags & FLAGS_SNAKE);
 
-            memcpy(framebuffer, buffer, vinfo.yres * vinfo.pitch);
+            food_cell->flags = FLAGS_FOOD;
+
+            cell_draw(food_cell, FOOD);
         }
+
+        memcpy(framebuffer, buffer, vinfo.yres * vinfo.pitch);
 
         ++i;
     }
