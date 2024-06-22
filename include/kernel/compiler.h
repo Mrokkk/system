@@ -19,6 +19,7 @@
 #define MUST_CHECK(ret)         __attribute__((warn_unused_result)) ret
 #define NORETURN(fn)             __attribute__((noreturn)) fn
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn
+#define UNUSED(x)               (void)x
 
 #define __STRINGIFY(x)          #x
 #define STRINGIFY(x)            __STRINGIFY(x)

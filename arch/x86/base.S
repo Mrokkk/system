@@ -73,7 +73,7 @@ ENTRY(timer_handler)
     incl jiffies
     SAVE_ALL(0)
     call SYMBOL_NAME(timestamp_update)
-    call SYMBOL_NAME(ktimer_run)
+    call SYMBOL_NAME(ktimers_update)
     push $0
     call SYMBOL_NAME(irq_eoi)
     sti

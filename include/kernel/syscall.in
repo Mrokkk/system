@@ -59,3 +59,5 @@ umount2: int, const char*, int
 unlink: int, const char*
 waitpid: int, int, int*, int
 write: int, int, const char*, size_t
+timer_create: int, clockid_t, struct sigevent*, timer_t*
+timer_settime: int, timer_t, int, const struct itimerspec*, struct itimerspec*

@@ -96,6 +96,12 @@ static inline void list_merge(list_head_t* list1, list_head_t* list2)
        ((type*)(addr((ptr)->prev) - addr(offsetof(type, member)))); \
     })
 
+#define __list_safe_init(pos, head, member) \
+    ({ \
+       pos = list_next_entry((head), typeof(*pos), member); \
+       list_next_entry(&(pos)->member, typeof(*pos), member); \
+    })
+
 #define list_front(head, type, member) \
     list_next_entry(head, type, member)
 
@@ -109,3 +115,13 @@ static inline void list_merge(list_head_t* list1, list_head_t* list2)
     for (pos = list_entry((head)->next, typeof(*pos), member); \
          &pos->member != (head); \
          pos = list_entry(pos->member.next, typeof(*pos), member))
+
+// list_for_each_entry_safe - iterate over list in a way which allows for list entry removal
+//
+// @pos - already declared variable of type* kept in list used as an iterator
+// @head - pointer to the head of the list
+// @member - name of the list_head_t member within a type
+#define list_for_each_entry_safe(pos, head, member) \
+    for (typeof(pos) __n = __list_safe_init(pos, head, member); \
+         &pos->member != (head); \
+         pos = __n, __n = list_next_entry(&__n->member, typeof(*pos), member))

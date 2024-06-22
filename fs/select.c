@@ -68,7 +68,7 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, timeval_t* timeout)
 
     if (timeout != NULL)
     {
-        ktimer_create(KTIMER_ONESHOT, *timeout, &do_poll_timeout, (void*)&timedout);
+        ktimer_create_and_start(KTIMER_ONESHOT, *timeout, &do_poll_timeout, (void*)&timedout);
     }
 
     while (!ready)

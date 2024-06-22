@@ -35,8 +35,8 @@ syscall_h_template : str = """#ifndef __SYSCALL_H
 
 
 trace_syscall_template : str = """#include <kernel/trace.h>
-#include <kernel/types.h>
 #include <kernel/kernel.h>
+#include <kernel/api/types.h>
 
 syscall_t trace_syscalls[] = {
     { },
@@ -127,7 +127,7 @@ def type_convert(t : str):
     elif t in ('int', 'long', 'gid_t'): return 'TYPE_LONG'
     elif t == 'short': return 'TYPE_SHORT'
     elif t == 'char': return 'TYPE_CHAR'
-    elif t in ('unsigned long', 'unsigned int', 'size_t', 'off_t', 'uint32_t', 'time_t'): return 'TYPE_UNSIGNED_LONG'
+    elif t in ('unsigned long', 'unsigned int', 'size_t', 'off_t', 'uint32_t', 'time_t', 'clockid_t', 'timer_t'): return 'TYPE_UNSIGNED_LONG'
     elif t in ('unsigned short', 'mode_t', 'uid_t', 'dev_t'): return 'TYPE_UNSIGNED_SHORT'
     elif t == 'void': return 'TYPE_VOID'
     else:

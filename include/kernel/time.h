@@ -35,19 +35,45 @@ time_t mktime(
 
 void time_setup(void);
 
+static inline long usec2nsec(suseconds_t usec)
+{
+    return usec * 1000;
+}
+
+static inline suseconds_t nsec2usec(long nsec)
+{
+    return nsec / 1000;
+}
+
 static inline void ts_normalize(timeval_t* ts)
 {
-    while (ts->tv_usec >= USEC_IN_SEC)
+    time_t sec = ts->tv_sec;
+    suseconds_t usec = ts->tv_usec;
+    while (usec >= USEC_IN_SEC)
     {
-        ++ts->tv_sec;
-        ts->tv_usec -= USEC_IN_SEC;
+        ++sec;
+        usec -= USEC_IN_SEC;
     }
+    while (usec < 0)
+    {
+        --sec;
+        usec += USEC_IN_SEC;
+    }
+    ts->tv_sec = sec;
+    ts->tv_usec = usec;
 }
 
 static inline void ts_add(timeval_t* to, timeval_t* from)
 {
     to->tv_sec += from->tv_sec;
     to->tv_usec += from->tv_usec;
+    ts_normalize(to);
+}
+
+static inline void ts_sub(timeval_t* to, timeval_t* from)
+{
+    to->tv_sec -= from->tv_sec;
+    to->tv_usec -= from->tv_usec;
     ts_normalize(to);
 }
 

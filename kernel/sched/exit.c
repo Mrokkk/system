@@ -160,7 +160,7 @@ void process_exit(struct process* p)
     p->stat = PROCESS_ZOMBIE;
     process_wake_waiting(p);
     p->need_resched = true;
-    ktimers_stop(p);
+    process_ktimers_exit(p);
     irq_restore(flags);
 }
 

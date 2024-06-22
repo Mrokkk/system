@@ -3,6 +3,7 @@
 #include <kernel/api/signal.h>
 
 struct process;
+typedef struct sigevent sigevent_t;
 
 int do_kill(struct process* proc, int signum);
 int signal_deliver(struct process* proc, int signum);

@@ -417,4 +417,18 @@ syscall_t trace_syscalls[] = {
         .nargs  = 3,
         .args   = { TYPE_LONG, TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_LONG },
     },
+
+    {
+        .name   = "timer_create",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_UNSIGNED_LONG, TYPE_VOID_PTR, TYPE_VOID_PTR },
+    },
+
+    {
+        .name   = "timer_settime",
+        .ret    = TYPE_LONG,
+        .nargs  = 4,
+        .args   = { TYPE_UNSIGNED_LONG, TYPE_LONG, TYPE_VOID_PTR, TYPE_VOID_PTR },
+    },
 };

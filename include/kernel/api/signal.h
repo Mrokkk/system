@@ -56,6 +56,25 @@ struct sigaction
     void     (*sa_restorer)(void);
 };
 
+union sigval
+{
+    int    sival_int;   // integer signal value
+    void*  sival_ptr;   // pointer signal value
+};
+
+#define SIGEV_NONE      0
+#define SIGEV_SIGNAL    1
+#define SIGEV_THREAD    2
+
+struct sigevent
+{
+    int          sigev_notify;                   // notification type
+    int          sigev_signo;                    // signal number
+    union sigval sigev_value;                    // signal value
+    void         (*sigev_notify_function)(union sigval); // notification function
+    void*        sigev_notify_attributes;        // notification attributes
+};
+
 int signal(int signum, sighandler_t handler);
 int kill(int pid, int signum);
 int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact);

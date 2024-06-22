@@ -203,7 +203,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     strncpy(p->name, copied_path, PROCESS_NAME_LEN);
     process_bin_exit(p);
-    ktimers_stop(p);
+    //process_ktimers_exit(p);
     p->bin = bin;
     bin->count = 1;
 

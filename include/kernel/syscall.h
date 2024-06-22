@@ -60,14 +60,18 @@
 #define __NR_unlink         57
 #define __NR_waitpid        58
 #define __NR_write          59
+#define __NR_timer_create   60
+#define __NR_timer_settime  61
 
-#define __NR_syscalls       60
+#define __NR_syscalls       62
 
 #ifndef __ASSEMBLER__
 
 struct fd_set;
+struct itimerspec;
 struct pollfd;
 struct sigaction;
+struct sigevent;
 struct stat;
 struct statvfs;
 struct timespec;
@@ -91,6 +95,9 @@ struct timeval;
 #endif
 #ifndef __syscall3
 #define __syscall3(...)
+#endif
+#ifndef __syscall4
+#define __syscall4(...)
 #endif
 #ifndef __syscall5
 #define __syscall5(...)
@@ -158,3 +165,5 @@ __syscall2(umount2, int, const char*, int)
 __syscall1(unlink, int, const char*)
 __syscall3(waitpid, int, int, int*, int)
 __syscall3(write, int, int, const char*, size_t)
+__syscall3(timer_create, int, clockid_t, struct sigevent*, timer_t*)
+__syscall4(timer_settime, int, timer_t, int, const struct itimerspec*, struct itimerspec*)
