@@ -1,7 +1,9 @@
+#include <stdbool.h>
 #include <kernel/fs.h>
 #include <kernel/vm.h>
 #include <kernel/time.h>
 #include <kernel/wait.h>
+#include <kernel/timer.h>
 #include <kernel/bitset.h>
 #include <kernel/process.h>
 
@@ -15,6 +17,13 @@ struct poll_data
 
 typedef struct poll_data poll_data_t;
 
+static void do_poll_timeout(ktimer_t* timer)
+{
+    bool* timedout = timer->data;
+    *timedout = true;
+    process_wake(timer->process);
+}
+
 static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
 {
     int errno;
@@ -22,6 +31,7 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
     poll_data_t* data;
     file_t* file;
     int ready = 0;
+    volatile bool timedout = false;
 
     if (timeout == 0)
     {
@@ -54,6 +64,11 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
 
         data->head = NULL;
         wait_queue_init(&data[i].queue, process_current);
+    }
+
+    if (timeout != -1)
+    {
+        ktimer_create(KTIMER_ONESHOT, (timeval_t){.tv_sec = timeout, .tv_usec = 0}, &do_poll_timeout, (void*)&timedout);
     }
 
     while (!ready)
@@ -99,6 +114,11 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, int timeout)
             // go to sleep (thus avoiding exit)
             delete_array(data, nfds);
             return -ERESTART;
+        }
+
+        if (timedout)
+        {
+            return 0;
         }
     }
 
@@ -160,9 +180,14 @@ int sys_pselect(struct pselect_params* params)
     int errno, res, count = 0;
     struct pollfd* fds;
 
-    if (params->writefds || params->errorfds || !params->readfds)
+    if (params->writefds || params->errorfds)
     {
         return -EINVAL;
+    }
+
+    if (!params->nfds)
+    {
+        params->nfds = 1;
     }
 
     fds = alloc_array(struct pollfd, params->nfds);
@@ -172,25 +197,33 @@ int sys_pselect(struct pselect_params* params)
         return -ENOMEM;
     }
 
-    for (int i = 0; i < FD_SETSIZE; ++i)
+    memset(fds, 0, sizeof(*fds) * params->nfds);
+
+    if (params->readfds)
     {
-        if (bitset_test((uint32_t*)params->readfds->fd_bits, i))
+        for (int i = 0; i < params->nfds; ++i)
         {
-            fds[count].events = POLLIN;
-            fds[count].revents = 0;
-            fds[count].fd = i;
-            count++;
+            if (bitset_test((uint32_t*)params->readfds->fd_bits, i))
+            {
+                fds[count].events = POLLIN;
+                fds[count].revents = 0;
+                fds[count].fd = i;
+                count++;
+            }
         }
     }
 
-    res = do_poll(fds, count, -1);
+    res = do_poll(fds, count, params->timeout ? (int)params->timeout->tv_sec : -1);
 
     if (unlikely(errno = errno_get(res)))
     {
         return errno;
     }
 
-    params->readfds->fd_bits[0] = 0;
+    if (params->readfds)
+    {
+        params->readfds->fd_bits[0] = 0;
+    }
 
     for (int i = 0; i < count; ++i)
     {
