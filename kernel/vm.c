@@ -193,3 +193,41 @@ int __vm_verify(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area_t*
 
     return -EFAULT;
 }
+
+int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
+{
+    // FIXME: hack for kernel processes
+    if (unlikely(!vma))
+    {
+        return 0;
+    }
+
+    for (; vma; vma = vma->next)
+    {
+        if (addr(string) >= vma->start && addr(string) < vma->end)
+        {
+            if (unlikely((flag == VERIFY_WRITE && !(vma->vm_flags & VM_WRITE)) ||
+                (flag == VERIFY_READ && !(vma->vm_flags & VM_READ))))
+            {
+                return -EFAULT;
+            }
+
+            size_t i;
+            size_t max_len = vma->end - addr(string);
+
+            for (i = 1, string++;; ++i, ++string)
+            {
+                if (unlikely(i > max_len))
+                {
+                    return -EFAULT;
+                }
+                if (*string == 0)
+                {
+                    return 0;
+                }
+            }
+        }
+    }
+
+    return -EFAULT;
+}

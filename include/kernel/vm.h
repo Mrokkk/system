@@ -56,9 +56,9 @@ typedef enum
     VERIFY_WRITE    = 2
 } vm_verify_flag_t;
 
-static inline int _vm_verify(vm_verify_flag_t verify, const void* ptr, size_t size, vm_area_t* vma)
+static inline int _vm_verify(vm_verify_flag_t flag, const void* ptr, size_t size, vm_area_t* vma)
 {
-    extern int __vm_verify(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area_t* vma);
+    extern int __vm_verify(vm_verify_flag_t flag, uint32_t vaddr, size_t size, vm_area_t* vma);
 
     if (!vma)
     {
@@ -71,8 +71,15 @@ static inline int _vm_verify(vm_verify_flag_t verify, const void* ptr, size_t si
         return -EFAULT;
     }
 
-    return __vm_verify(verify, addr(ptr), size, vma);
+    return __vm_verify(flag, addr(ptr), size, vma);
 }
+
+// vm_verify_string - check access to the string pointed by string
+//
+// @flag - vm_verify_flag_t as defined above
+// @string - pointer to a string
+// @vma - vm_areas against which access is checked
+int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 
 // vm_verify - check access to the object pointed by data_ptr
 //
@@ -82,7 +89,7 @@ static inline int _vm_verify(vm_verify_flag_t verify, const void* ptr, size_t si
 #define vm_verify(flag, data_ptr, vma) \
     ({ _vm_verify(flag, data_ptr, sizeof(*(data_ptr)), vma); })
 
-// vm_verify - check access to the array of n objects pointed by data_ptr
+// vm_verify_array - check access to the array of n objects pointed by data_ptr
 //
 // @flag - vm_verify_flag_t as defined above
 // @data_ptr - pointer to data
@@ -91,7 +98,7 @@ static inline int _vm_verify(vm_verify_flag_t verify, const void* ptr, size_t si
 #define vm_verify_array(flag, data_ptr, n, vma) \
     ({ _vm_verify(flag, data_ptr, sizeof(*(data_ptr)) * (n), vma); })
 
-// vm_verify - check access to the buffer of n bytes pointed by data_ptr
+// vm_verify_buf - check access to the buffer of n bytes pointed by data_ptr
 //
 // @flag - vm_verify_flag_t as defined above
 // @data_ptr - pointer to data
