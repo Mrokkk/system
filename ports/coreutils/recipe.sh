@@ -1,7 +1,7 @@
 REPO="https://github.com/coreutils/coreutils.git"
 VERSION=
 BRANCH=
-APPS=("ls" "tty" "dirname" "basename" "env" "fold")
+APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep")
 
 function build()
 {
@@ -53,7 +53,7 @@ function build()
 
     for app in "${APPS[@]}"
     do
-        make -O src/${app} || die "${app} build failed"
+        make -O src/${app} -j${NPROC} || die "${app} build failed"
     done
 }
 
