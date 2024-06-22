@@ -30,6 +30,8 @@ long long strtoll(
     char** restrict endptr,
     int base);
 
+double strtod(const char* restrict nptr, char** restrict endptr);
+
 void qsort(
     void* base,
     size_t nmemb,

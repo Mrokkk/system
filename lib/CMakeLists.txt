@@ -32,6 +32,7 @@ add_library(c STATIC
     setjmp.c
     signal.c
     sleep.c
+    strtod.c
     strtol.c
     syscall.c
     termios.c
