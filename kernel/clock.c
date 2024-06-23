@@ -19,6 +19,7 @@ static list_head_t clocks = LIST_INIT(clocks);
 
 static clock_source_t* systick_clock;
 static clock_source_t* monotonic_best;
+clock_source_t* rtc_clock;
 clock_source_t* monotonic_clock = &dummy_clock;
 
 static void clock_set(clock_source_t** current_best, clock_source_t* cs)
@@ -107,6 +108,11 @@ UNMAP_AFTER_INIT int clock_source_register(clock_source_t* cs, uint32_t freq, ui
         clock_set(&systick_clock, cs);
     }
 
+    if (cs->read_rtc)
+    {
+        clock_set(&rtc_clock, cs);
+    }
+
     return 0;
 }
 
@@ -170,11 +176,16 @@ UNMAP_AFTER_INIT int clock_sources_setup(void)
 
     panic_if(!systick_clock, "cannot select systick source");
     panic_if(!monotonic_clock, "cannot select monotonic clock");
+    panic_if(!rtc_clock, "cannot select rtc clock");
+
     panic_if((errno = systick_clock->enable_systick()),
         "%s: cannot enable systick: %d", systick_clock->name, errno);
 
     panic_if(monotonic_clock->enable && (errno = monotonic_clock->enable()),
         "%s: cannot enable monotonic source: %d", monotonic_clock->name, errno);
+
+    panic_if(rtc_clock->enable && (errno = rtc_clock->enable()),
+        "%s: cannot enable rtc source: %d", rtc_clock->name, errno);
 
     log_notice("available sources: ");
 
@@ -199,6 +210,8 @@ UNMAP_AFTER_INIT int clock_sources_setup(void)
         monotonic_clock->mult_ns,
         monotonic_clock->shift_ns);
 
+    log_notice("rtc source: %-10s freq %u KHz", rtc_clock->name, rtc_clock->freq_khz);
+
     return 0;
 }
 
@@ -212,6 +225,11 @@ int clock_sources_shutdown(void)
     if (monotonic_clock && monotonic_clock != systick_clock && monotonic_clock->shutdown)
     {
         monotonic_clock->shutdown();
+    }
+
+    if (rtc_clock && rtc_clock->shutdown)
+    {
+        rtc_clock->shutdown();
     }
 
     monotonic_clock = &dummy_clock;

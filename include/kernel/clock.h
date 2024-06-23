@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <kernel/div.h>
+#include <kernel/rtc.h>
 #include <kernel/list.h>
 #include <kernel/time.h>
 #include <arch/processor.h>
@@ -21,6 +22,8 @@ struct clock_source
     uint32_t mult_ns;
     uint32_t shift_ns;
     uint32_t read_overhead;
+
+    void (*read_rtc)(rtc_meas_t*);
 
     const char* name;
     uint32_t freq_khz;
@@ -46,4 +49,5 @@ static inline int clock_source_register_khz(clock_source_t* cs, uint32_t freq)
     return clock_source_register(cs, freq, 1000);
 }
 
+extern clock_source_t* rtc_clock;
 extern clock_source_t* monotonic_clock;

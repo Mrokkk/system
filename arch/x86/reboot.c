@@ -1,6 +1,5 @@
 #include <arch/io.h>
 #include <arch/irq.h>
-#include <arch/rtc.h>
 
 #include <kernel/clock.h>
 #include <kernel/kernel.h>
@@ -17,7 +16,6 @@ static void prepare(void)
     panic_mode_enter();
     irq_chip_disable();
     clock_sources_shutdown();
-    rtc_disable();
 }
 
 void machine_shutdown(void)

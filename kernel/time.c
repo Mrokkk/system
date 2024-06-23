@@ -1,10 +1,10 @@
 #define log_fmt(fmt) "time: " fmt
 #include <arch/io.h>
-#include <arch/rtc.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
 #include <kernel/timer.h>
 #include <kernel/kernel.h>
+#include <kernel/process.h>
 
 volatile unsigned int jiffies;
 timeval_t timestamp;
@@ -114,6 +114,22 @@ static void io_delay_measure(void)
         });
 
     log_info("dummy IO duration: %u ns", nseconds / IO_LOOPS);
+}
+
+time_t sys_time(void* tloc)
+{
+    time_t ret;
+    rtc_meas_t m;
+
+    if (tloc && current_vm_verify(VERIFY_WRITE, (time_t*)tloc))
+    {
+        return -EFAULT;
+    }
+
+    rtc_clock->read_rtc(&m);
+    ret = mktime(m.year, m.month, m.day, m.hour, m.minute, m.second);
+
+    return ret;
 }
 
 void time_setup(void)
