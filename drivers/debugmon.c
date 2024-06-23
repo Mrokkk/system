@@ -10,6 +10,8 @@
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>
+#include <kernel/termios.h>
+#include <kernel/api/ioctl.h>
 #include <kernel/api/unistd.h>
 
 #include <arch/rtc.h>
@@ -202,7 +204,12 @@ static int initialize(void)
         return -1;
     }
 
-    strcpy(process_current->name, "debug_monitor");
+    termios_t termios;
+    ioctl(fd, TCGETA, &termios);
+
+    termios.c_lflag &= ~ECHO;
+
+    ioctl(fd, TCSETA, &termios);
 
     return 0;
 }
@@ -276,13 +283,17 @@ static void line_handle(const char* line)
     }
 }
 
-static int debug_monitor()
+static void NORETURN(debug_monitor())
 {
     char line[32];
 
     if (initialize())
     {
-        return -1;
+        flags_t flags;
+        log_warning("failed to start debugmon");
+        irq_save(flags);
+        process_wait2(flags);
+        ASSERT_NOT_REACHED();
     }
 
     while (1)
@@ -291,13 +302,11 @@ static int debug_monitor()
         read_line(line);
         line_handle(line);
     }
-
-    return 0;
 }
 
 static int debugmon_init(void)
 {
-    kernel_process_spawn(&debug_monitor, NULL, NULL, SPAWN_KERNEL);
+    process_spawn("debugmon", &debug_monitor, NULL, SPAWN_KERNEL);
     return 0;
 }
 

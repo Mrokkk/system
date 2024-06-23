@@ -173,10 +173,12 @@ extern pid_t last_pid;
 extern unsigned int total_forks;
 extern unsigned int context_switches;
 
+typedef void (*process_entry_t)();
+
 int processes_init();
 int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags);
 void process_exit(struct process* p);
-int kernel_process_spawn(int (*entry)(), void* args, void* stack, int flags);
+process_t* process_spawn(const char* name, process_entry_t entry, void* args, int flags);
 int process_find(int pid, struct process** p);
 void process_wake_waiting(struct process* p);
 int process_find_free_fd(struct process* p, int* fd);
@@ -191,7 +193,7 @@ vm_area_t* exec_prepare_initial_vma();
 
 // Arch-dependent functions
 int arch_process_copy(struct process* dest, struct process* src, struct pt_regs* old_regs);
-int arch_process_spawn(struct process* child, int (*entry)(), void* args, int flags);
+int arch_process_spawn(struct process* child, process_entry_t entry, void* args, int flags);
 void arch_process_free(struct process* p);
 int arch_process_execute_sighan(struct process* p, uint32_t ip, uint32_t restorer);
 int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);

@@ -20,7 +20,7 @@
 #include <arch/earlycon.h>
 #include <arch/multiboot.h>
 
-static int init(const char* cmdline);
+static void init(const char* cmdline);
 
 unsigned init_in_progress = INIT_IN_PROGRESS;
 char cmdline[128];
@@ -29,7 +29,7 @@ static param_t* params;
 NOINLINE static void NORETURN(run_init_and_go_idle(void))
 {
     sti();
-    kernel_process_spawn(&init, cmdline, NULL, SPAWN_KERNEL);
+    process_spawn("init", &init, cmdline, SPAWN_KERNEL);
     process_stop(process_current);
     scheduler();
     for (;; halt());
@@ -317,7 +317,7 @@ static void timer_callback(ktimer_t* timer)
     log_info("timer %u callback", timer->id);
 }
 
-static int NORETURN(init(const char* cmdline))
+static void NORETURN(init(const char* cmdline))
 {
     rootfs_prepare();
     syslog_configure();

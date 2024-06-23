@@ -251,7 +251,7 @@ int sys_execve(struct pt_regs regs)
     return do_exec(pathname, argv, envp);
 }
 
-int arch_process_spawn(struct process* child, int (*entry)(), void* args, int)
+int arch_process_spawn(struct process* child, process_entry_t entry, void* args, int)
 {
     uint32_t* kernel_stack = child->mm->kernel_stack;
     uint32_t eflags = EFL_IF;

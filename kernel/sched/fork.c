@@ -336,11 +336,14 @@ cannot_create_process:
     return errno;
 }
 
-int kernel_process_spawn(int (*entry)(), void* args, void*, int flags)
+process_t* process_spawn(const char* name, process_entry_t entry, void* args, int flags)
 {
     int errno = -ENOMEM;
+
     struct process* child;
-    struct process* parent = process_current;
+    struct process* parent = flags == SPAWN_KERNEL
+        ? &init_process
+        : process_current;
 
     cli();
 
@@ -357,6 +360,7 @@ int kernel_process_spawn(int (*entry)(), void* args, void*, int flags)
     process_parent_child_link(parent, child);
     process_forked(parent);
 
+    strcpy(child->name, name);
     child->trace = 0;
     child->stat = PROCESS_RUNNING;
     list_add_tail(&child->running, &running);
@@ -364,7 +368,7 @@ int kernel_process_spawn(int (*entry)(), void* args, void*, int flags)
     sti();
     scheduler();
 
-    return child->pid;
+    return child;
 
 arch_error:
     process_signals_exit(child);
@@ -377,7 +381,7 @@ cannot_allocate:
     delete(child);
 cannot_create_process:
     sti();
-    return errno;
+    return ptr(errno);
 }
 
 int sys_fork(struct pt_regs regs)
