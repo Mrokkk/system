@@ -188,7 +188,10 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
     }
 
     first_page->pages_count = count;
-    page_kernel_identity_mapping_range(first_page, flag & PAGE_ALLOC_UNCACHED ? PTE_CACHEDIS : 0);
+    if (!(flag & PAGE_ALLOC_NO_KERNEL))
+    {
+        page_kernel_identity_mapping_range(first_page, flag & PAGE_ALLOC_UNCACHED ? PTE_CACHEDIS : 0);
+    }
 
 #if DEBUG_PAGE_DETAILED
     void* caller = __builtin_return_address(0);
@@ -245,72 +248,6 @@ int __pages_free(page_t* pages)
         list_del(temp2);
 
         frame_free(page_phys(temp_page));
-    }
-
-    mutex_unlock(&page_mutex);
-
-    return count;
-}
-
-page_t* __page_range_get(uint32_t paddr, int count)
-{
-    page_t* temp;
-    page_t* first_page = page(paddr);
-
-    mutex_lock(&page_mutex);
-
-    if (!list_empty(&first_page->list_entry))
-    {
-        log_info("paddr=%x vaddr=%x is used somewhere!", paddr, page_virt(first_page));
-        list_init(&first_page->list_entry);
-    }
-
-    first_page->pages_count = count;
-
-    for (int i = 1; i < count; ++i)
-    {
-        temp = first_page + i;
-        list_init(&temp->list_entry);
-        list_add_tail(&temp->list_entry, &first_page->list_entry);
-    }
-
-    mutex_unlock(&page_mutex);
-
-    return first_page;
-}
-
-int __page_range_free(list_head_t* head)
-{
-    int count = 0;
-    list_head_t* temp;
-    list_head_t* temp2;
-    page_t* temp_page;
-
-    if (unlikely(list_empty(head)))
-    {
-        panic("list is empty!");
-    }
-
-    mutex_lock(&page_mutex);
-
-    page_t* first_page = list_front(head, page_t, list_entry);
-    page_t* last_page = list_back(head, page_t, list_entry);
-
-    for (temp = &first_page->list_entry;;)
-    {
-        ++count;
-        temp_page = list_entry(temp, page_t, list_entry);
-
-        temp2 = temp;
-        temp = temp->next;
-        list_del(temp2);
-
-        frame_free(page_phys(temp_page));
-
-        if (temp_page == last_page)
-        {
-            break;
-        }
     }
 
     mutex_unlock(&page_mutex);
@@ -392,18 +329,25 @@ static inline void* page_map_region(uint32_t paddr_start, uint32_t vaddr_start, 
     return ptr(vaddr_start);
 }
 
-static inline void page_unmap(uint32_t vaddr, uint32_t size)
+void pages_unmap(page_t* pages)
 {
     pgt_t* pgt;
     uint32_t pde_index;
     uint32_t pte_index;
+    page_t* temp = pages;
 
-    for (uint32_t temp = vaddr; temp < vaddr + size; temp += PAGE_SIZE)
+    for (uint32_t vaddr = page_virt(temp);; )
     {
-        pde_index = pde_index(temp);
-        pte_index = pte_index(temp);
+        pde_index = pde_index(vaddr);
+        pte_index = pte_index(vaddr);
         pgt = virt_ptr(kernel_page_dir[pde_index] & PAGE_ADDRESS);
         pgt[pte_index] = 0;
+        invlpg(ptr(vaddr));
+        temp = list_next_entry(&temp->list_entry, page_t, list_entry);
+        if (temp == pages)
+        {
+            break;
+        }
     }
 }
 
@@ -685,7 +629,7 @@ static inline void pgt_init(pgt_t* prev_pgt, uint32_t virt_end)
 
     // Set up page directory
     for (pde_index = KERNEL_PDE_OFFSET, pte_index = 0;
-        pde_index < min(ram / PAGE_SIZE / PAGES_IN_PTE + KERNEL_PDE_OFFSET, PTE_IN_PDE);
+        pde_index < min(align(ram / PAGE_SIZE, PAGES_IN_PTE) / PAGES_IN_PTE + KERNEL_PDE_OFFSET, PTE_IN_PDE);
         pde_index++, pte_index += PTE_IN_PDE)
     {
         pde_set(pde_index, phys_addr(&page_table[pte_index]) | PAGE_KERNEL_FLAGS);

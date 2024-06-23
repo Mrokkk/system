@@ -2,7 +2,7 @@
 #include <kernel/page.h>
 #include <kernel/process.h>
 
-vm_area_t* vm_create(uint32_t virt_address, uint32_t size, int vm_flags)
+vm_area_t* vm_create(uint32_t vaddr, uint32_t size, int vm_flags)
 {
     vm_area_t* vma = alloc(vm_area_t);
 
@@ -20,10 +20,10 @@ vm_area_t* vm_create(uint32_t virt_address, uint32_t size, int vm_flags)
         return NULL;
     }
 
-    vma->pages->count = 1;
+    vma->pages->refcount = 1;
     list_init(&vma->pages->head);
-    vma->start = virt_address;
-    vma->end = virt_address + size;
+    vma->start = vaddr;
+    vma->end = vaddr + size;
     vma->vm_flags = vm_flags;
     vma->inode = NULL;
     vma->next = NULL;
@@ -82,7 +82,7 @@ int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, cons
     memcpy(dest_vma, src_vma, sizeof(vm_area_t) - 2 * sizeof(struct vm_area*));
     dest_vma->next = NULL;
     dest_vma->prev = NULL;
-    dest_vma->pages->count++;
+    dest_vma->pages->refcount++;
 
     return arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end);
 }
@@ -93,7 +93,7 @@ int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd)
 
     vm_print_single(vma, DEBUG_VM_COW);
 
-    if (unlikely(!--vma->pages->count))
+    if (unlikely(!--vma->pages->refcount))
     {
         log_error("cow on not shared pages!");
         return -EFAULT;
@@ -115,56 +115,44 @@ int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd)
         return -ENOMEM;
     }
 
-    vma->pages->count = 1;
+    vma->pages->refcount = 1;
     list_init(&vma->pages->head);
     list_merge(&vma->pages->head, &page_range->list_entry);
 
     return arch_vm_copy_on_write(vma, pgd, page_range);
 }
 
-int vm_map(vm_area_t* vma, page_t* pages, pgd_t* pgd, int vm_apply_flags)
+int vm_map(vm_area_t* vma, page_t* new_pages, pgd_t* pgd, int vm_apply_flags)
 {
     int errno;
     uint32_t start, end;
 
     start = vm_apply_flags & VM_APPLY_EXTEND ? vma->end : vma->start;
-    end = start + pages->pages_count * PAGE_SIZE;
+    end = start + new_pages->pages_count * PAGE_SIZE;
 
-    errno = arch_vm_apply(
-        pgd,
-        pages,
-        start,
-        end,
-        vma->vm_flags);
-
-    if (!errno)
-    {
-        vma->end = end;
-        if (vm_apply_flags & VM_APPLY_EXTEND)
-        {
-            list_merge(&vma->pages->head, &pages->list_entry);
-        }
-    }
-    else
+    if (unlikely(errno = arch_vm_apply(pgd, new_pages, start, end, vma->vm_flags)))
     {
         log_debug(DEBUG_VM_APPLY, "failed %d", errno);
+        return errno;
     }
+
+    vma->end = end;
 
     pgd_reload();
 
     return errno;
 }
 
-static inline int address_within(uint32_t virt_address, vm_area_t* vma)
+static inline int address_within(uint32_t vaddr, vm_area_t* vma)
 {
-    return virt_address >= vma->start && virt_address < vma->end;
+    return vaddr >= vma->start && vaddr < vma->end;
 }
 
-vm_area_t* vm_find(uint32_t virt_address, vm_area_t* vmas)
+vm_area_t* vm_find(uint32_t vaddr, vm_area_t* vmas)
 {
     for (vm_area_t* temp = vmas; temp; temp = temp->next)
     {
-        if (address_within(virt_address, temp))
+        if (address_within(vaddr, temp))
         {
             return temp;
         }

@@ -39,6 +39,7 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
         goto error;
     }
 
+    list_merge(&stack_vma->pages->head, &pages->list_entry);
     errno = vm_map(stack_vma, pages, pgd, 0);
 
     if (unlikely(errno))
@@ -49,11 +50,8 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
     return stack_vma;
 
 error:
-    {
-        list_head_t head = LIST_INIT(head);
-        list_merge(&head, &pages->list_entry);
-        page_range_free(&head);
-    }
+    list_del(&stack_vma->pages->head);
+    pages_free(pages);
     return NULL;
 }
 

@@ -15,7 +15,7 @@ module_init(iso9660_init);
 module_exit(iso9660_deinit);
 
 static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result);
-static int iso9660_mmap(file_t* file, vm_area_t* vma, size_t offset);
+static int iso9660_mmap(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
 static int iso9660_read(file_t* file, char* buffer, size_t count);
 static int iso9660_open(file_t* file);
 static int iso9660_readdir(file_t* file, void* buf, direntadd_t dirent_add);
@@ -351,7 +351,7 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
     return 0;
 }
 
-static int iso9660_mmap(file_t* file, vm_area_t* vma, size_t offset)
+static int iso9660_mmap(file_t* file, vm_area_t*, page_t* pages, size_t size, size_t offset)
 {
     iso9660_dirent_t* dirent = file->inode->fs_data;
     iso9660_data_t* data = file->inode->sb->fs_data;
@@ -366,9 +366,7 @@ static int iso9660_mmap(file_t* file, vm_area_t* vma, size_t offset)
     void* data_ptr;
     uint32_t pos = offset, data_size;
     uint32_t block_nr = offset / BLOCK_SIZE + block_nr_convert(GET(dirent->lba));
-    size_t size = vma->end - vma->start;
     page_t* current_page;
-    page_t* pages;
     size_t blocks_count = size / BLOCK_SIZE;
     buffer_t* b;
 
@@ -405,8 +403,6 @@ static int iso9660_mmap(file_t* file, vm_area_t* vma, size_t offset)
         pos += data_size;
         data_ptr = shift(data_ptr, data_size);
     }
-
-    list_merge(&vma->pages->head, &pages->list_entry);
 
     return 0;
 

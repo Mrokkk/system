@@ -64,6 +64,7 @@ typedef enum
     PAGE_ALLOC_DISCONT = 0,
     PAGE_ALLOC_CONT = 1,
     PAGE_ALLOC_UNCACHED = 2,
+    PAGE_ALLOC_NO_KERNEL = 4,
 } alloc_flag_t;
 
 // Allocate a page(s) and map it/them in kernel; allocation of
@@ -71,15 +72,14 @@ typedef enum
 // Returned pages are linked together through list_entry (first
 // page is list's head)
 MUST_CHECK(page_t*) __page_alloc(int count, alloc_flag_t flag);
-int __page_free(void* address);
+int __page_free(void* address); // FIXME: remove this in the future
 int __pages_free(page_t* pages);
-
-MUST_CHECK(page_t*) __page_range_get(uint32_t paddr, int count);
-int __page_range_free(list_head_t* head);
 
 MUST_CHECK(pgd_t*) pgd_alloc(void);
 MUST_CHECK(pgt_t*) pgt_alloc(void);
 MUST_CHECK(pgd_t*) init_pgd_get(void);
+
+void pages_unmap(page_t* pages);
 
 void* region_map(uint32_t paddr, uint32_t size, const char* name);
 
@@ -111,27 +111,11 @@ void page_stats_print(void);
        res; \
     })
 
-#define page_range_get(p, c) \
-    ({ page_t* res = __page_range_get(p, c); \
-       if (likely(res)) { log_debug(DEBUG_PAGE, "[PGET] paddr=%x vaddr=%x count=%u", page_phys(res), res->virtual, c); } \
-       res; \
-    })
-
-#define page_range_free(h) \
-    ({ \
-       typecheck(list_head_t*, h); \
-       int c = __page_range_free(h); \
-       if (likely(c)) { log_debug(DEBUG_PAGE, "[PFREE] count=%u", c); } \
-       c; \
-    })
-
 #else
 
 #define page_free(ptr)          __page_free(ptr)
 #define pages_free(ptr)         __pages_free(ptr)
 #define page_alloc(c, f)        __page_alloc(c, f)
-#define page_range_free(h)      __page_range_free(h)
-#define page_range_get(p, c)    __page_range_get(p, c)
 
 #endif // DEBUG_PAGE
 

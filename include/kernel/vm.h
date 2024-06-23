@@ -1,11 +1,10 @@
 #pragma once
 
+#include <kernel/list.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
 
 struct inode;
-struct pages;
-struct vm_area;
 
 typedef struct pages pages_t;
 typedef struct vm_area vm_area_t;
@@ -15,29 +14,24 @@ typedef struct vm_area vm_area_t;
 #define VM_EXEC         0x00000004
 #define VM_SHARED       0x00000008
 #define VM_IO           0x00000010
-#define VM_EXECUTABLE   0x00001000
-#define VM_NONFREEABLE  0x00010000
 
 struct vm_area
 {
-    pages_t* pages;
-    uint32_t start, end;
-    int vm_flags;
+    pages_t*      pages;
+    uint32_t      start, end;
+    int           vm_flags;
     struct inode* inode;
-    vm_area_t* next;
-    vm_area_t* prev;
+    vm_area_t*    next;
+    vm_area_t*    prev;
 };
 
 struct pages
 {
-    list_head_t head;
-    int count;
+    list_head_t   head;
+    int           refcount;
 };
 
-#define VM_AREA_INIT() {NULL, 0, 0, 0, NULL}
-
-#define VM_APPLY_DONT_REPLACE   0
-#define VM_APPLY_EXTEND         2
+#define VM_APPLY_EXTEND 2
 
 vm_area_t* vm_create(uint32_t virt_address, uint32_t size, int vm_flags);
 vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
@@ -113,7 +107,7 @@ static inline char* vm_flags_string(char* buffer, int vm_flags)
     b += sprintf(b, (vm_flags & VM_READ) ? "R" : "-");
     b += sprintf(b, (vm_flags & VM_WRITE) ? "W" : "-");
     b += sprintf(b, (vm_flags & VM_EXEC) ? "X" : "-");
-    b += sprintf(b, (vm_flags & VM_EXEC) ? "N" : "-");
+    b += sprintf(b, (vm_flags & VM_IO) ? "I" : "-");
     return buffer;
 }
 
@@ -124,14 +118,14 @@ static inline char* vm_flags_string(char* buffer, int vm_flags)
             page_t* p; \
             char buf[5]; \
             int safety = 0; \
-            log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x p=%u]", \
+            log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x refcount=%u]", \
                 vma, \
                 vma->start, \
                 vma->end, \
                 vma->end - vma->start, \
                 vm_flags_string(buf, vma->vm_flags), \
                 vma->inode, \
-                vma->pages->count); \
+                vma->pages->refcount); \
             list_for_each_entry(p, &vma->pages->head, list_entry) \
             { \
                 log_debug(flag, "  page: %x[%u]", page_phys(p), pfn(p)); \
@@ -158,14 +152,14 @@ static inline char* vm_flags_string(char* buffer, int vm_flags)
             for (vm_area_t* vma = orig_vma; vma; vma = vma->next) \
             { \
                 char buf[5]; \
-                log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x p=%u]", \
+                log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x refcount=%u]", \
                     vma, \
                     vma->start, \
                     vma->end, \
                     vma->end - vma->start, \
                     vm_flags_string(buf, vma->vm_flags), \
                     vma->inode, \
-                    vma->pages->count); \
+                    vma->pages->refcount); \
             } \
         } while(0); \
     }

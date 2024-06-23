@@ -79,10 +79,18 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         return ptr(-ENOMEM);
     }
 
+    pages = page_alloc(page_count, PAGE_ALLOC_DISCONT);
+
+    if (unlikely(!pages))
+    {
+        errno = -ENOMEM;
+        goto free_vma;
+    }
+
+    list_merge(&vma->pages->head, &pages->list_entry);
+
     if (flags & MAP_ANONYMOUS)
     {
-        pages = page_alloc(page_count, PAGE_ALLOC_DISCONT);
-        list_merge(&vma->pages->head, &pages->list_entry);
         vma->inode = NULL;
     }
     else
@@ -90,14 +98,15 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         if (!file->ops || !file->ops->mmap)
         {
             log_debug(DEBUG_MMAP, "no operation");
-            return ptr(-ENOSYS);
+            errno = -ENOSYS;
+            goto free_pages;
         }
 
         log_debug(DEBUG_MMAP, "calling ops->mmap");
-        if ((errno = file->ops->mmap(file, vma, offset)))
+        if ((errno = file->ops->mmap(file, vma, pages, page_count * PAGE_SIZE, offset)))
         {
             log_debug(DEBUG_MMAP, "ops->mmap failed");
-            return ptr(errno);
+            goto free_pages;
         }
 
         vma->inode = prot & PROT_WRITE ? NULL : file->inode;
@@ -109,20 +118,16 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         process_current->mm->code_end = vma->end;
     }
 
-    if (!list_empty(&vma->pages->head))
-    {
-        page_t* pages = list_front(&vma->pages->head, page_t, list_entry);
-        if (unlikely(errno = vm_map(vma, pages, process_current->mm->pgd, 0)))
-        {
-            goto free_vma;
-        }
-    }
-
     mutex_lock(&process_current->mm->lock);
+
+    if (unlikely(errno = vm_map(vma, pages, process_current->mm->pgd, 0)))
+    {
+        goto unlock_mm;
+    }
 
     if (unlikely(errno = vm_add(&process_current->mm->vm_areas, vma)))
     {
-        goto remove_vma;
+        goto unlock_mm;
     }
 
     mutex_unlock(&process_current->mm->lock);
@@ -131,8 +136,11 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 
     return ptr(vaddr);
 
-remove_vma:
+unlock_mm:
     mutex_unlock(&process_current->mm->lock);
+free_pages:
+    list_del(&vma->pages->head);
+    pages_free(pages);
 free_vma:
     delete(vma);
     return ptr(errno);
@@ -161,6 +169,7 @@ void* sys_mmap(struct mmap_params* params)
 
 void* sys_sbrk(size_t incr)
 {
+    int errno;
     page_t* new_page;
     vm_area_t* brk_vma;
     uint32_t previous_brk = process_current->mm->brk;
@@ -170,15 +179,16 @@ void* sys_sbrk(size_t incr)
 
     log_debug(DEBUG_MMAP, "incr=%x previous_brk=%x", incr, previous_brk);
 
+    mutex_lock(&process_current->mm->lock);
+
     brk_vma = process_brk_vm_area(process_current);
 
     if (unlikely(!brk_vma))
     {
         vm_print(process_current->mm->vm_areas, DEBUG_MMAP);
         panic("no brk vma; brk = %x", previous_brk, brk_vma);
-        ASSERT_NOT_REACHED();
     }
-    else if (brk_vma->pages->count > 1)
+    else if (brk_vma->pages->refcount > 1)
     {
         // Get own pages
         vm_copy_on_write(brk_vma, process_current->mm->pgd);
@@ -188,21 +198,30 @@ void* sys_sbrk(size_t incr)
     {
         log_debug(DEBUG_MMAP, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
         process_current->mm->brk = current_brk;
+        mutex_unlock(&process_current->mm->lock);
         return ptr(previous_brk);
     }
 
-    new_page = page_alloc((next_page - previous_page) / PAGE_SIZE, PAGE_ALLOC_DISCONT);
+    new_page = page_alloc((next_page - previous_page) / PAGE_SIZE, PAGE_ALLOC_NO_KERNEL);
 
     if (unlikely(!new_page))
     {
+        mutex_unlock(&process_current->mm->lock);
         return ptr(-ENOMEM);
     }
 
-    vm_map(brk_vma, new_page, process_current->mm->pgd, VM_APPLY_EXTEND);
+    list_merge(&brk_vma->pages->head, &new_page->list_entry);
+    if (unlikely(errno = vm_map(brk_vma, new_page, process_current->mm->pgd, VM_APPLY_EXTEND)))
+    {
+        // FIXME: I should do a cleanup of pages merged to vma
+        return ptr(errno);
+    }
 
     process_current->mm->brk = current_brk;
 
     vm_print_short(process_current->mm->vm_areas, DEBUG_MMAP);
+
+    mutex_unlock(&process_current->mm->lock);
 
     return ptr(previous_brk);
 }

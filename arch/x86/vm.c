@@ -95,9 +95,9 @@ static inline pgt_t* vm_remove(vm_area_t* vma, pgd_t* pgd, pgt_t* prev_pgt, oper
 
     vm_print_single(vma, DEBUG_VM);
 
-    if (!--vma->pages->count)
+    if (!--vma->pages->refcount)
     {
-        if (!(vma->vm_flags & VM_NONFREEABLE || vma->vm_flags & VM_IO))
+        if (!(vma->vm_flags & VM_IO))
         {
             free_pages = true;
         }

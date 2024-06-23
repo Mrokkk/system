@@ -16,7 +16,7 @@ module_exit(ext2_deinit);
 static int ext2_lookup(inode_t* parent, const char* name, inode_t** result);
 static int ext2_open(file_t* file);
 static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add);
-static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset);
+static int ext2_mmap(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int ext2_read(file_t* file, char* buffer, size_t count);
 
@@ -519,16 +519,13 @@ static cmd_t ext2_mmap_block(void* block, size_t to_copy, void* data)
     return TRAVERSE_CONTINUE;
 }
 
-static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
+static int ext2_mmap(file_t* file, vm_area_t*, page_t* pages, size_t size, size_t offset)
 {
     int res, errno;
-    page_t* pages;
     mmap_context_t ctx;
 
     ext2_inode_t* raw_inode = file->inode->fs_data;
     ext2_data_t* data = file->inode->sb->fs_data;
-    size_t size = vma->end - vma->start;
-    pages = page_alloc(size / PAGE_SIZE, PAGE_ALLOC_DISCONT);
 
     if (unlikely(!pages))
     {
@@ -543,11 +540,8 @@ static int ext2_mmap(file_t* file, vm_area_t* vma, size_t offset)
 
     if (unlikely(errno = errno_get(res)))
     {
-        pages_free(pages);
         return errno;
     }
-
-    list_merge(&vma->pages->head, &pages->list_entry);
 
     return 0;
 }

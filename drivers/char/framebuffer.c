@@ -12,7 +12,7 @@
 
 static int framebuffer_open();
 static int framebuffer_write(file_t*, const char* data, size_t size);
-static int framebuffer_mmap(file_t* file, vm_area_t* vma, size_t offset);
+static int framebuffer_mmap(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
 static int framebuffer_ioctl(file_t* file, unsigned long request, void* arg);
 
 framebuffer_t framebuffer;
@@ -79,7 +79,7 @@ static int framebuffer_write(file_t*, const char* data, size_t size)
     return size;
 }
 
-static int framebuffer_mmap(file_t*, vm_area_t* vma, size_t)
+static int framebuffer_mmap(file_t*, vm_area_t* vma, page_t*, size_t, size_t)
 {
     return vm_io_apply(vma, process_current->mm->pgd, framebuffer_ptr->addr);
 }

@@ -72,7 +72,7 @@ struct file_operations
     int (*read)(file_t* file, char* buf, size_t count);
     int (*write)(file_t* file, const char* buf, size_t count);
     int (*readdir)(file_t* file, void* buf, direntadd_t dirent_add);
-    int (*mmap)(file_t* file, vm_area_t* vma, size_t offset);
+    int (*mmap)(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
     int (*ioctl)(file_t* file, unsigned long request, void* arg);
     int (*poll)(file_t* file, short events, short* revents, wait_queue_head_t** head);
     int (*open)(file_t* file);
