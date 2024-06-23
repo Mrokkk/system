@@ -166,13 +166,19 @@ void do_exception(uint32_t nr, struct pt_regs regs)
         regs.error_code,
         regs.eip);
 
-    if (DEBUG_EXCEPTION && printer)
+    // FIXME: hack for printing the stacktrace and registers if bash crashes (same check
+    // is done in elf_load to load symbols. This is caused by super rare crash of bash
+    // process after entering the command. EIP points to list_length at bash/list.c:85,
+    // but I haven't figured out what's the real RC (yet)
+    const int is_bash = !strcmp(process_current->name, "/bin/bash");
+
+    if ((DEBUG_EXCEPTION || is_bash) && printer)
     {
         printer(&regs, cr2, cr3, header);
         regs_print(header, &regs, log_exception);
     }
 
-    if (DEBUG_BTUSER)
+    if (DEBUG_BTUSER || is_bash)
     {
         backtrace_user(log_notice, &regs, page_virt_ptr(process_current->bin->symbols_pages));
     }

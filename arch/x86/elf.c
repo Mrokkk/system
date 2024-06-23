@@ -107,6 +107,9 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
     elf32_phdr_t* phdr;
     elf32_header_t header;
 
+    // FIXME: see explanation in exception.c
+    const int is_bash = !strcmp("/bin/bash", name);
+
     if ((errno = do_read(file, 0, &header, sizeof(elf32_header_t))))
     {
         log_debug(DEBUG_ELF, "%s: cannot read header: %d", name, errno);
@@ -178,7 +181,8 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
 
     log_debug(DEBUG_ELF, "entry: %x", bin->entry);
 
-    if (DEBUG_BTUSER)
+    // FIXME: see explanation in exception.c
+    if (DEBUG_BTUSER || is_bash)
     {
         elf_symbols_read(&header, file, &bin->symbols_pages);
     }
