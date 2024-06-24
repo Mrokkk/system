@@ -60,6 +60,11 @@ int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
         }
     }
 
+    if (i == 0 && file->mode & O_NONBLOCK)
+    {
+        return -EAGAIN;
+    }
+
     return i;
 }
 
@@ -124,6 +129,7 @@ void tty_ldisc_putch(tty_t* tty, int c)
     if (signal && L_ISIG(tty))
     {
         tty->ldisc_current = tty->ldisc_buf;
+
         for_each_process(p)
         {
             if (p->sid == tty->sid)
