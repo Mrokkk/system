@@ -59,14 +59,18 @@ static inline int isupper(int c)
 #ifndef tolower
 static inline int tolower(int c)
 {
-    return c + ('a' - 'A');
+    return islower(c)
+        ? c + ('a' - 'A')
+        : c;
 }
 #endif
 
 #ifndef toupper
 static inline int toupper(int c)
 {
-    return c - ('a' - 'A');
+    return isupper(c)
+        ? c - ('a' - 'A')
+        : c;
 }
 #endif
 
