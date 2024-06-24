@@ -106,7 +106,10 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, timeval_t* timeout)
             }
         }
 
-        signal_run(process_current);
+        if (signal_run(process_current))
+        {
+            return -EINTR;
+        }
 
         if (!process_is_running(process_current))
         {
