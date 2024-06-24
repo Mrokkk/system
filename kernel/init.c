@@ -15,8 +15,7 @@
 #include <kernel/backtrace.h>
 #include <kernel/api/unistd.h>
 
-#include <arch/pci.h>
-#include <arch/vbe.h>
+#include <arch/idle.h>
 #include <arch/earlycon.h>
 #include <arch/multiboot.h>
 
@@ -26,13 +25,19 @@ unsigned init_in_progress = INIT_IN_PROGRESS;
 char cmdline[128];
 static param_t* params;
 
-NOINLINE static void NORETURN(run_init_and_go_idle(void))
+NOINLINE static void NORETURN(spawn_init_and_go_idle(void))
 {
     sti();
+
     process_spawn("init", &init, cmdline, SPAWN_KERNEL);
+
+    // Remove process from the running queue and reschedule
     process_stop(process_current);
     scheduler();
-    for (;; halt());
+
+    idle();
+
+    ASSERT_NOT_REACHED();
 }
 
 UNMAP_AFTER_INIT static void params_read(char* tmp_cmdline, param_t* output)
@@ -170,7 +175,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
         log_notice("boot finished in %u.%06u s", ts.tv_sec, ts.tv_usec);
     }
 
-    run_init_and_go_idle();
+    spawn_init_and_go_idle();
 
     ASSERT_NOT_REACHED();
 }

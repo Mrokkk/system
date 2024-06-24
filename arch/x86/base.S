@@ -86,16 +86,32 @@ ENTRY(exit_kernel)
     mov SYMBOL_NAME(need_resched), %eax
     mov (%eax), %edx
     test %edx, %edx
-    jne 1f
+    jne run_scheduler
+
+check_signals:
+    mov 4(%eax), %edx
+    test %edx, %edx
+    jne run_signals
+
+leave_kernel:
     RESTORE_ALL
     sti
     iret
-1:
+
+run_scheduler:
     movl $0, (%eax)
     sti
     call SYMBOL_NAME(scheduler)
-    RESTORE_ALL
-    iret
+
+    cli
+    mov SYMBOL_NAME(need_resched), %eax
+    jmp check_signals
+
+run_signals:
+    push leave_kernel
+    sti
+    jmp SYMBOL_NAME(do_signals)
+
 ENDPROC(exit_kernel)
 
 ENTRY(bad_syscall)

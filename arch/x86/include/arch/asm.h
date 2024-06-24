@@ -2,6 +2,7 @@
 
 #include <arch/segment.h>
 #include <kernel/linkage.h>
+#include <kernel/compiler.h>
 
 #ifdef __ASSEMBLER__
 
@@ -177,5 +178,9 @@
         pop %ebx; \
         ret; \
     ENDPROC(name)
+
+#else
+
+#define ASM_VALUE(x) "$" STRINGIFY(x)
 
 #endif

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -136,6 +137,36 @@ TEST(signal)
         signal(SIGUSR1, &sighan);
         kill(getpid(), SIGSTOP);
         EXPECT_EQ(sigreceived, 1);
+        exit(FAILED_EXPECTATIONS());
+    }
+}
+
+int received;
+
+void handler(int sig)
+{
+    received |= 1 << sig;
+    ++received;
+    switch (sig)
+    {
+        case SIGUSR1:
+            raise(SIGUSR2);
+            break;
+        case SIGUSR2:
+            raise(SIGPIPE);
+            break;
+    }
+}
+
+TEST(signal_nested)
+{
+    EXPECT_EXIT_WITH(0)
+    {
+        signal(SIGUSR1, &handler);
+        signal(SIGUSR2, &handler);
+        signal(SIGPIPE, &handler);
+        raise(SIGUSR1);
+        EXPECT_EQ(received, 3 | (1 << SIGUSR1) | (1 << SIGUSR2) | (1 << SIGPIPE));
         exit(FAILED_EXPECTATIONS());
     }
 }

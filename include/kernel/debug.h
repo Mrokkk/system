@@ -23,6 +23,7 @@
 #define DEBUG_BTUSER        0
 #define DEBUG_SEQFILE       0
 #define DEBUG_IRQ           0
+#define PARANOIA_IDLE       0
 #define PARANOIA_SCHED      0
 #define PARANOIA_SYSCALL    0
 

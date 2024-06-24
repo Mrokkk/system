@@ -78,13 +78,19 @@ struct context_switch_frame
 } PACKED;
 
 typedef struct context_switch_frame context_switch_frame_t;
+typedef struct signal_context signal_context_t;
+typedef struct signal_frame signal_frame_t;
+
+struct signal_frame
+{
+    int sig;
+    pt_regs_t* context;
+    signal_frame_t* prev;
+};
 
 struct signal_context
 {
-    uint32_t esp, esp0, esp2, eip;
 };
-
-typedef struct signal_context signal_context_t;
 
 typedef struct { uint16_t off, seg; } farptr_t;
 

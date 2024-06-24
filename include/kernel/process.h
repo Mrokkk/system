@@ -67,13 +67,14 @@ struct mm
 struct signals
 {
     int count;
+    uint32_t ongoing;
     uint32_t trapped;
     uint32_t pending;
     sighandler_t sighandler[NSIGNALS];
     sigrestorer_t sigrestorer;
-    struct signal_context context;
+    signal_context_t context;
 #define SIGNALS_INIT \
-    { 1, 0, 0, { 0, }, 0, { 0, }, }
+    { 1, 0, 0, 0, { 0, }, 0, { }, }
 };
 
 struct fs
@@ -99,6 +100,7 @@ struct process
     stat_t stat;
     list_head_t running;
     unsigned need_resched;
+    int need_signal;
     pid_t pid, ppid;
     int trace;
     int exit_code;
@@ -195,7 +197,6 @@ vm_area_t* exec_prepare_initial_vma();
 int arch_process_copy(struct process* dest, struct process* src, struct pt_regs* old_regs);
 int arch_process_spawn(struct process* child, process_entry_t entry, void* args, int flags);
 void arch_process_free(struct process* p);
-int arch_process_execute_sighan(struct process* p, uint32_t ip, uint32_t restorer);
 int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
 
 static inline char process_state_char(int s)

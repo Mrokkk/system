@@ -122,6 +122,12 @@ int signal_run(struct process* proc)
 
 int signal_deliver(struct process* proc, int signum)
 {
+    if (proc->signals->ongoing & (1 << signum))
+    {
+        log_debug(DEBUG_SIGNAL, "ignoring %s in %u; already ongoing", signame(signum), proc->pid);
+        return 0;
+    }
+
     if (proc->signals->trapped & (1 << signum))
     {
         if (proc->signals->sighandler[signum] == SIG_IGN)
@@ -130,12 +136,10 @@ int signal_deliver(struct process* proc, int signum)
             return 0;
         }
 
-        log_debug(DEBUG_SIGNAL, "calling custom handler for %s in %u", signame(signum), proc->pid);
+        log_debug(DEBUG_SIGNAL, "scheduling custom handler for %s in %u", signame(signum), proc->pid);
 
-        arch_process_execute_sighan(
-            proc,
-            addr(proc->signals->sighandler[signum]),
-            addr(proc->signals->sigrestorer));
+        proc->signals->ongoing |= (1 << signum);
+        proc->need_signal = true;
     }
     else
     {
@@ -149,6 +153,7 @@ int signal_deliver(struct process* proc, int signum)
 int do_kill(struct process* proc, int signum)
 {
     log_debug(DEBUG_SIGNAL, "%s to %s[%u]", signame(signum), proc->name, proc->pid);
+
     if (!signum_exists(signum))
     {
         return -EINVAL;
@@ -177,6 +182,12 @@ int sys_kill(int pid, int signum)
     {
         log_debug(DEBUG_SIGNAL, "no process with pid: %d", pid);
         return -ESRCH;
+    }
+
+    if (unlikely(p->type == KERNEL_PROCESS))
+    {
+        log_debug(DEBUG_SIGNAL, "cannot send signal to kernel process %d", pid);
+        return -EPERM;
     }
 
     log_debug(DEBUG_SIGNAL, "sending %s to pid %d", signame(signum), pid);

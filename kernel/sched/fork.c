@@ -190,6 +190,7 @@ static inline void process_init(struct process* child, struct process* parent)
     child->forks = 0;
     child->sid = parent->sid;
     child->need_resched = false;
+    child->need_signal = false;
     child->alarm = 0;
     strcpy(child->name, parent->name);
     wait_queue_head_init(&child->wait_child);

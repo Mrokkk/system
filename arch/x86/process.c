@@ -1,4 +1,4 @@
-#include <arch/io.h>
+#include <arch/asm.h>
 #include <arch/string.h>
 #include <arch/segment.h>
 #include <arch/register.h>
@@ -9,10 +9,11 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/debug.h>
+#include <kernel/signal.h>
 #include <kernel/process.h>
 
 #define push(val, stack) \
-    { (stack)--; *stack = (typeof(*stack))(val); }
+    do { (stack)--; *stack = (typeof(*stack))(val); } while (0)
 
 extern void exit_kernel();
 
@@ -49,7 +50,7 @@ static inline void fork_kernel_stack_frame(
     pushk(regs->fs);    // fs
     pushk(regs->es);    // es
     pushk(regs->ds);    // ds
-    pushk(0)            // eax; return value in child
+    pushk(0);           // eax; return value in child
     pushk(ebp);         // ebp
     pushk(regs->edi);   // edi
     pushk(regs->esi);   // esi
@@ -267,7 +268,7 @@ int arch_process_spawn(struct process* child, process_entry_t entry, void* args,
     pushk(KERNEL_DS);   // fs
     pushk(KERNEL_DS);   // es
     pushk(KERNEL_DS);   // ds
-    pushk(0)            // eax; return value in child
+    pushk(0);           // eax; return value in child
     pushk(0);           // ebp
     pushk(0);           // edi
     pushk(0);           // esi
@@ -287,8 +288,9 @@ int arch_process_spawn(struct process* child, process_entry_t entry, void* args,
     return 0;
 }
 
-#define set_context(stack, ip)  \
-    do {                        \
+#define context_set(stack, ip)  \
+    do                          \
+    {                           \
         asm volatile(           \
             "movl %0, %%esp;"   \
             "jmp *%1;"          \
@@ -302,82 +304,85 @@ int NORETURN(arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack)
     irq_save(flags);
     process_current->context.esp0 = addr(process_current->mm->kernel_stack);
     exec_kernel_stack_frame(&kernel_stack, user_stack, addr(entry));
-    set_context(kernel_stack, &exit_kernel);
+    context_set(kernel_stack, &exit_kernel);
     ASSERT_NOT_REACHED();
 }
 
-int arch_process_execute_sighan(struct process* proc, uint32_t eip, uint32_t restorer)
+void NORETURN(sys_sigreturn(struct pt_regs))
 {
-    uint32_t* kernel_stack;
-    uint32_t* sighan_stack;
-    uint32_t flags;
-    pgd_t* pgd = ptr(proc->mm->pgd);
-    uint32_t virt_stack_addr = proc->context.esp2;
+    signal_frame_t* frame = ptr(process_current->context.esp0);
 
-    irq_save(flags);
+    log_debug(DEBUG_SIGNAL, "%s", signame(frame->sig));
 
-    sighan_stack = virt_ptr(vm_paddr(virt_stack_addr, pgd));
+    process_current->context.esp0 = addr(frame->prev);
+    process_current->need_signal = !!process_current->signals->ongoing;
 
-    log_debug(DEBUG_SIGNAL, "user stack = %x", virt_stack_addr);
+    context_set(frame->context, &exit_kernel);
 
-    kernel_stack = ptr(addr(proc->context.esp) - 1024); // TODO:
+    ASSERT_NOT_REACHED();
+}
 
-    proc->signals->context.esp = proc->context.esp;
-    proc->signals->context.esp0 = proc->context.esp0;
-    proc->signals->context.esp2 = proc->context.esp2;
-    proc->signals->context.eip = proc->context.eip;
+void do_signals(pt_regs_t regs)
+{
+    process_t* proc = process_current;
+    uint32_t* user_stack = ptr(proc->context.esp2);
+    signal_frame_t frame;
 
-    push(process_current->pid, sighan_stack);
-    push(restorer, sighan_stack);
+    cli();
 
-    exec_kernel_stack_frame(&kernel_stack, virt_stack_addr - 8, eip);
-
-    proc->context.eip = addr(&exit_kernel);
-    proc->context.esp = addr(kernel_stack);
-    proc->context.esp0 = proc->context.esp;
-
-    irq_restore(flags);
-
-    if (proc == process_current)
+    for (int sig = 0; sig < NSIGNALS; ++sig)
     {
+        if (!(proc->signals->ongoing & (1 << sig)))
+        {
+            continue;
+        }
+
+        proc->need_signal = false;
+        proc->signals->ongoing &= ~(1 << sig);
+
+        log_debug(DEBUG_SIGNAL, "%u: running handler for %s", proc->pid, signame(sig));
+
+        frame.sig = sig;
+        frame.context = &regs;
+        frame.prev = ptr(proc->context.esp0);
+
+        // Signal frames are saved on the current kernel stack frame. With each nested
+        // signal  esp0 is moving forward the stack so that previous frames are not
+        // destroyed and it's possible to use signal frame pointed by esp0 to unwind it
+        // back to original esp0
+        proc->context.esp0 = addr(&frame);
+
+        // Currently only void(int sig) signal handler
+        // are supported
+        push(sig, user_stack);
+        push(proc->signals->sigrestorer, user_stack);
+
         asm volatile(
-            "pushl %%ebx;"
-            "pushl %%ecx;"
-            "pushl %%esi;"
-            "pushl %%edi;"
-            "pushl %%ebp;"
-            "movl $1f, %0;"
-            "movl %%esp, %1;"
-            "movl %2, %%esp;"
-            "jmp *%3;"
-            "1:"
-            "popl %%ebp;"
-            "popl %%edi;"
-            "popl %%esi;"
-            "popl %%ecx;"
-            "popl %%ebx;"
-            :: "m" (proc->signals->context.eip),
-               "m" (proc->signals->context.esp),
-               "r" (kernel_stack),
-               "r" (exit_kernel)
+            "pushl "ASM_VALUE(USER_DS)";" // ss
+            "push %0;"                    // esp
+            "pushl "ASM_VALUE(EFL_IF)";"  // eflags
+            "pushl "ASM_VALUE(USER_CS)";" // cs
+            "push %1;"                    // eip
+            "mov "ASM_VALUE(USER_DS)", %%eax;"
+            "mov %%eax, %%ds;"
+            "mov %%eax, %%es;"
+            "mov %%eax, %%fs;"
+            "mov %%eax, %%gs;"
+            "sti;"
+            "iret;"
+            :: "m" (user_stack),
+               "m" (proc->signals->sighandler[sig])
             : "memory");
     }
 
-    return 0;
-}
+    // FIXME: There are some race conditions which causes
+    // to enter do_signals with zero signals->ongoing
+    log_warning("%s: %u: signals->ongoing = %x, need_signal = %u",
+        __func__,
+        proc->pid,
+        proc->signals->ongoing,
+        proc->need_signal);
 
-int NORETURN(sys_sigreturn(struct pt_regs))
-{
-    log_debug(DEBUG_SIGNAL, "setting stack to %x and jumping to %x",
-        process_current->signals->context.esp,
-        process_current->signals->context.eip);
-
-    process_current->context.esp0 = process_current->signals->context.esp0;
-    process_current->context.esp2 = process_current->signals->context.esp2;
-
-    set_context(
-        process_current->signals->context.esp,
-        process_current->signals->context.eip);
-
-    ASSERT_NOT_REACHED();
+    sti();
+    /*ASSERT_NOT_REACHED();*/
 }
