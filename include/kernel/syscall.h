@@ -62,8 +62,10 @@
 #define __NR_write          59
 #define __NR_timer_create   60
 #define __NR_timer_settime  61
+#define __NR_statfs         62
+#define __NR_fstatfs        63
 
-#define __NR_syscalls       62
+#define __NR_syscalls       64
 
 #ifndef __ASSEMBLER__
 
@@ -73,6 +75,7 @@ struct pollfd;
 struct sigaction;
 struct sigevent;
 struct stat;
+struct statfs;
 struct statvfs;
 struct timespec;
 struct timeval;
@@ -167,3 +170,5 @@ __syscall3(waitpid, int, int, int*, int)
 __syscall3(write, int, int, const char*, size_t)
 __syscall3(timer_create, int, clockid_t, struct sigevent*, timer_t*)
 __syscall4(timer_settime, int, timer_t, int, const struct itimerspec*, struct itimerspec*)
+__syscall2(statfs, int, const char*, struct statfs*)
+__syscall2(fstatfs, int, int, struct statfs*)

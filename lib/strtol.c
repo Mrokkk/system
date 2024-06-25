@@ -123,6 +123,15 @@ long long LIBC(strtoll)(
     STRTOL(long long, 1, LONG_LONG_MIN, LONG_LONG_MAX, nptr, endptr, base);
 }
 
+unsigned long LIBC(strtoul)(
+    const char* nptr,
+    char** endptr,
+    int base)
+{
+    STRTOL(long, 1, ULONG_MAX, ULONG_MAX, nptr, endptr, base);
+}
+
 LIBC_ALIAS(atoi);
 LIBC_ALIAS(strtol);
 LIBC_ALIAS(strtoll);
+LIBC_ALIAS(strtoul);

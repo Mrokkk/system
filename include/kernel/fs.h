@@ -10,7 +10,7 @@
 #include <kernel/magic.h>
 #include <kernel/dentry.h>
 #include <kernel/kernel.h>
-#include <kernel/compiler.h>
+#include <kernel/api/vfs.h>
 #include <kernel/api/stat.h>
 #include <kernel/api/fcntl.h>
 #include <kernel/api/dirent.h>
@@ -27,6 +27,7 @@ typedef struct file_operations file_operations_t;
 typedef struct block_operations block_operations_t;
 typedef struct inode_operations inode_operations_t;
 typedef struct super_operations super_operations_t;
+typedef struct statfs statfs_t;
 
 struct inode
 {

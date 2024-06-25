@@ -431,4 +431,18 @@ syscall_t trace_syscalls[] = {
         .nargs  = 4,
         .args   = { TYPE_UNSIGNED_LONG, TYPE_LONG, TYPE_VOID_PTR, TYPE_VOID_PTR },
     },
+
+    {
+        .name   = "statfs",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_VOID_PTR },
+    },
+
+    {
+        .name   = "fstatfs",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_LONG, TYPE_VOID_PTR },
+    },
 };

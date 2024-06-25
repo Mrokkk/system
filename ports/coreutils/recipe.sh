@@ -1,7 +1,7 @@
 REPO="https://github.com/coreutils/coreutils.git"
 VERSION=
 BRANCH=
-APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep")
+APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep" "stty" "kill" "stat")
 
 function build()
 {

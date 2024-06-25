@@ -266,6 +266,18 @@ int sys_chroot(const char* path)
     return 0;
 }
 
+int sys_statfs(const char* path, struct statfs* buf)
+{
+    UNUSED(path); UNUSED(buf);
+    return -ENOSYS;
+}
+
+int sys_fstatfs(int fd, struct statfs* buf)
+{
+    UNUSED(fd); UNUSED(buf);
+    return -ENOSYS;
+}
+
 void file_systems_print(void)
 {
     mounted_system_t* ms;

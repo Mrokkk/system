@@ -242,7 +242,7 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
 
         // get the conversion qualifier
         qualifier = -1;
-        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L')
+        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'j')
         {
             qualifier = *fmt;
             ++fmt;
