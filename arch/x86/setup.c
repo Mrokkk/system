@@ -23,6 +23,7 @@
 #include <arch/descriptor.h>
 
 #include <kernel/cpu.h>
+#include <kernel/elf.h>
 #include <kernel/irq.h>
 #include <kernel/init.h>
 #include <kernel/page.h>
@@ -114,6 +115,8 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
 
     // Make sure PIC is in proper state
     i8259_check();
+
+    elf_register();
 
     clear_first_pde();
 }

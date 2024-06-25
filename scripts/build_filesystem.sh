@@ -108,6 +108,8 @@ do
     copy ${binary} ${mountpoint}/bin
 done
 
+cp "bin/loader/loader" "${mountpoint}/lib/ld.so"
+
 for binary in $(find sysroot -type f -executable)
 do
     copy ${binary} ${mountpoint}/bin

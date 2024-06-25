@@ -73,7 +73,7 @@ int sys_lseek(int fd, off_t offset, int whence)
 {
     file_t* file;
 
-    if (whence > SEEK_END || whence < SEEK_SET)
+    if (whence > SEEK_END || whence < 0)
     {
         return -EINVAL;
     }
@@ -84,6 +84,9 @@ int sys_lseek(int fd, off_t offset, int whence)
     // TODO: add checking whether offset can be set
     switch (whence)
     {
+        case 0: // FIXME: wtf, bash?
+            file->offset = 0;
+            break;
         case SEEK_SET:
             file->offset = offset;
             break;

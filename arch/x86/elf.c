@@ -1,5 +1,6 @@
 #include <kernel/vm.h>
 #include <kernel/elf.h>
+#include <kernel/exec.h>
 #include <kernel/ksyms.h>
 #include <kernel/usyms.h>
 #include <kernel/kernel.h>
@@ -9,7 +10,21 @@
 
 #include <arch/mmap.h>
 
+#define DEBUG_ELF 0
+
+static int elf_prepare(const char* name, file_t* file, interp_t** interpreter, void** data);
+static int elf_load(file_t* file, binary_t* bin, void* data);
+static void elf_cleanup(void* data);
+
 static int elf_symbols_read(const elf32_header_t* header, file_t* file, page_t** pages);
+
+static binfmt_t elf = {
+    .name = "elf",
+    .signature = ELFMAG0,
+    .prepare = &elf_prepare,
+    .load = &elf_load,
+    .cleanup = &elf_cleanup,
+};
 
 static inline char* elf_get_architecture(uint8_t v)
 {
@@ -62,7 +77,7 @@ static inline void elf_header_print(const char* name, const elf32_header_t* head
 
 static inline int elf_validate(const char* name, const elf32_header_t* header)
 {
-    int is_valid =
+    bool is_valid =
         header->e_ident[EI_MAG0] == ELFMAG0 &&
         header->e_ident[EI_MAG1] == ELFMAG1 &&
         header->e_ident[EI_MAG2] == ELFMAG2 &&
@@ -77,7 +92,7 @@ static inline int elf_validate(const char* name, const elf32_header_t* header)
     return 0;
 }
 
-char* elf_phdr_type_get(uint32_t type)
+static char* elf_phdr_type_get(uint32_t type)
 {
     switch (type)
     {
@@ -100,23 +115,34 @@ static inline int mmap_flags_get(elf32_phdr_t* p)
     return mmap_flags;
 }
 
-int elf_load(const char* name, file_t* file, binary_t* bin)
+struct elf_data
+{
+    elf32_header_t header;
+    page_t* header_page;
+};
+
+typedef struct elf_data elf_data_t;
+
+static int elf_prepare(const char* name, file_t* file, interp_t** interpreter, void** data)
 {
     int errno;
     page_t* page;
     elf32_phdr_t* phdr;
-    elf32_header_t header;
+    size_t interpreter_len;
+    elf_data_t* elf_data = fmalloc(sizeof(*elf_data));
 
-    // FIXME: see explanation in exception.c
-    const int is_bash = !strcmp("/bin/bash", name);
-
-    if ((errno = do_read(file, 0, &header, sizeof(elf32_header_t))))
+    if (unlikely(!elf_data))
     {
-        log_debug(DEBUG_ELF, "%s: cannot read header: %d", name, errno);
-        return errno;
+        return -ENOMEM;
     }
 
-    if (elf_validate(name, &header))
+    if ((errno = do_read(file, 0, &elf_data->header, sizeof(elf32_header_t))))
+    {
+        log_debug(DEBUG_ELF, "%s: cannot read header: %d", name, errno);
+        goto free_elf_data;
+    }
+
+    if (elf_validate(name, &elf_data->header))
     {
         log_debug(DEBUG_ELF, "%s: not an ELF", name);
         return -ENOEXEC;
@@ -125,20 +151,94 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
     if (unlikely(!(page = page_alloc1())))
     {
         log_debug(DEBUG_ELF, "%s: cannot allocate page for phdr", name);
-        return -ENOMEM;
+        errno = -ENOMEM;
+        goto free_elf_data;
     }
 
     phdr = page_virt_ptr(page);
 
-    if ((errno = do_read(file, header.e_phoff, phdr, header.e_phentsize * header.e_phnum)))
+    if ((errno = do_read(file, elf_data->header.e_phoff, phdr, elf_data->header.e_phentsize * elf_data->header.e_phnum)))
     {
         log_debug(DEBUG_ELF, "%s: cannot read phdr: %d", name, errno);
+        goto free_phdr;
+    }
+
+    for (size_t i = 0; i < elf_data->header.e_phnum; ++i)
+    {
+        if (phdr[i].p_type == PT_INTERP)
+        {
+            interpreter_len = phdr[i].p_memsz;
+            if (unlikely(!(*interpreter = fmalloc(sizeof(interp_t) + interpreter_len))))
+            {
+                log_debug(DEBUG_ELF, "%s: cannot allocate memory for interpreter path", name);
+                goto free_phdr;
+            }
+
+            (*interpreter)->data = shift_as(char*, *interpreter, sizeof(interp_t));
+            (*interpreter)->len = interpreter_len;
+
+            if ((errno = do_read(file, phdr[i].p_offset, (*interpreter)->data, phdr[i].p_memsz)))
+            {
+                log_debug(DEBUG_ELF, "%s: cannot read interpreter path", name);
+                goto free_interpreter;
+            }
+        }
+    }
+
+    elf_data->header_page = page;
+
+    *data = elf_data;
+
+    return 0;
+
+free_interpreter:
+    ffree(*interpreter, interpreter_len + sizeof(interp_t));
+free_phdr:
+    pages_free(page);
+free_elf_data:
+    return errno;
+}
+
+static void elf_cleanup(void* data)
+{
+    elf_data_t* elf_data = data;
+
+    pages_free(elf_data->header_page);
+    ffree(elf_data, sizeof(*elf_data));
+}
+
+int elf_header_read(const char* name, file_t* file, elf32_header_t* header)
+{
+    int errno;
+
+    if ((errno = do_read(file, 0, header, sizeof(elf32_header_t))))
+    {
+        log_debug(DEBUG_ELF, "%s: cannot read header: %d", name, errno);
         return errno;
     }
 
+    if (elf_validate(name, header))
+    {
+        log_debug(DEBUG_ELF, "%s: not an ELF", name);
+        return -ENOEXEC;
+    }
+
+    return 0;
+}
+
+static int elf_load(file_t* file, binary_t* bin, void* data)
+{
+    int errno;
+    elf_data_t* elf_data = data;
+    elf32_header_t* header = &elf_data->header;
+    elf32_phdr_t* phdr = page_virt_ptr(elf_data->header_page);
+
+    // FIXME: this breaks running process if there's some failure
+    // in do_mmap below. I should save previous vmas and restore
+    // then in case of failure
     bin->stack_vma = exec_prepare_initial_vma();
 
-    for (uint32_t i = 0; i < header.e_phnum; ++i)
+    for (uint32_t i = 0; i < header->e_phnum; ++i)
     {
         log_debug(DEBUG_ELF, "%8s %08x %08x %08x %08x %08x %x %x", elf_phdr_type_get(phdr[i].p_type),
             phdr[i].p_offset,
@@ -149,10 +249,6 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
             phdr[i].p_flags,
             phdr[i].p_align);
 
-        if (phdr[i].p_type == PT_DYNAMIC)
-        {
-        }
-
         if (phdr[i].p_type != PT_LOAD)
         {
             continue;
@@ -161,7 +257,7 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
         void* ptr = do_mmap(
             ptr(phdr[i].p_vaddr),
             phdr[i].p_memsz,
-            mmap_flags_get(phdr + i),
+            mmap_flags_get(&phdr[i]),
             MAP_PRIVATE | MAP_FIXED,
             file,
             phdr[i].p_offset);
@@ -169,29 +265,29 @@ int elf_load(const char* name, file_t* file, binary_t* bin)
         if ((errno = errno_get(ptr)))
         {
             log_debug(DEBUG_ELF, "failed mmap: %d", ptr);
-            page_free(phdr);
             return errno;
         }
 
         bin->brk = page_align(phdr[i].p_vaddr + phdr[i].p_memsz);
     }
 
-    bin->entry = ptr(header.e_entry);
-    pages_free(page);
+    bin->entry = ptr(header->e_entry);
 
     log_debug(DEBUG_ELF, "entry: %x", bin->entry);
 
-    // FIXME: see explanation in exception.c
-    if (DEBUG_BTUSER || is_bash)
+    if (DEBUG_BTUSER)
     {
-        elf_symbols_read(&header, file, &bin->symbols_pages);
+        elf_symbols_read(header, file, &bin->symbols_pages);
     }
     else
     {
         bin->symbols_pages = NULL;
     }
 
-    return 0;
+    // FIXME: move this to elf_load
+    bin->inode = file->inode;
+
+    return errno;
 }
 
 static int elf_section_read(const elf32_shdr_t* shdr, file_t* file, page_t** pages)
@@ -549,4 +645,13 @@ error:
     }
     pages_free(module_pages);
     return errno;
+}
+
+void elf_register(void)
+{
+    int errno;
+    if (unlikely(errno = binfmt_register(&elf)))
+    {
+        log_warning("failed to register elf binfmt: %d", errno);
+    }
 }

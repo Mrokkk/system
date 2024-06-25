@@ -170,7 +170,7 @@ void do_exception(uint32_t nr, struct pt_regs regs)
     // is done in elf_load to load symbols. This is caused by super rare crash of bash
     // process after entering the command. EIP points to list_length at bash/list.c:85,
     // but I haven't figured out what's the real RC (yet)
-    const int is_bash = !strcmp(process_current->name, "/bin/bash");
+    const int is_bash = false/*!strcmp(process_current->name, "/bin/bash")*/;
 
     if ((DEBUG_EXCEPTION || is_bash) && printer)
     {

@@ -43,7 +43,6 @@
 #define DEBUG_CON_SCROLL    0
 #define DEBUG_KEYBOARD      0
 
-#define DEBUG_ELF           0
 #define DEBUG_MULTIBOOT     0
 #define DEBUG_ASSERT        1
 
