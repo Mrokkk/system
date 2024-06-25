@@ -18,6 +18,7 @@ function build()
             --disable-gcov \
             --disable-bootstrap \
             --enable-checking=release \
+            --enable-shared \
             --enable-host-shared \
             --with-system-zlib || die "configuration failed"
     fi

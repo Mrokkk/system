@@ -81,6 +81,7 @@ add_library(c STATIC
 )
 
 add_library(crt0 OBJECT crt0.c)
+add_library(crt0_shared OBJECT crt0_shared.c)
 
 add_custom_target(
     libc_headers_install
@@ -94,7 +95,8 @@ add_dependencies(c libc_headers_install)
 add_custom_target(
     crt0_install
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0> ../sysroot/usr/lib/crt0.o
-    DEPENDS crt0 libc_headers_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0_shared> ../sysroot/usr/lib/crt0_shared.o
+    DEPENDS crt0 crt0_shared libc_headers_install
     COMMENT "Installing crt0"
 )
 

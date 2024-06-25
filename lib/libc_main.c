@@ -22,3 +22,13 @@ void __libc_start_main(int, char* const argv[], char* const envp[])
     signals_init();
     stdio_init();
 }
+
+
+#define STUB(name) \
+    void name() {}
+
+STUB(__register_frame_info);
+STUB(__deregister_frame_info);
+STUB(_ITM_registerTMCloneTable);
+STUB(_ITM_deregisterTMCloneTable);
+STUB(__cxa_finalize); // FIXME: this shouldn't be a stub

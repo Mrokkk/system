@@ -1,10 +1,11 @@
-commit ed939d5f08a5cc8412bf865b03853e401abb4437
+commit 270d3c82ddf169e741d09466c3816364f635935a
 Author: Mrokkk <mrokk@protonmail.com>
-Date:   Mon May 27 23:30:56 2024 +0200
+Date:   Tue Jun 25 21:42:02 2024 +0200
 
     Support for Phoenix
     
     * remove existing support for Phoenix-RTOS
+    * add support for shared libs and dynamic executables
     * don't link shared libgcc with libc (for the future)
 
 diff --git a/fixincludes/mkfixinc.sh b/fixincludes/mkfixinc.sh
@@ -64,10 +65,10 @@ index 648b3dc21..7566d20fd 100644
  	xm_defines=POSIX
  	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h i386/lynx.h lynx.h"
 diff --git a/gcc/config/phoenix.h b/gcc/config/phoenix.h
-index bbfdca449..68eb37804 100644
+index bbfdca449..9585d99b7 100644
 --- a/gcc/config/phoenix.h
 +++ b/gcc/config/phoenix.h
-@@ -1,33 +1,28 @@
+@@ -1,33 +1,39 @@
 -/* Base configuration file for all Phoenix-RTOS targets.
 -   Copyright (C) 2016-2023 Free Software Foundation, Inc.
 +/* Useful if you wish to make target-specific GCC changes. */
@@ -87,20 +88,30 @@ index bbfdca449..68eb37804 100644
 +/* Files that are linked before user code.
 +   The %s tells GCC to look for these files in the library directory. */
 +#undef STARTFILE_SPEC
-+#define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared: crt0_shared.o%s} %{shared|static-pie|!no-pie:crtbeginS.o%s; :crtbegin.o%s}"
  
 -GCC is distributed in the hope that it will be useful,
 -but WITHOUT ANY WARRANTY; without even the implied warranty of
 -MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 -GNU General Public License for more details.
--
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared|static-pie|!no-pie:crtendS.o%s; :crtend.o%s} crtn.o%s"
+ 
 -You should have received a copy of the GNU General Public License
 -along with GCC; see the file COPYING3.  If not see
 -<http://www.gnu.org/licenses/>.  */
-+/* Files that are linked after user code. */
-+#undef ENDFILE_SPEC
-+#define ENDFILE_SPEC "crtend.o%s crtn.o%s"
++#define TARGET_LIBC_PROVIDES_SSP
  
++#undef CC1_SPEC
++#define CC1_SPEC "-fno-semantic-interposition"
++
++#undef LINK_SPEC
++#define LINK_SPEC "%{shared:-shared} %{static:-static} %{!static: %{rdynamic:-export-dynamic} -dynamic-linker /lib/ld.so}"
++
++/* Math is included in libc (or rather will be). */
++#define MATH_LIBRARY ""
++
 +/* Additional predefined macros. */
  #undef TARGET_OS_CPP_BUILTINS
 -#define TARGET_OS_CPP_BUILTINS()           \
@@ -125,7 +136,7 @@ index bbfdca449..68eb37804 100644
 +    builtin_assert ("system=posix");   \
 +  } while(0);
 diff --git a/libgcc/config.host b/libgcc/config.host
-index 9d7212028..e7a16a769 100644
+index 9d7212028..febb6a25f 100644
 --- a/libgcc/config.host
 +++ b/libgcc/config.host
 @@ -704,6 +704,10 @@ i[34567]86-*-elfiamcu)
@@ -133,7 +144,7 @@ index 9d7212028..e7a16a769 100644
  	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
  	;;
 +i[34567]86-*-phoenix*)
-+	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o"
++	extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
 +	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
 +	;;
  x86_64-*-elf* | x86_64-*-rtems*)
