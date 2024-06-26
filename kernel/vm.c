@@ -143,6 +143,27 @@ int vm_map(vm_area_t* vma, page_t* new_pages, pgd_t* pgd, int vm_apply_flags)
     return errno;
 }
 
+int vm_remap(vm_area_t* vma, page_t* pages, pgd_t* pgd)
+{
+    int errno;
+    uint32_t start, end;
+
+    start = vma->start;
+    end = start + pages->pages_count * PAGE_SIZE;
+
+    if (unlikely(errno = arch_vm_reapply(pgd, pages, start, end, vma->vm_flags)))
+    {
+        log_debug(DEBUG_VM_APPLY, "failed %d", errno);
+        return errno;
+    }
+
+    vma->end = end;
+
+    pgd_reload();
+
+    return errno;
+}
+
 static inline int address_within(uint32_t vaddr, vm_area_t* vma)
 {
     return vaddr >= vma->start && vaddr < vma->end;

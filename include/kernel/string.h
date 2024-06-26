@@ -3,6 +3,37 @@
 #include <arch/string.h>
 #include <kernel/api/types.h>
 
+struct string
+{
+    char* data;
+    short len;
+    short capacity;
+};
+
+typedef char* string_it_t;
+typedef struct string string_t;
+
+string_t* string_from_cstr(const char* s);
+string_t* string_from_empty(size_t capacity);
+void string_free(string_t* string);
+string_it_t string_find(string_t* string, char c);
+void string_trunc(string_t* string, string_it_t it);
+
+#define string_create(arg) \
+    _Generic((arg), \
+        char*: string_from_cstr((const char*)arg), \
+        default: string_from_empty((size_t)arg))
+
+static inline void __string_free(string_t** string)
+{
+    if (*string)
+    {
+        string_free(*string);
+    }
+}
+
+#define scoped_string_t CLEANUP(__string_free) string_t
+
 #ifndef __HAVE_ARCH_STRLEN
 size_t strlen(const char* s);
 #endif

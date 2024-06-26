@@ -64,8 +64,10 @@
 #define __NR_timer_settime  61
 #define __NR_statfs         62
 #define __NR_fstatfs        63
+#define __NR_brk            64
+#define __NR_mprotect       65
 
-#define __NR_syscalls       64
+#define __NR_syscalls       66
 
 #ifndef __ASSEMBLER__
 
@@ -172,3 +174,5 @@ __syscall3(timer_create, int, clockid_t, struct sigevent*, timer_t*)
 __syscall4(timer_settime, int, timer_t, int, const struct itimerspec*, struct itimerspec*)
 __syscall2(statfs, int, const char*, struct statfs*)
 __syscall2(fstatfs, int, int, struct statfs*)
+__syscall1(brk, int, void*)
+__syscall3(mprotect, int, void*, size_t, int)

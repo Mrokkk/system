@@ -113,6 +113,21 @@ set_file:
     return errno;
 }
 
+int file_fd_allocate(file_t* file)
+{
+    int fd;
+
+    if (process_find_free_fd(process_current, &fd))
+    {
+        return -ENOMEM;
+    }
+
+    process_fd_set(process_current, fd, file);
+    file->count = 1;
+
+    return fd;
+}
+
 int sys_open(const char* __user filename, int flags, int mode)
 {
     int fd, errno;

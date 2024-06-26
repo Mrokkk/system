@@ -445,4 +445,18 @@ syscall_t trace_syscalls[] = {
         .nargs  = 2,
         .args   = { TYPE_LONG, TYPE_VOID_PTR },
     },
+
+    {
+        .name   = "brk",
+        .ret    = TYPE_LONG,
+        .nargs  = 1,
+        .args   = { TYPE_VOID_PTR },
+    },
+
+    {
+        .name   = "mprotect",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG, TYPE_LONG },
+    },
 };

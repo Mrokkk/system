@@ -15,11 +15,13 @@ extern int libc_debug;
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #define FALLTHROUGH __attribute__((__fallthrough__))
 
-#define LIBC(name)      __libc_##name
-#define __STRINGIFY(x)  #x
-#define STRINGIFY(x)    __STRINGIFY(x)
-#define ADDR(a)         ((uintptr_t)(a))
-#define PTR(a)          ((void*)(a))
+#define LIBC(name)              __libc_##name
+#define __STRINGIFY(x)          #x
+#define STRINGIFY(x)            __STRINGIFY(x)
+#define ADDR(a)                 ((uintptr_t)(a))
+#define PTR(a)                  ((void*)(a))
+#define SHIFT(ptr, off)         ((typeof(ptr))(ADDR(ptr) + (off)))
+#define SHIFT_AS(t, ptr, off)   ((t)(ADDR(ptr) + (off)))
 
 #define STRONG_ALIAS(name, aliasname) \
     extern __typeof(name) aliasname __attribute__((alias(STRINGIFY(name))))

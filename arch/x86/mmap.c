@@ -10,11 +10,27 @@
 
 static inline uint32_t address_space_find(size_t size)
 {
+    uint32_t as_start = 0x1000;
+    uint32_t as_end = USER_STACK_VIRT_ADDRESS - USER_STACK_SIZE;
+
     uint32_t last_start;
     vm_area_t* vma = process_current->mm->vm_areas;
+
+    if (!vma)
+    {
+        goto finish;
+    }
+
     for (; vma->next; vma = vma->next);
+
     last_start = vma->start;
     vma = vma->prev;
+
+    if (!vma)
+    {
+        return last_start - size;
+    }
+
     for (; vma->prev; vma = vma->prev)
     {
         if (last_start - vma->end >= size)
@@ -23,7 +39,14 @@ static inline uint32_t address_space_find(size_t size)
         }
         last_start = vma->start;
     }
-    return 0;
+
+    if (unlikely(last_start - as_start < size))
+    {
+        return 0;
+    }
+
+finish:
+    return as_end - size;
 }
 
 static inline int vm_flags_get(int prot)
@@ -43,7 +66,9 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     size_t size = page_align(len);
     size_t page_count = size / PAGE_SIZE;
 
-    if (unlikely(!size || (offset & PAGE_MASK)))
+    log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", addr, size, prot, flags, file);
+
+    if (unlikely(!size || (offset & PAGE_MASK) || (addr(addr) & PAGE_MASK)))
     {
         return ptr(-EINVAL);
     }
@@ -59,6 +84,11 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         {
             return ptr(-EINVAL);
         }
+        if (!current_vm_verify(VERIFY_READ, addr))
+        {
+            // Fail if address is already mapped
+            return ptr(-EINVAL);
+        }
         vaddr = addr(addr);
     }
     else
@@ -69,8 +99,6 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
             return ptr(-ENOMEM);
         }
     }
-
-    log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", vaddr, size, prot, flags, file);
 
     vma = vm_create(vaddr, size, vm_flags_get(prot));
 
@@ -165,6 +193,47 @@ void* sys_mmap(struct mmap_params* params)
         if (process_fd_get(process_current, params->fd, &file)) return ptr(-EBADF);
     }
     return do_mmap(params->addr, params->len, params->prot, params->flags, file, params->off);
+}
+
+int sys_mprotect(void* addr, size_t len, int prot)
+{
+    UNUSED(addr); UNUSED(len); UNUSED(prot);
+    int errno;
+    vm_area_t* vma = vm_find(addr(addr), process_current->mm->vm_areas);
+
+    if (unlikely(!vma))
+    {
+        return -ENOMEM;
+    }
+
+    if (vma->end - vma->start != len)
+    {
+        // TODO: divide vma
+        return -EINVAL;
+    }
+
+    vma->vm_flags = vm_flags_get(prot);
+
+    if (unlikely(errno = vm_remap(vma, list_next_entry(&vma->pages->head, page_t, list_entry), process_current->mm->pgd)))
+    {
+        return errno;
+    }
+
+    return 0;
+}
+
+int sys_brk(void* addr)
+{
+    vm_area_t* new_brk_vma = vm_find(addr(addr), process_current->mm->vm_areas);
+
+    if (unlikely(!new_brk_vma))
+    {
+        return -ENOMEM;
+    }
+
+    // TODO: free pages
+    process_current->mm->brk = addr(addr);
+    return 0;
 }
 
 void* sys_sbrk(size_t incr)

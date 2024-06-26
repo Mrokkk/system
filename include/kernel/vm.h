@@ -38,6 +38,7 @@ vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
 int vm_map(vm_area_t* vma, page_t* page_range, pgd_t* pgd, int vm_apply_flags);
+int vm_remap(vm_area_t* vma, page_t* page_range, pgd_t* pgd);
 int vm_unmap(vm_area_t* vma, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, const pgd_t* src_pgd);
@@ -167,5 +168,6 @@ static inline char* vm_flags_string(char* buffer, int vm_flags)
 #include <arch/vm.h>
 
 int arch_vm_apply(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags);
+int arch_vm_reapply(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags);
 int arch_vm_copy(pgd_t* dest_pgd, const pgd_t* src_pgd,  uint32_t start, uint32_t end);
 int arch_vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd, page_t* pages);

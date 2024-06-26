@@ -7,6 +7,7 @@
 #include <kernel/process.h>
 #include <kernel/process.h>
 #include <kernel/syscall.h>
+#include <kernel/api/mman.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/api/types.h>
 
@@ -235,6 +236,13 @@ static int* parameters_get(int* buf, va_list args, size_t count)
         *it += sprintf(*it, "%s%x", continuation ? "|" : "", value); \
     }
 
+#define FOR_ARGUMENT(nr, ...) \
+    do if (id == nr) \
+    { \
+        __VA_ARGS__; \
+    } \
+    while (0)
+
 static int special_parameter(int nr, size_t id, int value, char** it)
 {
     int continuation = 0;
@@ -242,80 +250,100 @@ static int special_parameter(int nr, size_t id, int value, char** it)
     {
         case __NR_signal:
         case __NR_sigaction:
-            if (id == 0)
-            {
+            FOR_ARGUMENT(0,
                 *it += sprintf(*it, "%s", signame(value));
-                return 1;
-            }
+                return 1);
             break;
+
         case __NR_kill:
-            if (id == 1)
-            {
+            FOR_ARGUMENT(1,
                 *it += sprintf(*it, "%s", signame(value));
-                return 1;
-            }
+                return 1);
             break;
+
         case __NR_ioctl:
-            if (id != 1)
-            {
-                return 0;
-            }
-            switch (value)
-            {
-                FLAG(KDSETMODE);
-                FLAG(KDGETMODE);
-                FLAG(TCGETA);
-                FLAG(TCSETA);
-                FLAG(TIOCGETA);
-                FLAG(TIOCGWINSZ);
-                FLAG(TIOCSWINSZ);
-                FLAG(FBIOGET_VSCREENINFO);
-                FLAG(FBIOPUT_VSCREENINFO);
-                FLAG(FBIOGET_FSCREENINFO);
-            }
+            FOR_ARGUMENT(1,
+                switch (value)
+                {
+                    FLAG(KDSETMODE);
+                    FLAG(KDGETMODE);
+                    FLAG(TCGETA);
+                    FLAG(TCSETA);
+                    FLAG(TIOCGETA);
+                    FLAG(TIOCGWINSZ);
+                    FLAG(TIOCSWINSZ);
+                    FLAG(FBIOGET_VSCREENINFO);
+                    FLAG(FBIOPUT_VSCREENINFO);
+                    FLAG(FBIOGET_FSCREENINFO);
+                });
             break;
+
         case __NR_open:
-            if (id != 1)
-            {
-                return 0;
-            }
-            BITFLAG_EMPTY(value & O_ACCMODE, O_RDONLY);
-            BITFLAG(O_WRONLY);
-            BITFLAG(O_RDWR);
-            BITFLAG(O_CREAT);
-            BITFLAG(O_EXCL);
-            BITFLAG(O_NOCTTY);
-            BITFLAG(O_TRUNC);
-            BITFLAG(O_APPEND);
-            BITFLAG(O_NONBLOCK);
-            BITFLAG(O_DIRECTORY);
-            BITFLAG_LEFT();
-            return 1;
+            FOR_ARGUMENT(1,
+                BITFLAG_EMPTY(value & O_ACCMODE, O_RDONLY);
+                BITFLAG(O_WRONLY);
+                BITFLAG(O_RDWR);
+                BITFLAG(O_CREAT);
+                BITFLAG(O_EXCL);
+                BITFLAG(O_NOCTTY);
+                BITFLAG(O_TRUNC);
+                BITFLAG(O_APPEND);
+                BITFLAG(O_NONBLOCK);
+                BITFLAG(O_DIRECTORY);
+                BITFLAG_LEFT();
+                return 1);
+            break;
+
         case __NR_waitpid:
-            if (id != 2)
-            {
-                return 0;
-            }
-            BITFLAG_EMPTY(value, 0);
-            BITFLAG(WNOHANG);
-            BITFLAG(WUNTRACED);
-            BITFLAG(WCONTINUED);
-            BITFLAG_LEFT();
-            return 1;
+            FOR_ARGUMENT(2,
+                BITFLAG_EMPTY(value, 0);
+                BITFLAG(WNOHANG);
+                BITFLAG(WUNTRACED);
+                BITFLAG(WCONTINUED);
+                BITFLAG_LEFT();
+                return 1);
+            break;
+
         case __NR_fcntl:
-            if (id != 1)
-            {
-                return 0;
-            }
-            switch (value)
-            {
-                FLAG(F_DUPFD);
-                FLAG(F_GETFD);
-                FLAG(F_SETFD);
-                FLAG(F_GETFL);
-                FLAG(F_SETFL);
-            }
-            return 0;
+            FOR_ARGUMENT(1,
+                switch (value)
+                {
+                    FLAG(F_DUPFD);
+                    FLAG(F_GETFD);
+                    FLAG(F_SETFD);
+                    FLAG(F_GETFL);
+                    FLAG(F_SETFL);
+                }
+                return 0);
+            break;
+
+        case __NR_mmap:
+            FOR_ARGUMENT(2,
+                BITFLAG_EMPTY(value, PROT_NONE);
+                BITFLAG(PROT_READ);
+                BITFLAG(PROT_WRITE);
+                BITFLAG(PROT_EXEC);
+                return 1);
+            FOR_ARGUMENT(3,
+                BITFLAG(MAP_SHARED);
+                BITFLAG(MAP_PRIVATE);
+                BITFLAG(MAP_TYPE);
+                BITFLAG(MAP_FIXED);
+                BITFLAG(MAP_ANONYMOUS);
+                BITFLAG(MAP_GROWSDOWN);
+                BITFLAG(MAP_DENYWRITE);
+                BITFLAG(MAP_EXECUTABLE);
+                BITFLAG(MAP_LOCKED);
+                return 1);
+            break;
+
+        case __NR_mprotect:
+            FOR_ARGUMENT(2,
+                BITFLAG_EMPTY(value, PROT_NONE);
+                BITFLAG(PROT_READ);
+                BITFLAG(PROT_WRITE);
+                BITFLAG(PROT_EXEC);
+                return 1);
     }
 
     return 0;

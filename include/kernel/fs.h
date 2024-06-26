@@ -143,6 +143,16 @@ int do_read(file_t* file, size_t offset, void* buffer, size_t count);
 int do_mount(file_system_t* fs, const char* source, const char* mount_point, dev_t dev, file_t* device_file);
 int do_open(file_t** new_file, const char* filename, int flags, int mode);
 int do_close(file_t* file);
+int file_fd_allocate(file_t* file);
+
+// string_read - allocate string with count+1 capacity and read count bytes
+//               from file starting at offset. count+1 byte is set to '\0'
+//
+// @file - file to read from
+// @offset - starting offset
+// @count - number of bytes to read
+// @output - result
+int string_read(file_t* file, size_t offset, size_t count, string_t** output);
 
 int inode_get(inode_t** inode);
 int inode_put(inode_t* inode);

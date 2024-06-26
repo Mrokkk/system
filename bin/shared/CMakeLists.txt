@@ -8,7 +8,6 @@ target_compile_options(shared PRIVATE
     -fpie
     -pie
     -fPIC
-    -nostdlib
 )
 
 add_library(test2 SHARED test.c)

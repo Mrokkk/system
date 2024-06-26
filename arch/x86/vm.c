@@ -51,6 +51,31 @@ int arch_vm_apply(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int v
     return 0;
 }
 
+int arch_vm_reapply(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags)
+{
+    pgt_t* pgt;
+    uint32_t paddr, pde_index, pte_index;
+    page_t* page = pages;
+
+    for (uint32_t vaddr = start;
+         vaddr < end;
+         vaddr += PAGE_SIZE, page = list_next_entry(&page->list_entry, page_t, list_entry))
+    {
+        paddr = page_phys(page);
+        pde_index = pde_index(vaddr);
+        pte_index = pte_index(vaddr);
+
+        pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS);
+
+        log_debug(DEBUG_VM_APPLY, "mapping v=%x <=> p=%x @ %u:%u pgt=%x",
+            vaddr, paddr, pde_index, pte_index, pgt);
+
+        pgt[pte_index] = paddr | pte_flags_get(vm_flags);
+    }
+
+    return 0;
+}
+
 typedef enum
 {
     UNMAP,

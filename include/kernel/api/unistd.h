@@ -33,6 +33,7 @@ int getdents(unsigned int, void*, size_t);
 int reboot(int magic, int magic2, int cmd);
 int chdir(const char* buf);
 char* getcwd(char* buf, size_t size);
+int brk(void* addr);
 void* sbrk(size_t incr);
 int chroot(const char* path);
 int setsid(void);

@@ -1,4 +1,4 @@
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${PROJECT_SOURCE_DIR}/lib/libc.h")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${PROJECT_SOURCE_DIR}/lib/libc.h -fdata-sections -ffunction-sections")
 
 include_directories(
    ${PROJECT_SOURCE_DIR}/lib/include
@@ -83,6 +83,8 @@ add_library(c STATIC
 add_library(crt0 OBJECT crt0.c)
 add_library(crt0_shared OBJECT crt0_shared.c)
 
+add_subdirectory(loader)
+
 add_custom_target(
     libc_headers_install
     COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/lib/include" ../sysroot/usr/include
@@ -103,5 +105,7 @@ add_custom_target(
 add_custom_target(
     libc_install
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.a ../sysroot/usr/lib/libc.a
-    DEPENDS crt0_install c
+    DEPENDS crt0_install c loader
     COMMENT "Installing libc")
+
+add_dependencies(rootfs libc_install)

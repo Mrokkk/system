@@ -1,3 +1,4 @@
+#include "kernel/page.h"
 #include <kernel/fs.h>
 #include <kernel/vm.h>
 #include <kernel/process.h>
@@ -67,6 +68,36 @@ int do_read(file_t* file, size_t offset, void* buffer, size_t count)
     }
 
     return 0;
+}
+
+int string_read(file_t* file, size_t offset, size_t count, string_t** output)
+{
+    int errno, retval;
+    string_t* string;
+
+    file->offset = offset;
+
+    if (unlikely(!(string = string_create(count + 1))))
+    {
+        return -ENOMEM;
+    }
+
+    retval = file->ops->read(file, string->data, count);
+
+    if (unlikely(errno = errno_get(retval)))
+    {
+        goto free_string;
+    }
+
+    string->len = retval;
+    string->data[retval] = '\0';
+    *output = string;
+
+    return 0;
+
+free_string:
+    string_free(string);
+    return errno;
 }
 
 int sys_lseek(int fd, off_t offset, int whence)

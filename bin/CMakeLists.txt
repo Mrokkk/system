@@ -1,5 +1,7 @@
 project(bin)
 
+set(CMAKE_SKIP_RPATH ON)
+
 set(CMAKE_C_FLAGS
     "-pipe \
     ${C_FLAGS_STANDARD} \
@@ -14,8 +16,10 @@ function(add_application)
 
     get_filename_component(name ${CMAKE_CURRENT_SOURCE_DIR} NAME)
     add_executable(${name} ${ARGN})
-    target_link_libraries(${name} c)
-    add_dependencies(rootfs ${name} libc_install)
+    target_compile_options(${name} PRIVATE -fdata-sections -ffunction-sections)
+    target_link_libraries(${name} c -Wl,-gc-sections)
+    add_dependencies(rootfs ${name})
+    add_dependencies(${name} libc_install)
 
 endfunction()
 

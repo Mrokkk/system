@@ -6,10 +6,11 @@
 #include <kernel/backtrace.h>
 #include <kernel/byteorder.h>
 
+#include <kernel/api/elf.h>
+
 static LIST_DECLARE(binfmts);
 
-static int shebang_prepare(const char* name, file_t* file, interp_t** interpreter, void** data);
-static void shebang_cleanup(void* data);
+static int sheband_interp_read(file_t* file, string_t** interpreter);
 
 static binfmt_t* binfmt_find(int signature)
 {
@@ -26,65 +27,56 @@ static binfmt_t* binfmt_find(int signature)
     return NULL;
 }
 
-static binfmt_t shebang_fmt = {
-    .prepare = &shebang_prepare,
-    .cleanup = &shebang_cleanup,
-};
+#define INTERPRETER_LEN 32
 
-#define INTERPRETER_LEN 17
-
-static int shebang_prepare(const char*, file_t* file, interp_t** interpreter, void**)
+static int sheband_interp_read(file_t* file, string_t** interpreter)
 {
     int errno;
-    char* newline;
+    string_it_t newline;
 
-    if (unlikely(!(*interpreter = fmalloc(INTERPRETER_LEN + sizeof(interp_t)))))
+    if (unlikely(errno = string_read(file, 2, INTERPRETER_LEN, interpreter)))
     {
-        log_debug(DEBUG_PROCESS, "cannot allocate memory for interpreter");
-        return -ENOMEM;
+        return errno;
     }
 
-    (*interpreter)->data = shift_as(char*, *interpreter, sizeof(interp_t));
-    (*interpreter)->len = INTERPRETER_LEN;
-
-    if (unlikely(errno = do_read(file, 2, (*interpreter)->data, INTERPRETER_LEN)))
+    if (unlikely(!(newline = string_find(*interpreter, '\n'))))
     {
-        log_debug(DEBUG_PROCESS, "failed to read line: %d", errno);
-        goto free_interpreter;
-    }
-
-    (*interpreter)->data[INTERPRETER_LEN - 1] = 0;
-
-    if (unlikely(!(newline = strchr((*interpreter)->data, '\n'))))
-    {
-        log_debug(DEBUG_PROCESS, "line too long");
+        log_debug(DEBUG_PROCESS, "shebang line too long");
         errno = -ENOEXEC;
         goto free_interpreter;
     }
 
-    *newline = 0;
+    string_trunc(*interpreter, newline);
 
     return 0;
 
 free_interpreter:
-    ffree(*interpreter, sizeof(interp_t) + INTERPRETER_LEN);
+    string_free(*interpreter);
     return errno;
 }
 
-static void shebang_cleanup(void*)
+int aux_insert(int type, uintptr_t value, argvecs_t argvecs)
 {
+    aux_t* aux = fmalloc(sizeof(aux_t));
+
+    if (unlikely(!aux))
+    {
+        return -ENOMEM;
+    }
+
+    aux->type = type;
+    aux->value = value;
+    list_init(&aux->list_entry);
+
+    argvecs[AUXV].size += sizeof(aux_t);
+    argvecs[AUXV].count++;
+
+    list_add_tail(&aux->list_entry, &argvecs[AUXV].head);
+
+    return 0;
 }
 
-#define FRONT 1
-#define TAIL  0
-
-// arg_insert - allocate and insert new arg at front/tail of argvec
-//
-// @string - string arg
-// @len - length of arg including '\0'
-// @argvec - argvec to which new arg is inserted
-// @flag - whetner new entry should be added at front or tail
-static int arg_insert(const char* string, const size_t len, argvec_t* argvec, int flag)
+int arg_insert(const char* string, const size_t len, argvec_t* argvec, int flag)
 {
     arg_t* arg = fmalloc(len + sizeof(arg_t));
 
@@ -146,6 +138,18 @@ static void args_put(argvec_t* argvec)
     }
 }
 
+// auxs_put - free allocated auxv
+//
+// @argvec - vector to free
+static void auxs_put(argvec_t* argvec)
+{
+    aux_t* aux;
+    list_for_each_entry_safe(aux, &argvec->head, list_entry)
+    {
+        ffree(aux, sizeof(aux_t));
+    }
+}
+
 // Memory layout of stack:
 // +------------+ 0 <- top
 // | argc       |
@@ -154,54 +158,73 @@ static void args_put(argvec_t* argvec)
 // +------------+ 8
 // | envp       |
 // +------------+ 12
+// | auxv       |
+// +------------+ 16
 // | argv[0]    |
 // +------------+
 // | ...        |
-// +------------+ 12 + 4 * argc
-// | argv[argc] |
 // +------------+ 16 + 4 * argc
+// | argv[argc] |
+// +------------+ 20 + 4 * argc
 // | envp[0]    |
 // +------------+
 // | ...        |
-// +------------+ 16 + 4 * (argc + n)
-// | envp[n]    |
 // +------------+ 20 + 4 * (argc + n)
+// | envp[n]    |
+// +------------+ 24 + 4 * (argc + n)
 // | argv str   |
 // +------------+ variable
 // | envp str   |
+// +------------+ variable
+// | auxv[0]    |
+// +------------+
+// | ...        |
+// +------------+ variable
+// | auxv[auxn] |
 // +------------+ <- bottom
 static void* argvecs_copy_to_user(uint32_t* dest, argvecs_t argvecs)
 {
-    char* temp;
+    char* strings;
     arg_t* arg;
+    aux_t* aux;
+    uintptr_t* temp;
+    uintptr_t* vec[3];
 
-    // Put argc
     *dest++ = argvecs[ARGV].count;
+    vec[ARGV] = dest++;
+    vec[ENVP] = dest++;
+    vec[AUXV] = dest++;
 
-    // Put argv address, dest + 2, because next will be envp
-    *dest = addr(dest + 2);
-    dest++;
-
-    // Put envp address, argc + 2, because there will be argc + 1
-    // entries before envp[0]
-    *dest = addr(dest + argvecs[ARGV].count + 2);
-    dest++;
-
-    // argv will always have size == argc + 1; argv[argc] must be 0
-    temp = ptr(dest + argvecs[ARGV].count + 2 + argvecs[ENVP].count);
+    // String table is located after all entries of argv and envp, which
+    // both  have NULL entries at the end, thus "+1"s
+    strings = ptr(dest + argvecs[ARGV].count + 1 + argvecs[ENVP].count + 1);
 
     for (int i = 0; i < 2; ++i)
     {
+        // Set address of actual array to argv/envp
+        *vec[i] = addr(dest);
         list_for_each_entry(arg, &argvecs[i].head, list_entry)
         {
             // Put argv/envp[i] address and copy content of argv/envp[i]
-            *dest++ = addr(temp);
-            strcpy(temp, arg->arg);
-            temp += arg->len;
+            *dest++ = addr(strings);
+            strcpy(strings, arg->arg);
+            strings += arg->len;
         }
 
         *dest++ = 0;
     }
+
+    temp = ptr(align(addr(strings), sizeof(uintptr_t)));
+    *vec[AUXV] = addr(temp);
+
+    list_for_each_entry(aux, &argvecs[AUXV].head, list_entry)
+    {
+        *temp++ = aux->type;
+        *temp++ = aux->value;
+    }
+
+    *temp++ = 0;
+    *temp++ = 0;
 
     return temp;
 }
@@ -212,9 +235,10 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
     char buffer[2];
     binfmt_t* binfmt;
     void* data;
-    interp_t* tmp;
-    interp_t* interpreter = NULL;
+    string_t* tmp;
     scoped_file_t* file = NULL;
+    scoped_string_t* interpreter = NULL;
+    scoped_string_t* shebang_interp = NULL;
 
     for (;;)
     {
@@ -225,12 +249,6 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
         if ((errno = do_open(&file, pathname, O_RDONLY, 0)))
         {
             return errno;
-        }
-
-        if (unlikely(!file))
-        {
-            log_error("null file returned by open; pathname = %s", pathname);
-            return -ENOENT;
         }
 
         if (unlikely(!file->ops || !file->ops->mmap || !file->ops->read))
@@ -245,15 +263,26 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
 
         if (*(uint16_t*)buffer == U16('#', '!'))
         {
-            binfmt = &shebang_fmt;
-        }
-        else
-        {
-            if (unlikely(!(binfmt = binfmt_find(*buffer))))
+            if (unlikely(errno = sheband_interp_read(file, &shebang_interp)))
             {
-                log_debug(DEBUG_PROCESS, "invalid file");
-                return -ENOEXEC;
+                return errno;
             }
+
+            // Insert current path as the argv[0] so the interpreter will know what to load
+            if (unlikely(errno = argv_insert(pathname, strlen(pathname) + 1, argvecs, FRONT)))
+            {
+                return errno;
+            }
+
+            pathname = shebang_interp->data;
+            do_close(file);
+            continue;
+        }
+
+        if (unlikely(!(binfmt = binfmt_find(*buffer))))
+        {
+            log_debug(DEBUG_PROCESS, "invalid file");
+            return -ENOEXEC;
         }
 
         if ((errno = binfmt->prepare(pathname, file, &tmp, &data)))
@@ -261,37 +290,42 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
             return errno;
         }
 
-        if (interpreter && tmp)
+        if (tmp)
         {
-            log_info("%s: no support for nested interpreters", pathname);
-            binfmt->cleanup(data);
-            return -ENOEXEC;
-        }
-        else if (tmp)
-        {
+            int fd;
             interpreter = tmp;
             log_debug(DEBUG_PROCESS, "%s: interpreter: %s", pathname, interpreter->data);
 
-            // Insert current path as the argv[0] so the interpreter will know what to load
-            if (unlikely(errno = arg_insert(pathname, strlen(pathname) + 1, &argvecs[ARGV], FRONT)))
+            errno = binfmt->load(file, bin, data, argvecs);
+
+            pathname = interpreter->data;
+
+            fd = file_fd_allocate(file);
+
+            if (unlikely(errno = errno_get(fd)))
             {
                 return errno;
             }
 
-            pathname = interpreter->data;
-            do_close(file);
+            if (unlikely(errno = aux_insert(AT_EXECFD, fd, argvecs)))
+            {
+                return errno;
+            }
+
             binfmt->cleanup(data);
             continue;
         }
 
-        errno = binfmt->load(file, bin, data);
+        if (interpreter)
+        {
+            errno = binfmt->interp_load(file, bin, data, argvecs);
+        }
+        else
+        {
+            errno = binfmt->load(file, bin, data, argvecs);
+        }
         binfmt->cleanup(data);
         break;
-    }
-
-    if (interpreter)
-    {
-        ffree(interpreter, interpreter->len + sizeof(*interpreter));
     }
 
     return errno;
@@ -303,7 +337,6 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     char copied_path[PATH_MAX];
     int errno;
     uint32_t user_stack;
-    uint32_t* kernel_stack;
     struct process* p = process_current;
     ARGVECS_DECLARE(argvec);
 
@@ -318,7 +351,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         return errno;
     }
 
-    if (!(bin = alloc(binary_t)))
+    if (!(bin = alloc(binary_t, memset(this, 0, sizeof(*this)))))
     {
         return -ENOMEM;
     }
@@ -327,6 +360,12 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     args_get(argv, true, &argvec[ARGV]);
     args_get(envp, false, &argvec[ENVP]);
+    argvec[AUXV].size = sizeof(void*) + 2 * sizeof(uint32_t);
+
+    if (aux_insert(AT_PAGESZ, PAGE_SIZE, argvec))
+    {
+        return -ENOMEM;
+    }
 
     log_debug(DEBUG_PROCESS, "%s, argc=%u, envc=%u",
         pathname,
@@ -338,13 +377,17 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         return errno;
     }
 
-    kernel_stack = p->mm->kernel_stack; // FIXME: maybe I should alloc a new stack?
-
     strncpy(p->name, copied_path, PROCESS_NAME_LEN);
     process_bin_exit(p);
     //process_ktimers_exit(p);
     p->bin = bin;
     bin->count = 1;
+
+    if (unlikely(!bin->stack_vma))
+    {
+        do_kill(p, SIGSTKFLT);
+        return -EFAULT;
+    }
 
     pgd_reload();
 
@@ -363,6 +406,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     args_put(&argvec[ARGV]);
     args_put(&argvec[ENVP]);
+    auxs_put(&argvec[AUXV]);
 
     ASSERT(*(int*)user_stack == argvec[ARGV].count);
 
@@ -371,7 +415,8 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     log_debug(DEBUG_PROCESS, "%s[%u] vma:", p->name, p->pid);
     vm_print(p->mm->vm_areas, DEBUG_PROCESS);
 
-    arch_exec(bin->entry, kernel_stack, user_stack);
+    // TODO: maybe I should alloc a new stack?
+    arch_exec(bin->entry, p->mm->kernel_stack, user_stack);
 
     return 0;
 }
@@ -412,8 +457,8 @@ vm_area_t* exec_prepare_initial_vma()
     }
     else
     {
-        log_warning("process %u:%x without a stack; sending SIGSEGV", process_current->pid, process_current);
-        do_kill(process_current, SIGSEGV);
+        log_warning("process %u:%x without a stack; sending SIGSTKFLT", process_current->pid, process_current);
+        do_kill(process_current, SIGSTKFLT);
     }
 
     vm_add(&process_current->mm->vm_areas, stack_vma);
