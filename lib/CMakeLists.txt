@@ -1,10 +1,24 @@
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${PROJECT_SOURCE_DIR}/lib/libc.h -fdata-sections -ffunction-sections")
+set(CMAKE_C_FLAGS
+    "-pipe \
+    ${C_FLAGS_STANDARD} \
+    ${C_FLAGS_OPTIMIZATION} \
+    ${C_FLAGS_WARNINGS} \
+    ${C_FLAGS_DEBUG} \
+    ${C_FLAGS_FRAME_POINTER} \
+    -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx \
+    -nostdlib \
+    -nostartfiles \
+    -fno-builtin \
+    -fno-asynchronous-unwind-tables -fno-stack-protector \
+    -include ${PROJECT_SOURCE_DIR}/lib/libc.h \
+    -fdata-sections \
+    -ffunction-sections")
 
 include_directories(
    ${PROJECT_SOURCE_DIR}/lib/include
 )
 
-add_library(c STATIC
+set(LIBC_SRC
     abort.c
     assert.c
     atexit.c
@@ -80,6 +94,16 @@ add_library(c STATIC
     ../kernel/lib/bitset.c
 )
 
+add_library(c STATIC ${LIBC_SRC})
+add_library(c_s SHARED ${LIBC_SRC})
+
+target_compile_options(c_s
+    PRIVATE
+        -fpie
+        -pie
+        -fPIC
+)
+
 add_library(crt0 OBJECT crt0.c)
 add_library(crt0_shared OBJECT crt0_shared.c)
 
@@ -93,6 +117,7 @@ add_custom_target(
 )
 
 add_dependencies(c libc_headers_install)
+add_dependencies(c_s libc_headers_install)
 
 add_custom_target(
     crt0_install
@@ -105,7 +130,7 @@ add_custom_target(
 add_custom_target(
     libc_install
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.a ../sysroot/usr/lib/libc.a
-    DEPENDS crt0_install c loader
+    DEPENDS crt0_install c loader c_s
     COMMENT "Installing libc")
 
 add_dependencies(rootfs libc_install)

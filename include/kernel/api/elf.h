@@ -134,6 +134,10 @@ typedef struct elf32_segment_header
     uint32_t sh_entsize;
 } elf32_shdr_t;
 
+#define ELF32_ST_BIND(info)         ((info) >> 4)
+#define ELF32_ST_TYPE(info)         ((info) & 0xf)
+#define ELF32_ST_INFO(bind, type)   (((bind) << 4)+((type) & 0xf))
+
 typedef struct
 {
     uint32_t    st_name;
@@ -142,11 +146,11 @@ typedef struct
     uint8_t     st_info;
     uint8_t     st_other;
     uint16_t    st_shndx;
-} elf32_sym;
+} elf32_sym_t;
 
-#define ELF32_R_SYM(val)        ((val) >> 8)
-#define ELF32_R_TYPE(val)       ((val) & 0xff)
-#define ELF32_R_INFO(sym, type) (((sym) << 8) + ((type) & 0xff))
+#define ELF32_R_SYM(val)            ((val) >> 8)
+#define ELF32_R_TYPE(val)           ((val) & 0xff)
+#define ELF32_R_INFO(sym, type)     (((sym) << 8) + ((type) & 0xff))
 
 #define R_386_NONE          0       /* No reloc */
 #define R_386_32            1       /* Direct 32 bit  */

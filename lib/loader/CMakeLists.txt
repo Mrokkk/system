@@ -10,6 +10,7 @@ target_include_directories(loader
 
 target_compile_options(loader
     PRIVATE
+        -ggdb3
         -ffunction-sections
         -fdata-sections
 )

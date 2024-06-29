@@ -183,6 +183,8 @@ void do_exception(uint32_t nr, struct pt_regs regs)
         backtrace_user(log_notice, &regs, page_virt_ptr(process_current->bin->symbols_pages));
     }
 
+    vm_print_short(process_current->mm->vm_areas, DEBUG_EXCEPTION);
+
     do_kill(process_current, exception->signal);
 }
 

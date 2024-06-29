@@ -109,6 +109,7 @@ do
 done
 
 cp "lib/loader/loader" "${mountpoint}/lib/ld.so"
+cp "lib/libc_s.so" "${mountpoint}/bin/libc_s.so"
 
 for binary in $(find sysroot -type f -executable)
 do

@@ -1,15 +1,11 @@
 #include <stdio.h>
 
 extern int test();
+extern int a;
 
-int main(int argc, char** argv)
+int main()
 {
-    printf("Command:");
-    for (int i = 0; i < argc; ++i)
-    {
-        printf(" %s", argv[i]);
-    }
-    printf("\nHello world!\n");
-    test();
+    printf("Hello world!\n");
+    printf("Test returned: %u, %u\n", test(), a);
     return 0;
 }

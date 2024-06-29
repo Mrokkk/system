@@ -1,34 +1,63 @@
 #!/bin/env python3
 
+import re
 import argparse
 import subprocess
+from typing import List
 
-def parse_args():
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--app', action='store')
     parser.add_argument('-p', '--port', action='store')
     return parser.parse_args()
 
-def build_gdb_args(args):
+
+def build_gdb_args(app : str, text_start : str) -> List[str]:
     a = [
         'gdb',
         '-ex', 'set confirm off',
         '-ex', 'symbol-file system',
         '-ex', 'target remote localhost:9000',
     ]
-    if args.app:
-        a.extend(['-ex', f'add-symbol-file bin/{args.app}/{args.app}'])
-    if args.port:
-        a.extend(['-ex', f'add-symbol-file sysroot/bin/{args.port}'])
+    if app:
+        a.extend(['-ex', f'add-symbol-file {app} {text_start}'])
     return a
 
-def main():
+
+def text_start_get(app : str) -> int:
+    objdump = subprocess.Popen(
+        ['/bin/objdump', '-d', '--prefix-addresses', '-j', '.text', app],
+        errors='ignore',
+        stdout=subprocess.PIPE,
+        shell=False)
+
+    asm_regex = re.compile(r'([a-f0-9]+) ')
+
+    for line in objdump.stdout.readlines():
+        match = re.match(asm_regex, line)
+        if match:
+            break
+
+    objdump.communicate()
+
+    return int(f'0x{match.group(1)}', 16)
+
+
+def main() -> None:
     args = parse_args()
-    gdb_args = build_gdb_args(args)
-    print(gdb_args)
+    text_start : str = None
+    app : str = None
+
+    if args.app:
+        app = f'mnt/bin/{args.app}'
+        text_start = text_start_get(app) + 0x1000
+    elif args.port:
+        app = f'mnt/bin/{args.port}'
+        text_start = text_start_get(app)
 
     gdb = subprocess.Popen(
-        build_gdb_args(args),
+        build_gdb_args(app, text_start),
         errors='ignore',
         shell=False)
 
@@ -39,6 +68,7 @@ def main():
                 return
         except KeyboardInterrupt:
             pass
+
 
 if __name__ == '__main__':
     main()

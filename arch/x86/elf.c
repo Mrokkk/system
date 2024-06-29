@@ -239,9 +239,14 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
             continue;
         }
 
+        uint32_t vaddr_start = phdr[i].p_vaddr + base;
+        uint32_t vaddr_file_end = vaddr_start + phdr[i].p_filesz;
+        uint32_t vaddr_page_start = vaddr_start & ~PAGE_MASK;
+        uint32_t vaddr_page_end = page_align(vaddr_start + phdr[i].p_memsz);
+
         void* ptr = do_mmap(
-            ptr(phdr[i].p_vaddr & ~PAGE_MASK) + base,
-            phdr[i].p_memsz,
+            ptr(vaddr_page_start),
+            page_align(phdr[i].p_memsz),
             mmap_flags_get(&phdr[i]),
             MAP_PRIVATE | MAP_FIXED,
             file,
@@ -251,6 +256,11 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
         {
             log_debug(DEBUG_ELF, "failed mmap: %d", ptr);
             return errno;
+        }
+
+        if (phdr[i].p_flags & PF_W)
+        {
+            memset(ptr(vaddr_file_end), 0, vaddr_page_end - vaddr_file_end);
         }
 
         bin->brk = page_align(phdr[i].p_vaddr + phdr[i].p_memsz + base);
@@ -363,7 +373,7 @@ static int elf_section_read(const elf32_shdr_t* shdr, file_t* file, page_t** pag
     return 0;
 }
 
-static void elf_symbols_fill(page_t* pages, const elf32_sym* sym, const size_t sym_count, const char* strings)
+static void elf_symbols_fill(page_t* pages, const elf32_sym_t* sym, const size_t sym_count, const char* strings)
 {
     size_t i;
     usym_t* usym = page_virt_ptr(pages);
@@ -395,7 +405,7 @@ static int elf_symbols_read(const elf32_header_t* header, file_t* file, page_t**
     page_t* syms_pages = NULL;
     page_t* str_pages = NULL;
     page_t* usyms_pages;
-    elf32_sym* sym = NULL;
+    elf32_sym_t* sym = NULL;
     char* strings = NULL;
     size_t sym_count = 0, strings_len = 0;
 
@@ -425,7 +435,7 @@ static int elf_symbols_read(const elf32_header_t* header, file_t* file, page_t**
                     goto free;
                 }
                 sym = page_virt_ptr(syms_pages);
-                sym_count = shdr->sh_size / sizeof(elf32_sym);
+                sym_count = shdr->sh_size / sizeof(elf32_sym_t);
                 break;
             case SHT_STRTAB:
                 if (strings) continue;
@@ -480,7 +490,7 @@ int elf_locate_common_sections(
     elf32_header_t* header,
     const char** symstr,
     const char** shstr,
-    elf32_sym** symbols)
+    elf32_sym_t** symbols)
 {
     elf32_shdr_t* shdrt = shift_as(elf32_shdr_t*, header, header->e_shoff);
     int count = 0;
@@ -528,7 +538,7 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
     elf32_header_t* header;
     const char* symstr = NULL;
     const char* shstr = NULL;
-    elf32_sym* symbols = NULL;
+    elf32_sym_t* symbols = NULL;
     uint32_t* got = NULL;
     size_t size = file->inode->size;
     page_t* module_pages = page_alloc(page_align(size) / PAGE_SIZE, PAGE_ALLOC_CONT);
@@ -593,7 +603,7 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
 
         for (size_t i = 0; i < shdr->sh_size / shdr->sh_entsize; ++i, ++rel)
         {
-            elf32_sym* s = &symbols[ELF32_R_SYM(rel->r_info)];
+            elf32_sym_t* s = &symbols[ELF32_R_SYM(rel->r_info)];
             symbol_section = &shdrt[s->st_shndx];
 
             uint32_t relocated;

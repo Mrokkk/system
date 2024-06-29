@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <kernel/api/elf.h>
@@ -12,8 +13,13 @@
 #include "elf.h"
 #include "list.h"
 
+// References:
+// https://docs.oracle.com/cd/E18752_01/html/817-1984/chapter6-14428.html
+
 int debug;
-static auxv_t saved_auxv;
+static auxv_t saved_auxv = {
+    ._AT_EXECFD = -1
+};
 static LIST_DECLARE(libs);
 
 #define STORE(what, where) \
@@ -23,8 +29,8 @@ static LIST_DECLARE(libs);
     case a: \
         saved_auxv._##a = aux[i].a_un.a_val; break
 
-#define AUX_VERIFY(a) \
-    do { if (UNLIKELY(!saved_auxv._##a)) die("missing " #a); } while (0)
+#define AUX_VERIFY(a, bad_value) \
+    do { if (UNLIKELY(saved_auxv._##a == bad_value)) die("missing " #a); } while (0)
 
 #define AUX_GET(a) \
     ({ saved_auxv._##a; })
@@ -46,25 +52,22 @@ static void auxv_read(elf32_auxv_t** vec)
         }
     }
 
-    AUX_VERIFY(AT_EXECFD);
-    AUX_VERIFY(AT_PHDR);
-    AUX_VERIFY(AT_PAGESZ);
-    AUX_VERIFY(AT_PHNUM);
-    AUX_VERIFY(AT_ENTRY);
-    AUX_VERIFY(AT_BASE);
+    AUX_VERIFY(AT_EXECFD, -1);
+    AUX_VERIFY(AT_PHDR, 0);
+    AUX_VERIFY(AT_PAGESZ, 0);
+    AUX_VERIFY(AT_PHNUM, 0);
+    AUX_VERIFY(AT_ENTRY, 0);
+    AUX_VERIFY(AT_BASE, 0);
 }
 
-static void link(dynamic_t* dynamic, int exec_fd, uintptr_t base_address)
+static void dynamic_store(dynamic_t* dynamic)
 {
-    STRTAB_DECLARE(dynstr);
-    REL_DECLARE(rel);
-
-    for (size_t i = 0; i < dynamic->count && dynamic->entries[i].d_tag; ++i)
+    FOR_EACH(*dynamic,
     {
-        elf32_dyn_t* entry = &dynamic->entries[i];
         uint32_t value = entry->d_un.d_val;
         switch (entry->d_tag)
         {
+            case DT_NULL: return;
             case DT_NEEDED:
             {
                 lib_t* lib = ALLOC(malloc(sizeof(*lib)));
@@ -73,28 +76,214 @@ static void link(dynamic_t* dynamic, int exec_fd, uintptr_t base_address)
                 list_add_tail(&lib->list_entry, &libs);
                 break;
             }
-            STORE(DT_REL, rel.offset);
-            STORE(DT_RELSZ, rel.size);
-            STORE(DT_RELENT, rel.entsize);
-            STORE(DT_STRSZ, dynstr.size);
-            STORE(DT_STRTAB, dynstr.offset);
+            STORE(DT_REL, dynamic->rel.offset);
+            STORE(DT_RELSZ, dynamic->rel.size);
+            STORE(DT_RELENT, dynamic->rel.entsize);
+            STORE(DT_STRSZ, dynamic->dynstr.size);
+            STORE(DT_STRTAB, dynamic->dynstr.offset);
+            STORE(DT_SYMTAB, dynamic->symtab.offset);
+            STORE(DT_SYMENT, dynamic->symtab.entsize);
+            STORE(DT_JMPREL, dynamic->jmprel.offset);
+            STORE(DT_PLTRELSZ, dynamic->jmprel.size);
+            STORE(DT_HASH, dynamic->hash.offset);
+        }
+    });
+}
+
+elf32_sym_t* elf_lookup(dynamic_t* dynamic, const char* symname)
+{
+    uint32_t hash = elf_hash(symname);
+
+    uint32_t* hashtab = dynamic->hash.data;
+    elf32_sym_t* symtab = dynamic->symtab.entries;
+    const char* strtab = dynamic->dynstr.strings;
+
+    uint32_t nbucket = hashtab[0];
+    uint32_t nchain = hashtab[1];
+    uint32_t* bucket = &hashtab[2];
+    uint32_t* chain = &bucket[nbucket];
+
+    UNUSED(nchain);
+
+    for (uint32_t i = bucket[hash % nbucket]; i; i = chain[i])
+    {
+        if (!strcmp(symname, strtab + symtab[i].st_name))
+        {
+            return &symtab[i];
         }
     }
 
-    dynstr.strings = alloc_read(exec_fd, dynstr.size, dynstr.offset);
-    rel.entries = alloc_read(exec_fd, rel.size, rel.offset);
+    return NULL;
+}
 
-    for (size_t i = 0; i < rel.size / rel.entsize; ++i)
+static void dynamic_read(int exec_fd, elf32_phdr_t* p, dynamic_t* dynamic)
+{
+    dynamic->entries = alloc_read(exec_fd, dynamic->size = p->p_filesz, p->p_offset);
+    dynamic->count = dynamic->size / sizeof(elf32_dyn_t);
+
+    dynamic_store(dynamic);
+
+    dynamic->symtab.count = (dynamic->dynstr.offset - dynamic->symtab.offset) / dynamic->symtab.entsize;
+    dynamic->symtab.entries = alloc_read(exec_fd, dynamic->dynstr.offset - dynamic->symtab.offset, dynamic->symtab.offset);
+    dynamic->dynstr.strings = alloc_read(exec_fd, dynamic->dynstr.size, dynamic->dynstr.offset);
+    dynamic->rel.entries = alloc_read(exec_fd, dynamic->rel.size, dynamic->rel.offset);
+    dynamic->rel.count = dynamic->rel.size / dynamic->rel.entsize;
+    dynamic->hash.size =  dynamic->symtab.offset - dynamic->hash.offset;
+    dynamic->hash.data = alloc_read(exec_fd, dynamic->hash.size, dynamic->hash.offset);
+
+    if (dynamic->jmprel.offset)
     {
-        int type = ELF32_R_TYPE(rel.entries[i].r_info);
-        if (type != R_386_RELATIVE)
+        dynamic->jmprel.entries = alloc_read(exec_fd, dynamic->jmprel.size, dynamic->jmprel.offset);
+        dynamic->jmprel.count = dynamic->jmprel.size / sizeof(elf32_rel_t);
+    }
+}
+
+static void missing_symbol_add(const char* name, elf32_sym_t* symbol, elf32_rel_t* rel, int type, uintptr_t base_address, list_head_t* missing_symbols)
+{
+    symbol_t* missing = ALLOC(malloc(sizeof(*missing)));
+    list_init(&missing->missing);
+    missing->name = name;
+    missing->base_address = base_address;
+    missing->type = type;
+    missing->symbol = symbol;
+    missing->rel = rel;
+    list_add_tail(&missing->missing, missing_symbols);
+}
+
+static void relocate_symbol(
+    const elf32_sym_t* symbol,
+    const elf32_rel_t* rel,
+    uintptr_t base_address, // base address of the binary where symbol is needed
+    uintptr_t lib_base_address)
+{
+    uintptr_t* memory = PTR(base_address + rel->r_offset);
+
+    switch (ELF32_R_TYPE(rel->r_info))
+    {
+        // A - The addend used to compute the value of the relocatable field.
+        // B - The base address at which a shared object is loaded into memory during
+        //     execution. Generally, a shared object file is built with a base virtual
+        //     address of 0. However, the execution address of the shared object is
+        //     different.
+        // S - The value of the symbol whose index resides in the relocation entry.
+        // P - The section offset or address of the storage unit being relocated, computed using r_offset.
+        case R_386_RELATIVE: // B + A
         {
-            printf("warning: unsupported rel type: %#x\n", type);
+            uintptr_t B = lib_base_address;
+            uintptr_t A = *memory;
+            *memory = B + A;
+            break;
+        }
+
+        case R_386_GLOB_DAT:
+        case R_386_JMP_SLOT: // S
+        {
+            uintptr_t S = lib_base_address + symbol->st_value;
+            *memory = S;
+            break;
+        }
+
+        case R_386_32: // S + A
+        {
+            uintptr_t S = lib_base_address + symbol->st_value;
+            uintptr_t A = *memory;
+
+            *memory = S + A;
+            break;
+        }
+
+        case R_386_PC32: // S + A - P
+        {
+            uintptr_t S = lib_base_address + symbol->st_value;
+            uintptr_t A = *memory;
+            uintptr_t P = ADDR(memory);
+
+            *memory = S + A - P;
+            break;
+        }
+
+        default:
+        {
+            printf("warning: unsupported rel type: %#x\n", ELF32_R_TYPE(rel->r_info));
+        }
+    }
+}
+
+void relocate_rel(dynamic_t* dynamic, uintptr_t base_address, list_head_t* missing_symbols)
+{
+    FOR_EACH(dynamic->rel,
+    {
+        elf32_sym_t* symbol = NULL;
+        int type = ELF32_R_TYPE(entry->r_info);
+
+        switch (type)
+        {
+            case R_386_32:
+            case R_386_PC32:
+            case R_386_GLOB_DAT:
+            {
+                symbol = SYMBOL(dynamic, entry);
+
+                if (!symbol->st_shndx)
+                {
+                    missing_symbol_add(
+                        DYNSTR(dynamic, symbol->st_name),
+                        symbol,
+                        entry,
+                        type,
+                        base_address,
+                        missing_symbols);
+                    continue;
+                }
+
+                FALLTHROUGH;
+            }
+
+            default:
+            {
+                relocate_symbol(symbol, entry, base_address, base_address);
+            }
+        }
+    });
+}
+
+void relocate_jmprel(dynamic_t* dynamic, uintptr_t base_address, list_head_t* missing_symbols)
+{
+    FOR_EACH(dynamic->jmprel,
+    {
+        int type = ELF32_R_TYPE(entry->r_info);
+
+        if (type != R_386_JMP_SLOT)
+        {
+            printf("warning: unsupported jmp rel type: %#x\n", type);
             continue;
         }
 
-        *(uintptr_t*)(rel.entries[i].r_offset + base_address) += base_address;
-    }
+        elf32_sym_t* symbol = SYMBOL(dynamic, entry);
+
+        if (!symbol->st_shndx)
+        {
+            missing_symbol_add(
+                DYNSTR(dynamic, symbol->st_name),
+                symbol,
+                entry,
+                type,
+                base_address,
+                missing_symbols);
+
+            continue;
+        }
+
+        relocate_symbol(symbol, entry, base_address, base_address);
+    });
+}
+
+static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_base, uintptr_t* brk_address)
+{
+    LIST_DECLARE(missing_symbols);
+
+    relocate_rel(dynamic, base_address, &missing_symbols);
+    relocate_jmprel(dynamic, base_address, &missing_symbols);
 
     lib_t* lib;
     list_for_each_entry(lib, &libs, list_entry)
@@ -103,27 +292,100 @@ static void link(dynamic_t* dynamic, int exec_fd, uintptr_t base_address)
         char path[128];
         elf32_phdr_t* phdr;
         elf32_header_t* header;
+        DYNAMIC_DECLARE(lib_dynamic);
 
-        sprintf(path, "/bin/%s", dynstr.read(&dynstr, lib->string_ndx));
+        sprintf(path, "/bin/%s", DYNSTR(dynamic, lib->string_ndx));
 
-        lib_fd = SYSCALL(open(path, O_RDONLY));
+        lib_fd = open(path, O_RDONLY);
+
+        if (UNLIKELY(lib_fd == -1))
+        {
+            perror(path);
+            exit(EXIT_FAILURE);
+        }
 
         header = alloc_read(lib_fd, sizeof(*header), 0);
         phdr = alloc_read(lib_fd, header->e_phentsize * header->e_phnum, header->e_phoff);
 
         phdr_print(phdr, header->e_phnum);
 
+        for (size_t i = 0; i < header->e_phnum; ++i)
+        {
+            elf32_phdr_t* p = &phdr[i];
+
+            switch (p->p_type)
+            {
+                case PT_LOAD:
+                {
+                    *brk_address = p->p_memsz + p->p_vaddr + lib_base;
+                    mmap_phdr(lib_fd, AUX_GET(AT_PAGESZ), p, p->p_flags & PF_X ? PF_W : 0, lib_base);
+                    break;
+                }
+
+                case PT_DYNAMIC:
+                {
+                    dynamic_read(lib_fd, p, &lib_dynamic);
+
+                    relocate_rel(&lib_dynamic, lib_base, &missing_symbols);
+                    relocate_jmprel(&lib_dynamic, lib_base, &missing_symbols);
+
+                    symbol_t* s;
+                    list_for_each_entry_safe(s, &missing_symbols, missing)
+                    {
+                        const elf32_sym_t* symbol = elf_lookup(&lib_dynamic, s->name);
+                        if (symbol)
+                        {
+                            relocate_symbol(symbol, s->rel, s->base_address, lib_base);
+                            DEBUG("resolved symbol: %s\n", s->name);
+                            list_del(&s->missing);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        for (size_t i = 0; i < header->e_phnum; ++i)
+        {
+            elf32_phdr_t* p = &phdr[i];
+
+            switch (p->p_type)
+            {
+                case PT_LOAD:
+                    if (p->p_flags & PF_X)
+                    {
+                        mprotect_phdr(lib_base, AUX_GET(AT_PAGESZ), 0, p);
+                    }
+                    lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, AUX_GET(AT_PAGESZ));
+                    break;
+            }
+        }
+
         close(lib_fd);
+    }
+
+    if (!list_empty(&missing_symbols))
+    {
+        printf("cannot load executable");
+        symbol_t* s;
+        list_for_each_entry(s, &missing_symbols, missing)
+        {
+            printf("cannot link %s\n", s->name);
+        }
+        exit(EXIT_FAILURE);
     }
 }
 
-static entry_t elf_load(elf32_auxv_t** auxv)
+static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* stack_ptr)
 {
     int exec_fd = 0;
     elf32_phdr_t* phdr = NULL;
     uintptr_t brk_address = 0;
     uintptr_t base_address = 0;
+    uintptr_t lib_base = 0;
     DYNAMIC_DECLARE(dynamic);
+
+    debug = !!getenv("L");
 
     auxv_read(auxv);
 
@@ -135,25 +397,32 @@ static entry_t elf_load(elf32_auxv_t** auxv)
 
     for (size_t i = 0; i < AUX_GET(AT_PHNUM); ++i)
     {
-        switch (phdr[i].p_type)
+        elf32_phdr_t* p = &phdr[i];
+
+        switch (p->p_type)
         {
             case PT_DYNAMIC:
-                dynamic.entries = alloc_read(exec_fd, dynamic.size = phdr[i].p_filesz, phdr[i].p_offset);
-                dynamic.count = dynamic.size / sizeof(elf32_dyn_t);
+            {
+                dynamic_read(exec_fd, p, &dynamic);
                 break;
+            }
 
             case PT_LOAD:
-                brk_address = phdr[i].p_memsz + phdr[i].p_vaddr + base_address;
+            {
+                brk_address = p->p_memsz + p->p_vaddr + base_address;
 
                 // Allow writing over segment to perform relocations
                 if (phdr[i].p_flags & PF_X)
                 {
-                    mprotect_phdr(base_address, AUX_GET(AT_PAGESZ), PROT_WRITE, &phdr[i]);
+                    mprotect_phdr(base_address, AUX_GET(AT_PAGESZ), PF_W, p);
                 }
+                lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + base_address, AUX_GET(AT_PAGESZ));
+                break;
+            }
         }
     }
 
-    link(&dynamic, exec_fd, AUX_GET(AT_BASE));
+    link(&dynamic, exec_fd, AUX_GET(AT_BASE), lib_base, &brk_address);
 
     for (size_t i = 0; i < AUX_GET(AT_PHNUM); ++i)
     {
@@ -167,22 +436,21 @@ static entry_t elf_load(elf32_auxv_t** auxv)
     close(exec_fd);
     brk((void*)brk_address);
 
-    return (entry_t)AUX_GET(AT_ENTRY);
+    // Load original stack ptr so the executable will
+    // see argc, argv, envp as was setup by kernel
+    // and jump to the entry
+    asm volatile(
+        "mov %1, %%esp;"
+        "jmp *%0"
+        :: "r" (AUX_GET(AT_ENTRY)), "r" (stack_ptr)
+        : "memory");
+
+    while (1);
 }
 
 __attribute__((noreturn)) int main(int argc, char*[], char* envp[])
 {
-    debug = !!getenv("L");
-
-    entry_t entry = elf_load(SHIFT_AS(elf32_auxv_t**, &envp, 4));
-
-    asm volatile(
-        "mov %1, %%esp;"
-        "jmp *%0"
-        :: "r" (entry), "r" (&argc)
-        : "memory");
-
-    while (1);
+    loader_main(SHIFT_AS(elf32_auxv_t**, &envp, 4), &argc);
 }
 
 __attribute__((naked,noreturn,used)) int _start()

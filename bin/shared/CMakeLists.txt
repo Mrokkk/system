@@ -1,5 +1,3 @@
-set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "-rdynamic")
-
 add_application(
     main.c
 )
@@ -11,6 +9,9 @@ target_compile_options(shared PRIVATE
 )
 
 add_library(test2 SHARED test.c)
+
+target_compile_options(test2 PRIVATE -fdata-sections -ffunction-sections)
+target_link_libraries(test2 c -Wl,-gc-sections)
 
 target_link_libraries(shared
     -pie

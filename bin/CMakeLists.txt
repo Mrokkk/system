@@ -16,8 +16,10 @@ function(add_application)
 
     get_filename_component(name ${CMAKE_CURRENT_SOURCE_DIR} NAME)
     add_executable(${name} ${ARGN})
-    target_compile_options(${name} PRIVATE -fdata-sections -ffunction-sections)
-    target_link_libraries(${name} c -Wl,-gc-sections)
+
+    target_compile_options(${name} PRIVATE -fdata-sections -ffunction-sections -nostdlib -pie -fPIC -fpie)
+    target_link_libraries(${name} c_s -Wl,-gc-sections -Wl,-nostdlib -pie)
+
     add_dependencies(rootfs ${name})
     add_dependencies(${name} libc_install)
 

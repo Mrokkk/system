@@ -146,7 +146,7 @@ void LIBC(perror)(const char* s)
 
     if (UNLIKELY(!error))
     {
-        fprintf(stderr, "internal libc error; errors=0x%x errors[%d]=0x%x\n",
+        fprintf(stderr, "internal libc error; errors=%p errors[%d]=%p\n",
             errors, e, errors[e]);
     }
 
