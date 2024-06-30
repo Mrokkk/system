@@ -20,8 +20,12 @@ def build_gdb_args(app : str, text_start : str) -> List[str]:
         '-ex', 'symbol-file system',
         '-ex', 'target remote localhost:9000',
     ]
+
     if app:
         a.extend(['-ex', f'add-symbol-file {app} {text_start}'])
+
+    a.extend(['-x', '../scripts/kernel.gdb'])
+
     return a
 
 
@@ -54,7 +58,7 @@ def main() -> None:
         text_start = text_start_get(app) + 0x1000
     elif args.port:
         app = f'mnt/bin/{args.port}'
-        text_start = text_start_get(app)
+        text_start = text_start_get(app) + 0x1000
 
     gdb = subprocess.Popen(
         build_gdb_args(app, text_start),

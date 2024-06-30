@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <kernel/ksyms.h>
-#include <kernel/usyms.h>
+#include <kernel/limits.h>
 
 #define BACKTRACE_MAX_RECURSION 32
 #define BACKTRACE_SYMNAME_LEN   128
@@ -15,11 +15,21 @@ typedef struct stack_frame
     void* ret;
 } stack_frame_t;
 
+struct user_address
+{
+    uint32_t vaddr;
+    uint32_t file_offset;
+    char path[PATH_MAX];
+};
+
+typedef struct user_address user_address_t;
+
 void* backtrace_start(void);
 void* backtrace_next(void** data);
 
 void* backtrace_user_start(struct process* p, uint32_t eip, uint32_t esp, uint32_t ebp);
-void* backtrace_user_next(void** data);
+void* backtrace_user_next(void** data, user_address_t* addr);
+void backtrace_user_format(user_address_t* addr, char* buffer);
 
 size_t do_backtrace_process(struct process* p, void** buffer, size_t count);
 void backtrace_exception(struct pt_regs* regs);
@@ -63,18 +73,21 @@ void backtrace_exception(struct pt_regs* regs);
     } while (0)
 
 // FIXME: there's a leak of struct bt_data when BACKTRACE_MAX_RECURSION is hit
-#define backtrace_user(log_fn, regs, syms, ...) \
+#define backtrace_user(log_fn, regs, ...) \
     do \
     { \
         char buffer[BACKTRACE_SYMNAME_LEN]; \
-        void* data = backtrace_user_start(process_current, (regs)->eip, (regs)->esp, (regs)->ebp); \
-        void* ret; \
-        unsigned depth = 0; \
         log_fn(__VA_ARGS__ "backtrace: "); \
-        while ((ret = backtrace_user_next(&data)) && depth < BACKTRACE_MAX_RECURSION) \
+        user_address_t __addr; \
+        void* data = backtrace_user_start(process_current, (regs)->eip, (regs)->esp, (regs)->ebp); \
+        if (data) \
         { \
-            usym_string(buffer, addr(ret), syms); \
-            log_fn(__VA_ARGS__ "%s", buffer); \
-            ++depth; \
+            unsigned depth = 0; \
+            while ((backtrace_user_next(&data, &__addr)) && depth < BACKTRACE_MAX_RECURSION) \
+            { \
+                backtrace_user_format(&__addr, buffer); \
+                log_fn(__VA_ARGS__ "%s", buffer); \
+                ++depth; \
+            } \
         } \
     } while (0)

@@ -410,7 +410,7 @@ int trace_syscall(unsigned long nr, ...)
     if (DEBUG_BTUSER)
     {
         const pt_regs_t* regs = ptr_get(addr(&nr));
-        backtrace_user(log_info, regs, page_virt_ptr(process_current->bin->symbols_pages), "\t");
+        backtrace_user(log_info, regs, "\t");
     }
 
     irq_restore(flags);

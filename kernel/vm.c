@@ -28,6 +28,7 @@ vm_area_t* vm_create(uint32_t vaddr, uint32_t size, int vm_flags)
     vma->inode = NULL;
     vma->next = NULL;
     vma->prev = NULL;
+    vma->offset = 0;
 
     return vma;
 }
@@ -80,9 +81,11 @@ int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, cons
 {
     // Copy vm_area except for next and prev
     memcpy(dest_vma, src_vma, sizeof(vm_area_t) - 2 * sizeof(struct vm_area*));
+
     dest_vma->next = NULL;
     dest_vma->prev = NULL;
     dest_vma->pages->refcount++;
+    dest_vma->vm_flags |= VM_COW;
 
     return arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end);
 }
@@ -118,6 +121,7 @@ int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd)
     vma->pages->refcount = 1;
     list_init(&vma->pages->head);
     list_merge(&vma->pages->head, &page_range->list_entry);
+    vma->vm_flags &= ~VM_COW;
 
     return arch_vm_copy_on_write(vma, pgd, page_range);
 }

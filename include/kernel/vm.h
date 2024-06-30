@@ -14,6 +14,7 @@ typedef struct vm_area vm_area_t;
 #define VM_EXEC         0x00000004
 #define VM_SHARED       0x00000008
 #define VM_IO           0x00000010
+#define VM_COW          0x00000020
 
 struct vm_area
 {
@@ -21,6 +22,7 @@ struct vm_area
     uint32_t      start, end;
     int           vm_flags;
     struct inode* inode;
+    uint32_t      offset; // offset within inode
     vm_area_t*    next;
     vm_area_t*    prev;
 };
@@ -112,6 +114,9 @@ static inline char* vm_flags_string(char* buffer, int vm_flags)
     return buffer;
 }
 
+#define vm_for_each(vma, vm_areas) \
+    for (vma = vm_areas; vma; vma = vma->next)
+
 #define vm_print_single(vma, flag) \
     if (flag) \
     { \
@@ -153,13 +158,14 @@ static inline char* vm_flags_string(char* buffer, int vm_flags)
             for (vm_area_t* vma = orig_vma; vma; vma = vma->next) \
             { \
                 char buf[5]; \
-                log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x refcount=%u]", \
+                log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x off=%08x refcount=%u]", \
                     vma, \
                     vma->start, \
                     vma->end, \
                     vma->end - vma->start, \
                     vm_flags_string(buf, vma->vm_flags), \
                     vma->inode, \
+                    vma->offset, \
                     vma->pages->refcount); \
             } \
         } while(0); \

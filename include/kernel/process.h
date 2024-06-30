@@ -5,7 +5,6 @@
 #include <kernel/page.h>
 #include <kernel/wait.h>
 #include <kernel/mutex.h>
-#include <kernel/usyms.h>
 #include <kernel/binary.h>
 #include <kernel/dentry.h>
 #include <kernel/kernel.h>
@@ -378,10 +377,6 @@ static inline void process_bin_exit(struct process* p)
 
     if (!--bin->count)
     {
-        if (bin->symbols_pages)
-        {
-            pages_free(bin->symbols_pages);
-        }
         delete(bin);
     }
 }

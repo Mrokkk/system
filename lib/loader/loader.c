@@ -418,6 +418,7 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
     // see argc, argv, envp as was setup by kernel
     // and jump to the entry
     asm volatile(
+        "mov $0, %%ebp;"
         "mov %1, %%esp;"
         "jmp *%0"
         :: "r" (AUX_GET(AT_ENTRY)), "r" (stack_ptr)

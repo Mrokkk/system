@@ -12,7 +12,6 @@ struct binary
     int count;
     void* entry;
     struct inode* inode;
-    page_t* symbols_pages;
     unsigned int brk;
     vm_area_t* stack_vma;
 };

@@ -161,14 +161,12 @@ class Addr2Line:
 class Context:
     addr2lines : Dict[str, Addr2Line]
     bt_number  : int
-    last_app   : str
     exceptions : List[str]
     args       : argparse.Namespace
 
     def __init__(self, args : argparse.Namespace) -> None:
         self.addr2lines = {}
         self.bt_number = 0
-        self.last_app = None
         self.exceptions = []
         self.args = args
 
@@ -229,51 +227,55 @@ def line_print(line : str) -> None:
                 pass
 
 
+def backtrace_print(addr: str, binary : str, timestamp : str, context : Context) -> None:
+    try:
+        addr2line = context.addr2line(binary)
+
+        entries = addr2line.resolve(addr)
+
+        if len(entries) == 0:
+            raise Exception(f'No entries given for {binary} at {addr}')
+
+        for func, file, linenr in entries:
+            context.bt_number += 1
+
+            stacktrace_line = gdb_stacktrace_line(timestamp, context.bt_number, addr, func, file, linenr)
+            line_print(stacktrace_line)
+
+    except Exception as e:
+        id = exception_save(context)
+        line_print(f'>> Internal exception #{id} encountered for {binary} at {addr}')
+
+
+
 def line_process(line : str, context : Context) -> None:
 
     if 'backtrace:' in line:
         context.bt_number = 0
         line_print(line)
 
-    elif '/bin' in line:
-        match = re.search(r'\/bin\/(.*)\[[0-9]*\]:', line)
+    elif match := re.search(r'USER:([x0-9a-f]*) ([x0-9a-f]*) (.*):', line):
+        # FIXME: how to properly detect non-dynamic executable
+        # and print both addresses as the same in kernel?
+        if 'ld.so' in line:
+            addr = match.group(1)
+        else:
+            addr = match.group(2)
 
-        if match:
-            app = match.group(1)
-            context.last_app = f'mnt/bin/{app}'
+        binary = f'mnt{match.group(3)}'
+        splitted = re.split('USER:', line)
+        timestamp = splitted[0]
 
-        line_print(line)
+        backtrace_print(addr, binary, timestamp, context)
 
     # Format of backtrace printed by kernel:
     # [       2.767291] [<0x0000baf2>] __libc_strcspn+0x52/0x94
     elif '[<' in line:
         splitted = re.split('[<>]', line)
         addr = splitted[1]
-        binary : str = None
+        binary = 'system'
 
-        try:
-            if int(addr, 16) > 0xc0100000:
-                binary = 'system'
-            elif context.last_app:
-                binary = context.last_app
-
-            addr2line = context.addr2line(binary)
-
-            timestamp = splitted[0][:-1]
-            entries = addr2line.resolve(addr)
-
-            if len(entries) == 0:
-                raise Exception(f'No entries given for {binary} at {addr}')
-
-            for func, file, linenr in entries:
-                context.bt_number += 1
-
-                stacktrace_line = gdb_stacktrace_line(timestamp, context.bt_number, addr, func, file, linenr)
-                line_print(stacktrace_line)
-
-        except Exception as e:
-            id = exception_save(context)
-            line_print(f'>> Internal exception #{id} encountered for {binary} at {addr}')
+        backtrace_print(addr, binary, splitted[0][:-1], context)
 
     elif '(qemu)' in line:
         line_print(line)

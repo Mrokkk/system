@@ -1,7 +1,6 @@
 #include <kernel/vm.h>
 #include <kernel/init.h>
 #include <kernel/ksyms.h>
-#include <kernel/usyms.h>
 #include <kernel/reboot.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
@@ -148,7 +147,7 @@ void do_exception(uint32_t nr, struct pt_regs regs)
         vm_area_t* area = vm_find(cr2, process_current->mm->vm_areas);
         if (area && area->vm_flags & VM_WRITE)
         {
-            log_debug(DEBUG_EXCEPTION, "%s: COW at %x caused by %x",
+            log_debug(DEBUG_EXCEPTION, "%s: COW at %x caused by write to %x",
                 header,
                 regs.eip,
                 cr2);
@@ -180,7 +179,7 @@ void do_exception(uint32_t nr, struct pt_regs regs)
 
     if (DEBUG_BTUSER || is_bash)
     {
-        backtrace_user(log_notice, &regs, page_virt_ptr(process_current->bin->symbols_pages));
+        backtrace_user(log_notice, &regs);
     }
 
     vm_print_short(process_current->mm->vm_areas, DEBUG_EXCEPTION);

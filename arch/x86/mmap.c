@@ -120,6 +120,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     if (flags & MAP_ANONYMOUS)
     {
         vma->inode = NULL;
+        vma->offset = 0;
     }
     else
     {
@@ -137,7 +138,8 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
             goto free_pages;
         }
 
-        vma->inode = prot & PROT_WRITE ? NULL : file->inode;
+        vma->inode = /*prot & PROT_WRITE ? NULL :*/ file->inode;
+        vma->offset = offset;
     }
 
     if (prot & PROT_EXEC)

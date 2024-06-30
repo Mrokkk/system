@@ -61,6 +61,11 @@ static int shell_run(const char* pathname)
     int child_pid;
     char* const argv[] = {(char*)pathname, NULL};
 
+    setenv("PATH", "/bin", 0);
+    setenv("SHELL", pathname, 0);
+    setenv("HOME", "/root", 0);
+    setenv("LC_ALL", "C", 0);
+
     if ((child_pid = fork()) < 0)
     {
         perror("fork");
@@ -73,11 +78,6 @@ static int shell_run(const char* pathname)
             perror("setsid");
             exit(EXIT_FAILURE);
         }
-
-        setenv("PATH", "/bin", 0);
-        setenv("SHELL", pathname, 0);
-        setenv("HOME", "/root", 0);
-        setenv("LC_ALL", "C", 0);
 
         if (execvp(pathname, argv))
         {
