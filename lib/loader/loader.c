@@ -9,7 +9,6 @@
 #include <sys/mman.h>
 #include <kernel/api/elf.h>
 
-#include "lib.h"
 #include "elf.h"
 #include "list.h"
 
@@ -60,7 +59,7 @@ static void auxv_read(elf32_auxv_t** vec)
     AUX_VERIFY(AT_BASE, 0);
 }
 
-static void dynamic_store(dynamic_t* dynamic)
+static void dynamic_store(dynamic_t* dynamic, list_head_t* libs)
 {
     FOR_EACH(*dynamic,
     {
@@ -73,7 +72,7 @@ static void dynamic_store(dynamic_t* dynamic)
                 lib_t* lib = ALLOC(malloc(sizeof(*lib)));
                 list_init(&lib->list_entry);
                 lib->string_ndx = value;
-                list_add_tail(&lib->list_entry, &libs);
+                list_add_tail(&lib->list_entry, libs);
                 break;
             }
             STORE(DT_REL, dynamic->rel.offset);
@@ -90,7 +89,7 @@ static void dynamic_store(dynamic_t* dynamic)
     });
 }
 
-elf32_sym_t* elf_lookup(dynamic_t* dynamic, const char* symname)
+static elf32_sym_t* elf_lookup(dynamic_t* dynamic, const char* symname)
 {
     uint32_t hash = elf_hash(symname);
 
@@ -116,12 +115,12 @@ elf32_sym_t* elf_lookup(dynamic_t* dynamic, const char* symname)
     return NULL;
 }
 
-static void dynamic_read(int exec_fd, elf32_phdr_t* p, dynamic_t* dynamic)
+static void dynamic_read(int exec_fd, elf32_phdr_t* p, dynamic_t* dynamic, list_head_t* libs)
 {
     dynamic->entries = alloc_read(exec_fd, dynamic->size = p->p_filesz, p->p_offset);
     dynamic->count = dynamic->size / sizeof(elf32_dyn_t);
 
-    dynamic_store(dynamic);
+    dynamic_store(dynamic, libs);
 
     dynamic->symtab.count = (dynamic->dynstr.offset - dynamic->symtab.offset) / dynamic->symtab.entsize;
     dynamic->symtab.entries = alloc_read(exec_fd, dynamic->dynstr.offset - dynamic->symtab.offset, dynamic->symtab.offset);
@@ -141,6 +140,9 @@ static void dynamic_read(int exec_fd, elf32_phdr_t* p, dynamic_t* dynamic)
 static void missing_symbol_add(const char* name, elf32_sym_t* symbol, elf32_rel_t* rel, int type, uintptr_t base_address, list_head_t* missing_symbols)
 {
     symbol_t* missing = ALLOC(malloc(sizeof(*missing)));
+
+    DEBUG("adding missing symbol %s\n", name);
+
     list_init(&missing->missing);
     missing->name = name;
     missing->base_address = base_address;
@@ -150,7 +152,7 @@ static void missing_symbol_add(const char* name, elf32_sym_t* symbol, elf32_rel_
     list_add_tail(&missing->missing, missing_symbols);
 }
 
-static void relocate_symbol(
+static void symbol_relocate(
     const elf32_sym_t* symbol,
     const elf32_rel_t* rel,
     uintptr_t base_address, // base address of the binary where symbol is needed
@@ -209,9 +211,9 @@ static void relocate_symbol(
     }
 }
 
-void relocate_rel(dynamic_t* dynamic, uintptr_t base_address, list_head_t* missing_symbols)
+static void relocate(rel_t* rel, dynamic_t* dynamic, uintptr_t base_address, list_head_t* missing_symbols)
 {
-    FOR_EACH(dynamic->rel,
+    FOR_EACH(*rel,
     {
         elf32_sym_t* symbol = NULL;
         int type = ELF32_R_TYPE(entry->r_info);
@@ -221,6 +223,7 @@ void relocate_rel(dynamic_t* dynamic, uintptr_t base_address, list_head_t* missi
             case R_386_32:
             case R_386_PC32:
             case R_386_GLOB_DAT:
+            case R_386_JMP_SLOT:
             {
                 symbol = SYMBOL(dynamic, entry);
 
@@ -241,49 +244,32 @@ void relocate_rel(dynamic_t* dynamic, uintptr_t base_address, list_head_t* missi
 
             default:
             {
-                relocate_symbol(symbol, entry, base_address, base_address);
+                symbol_relocate(symbol, entry, base_address, base_address);
             }
         }
     });
 }
 
-void relocate_jmprel(dynamic_t* dynamic, uintptr_t base_address, list_head_t* missing_symbols)
+static void missing_symbols_verify(list_head_t* missing_symbols)
 {
-    FOR_EACH(dynamic->jmprel,
+    if (!list_empty(missing_symbols))
     {
-        int type = ELF32_R_TYPE(entry->r_info);
-
-        if (type != R_386_JMP_SLOT)
+        symbol_t* s;
+        printf("cannot load executable");
+        list_for_each_entry(s, missing_symbols, missing)
         {
-            printf("warning: unsupported jmp rel type: %#x\n", type);
-            continue;
+            printf("cannot link %s\n", s->name);
         }
-
-        elf32_sym_t* symbol = SYMBOL(dynamic, entry);
-
-        if (!symbol->st_shndx)
-        {
-            missing_symbol_add(
-                DYNSTR(dynamic, symbol->st_name),
-                symbol,
-                entry,
-                type,
-                base_address,
-                missing_symbols);
-
-            continue;
-        }
-
-        relocate_symbol(symbol, entry, base_address, base_address);
-    });
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_base, uintptr_t* brk_address)
 {
     LIST_DECLARE(missing_symbols);
 
-    relocate_rel(dynamic, base_address, &missing_symbols);
-    relocate_jmprel(dynamic, base_address, &missing_symbols);
+    relocate(&dynamic->rel, dynamic, base_address, &missing_symbols);
+    relocate(&dynamic->jmprel, dynamic, base_address, &missing_symbols);
 
     lib_t* lib;
     list_for_each_entry(lib, &libs, list_entry)
@@ -293,6 +279,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
         elf32_phdr_t* phdr;
         elf32_header_t* header;
         DYNAMIC_DECLARE(lib_dynamic);
+        LIST_DECLARE(lib_libs);
 
         sprintf(path, "/bin/%s", DYNSTR(dynamic, lib->string_ndx));
 
@@ -324,18 +311,18 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
 
                 case PT_DYNAMIC:
                 {
-                    dynamic_read(lib_fd, p, &lib_dynamic);
+                    dynamic_read(lib_fd, p, &lib_dynamic, &lib_libs);
 
-                    relocate_rel(&lib_dynamic, lib_base, &missing_symbols);
-                    relocate_jmprel(&lib_dynamic, lib_base, &missing_symbols);
+                    relocate(&lib_dynamic.rel, &lib_dynamic, lib_base, &missing_symbols);
+                    relocate(&lib_dynamic.jmprel, &lib_dynamic, lib_base, &missing_symbols);
 
                     symbol_t* s;
                     list_for_each_entry_safe(s, &missing_symbols, missing)
                     {
                         const elf32_sym_t* symbol = elf_lookup(&lib_dynamic, s->name);
-                        if (symbol)
+                        if (symbol && symbol->st_shndx)
                         {
-                            relocate_symbol(symbol, s->rel, s->base_address, lib_base);
+                            symbol_relocate(symbol, s->rel, s->base_address, lib_base);
                             DEBUG("resolved symbol: %s\n", s->name);
                             list_del(&s->missing);
                         }
@@ -364,16 +351,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
         close(lib_fd);
     }
 
-    if (!list_empty(&missing_symbols))
-    {
-        printf("cannot load executable");
-        symbol_t* s;
-        list_for_each_entry(s, &missing_symbols, missing)
-        {
-            printf("cannot link %s\n", s->name);
-        }
-        exit(EXIT_FAILURE);
-    }
+    missing_symbols_verify(&missing_symbols);
 }
 
 static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* stack_ptr)
@@ -403,7 +381,7 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
         {
             case PT_DYNAMIC:
             {
-                dynamic_read(exec_fd, p, &dynamic);
+                dynamic_read(exec_fd, p, &dynamic, &libs);
                 break;
             }
 
@@ -456,7 +434,6 @@ __attribute__((noreturn)) int main(int argc, char*[], char* envp[])
 __attribute__((naked,noreturn,used)) int _start()
 {
     asm volatile(
-        "call bss_init;"
         "call __libc_start_main;"
         "call main;");
 }

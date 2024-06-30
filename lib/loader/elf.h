@@ -8,13 +8,14 @@
 #include "list.h"
 #include "loader.h"
 
+typedef struct lib lib_t;
 typedef struct rel rel_t;
 typedef struct auxv auxv_t;
 typedef struct hash hash_t;
 typedef struct strtab strtab_t;
+typedef struct symbol symbol_t;
 typedef struct symtab symtab_t;
 typedef struct dynamic dynamic_t;
-typedef struct symbol symbol_t;
 
 struct auxv
 {
@@ -81,6 +82,13 @@ struct symbol
     elf32_rel_t* rel;
     uintptr_t base_address;
     list_head_t missing;
+};
+
+struct lib
+{
+    const char* name;
+    uintptr_t string_ndx;
+    list_head_t list_entry;
 };
 
 #define FOR_EACH(x, ...) \
