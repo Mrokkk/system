@@ -19,6 +19,7 @@ function build()
             --disable-bootstrap \
             --enable-checking=release \
             --enable-shared \
+            --enable-default-pie \
             --enable-host-shared \
             --with-system-zlib || die "configuration failed"
     fi

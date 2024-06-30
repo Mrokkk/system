@@ -11,6 +11,7 @@ function build()
             --target="${TARGET}" \
             --with-sysroot="${SYSROOT}" \
             --enable-shared \
+            --enable-default-pie \
             --disable-nls \
             --disable-gdb \
             --disable-gdbserver \
