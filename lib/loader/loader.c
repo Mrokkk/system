@@ -14,6 +14,8 @@
 
 // References:
 // https://docs.oracle.com/cd/E18752_01/html/817-1984/chapter6-14428.html
+// https://flapenguin.me/elf-dt-hash
+// https://www.sco.com/developers/devspecs/abi386-4.pdf
 
 int debug;
 static auxv_t saved_auxv = {
@@ -26,7 +28,7 @@ static LIST_DECLARE(libs);
 
 #define AUX_STORE(a) \
     case a: \
-        saved_auxv._##a = aux[i].a_un.a_val; break
+        saved_auxv._##a = (typeof(saved_auxv._##a))aux[i].a_un.a_val; break
 
 #define AUX_VERIFY(a, bad_value) \
     do { if (UNLIKELY(saved_auxv._##a == bad_value)) die("missing " #a); } while (0)
@@ -47,6 +49,7 @@ static void auxv_read(elf32_auxv_t** vec)
             AUX_STORE(AT_PAGESZ);
             AUX_STORE(AT_PHNUM);
             AUX_STORE(AT_ENTRY);
+            AUX_STORE(AT_EXECFN);
             AUX_STORE(AT_BASE);
         }
     }
@@ -57,6 +60,7 @@ static void auxv_read(elf32_auxv_t** vec)
     AUX_VERIFY(AT_PHNUM, 0);
     AUX_VERIFY(AT_ENTRY, 0);
     AUX_VERIFY(AT_BASE, 0);
+    AUX_VERIFY(AT_EXECFN, 0);
 }
 
 static void dynamic_store(dynamic_t* dynamic, list_head_t* libs)
@@ -255,10 +259,10 @@ static void missing_symbols_verify(list_head_t* missing_symbols)
     if (!list_empty(missing_symbols))
     {
         symbol_t* s;
-        printf("cannot load executable");
+        printf("%s: cannot load executable\n", AUX_GET(AT_EXECFN));
         list_for_each_entry(s, missing_symbols, missing)
         {
-            printf("cannot link %s\n", s->name);
+            printf("  missing symbol %s\n", s->name);
         }
         exit(EXIT_FAILURE);
     }

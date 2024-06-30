@@ -312,11 +312,11 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
 
     memcpy(phdr_mapped, phdr, header->e_phentsize * header->e_phnum);
 
-    if (aux_insert(AT_ENTRY, addr(bin->entry), argvecs) ||
-        aux_insert(AT_PHDR, addr(phdr_mapped), argvecs) ||
-        aux_insert(AT_PHENT, header->e_phentsize, argvecs) ||
-        aux_insert(AT_BASE, base, argvecs) ||
-        aux_insert(AT_PHNUM, header->e_phnum, argvecs))
+    if (!aux_insert(AT_ENTRY, addr(bin->entry), argvecs) ||
+        !aux_insert(AT_PHDR, addr(phdr_mapped), argvecs) ||
+        !aux_insert(AT_PHENT, header->e_phentsize, argvecs) ||
+        !aux_insert(AT_BASE, base, argvecs) ||
+        !aux_insert(AT_PHNUM, header->e_phnum, argvecs))
     {
         return -ENOMEM;
     }

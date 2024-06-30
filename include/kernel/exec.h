@@ -8,9 +8,9 @@
 
 typedef struct arg arg_t;
 typedef struct aux aux_t;
-typedef struct argvec argvec_t;
-
 typedef struct binfmt binfmt_t;
+typedef struct argvec argvec_t;
+typedef struct aux_data aux_data_t;
 
 struct arg
 {
@@ -24,6 +24,15 @@ struct aux
     int type;
     uintptr_t value;
     list_head_t list_entry;
+    uintptr_t* ptr;
+};
+
+struct aux_data
+{
+    size_t size;
+    const void* data;
+    list_head_t list_entry;
+    aux_t* aux;
 };
 
 struct argvec
@@ -33,7 +42,7 @@ struct argvec
     size_t size;
 };
 
-typedef argvec_t argvecs_t[3];
+typedef argvec_t argvecs_t[4];
 
 struct binfmt
 {
@@ -46,19 +55,24 @@ struct binfmt
     list_head_t list_entry;
 };
 
-#define ARGV 0
-#define ENVP 1
-#define AUXV 2
+#define ARGV     0
+#define ENVP     1
+#define AUXV     2
+#define AUX_DATA 3
 
 #define ARGVECS_DECLARE(name) \
     argvecs_t name = { \
-        {.head = LIST_INIT(name[0].head)}, \
-        {.head = LIST_INIT(name[1].head)}, \
-        {.head = LIST_INIT(name[2].head)}, \
+        [ARGV] = {.head = LIST_INIT(name[ARGV].head)}, \
+        [ENVP] = {.head = LIST_INIT(name[ENVP].head)}, \
+        [AUXV] = {.head = LIST_INIT(name[AUXV].head)}, \
+        [AUX_DATA] = {.head = LIST_INIT(name[AUX_DATA].head)}, \
     }
 
 #define ARGVECS_SIZE(name) \
-    ({ align((name)[ARGV].size + (name)[ENVP].size + (name)[AUXV].size, sizeof(uintptr_t)); })
+    ({ \
+        align((name)[ARGV].size + (name)[ENVP].size + (name)[AUXV].size, sizeof(uintptr_t)) + \
+        align((name)[AUX_DATA].size, sizeof(uintptr_t)); \
+    })
 
 int binfmt_register(binfmt_t* binfmt);
 
@@ -83,4 +97,4 @@ static inline int argv_insert(const char* string, const size_t len, argvecs_t ar
     return arg_insert(string, len, &argvecs[ARGV], flag);
 }
 
-int aux_insert(int type, uintptr_t value, argvecs_t argvecs);
+aux_t* aux_insert(int type, uintptr_t value, argvecs_t argvecs);

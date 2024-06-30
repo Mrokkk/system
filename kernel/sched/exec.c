@@ -55,15 +55,16 @@ free_interpreter:
     return errno;
 }
 
-int aux_insert(int type, uintptr_t value, argvecs_t argvecs)
+aux_t* aux_insert(int type, uintptr_t value, argvecs_t argvecs)
 {
     aux_t* aux = fmalloc(sizeof(aux_t));
 
     if (unlikely(!aux))
     {
-        return -ENOMEM;
+        return NULL;
     }
 
+    aux->ptr = NULL;
     aux->type = type;
     aux->value = value;
     list_init(&aux->list_entry);
@@ -73,7 +74,36 @@ int aux_insert(int type, uintptr_t value, argvecs_t argvecs)
 
     list_add_tail(&aux->list_entry, &argvecs[AUXV].head);
 
-    return 0;
+    return aux;
+}
+
+aux_t* aux_data_insert(int type, const void* data_ptr, size_t size, argvecs_t argvecs)
+{
+    aux_t* aux = aux_insert(type, 0, argvecs);
+
+    if (unlikely(!aux))
+    {
+        return NULL;
+    }
+
+    aux_data_t* data = fmalloc(sizeof(*data));
+
+    if (unlikely(!data))
+    {
+        return NULL;
+    }
+
+    data->data = data_ptr;
+    data->size = size;
+    data->aux = aux;
+    list_init(&data->list_entry);
+
+    argvecs[AUX_DATA].size += data->size;
+    argvecs[AUX_DATA].count++;
+
+    list_add_tail(&data->list_entry, &argvecs[AUX_DATA].head);
+
+    return aux;
 }
 
 int arg_insert(const char* string, const size_t len, argvec_t* argvec, int flag)
@@ -126,9 +156,6 @@ static int args_get(const char* const vec[], bool has_count, argvec_t* argvec)
     return 0;
 }
 
-// args_put - free allocated argvec
-//
-// @argvec - vector to free
 static void args_put(argvec_t* argvec)
 {
     arg_t* arg;
@@ -138,9 +165,6 @@ static void args_put(argvec_t* argvec)
     }
 }
 
-// auxs_put - free allocated auxv
-//
-// @argvec - vector to free
 static void auxs_put(argvec_t* argvec)
 {
     aux_t* aux;
@@ -148,6 +172,23 @@ static void auxs_put(argvec_t* argvec)
     {
         ffree(aux, sizeof(aux_t));
     }
+}
+
+static void aux_data_put(argvec_t* argvec)
+{
+    aux_data_t* aux;
+    list_for_each_entry_safe(aux, &argvec->head, list_entry)
+    {
+        ffree(aux, sizeof(*aux));
+    }
+}
+
+static void argvecs_put(argvecs_t argvecs)
+{
+    args_put(&argvecs[ARGV]);
+    args_put(&argvecs[ENVP]);
+    auxs_put(&argvecs[AUXV]);
+    aux_data_put(&argvecs[AUX_DATA]);
 }
 
 // Memory layout of stack:
@@ -181,12 +222,15 @@ static void auxs_put(argvec_t* argvec)
 // | ...        |
 // +------------+ variable
 // | auxv[auxn] |
+// +------------+ variable
+// | aux data   |
 // +------------+ <- bottom
-static void* argvecs_copy_to_user(uint32_t* dest, argvecs_t argvecs)
+static void argvecs_copy_to_user(uint32_t* dest, argvecs_t argvecs)
 {
     char* strings;
     arg_t* arg;
     aux_t* aux;
+    aux_data_t* data;
     uintptr_t* temp;
     uintptr_t* vec[3];
 
@@ -220,13 +264,18 @@ static void* argvecs_copy_to_user(uint32_t* dest, argvecs_t argvecs)
     list_for_each_entry(aux, &argvecs[AUXV].head, list_entry)
     {
         *temp++ = aux->type;
+        aux->ptr = temp;
         *temp++ = aux->value;
     }
 
     *temp++ = 0;
     *temp++ = 0;
 
-    return temp;
+    list_for_each_entry(data, &argvecs[AUX_DATA].head, list_entry)
+    {
+        *data->aux->ptr = addr(temp);
+        memcpy(temp, data->data, data->size);
+    }
 }
 
 static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argvecs)
@@ -307,9 +356,9 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
                 return errno;
             }
 
-            if (unlikely(errno = aux_insert(AT_EXECFD, fd, argvecs)))
+            if (unlikely(!aux_insert(AT_EXECFD, fd, argvecs)))
             {
-                return errno;
+                return -ENOMEM;
             }
 
             binfmt->cleanup(data);
@@ -337,6 +386,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     char copied_path[PATH_MAX];
     int errno;
     uint32_t user_stack;
+    aux_t* execfn;
     struct process* p = process_current;
     ARGVECS_DECLARE(argvec);
 
@@ -360,9 +410,12 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     args_get(argv, true, &argvec[ARGV]);
     args_get(envp, false, &argvec[ENVP]);
+
     argvec[AUXV].size = sizeof(void*) + 2 * sizeof(uint32_t);
 
-    if (aux_insert(AT_PAGESZ, PAGE_SIZE, argvec))
+    execfn = aux_data_insert(AT_EXECFN, copied_path, strlen(copied_path) + 1, argvec);
+
+    if (!aux_insert(AT_PAGESZ, PAGE_SIZE, argvec) || !execfn)
     {
         return -ENOMEM;
     }
@@ -404,9 +457,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     user_stack -= ARGVECS_SIZE(argvec);
     argvecs_copy_to_user(ptr(user_stack), argvec);
 
-    args_put(&argvec[ARGV]);
-    args_put(&argvec[ENVP]);
-    auxs_put(&argvec[AUXV]);
+    argvecs_put(argvec);
 
     ASSERT(*(int*)user_stack == argvec[ARGV].count);
 

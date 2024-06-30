@@ -25,6 +25,7 @@ struct auxv
     uintptr_t _AT_PHNUM;
     uintptr_t _AT_PAGESZ;
     uintptr_t _AT_BASE;
+    const char* _AT_EXECFN;
 };
 
 struct strtab
