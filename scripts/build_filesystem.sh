@@ -96,6 +96,7 @@ alias dmesg="cat /proc/syslog"'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
+create_dir "${mountpoint}/usr/lib"
 create_dir "${mountpoint}/usr/share"
 create_dir "${mountpoint}/lib/modules"
 create_dir "${mountpoint}/tmp"
@@ -108,12 +109,17 @@ do
     copy ${binary} ${mountpoint}/bin
 done
 
-cp "lib/loader/loader" "${mountpoint}/lib/ld.so"
-cp "lib/libc_s.so" "${mountpoint}/bin/libc_s.so"
-
 for binary in $(find sysroot -type f -executable)
 do
-    copy ${binary} ${mountpoint}/bin
+    if [[ ${binary} == *"ld.so" ]]
+    then
+        copy ${binary} ${mountpoint}/lib
+    elif [[ ${binary} == *".so" ]]
+    then
+        copy ${binary} ${mountpoint}/usr/lib
+    else
+        copy ${binary} ${mountpoint}/bin
+    fi
 done
 
 copy_dir_content "modules" "${mountpoint}/lib/modules"

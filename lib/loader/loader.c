@@ -281,7 +281,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
         DYNAMIC_DECLARE(lib_dynamic);
         LIST_DECLARE(lib_libs);
 
-        sprintf(path, "/bin/%s", DYNSTR(dynamic, lib->string_ndx));
+        sprintf(path, "/usr/lib/%s", DYNSTR(dynamic, lib->string_ndx));
 
         lib_fd = open(path, O_RDONLY);
 

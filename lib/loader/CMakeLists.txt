@@ -15,9 +15,16 @@ target_compile_options(loader
         -fdata-sections
 )
 
-target_link_libraries(loader c
+target_link_libraries(loader c_static
     -Wl,-T${CMAKE_CURRENT_SOURCE_DIR}/loader.ld
     -Wl,--gc-sections
 )
 
-add_dependencies(rootfs loader)
+add_custom_target(
+    loader_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different loader ../../sysroot/lib/ld.so
+    DEPENDS loader
+    COMMENT "Installing loader"
+)
+
+add_dependencies(rootfs loader_install)

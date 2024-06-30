@@ -22,7 +22,6 @@ set(LIBC_SRC
     abort.c
     assert.c
     atexit.c
-    bss.c
     dirent.c
     env.c
     errno.c
@@ -94,10 +93,10 @@ set(LIBC_SRC
     ../kernel/lib/bitset.c
 )
 
-add_library(c STATIC ${LIBC_SRC})
-add_library(c_s SHARED ${LIBC_SRC})
+add_library(c SHARED ${LIBC_SRC})
+add_library(c_static STATIC ${LIBC_SRC})
 
-target_compile_options(c_s
+target_compile_options(c
     PRIVATE
         -fpie
         -pie
@@ -117,7 +116,7 @@ add_custom_target(
 )
 
 add_dependencies(c libc_headers_install)
-add_dependencies(c_s libc_headers_install)
+add_dependencies(c_static libc_headers_install)
 
 add_custom_target(
     crt0_install
@@ -129,8 +128,9 @@ add_custom_target(
 
 add_custom_target(
     libc_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.a ../sysroot/usr/lib/libc.a
-    DEPENDS crt0_install c loader c_s
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc_static.a ../sysroot/usr/lib/libc.a
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.so ../sysroot/usr/lib/libc.so
+    DEPENDS crt0_install c c_static loader
     COMMENT "Installing libc")
 
 add_dependencies(rootfs libc_install)

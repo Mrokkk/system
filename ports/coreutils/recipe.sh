@@ -7,7 +7,8 @@ function build()
 {
     local cross_gcc="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
     export CC="ccache ${cross_gcc}"
-    export CFLAGS="-Wno-error -fdiagnostics-color=always -ggdb3"
+    export CFLAGS="-Wno-error -fdiagnostics-color=always -ggdb3 -pie -fpie -fPIC"
+    export LDFLAGS="-pie"
     export PATH="${NATIVE_SYSROOT}/bin:${PATH}"
 
     [[ ! -f "${cross_gcc}" ]] && die "Toolchain not built"

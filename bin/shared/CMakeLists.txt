@@ -15,4 +15,13 @@ target_link_libraries(test2 c -Wl,-gc-sections)
 
 target_link_libraries(shared
     -pie
-    test2)
+    test2
+)
+
+add_custom_target(
+    test2_install
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libtest2.so ../../sysroot/usr/lib/libtest2.so
+    DEPENDS test2
+)
+
+add_dependencies(rootfs test2_install)
