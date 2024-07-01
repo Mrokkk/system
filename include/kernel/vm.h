@@ -15,6 +15,13 @@ typedef struct vm_area vm_area_t;
 #define VM_SHARED       0x00000008
 #define VM_IO           0x00000010
 #define VM_COW          0x00000020
+#define VM_TYPE_MASK    0xff000000
+
+#define VM_TYPE_STACK   1
+#define VM_TYPE_HEAP    2
+
+#define VM_TYPE(type)    ((type) << 24)
+#define VM_TYPE_GET(val) ((val) >> 24)
 
 struct vm_area
 {
@@ -39,6 +46,7 @@ vm_area_t* vm_create(uint32_t virt_address, uint32_t size, int vm_flags);
 vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
+void vm_del(vm_area_t* vma);
 int vm_map(vm_area_t* vma, page_t* page_range, pgd_t* pgd, int vm_apply_flags);
 int vm_remap(vm_area_t* vma, page_t* page_range, pgd_t* pgd);
 int vm_unmap(vm_area_t* vma, pgd_t* pgd);
@@ -104,72 +112,8 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 #define vm_verify_buf(flag, data_ptr, n, vma) \
     ({ _vm_verify(flag, data_ptr, n, vma); })
 
-static inline char* vm_flags_string(char* buffer, int vm_flags)
-{
-    char* b = buffer;
-    b += sprintf(b, (vm_flags & VM_READ) ? "R" : "-");
-    b += sprintf(b, (vm_flags & VM_WRITE) ? "W" : "-");
-    b += sprintf(b, (vm_flags & VM_EXEC) ? "X" : "-");
-    b += sprintf(b, (vm_flags & VM_IO) ? "I" : "-");
-    return buffer;
-}
-
 #define vm_for_each(vma, vm_areas) \
     for (vma = vm_areas; vma; vma = vma->next)
-
-#define vm_print_single(vma, flag) \
-    if (flag) \
-    { \
-        do { \
-            page_t* p; \
-            char buf[5]; \
-            int safety = 0; \
-            log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x refcount=%u]", \
-                vma, \
-                vma->start, \
-                vma->end, \
-                vma->end - vma->start, \
-                vm_flags_string(buf, vma->vm_flags), \
-                vma->inode, \
-                vma->pages->refcount); \
-            list_for_each_entry(p, &vma->pages->head, list_entry) \
-            { \
-                log_debug(flag, "  page: %x[%u]", page_phys(p), pfn(p)); \
-                if (++safety > 1024 * 1024) { panic("infinite loop detection"); } \
-            } \
-        } while(0); \
-    }
-
-#define vm_print(vma, flag) \
-    { \
-        if (flag && vma) \
-        { \
-            for (const vm_area_t* temp = vma; temp; temp = temp->next) \
-            { \
-                vm_print_single(temp, flag); \
-            } \
-        } \
-    }
-
-#define vm_print_short(orig_vma, flag) \
-    if (flag) \
-    { \
-        do { \
-            for (vm_area_t* vma = orig_vma; vma; vma = vma->next) \
-            { \
-                char buf[5]; \
-                log_debug(flag, "%x:[%08x-%08x %08x %s i=%08x off=%08x refcount=%u]", \
-                    vma, \
-                    vma->start, \
-                    vma->end, \
-                    vma->end - vma->start, \
-                    vm_flags_string(buf, vma->vm_flags), \
-                    vma->inode, \
-                    vma->offset, \
-                    vma->pages->refcount); \
-            } \
-        } while(0); \
-    }
 
 #include <arch/vm.h>
 

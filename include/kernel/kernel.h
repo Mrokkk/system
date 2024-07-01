@@ -69,10 +69,6 @@ int vsprintf(char*, const char*, __builtin_va_list);
         errno; \
     })
 
-static inline void breakpoint(void)
-{
-    extern void __breakpoint(void);
-    __breakpoint();
-}
+void breakpoint(void);
 
 extern volatile unsigned int jiffies;

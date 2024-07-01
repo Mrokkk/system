@@ -25,7 +25,7 @@ unsigned init_in_progress = INIT_IN_PROGRESS;
 char cmdline[128];
 static param_t* params;
 
-void __breakpoint(void)
+void breakpoint(void)
 {
 }
 

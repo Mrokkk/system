@@ -1,6 +1,7 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/process.h>
+#include <kernel/vm_print.h>
 
 int arch_vm_apply(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags)
 {
@@ -118,7 +119,7 @@ static inline pgt_t* vm_remove(vm_area_t* vma, pgd_t* pgd, pgt_t* prev_pgt, oper
     bool free_pages = false;
     uint32_t vaddr, pde_index, pte_index;
 
-    vm_print_single(vma, DEBUG_VM);
+    /*vm_area_print(KERN_DEBUG, vma);*/
 
     if (!--vma->pages->refcount)
     {

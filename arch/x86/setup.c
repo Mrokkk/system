@@ -140,7 +140,7 @@ void panic_mode_enter(void)
 
 void panic_mode_die(void)
 {
-    printk(KERN_CRIT "Press ENTER to reboot...");
+    log(KERN_CRIT, "Press ENTER to reboot...");
 
     while (i8042_receive() != 0x1c);
 

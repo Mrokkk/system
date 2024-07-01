@@ -3,6 +3,7 @@
 #include <kernel/dentry.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>
+#include <kernel/vm_print.h>
 #include <kernel/backtrace.h>
 
 typedef struct bt_data
@@ -60,15 +61,7 @@ static int address_fill(uint32_t eip, vm_area_t* vm_areas, user_address_t* addr)
     addr->vaddr = eip;
     addr->file_offset = eip - vma->start + vma->offset;
 
-    if (vma->inode)
-    {
-        dentry_t* dentry = dentry_get(vma->inode);
-        path_construct(dentry, addr->path, PATH_MAX);
-    }
-    else
-    {
-        __builtin_strcpy(addr->path, "unknown");
-    }
+    vm_file_path_read(vma, addr->path, PATH_MAX);
 
     return 0;
 }

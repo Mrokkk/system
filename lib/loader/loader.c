@@ -308,7 +308,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
             {
                 case PT_LOAD:
                 {
-                    *brk_address = p->p_memsz + p->p_vaddr + lib_base;
+                    *brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, AUX_GET(AT_PAGESZ));
                     mmap_phdr(lib_fd, AUX_GET(AT_PAGESZ), p, p->p_flags & PF_X ? PF_W : 0, lib_base);
                     break;
                 }
@@ -391,7 +391,7 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
 
             case PT_LOAD:
             {
-                brk_address = p->p_memsz + p->p_vaddr + base_address;
+                brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + base_address, AUX_GET(AT_PAGESZ));
 
                 // Allow writing over segment to perform relocations
                 if (phdr[i].p_flags & PF_X)

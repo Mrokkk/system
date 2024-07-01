@@ -11,6 +11,8 @@
 #include <kernel/api/ioctl.h>
 #include <kernel/api/types.h>
 
+#define DEBUG_TRACE_BACKTRACE 0
+
 extern syscall_t trace_syscalls[];
 
 #define ERRNO(x) [x] = #x
@@ -407,7 +409,7 @@ int trace_syscall(unsigned long nr, ...)
 
     log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
 
-    if (DEBUG_BTUSER)
+    if (DEBUG_TRACE_BACKTRACE)
     {
         const pt_regs_t* regs = ptr_get(addr(&nr));
         backtrace_user(log_info, regs, "\t");
@@ -432,7 +434,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 
     irq_save(flags);
 
-    if (DEBUG_BTUSER)
+    if (DEBUG_TRACE_BACKTRACE)
     {
         it += sprintf(it, "%s returned ", trace_syscalls[nr].name);
     }
@@ -450,7 +452,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
         it += sprintf(it, format_get(trace_syscalls[nr].ret, retval), retval);
     }
 
-    if (DEBUG_BTUSER)
+    if (DEBUG_TRACE_BACKTRACE)
     {
         log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
     }

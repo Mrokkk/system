@@ -8,6 +8,7 @@
 #include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/seq_file.h>
+#include <kernel/vm_print.h>
 
 static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int procfs_open(file_t* file);
@@ -26,6 +27,7 @@ static int meminfo_show(seq_file_t* s);
 static int cmdline_show(seq_file_t* s);
 static int uptime_show(seq_file_t* s);
 int syslog_show(seq_file_t* s);
+int maps_show(seq_file_t* s);
 
 #define NODE(NAME, MODE, IOPS, FOPS) \
     { \
@@ -100,6 +102,7 @@ static procfs_entry_t root_entries[] = {
 PROCFS_ENTRY(comm);
 PROCFS_ENTRY(status);
 PROCFS_ENTRY(stack);
+PROCFS_ENTRY(maps);
 
 static procfs_entry_t pid_entries[] = {
     DOT("."),
@@ -107,6 +110,7 @@ static procfs_entry_t pid_entries[] = {
     REG(comm, S_IRUGO),
     REG(status, S_IRUGO),
     REG(stack, S_IRUGO),
+    REG(maps, S_IRUGO),
 };
 
 static inline procfs_entry_t* procfs_find(const char* name, procfs_entry_t* dir, size_t count)
@@ -346,26 +350,6 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     }
 
     return i;
-}
-
-static struct process* process_get(seq_file_t* s)
-{
-    struct process* p = NULL;
-    short pid = s->file->inode->ino;
-
-    if (pid == -1)
-    {
-        p = process_current;
-    }
-    else
-    {
-        if (process_find(pid, &p))
-        {
-            panic("no process with pid %u", pid);
-        }
-    }
-
-    return p;
 }
 
 static int comm_show(seq_file_t* s)

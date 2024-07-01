@@ -59,8 +59,9 @@ struct mm
     void* kernel_stack;
     pgd_t* pgd;
     vm_area_t* vm_areas;
+    vm_area_t* brk_vma;
 #define MM_INIT(mm) \
-    { MUTEX_INIT(mm.lock), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    { MUTEX_INIT(mm.lock), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 struct signals
@@ -417,7 +418,7 @@ static inline vm_area_t* process_brk_vm_area(struct process* p)
     uint32_t brk = p->mm->brk;
     for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)
     {
-        if (vma->start < brk && vma->end >= brk)
+        if ((brk >= vma->start && brk <= vma->end) || (brk == vma->start && brk == vma->end))
         {
             return vma;
         }

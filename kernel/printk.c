@@ -69,7 +69,7 @@ static inline void push_entry(char* buffer, int len, int* index, char* logger_bu
     *index += sprintf(logger_buffer + *index, "%s", buffer, *index);
 }
 
-void __printk(struct printk_entry* entry, const char *fmt, ...)
+void printk(const printk_entry_t* entry, const char *fmt, ...)
 {
     timeval_t ts;
     char buffer[PRINTK_LINE_LEN];
@@ -160,7 +160,7 @@ void panic(const char *fmt, ...)
 
     panic_mode_enter();
 
-    printk(KERN_CRIT "Kernel panic: %s", buf);
+    log(KERN_CRIT, "Kernel panic: %s", buf);
 
     backtrace_dump(log_critical);
 

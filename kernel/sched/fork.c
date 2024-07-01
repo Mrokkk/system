@@ -1,6 +1,7 @@
 #include <kernel/vm.h>
 #include <kernel/procfs.h>
 #include <kernel/process.h>
+#include <kernel/vm_print.h>
 #include <kernel/api/unistd.h>
 
 unsigned int total_forks;
@@ -32,7 +33,7 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
     stack_vma = vm_create(
         address,
         USER_STACK_SIZE,
-        VM_WRITE | VM_READ);
+        VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
 
     if (unlikely(!stack_vma))
     {
@@ -114,6 +115,7 @@ static int process_space_copy(struct process* dest, struct process* src, int clo
     dest->mm->env_start = src->mm->env_start;
     dest->mm->env_end = src->mm->env_end;
     dest->mm->vm_areas = NULL;
+    dest->mm->brk_vma = NULL;
 
     if (process_is_kernel(dest))
     {
@@ -141,6 +143,11 @@ static int process_space_copy(struct process* dest, struct process* src, int clo
             goto free_areas;
         }
 
+        if (src->mm->brk_vma == src_vma)
+        {
+            dest->mm->brk_vma = new_vma;
+        }
+
         errno = vm_copy(new_vma, src_vma, dest->mm->pgd, src->mm->pgd);
 
         if (unlikely(errno))
@@ -162,8 +169,8 @@ static int process_space_copy(struct process* dest, struct process* src, int clo
 
     vm_add(&dest->mm->vm_areas, dest_stack_vma);
 
-    log_debug(DEBUG_PROCESS, "new areas:", dest->pid);
-    vm_print(dest->mm->vm_areas, DEBUG_PROCESS);
+    /*log_debug(DEBUG_PROCESS, "new areas:", dest->pid);*/
+    /*vm_print(dest->mm->vm_areas, DEBUG_PROCESS);*/
 
     return 0;
 

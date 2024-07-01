@@ -19,8 +19,6 @@
 #define DEBUG_EXIT          0
 #define DEBUG_SIGNAL        0
 #define DEBUG_POLL          0
-#define DEBUG_EXCEPTION     0
-#define DEBUG_BTUSER        0
 #define DEBUG_SEQFILE       0
 #define DEBUG_IRQ           0
 #define PARANOIA_IDLE       0

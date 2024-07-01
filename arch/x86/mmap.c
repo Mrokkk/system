@@ -2,11 +2,13 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
 #include <kernel/page.h>
-#include <kernel/process.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
+#include <kernel/process.h>
+#include <kernel/vm_print.h>
 
 #define DEBUG_MMAP 0
+#define DEBUG_BRK  0
 
 static inline uint32_t address_space_find(size_t size)
 {
@@ -51,10 +53,9 @@ finish:
 
 static inline int vm_flags_get(int prot)
 {
-    int vm_flags = prot & PROT_READ ? VM_READ : 0;
-    vm_flags |= prot & PROT_WRITE ? VM_WRITE : 0;
-    vm_flags |= prot & PROT_EXEC ? VM_EXEC : 0;
-    return vm_flags;
+    return (prot & PROT_READ ? VM_READ : 0)
+        | (prot & PROT_WRITE ? VM_WRITE : 0)
+        | (prot & PROT_EXEC ? VM_EXEC : 0);
 }
 
 void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t offset)
@@ -162,7 +163,8 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 
     mutex_unlock(&process_current->mm->lock);
 
-    log_debug(DEBUG_MMAP, "returning %x", vaddr);
+    log_debug(DEBUG_MMAP, "returning %x; vm area:", vaddr);
+    vm_area_log_debug(DEBUG_MMAP, vma);
 
     return ptr(vaddr);
 
@@ -200,8 +202,11 @@ void* sys_mmap(struct mmap_params* params)
 int sys_mprotect(void* addr, size_t len, int prot)
 {
     UNUSED(addr); UNUSED(len); UNUSED(prot);
-    int errno;
-    vm_area_t* vma = vm_find(addr(addr), process_current->mm->vm_areas);
+    vm_area_t* vma;
+
+    scoped_mutex_lock(&process_current->mm->lock);
+
+    vma = vm_find(addr(addr), process_current->mm->vm_areas);
 
     if (unlikely(!vma))
     {
@@ -216,25 +221,55 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
     vma->vm_flags = vm_flags_get(prot);
 
-    if (unlikely(errno = vm_remap(vma, list_next_entry(&vma->pages->head, page_t, list_entry), process_current->mm->pgd)))
-    {
-        return errno;
-    }
-
-    return 0;
+    return vm_remap(vma, list_next_entry(&vma->pages->head, page_t, list_entry), process_current->mm->pgd);
 }
 
 int sys_brk(void* addr)
 {
-    vm_area_t* new_brk_vma = vm_find(addr(addr), process_current->mm->vm_areas);
+    int errno = 0;
 
-    if (unlikely(!new_brk_vma))
+    scoped_mutex_lock(&process_current->mm->lock);
+
+    vm_area_t* new_brk_vma = vm_find(addr(addr), process_current->mm->vm_areas);
+    vm_area_t* old_brk_vma = process_current->mm->brk_vma;
+
+    current_log_debug(DEBUG_BRK, "%x, new vma: %x old: %x", addr, new_brk_vma, old_brk_vma);
+
+    if (unlikely(!old_brk_vma))
     {
+        current_log_error("brk vm_area missing; brk address: %x", process_current->mm->brk);
         return -ENOMEM;
     }
 
-    // TODO: free pages
+    if (old_brk_vma == new_brk_vma)
+    {
+        process_current->mm->brk = addr(addr);
+        return 0;
+    }
+
+    if (!new_brk_vma)
+    {
+        new_brk_vma = vm_create(addr(addr), 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+
+        if (unlikely(!new_brk_vma))
+        {
+            current_log_debug(DEBUG_BRK, "cannot allocate brk vma");
+            return -ENOMEM;
+        }
+
+        if (unlikely(errno = vm_add(&process_current->mm->vm_areas, new_brk_vma)))
+        {
+            current_log_debug(DEBUG_BRK, "cannot add brk vma to mm");
+            return errno;
+        }
+    }
+
+    process_current->mm->brk_vma = new_brk_vma;
     process_current->mm->brk = addr(addr);
+
+    vm_unmap(old_brk_vma, process_current->mm->pgd);
+    vm_del(old_brk_vma);
+
     return 0;
 }
 
@@ -243,21 +278,24 @@ void* sys_sbrk(size_t incr)
     int errno;
     page_t* new_page;
     vm_area_t* brk_vma;
-    uint32_t previous_brk = process_current->mm->brk;
-    uint32_t current_brk = previous_brk + incr;
-    uint32_t previous_page = page_beginning(previous_brk);
-    uint32_t next_page = page_align(current_brk);
+    uint32_t previous_brk, current_brk, previous_page, next_page;
 
-    log_debug(DEBUG_MMAP, "incr=%x previous_brk=%x", incr, previous_brk);
+    scoped_mutex_lock(&process_current->mm->lock);
 
-    mutex_lock(&process_current->mm->lock);
+    previous_brk = process_current->mm->brk;
+    current_brk = previous_brk + incr;
+    previous_page = page_beginning(previous_brk);
+    next_page = page_align(current_brk);
 
-    brk_vma = process_brk_vm_area(process_current);
+    current_log_debug(DEBUG_BRK, "incr=%x previous_brk=%x", incr, previous_brk);
+
+    brk_vma = process_current->mm->brk_vma;
 
     if (unlikely(!brk_vma))
     {
-        vm_print(process_current->mm->vm_areas, DEBUG_MMAP);
-        panic("no brk vma; brk = %x", previous_brk, brk_vma);
+        current_log_error("brk vm_area missing; brk address: %x", process_current->mm->brk);
+        process_vm_areas_log(KERN_ERR, process_current);
+        return ptr(-ENOMEM);
     }
     else if (brk_vma->pages->refcount > 1)
     {
@@ -267,9 +305,8 @@ void* sys_sbrk(size_t incr)
 
     if (previous_page == next_page)
     {
-        log_debug(DEBUG_MMAP, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
+        current_log_debug(DEBUG_BRK, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
         process_current->mm->brk = current_brk;
-        mutex_unlock(&process_current->mm->lock);
         return ptr(previous_brk);
     }
 
@@ -277,7 +314,6 @@ void* sys_sbrk(size_t incr)
 
     if (unlikely(!new_page))
     {
-        mutex_unlock(&process_current->mm->lock);
         return ptr(-ENOMEM);
     }
 
@@ -290,9 +326,7 @@ void* sys_sbrk(size_t incr)
 
     process_current->mm->brk = current_brk;
 
-    vm_print_short(process_current->mm->vm_areas, DEBUG_MMAP);
-
-    mutex_unlock(&process_current->mm->lock);
+    vm_area_log_debug(DEBUG_BRK, brk_vma);
 
     return ptr(previous_brk);
 }

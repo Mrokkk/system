@@ -3,6 +3,7 @@
 #include <kernel/timer.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/vm_print.h>
 #include <kernel/backtrace.h>
 #include <kernel/byteorder.h>
 
@@ -450,6 +451,24 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     p->mm->args_start = user_stack - argvec[ARGV].size;
     p->mm->args_end = user_stack;
 
+    vm_area_t* brk_vma = vm_create(bin->brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+
+    if (unlikely(!brk_vma))
+    {
+        // At this moment process is broken anyways
+        do_kill(p, SIGKILL);
+        return -ENOMEM;
+    }
+
+    if (unlikely(errno = vm_add(&p->mm->vm_areas, brk_vma)))
+    {
+        // As above
+        do_kill(p, SIGKILL);
+        return errno;
+    }
+
+    p->mm->brk_vma = brk_vma;
+
     p->signals->trapped = 0;
     p->signals->ongoing = 0;
     p->signals->pending = 0;
@@ -463,8 +482,10 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     p->type = USER_PROCESS;
 
-    log_debug(DEBUG_PROCESS, "%s[%u] vma:", p->name, p->pid);
-    vm_print(p->mm->vm_areas, DEBUG_PROCESS);
+    if (DEBUG_PROCESS)
+    {
+        process_vm_areas_indent_log(KERN_DEBUG, p, INDENT_LVL_1);
+    }
 
     // TODO: maybe I should alloc a new stack?
     arch_exec(bin->entry, p->mm->kernel_stack, user_stack);

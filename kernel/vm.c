@@ -1,6 +1,8 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
-#include <kernel/process.h>
+#include <kernel/vm_print.h>
+
+#define COW_BROKEN 1
 
 vm_area_t* vm_create(uint32_t vaddr, uint32_t size, int vm_flags)
 {
@@ -77,6 +79,12 @@ int vm_add(vm_area_t** head, vm_area_t* new_vma)
     return 0;
 }
 
+void vm_del(vm_area_t* vma)
+{
+    vma->next->prev = vma->prev;
+    vma->prev->next = vma->next;
+}
+
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, const pgd_t* src_pgd)
 {
     // Copy vm_area except for next and prev
@@ -87,14 +95,29 @@ int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, cons
     dest_vma->pages->refcount++;
     dest_vma->vm_flags |= VM_COW;
 
+    // FIXME: random bash crash was caused by COW implemented poorly -
+    // I wasn't  denying write access on parent pages, so parent could
+    // overwrite child's memory
+#if !COW_BROKEN
     return arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end);
+#else
+    int errno;
+    if ((errno = arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end)))
+    {
+        return errno;
+    }
+
+    return dest_vma->vm_flags & VM_WRITE
+        ? vm_copy_on_write(dest_vma, dest_pgd)
+        : 0;
+#endif
 }
 
 int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd)
 {
     page_t* page_range;
 
-    vm_print_single(vma, DEBUG_VM_COW);
+    vm_area_log_debug(DEBUG_VM_COW, vma);
 
     if (unlikely(!--vma->pages->refcount))
     {
