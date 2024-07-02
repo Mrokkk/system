@@ -36,6 +36,11 @@ static LIST_DECLARE(libs);
 #define AUX_GET(a) \
     ({ saved_auxv._##a; })
 
+static __attribute__((used,noinline)) void loader_breakpoint(const char* name, uintptr_t base_address)
+{
+    asm volatile("" :: "a" (name), "c" (base_address) : "memory");
+}
+
 static void auxv_read(elf32_auxv_t** vec)
 {
     elf32_auxv_t* aux = *vec;
@@ -295,6 +300,8 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
             exit(EXIT_FAILURE);
         }
 
+        loader_breakpoint(path, lib_base);
+
         header = alloc_read(lib_fd, sizeof(*header), 0);
         phdr = alloc_read(lib_fd, header->e_phentsize * header->e_phnum, header->e_phoff);
 
@@ -376,6 +383,8 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
     base_address = AUX_GET(AT_BASE);
 
     phdr_print(phdr, AUX_GET(AT_PHNUM));
+
+    loader_breakpoint(AUX_GET(AT_EXECFN), base_address);
 
     for (size_t i = 0; i < AUX_GET(AT_PHNUM); ++i)
     {
