@@ -34,7 +34,7 @@ int reboot(int magic, int magic2, int cmd);
 int chdir(const char* buf);
 char* getcwd(char* buf, size_t size);
 int brk(void* addr);
-void* sbrk(size_t incr);
+void* sbrk(int incr);
 int chroot(const char* path);
 int setsid(void);
 int setuid(gid_t gid);

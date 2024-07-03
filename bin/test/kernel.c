@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -219,6 +218,16 @@ TEST(sbrk2)
         EXPECT_EQ(data3[2], 254);
         EXPECT_EQ(data3[0x10000 - 1], 34);
 
+        exit(FAILED_EXPECTATIONS());
+    }
+}
+
+TEST(sbrk3)
+{
+    EXPECT_KILLED_BY(SIGSEGV)
+    {
+        uint8_t* data = sbrk(-0x1000);
+        data[2] = 29;
         exit(FAILED_EXPECTATIONS());
     }
 }

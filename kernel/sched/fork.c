@@ -32,18 +32,11 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
 
     stack_vma = vm_create(
         address,
-        USER_STACK_SIZE,
         VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
 
-    if (unlikely(!stack_vma))
-    {
-        goto error;
-    }
-
-    list_merge(&stack_vma->pages->head, &pages->list_entry);
-    errno = vm_map(stack_vma, pages, pgd, 0);
-
-    if (unlikely(errno))
+    if (unlikely(!stack_vma ||
+        (errno = vm_pages_add(stack_vma, pages)) ||
+        (errno = vm_map(stack_vma, pages, pgd))))
     {
         goto error;
     }
@@ -51,7 +44,6 @@ vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
     return stack_vma;
 
 error:
-    list_del(&stack_vma->pages->head);
     pages_free(pages);
     return NULL;
 }

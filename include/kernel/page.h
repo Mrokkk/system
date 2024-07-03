@@ -75,6 +75,8 @@ MUST_CHECK(page_t*) __page_alloc(int count, alloc_flag_t flag);
 int __page_free(void* address); // FIXME: remove this in the future
 int __pages_free(page_t* pages);
 
+page_t* pages_split(page_t* pages, size_t pages_to_keep);
+
 MUST_CHECK(pgd_t*) pgd_alloc(void);
 MUST_CHECK(pgt_t*) pgt_alloc(void);
 MUST_CHECK(pgd_t*) init_pgd_get(void);

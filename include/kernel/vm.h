@@ -36,20 +36,21 @@ struct vm_area
 
 struct pages
 {
-    list_head_t   head;
+    page_t*       pages;
     int           refcount;
 };
 
-#define VM_APPLY_EXTEND 2
-
-vm_area_t* vm_create(uint32_t virt_address, uint32_t size, int vm_flags);
+vm_area_t* vm_create(uint32_t virt_address, int vm_flags);
 vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
 void vm_del(vm_area_t* vma);
-int vm_map(vm_area_t* vma, page_t* page_range, pgd_t* pgd, int vm_apply_flags);
+int vm_pages_add(vm_area_t* vma, page_t* pages);
+int vm_map(vm_area_t* vma, page_t* page_range, pgd_t* pgd);
+int vm_map_range(vm_area_t* vma, uint32_t start, page_t* pages, pgd_t* pgd);
 int vm_remap(vm_area_t* vma, page_t* page_range, pgd_t* pgd);
 int vm_unmap(vm_area_t* vma, pgd_t* pgd);
+int vm_unmap_range(vm_area_t* vma, uint32_t start, page_t* pages, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, const pgd_t* src_pgd);
 int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd);
@@ -61,22 +62,26 @@ typedef enum
     VERIFY_WRITE    = 2
 } vm_verify_flag_t;
 
-static inline int _vm_verify(vm_verify_flag_t flag, const void* ptr, size_t size, vm_area_t* vma)
-{
-    extern int __vm_verify(vm_verify_flag_t flag, uint32_t vaddr, size_t size, vm_area_t* vma);
-
-    if (!vma)
-    {
-        // FIXME: hack for kernel processes
-        return 0;
+// FIXME: I must remove all user related memory checks from
+// do_sth functions. Only sys_sth should do them
+#define VM_VERIFY_KERNEL_PROCESS_HACK() \
+    if (!vma) \
+    { \
+        return 0; \
     }
+
+static inline int vm_verify_wrapper(vm_verify_flag_t flag, const void* ptr, size_t size, vm_area_t* vma)
+{
+    extern int vm_verify_impl(vm_verify_flag_t flag, uint32_t vaddr, size_t size, vm_area_t* vma);
+
+    VM_VERIFY_KERNEL_PROCESS_HACK();
 
     if (unlikely(kernel_address(addr(ptr))))
     {
         return -EFAULT;
     }
 
-    return __vm_verify(flag, addr(ptr), size, vma);
+    return vm_verify_impl(flag, addr(ptr), size, vma);
 }
 
 // vm_verify_string - check access to the string pointed by string
@@ -92,7 +97,7 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 // @data_ptr - pointer to data
 // @vma - vm_areas against which access is checked
 #define vm_verify(flag, data_ptr, vma) \
-    ({ _vm_verify(flag, data_ptr, sizeof(*(data_ptr)), vma); })
+    ({ vm_verify_wrapper(flag, data_ptr, sizeof(*(data_ptr)), vma); })
 
 // vm_verify_array - check access to the array of n objects pointed by data_ptr
 //
@@ -101,7 +106,7 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 // @n - size of array
 // @vma - vm_areas against which access is checked
 #define vm_verify_array(flag, data_ptr, n, vma) \
-    ({ _vm_verify(flag, data_ptr, sizeof(*(data_ptr)) * (n), vma); })
+    ({ vm_verify_wrapper(flag, data_ptr, sizeof(*(data_ptr)) * (n), vma); })
 
 // vm_verify_buf - check access to the buffer of n bytes pointed by data_ptr
 //
@@ -110,7 +115,7 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 // @n - number of bytes
 // @vma - vm_areas against which access is checked
 #define vm_verify_buf(flag, data_ptr, n, vma) \
-    ({ _vm_verify(flag, data_ptr, n, vma); })
+    ({ vm_verify_wrapper(flag, data_ptr, n, vma); })
 
 #define vm_for_each(vma, vm_areas) \
     for (vma = vm_areas; vma; vma = vma->next)

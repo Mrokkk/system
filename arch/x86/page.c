@@ -1,4 +1,5 @@
 #define log_fmt(fmt) "page: " fmt
+#include <kernel/list.h>
 #include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/mutex.h>
@@ -253,6 +254,39 @@ int __pages_free(page_t* pages)
     mutex_unlock(&page_mutex);
 
     return count;
+}
+
+page_t* pages_split(page_t* pages, size_t pages_to_split)
+{
+    page_t* other_pages = NULL;
+    page_t* removed;
+    size_t count = 0;
+
+    if (pages_to_split == pages->pages_count)
+    {
+        return pages;
+    }
+
+    do
+    {
+        count++;
+        removed = list_prev_entry(&pages->list_entry, page_t, list_entry);
+        list_del(&removed->list_entry);
+        if (!other_pages)
+        {
+            other_pages = removed;
+        }
+        else
+        {
+            list_add(&removed->list_entry, &other_pages->list_entry);
+        }
+    }
+    while (--pages_to_split);
+
+    other_pages->pages_count = count;
+    pages->pages_count -= count;
+
+    return other_pages;
 }
 
 pgd_t* pgd_alloc(void)

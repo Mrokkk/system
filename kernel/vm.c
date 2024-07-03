@@ -4,7 +4,7 @@
 
 #define COW_BROKEN 1
 
-vm_area_t* vm_create(uint32_t vaddr, uint32_t size, int vm_flags)
+vm_area_t* vm_create(uint32_t vaddr, int vm_flags)
 {
     vm_area_t* vma = alloc(vm_area_t);
 
@@ -23,9 +23,8 @@ vm_area_t* vm_create(uint32_t vaddr, uint32_t size, int vm_flags)
     }
 
     vma->pages->refcount = 1;
-    list_init(&vma->pages->head);
-    vma->start = vaddr;
-    vma->end = vaddr + size;
+    vma->pages->pages = NULL;
+    vma->start = vma->end = vaddr;
     vma->vm_flags = vm_flags;
     vma->inode = NULL;
     vma->next = NULL;
@@ -85,6 +84,23 @@ void vm_del(vm_area_t* vma)
     vma->prev->next = vma->next;
 }
 
+int vm_pages_add(vm_area_t* vma, page_t* pages)
+{
+    vma->end += pages->pages_count * PAGE_SIZE;
+
+    if (vma->pages->pages)
+    {
+        vma->pages->pages->pages_count += pages->pages_count;
+        list_merge(&vma->pages->pages->list_entry, &pages->list_entry);
+    }
+    else
+    {
+        vma->pages->pages = pages;
+    }
+
+    return 0;
+}
+
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, const pgd_t* src_pgd)
 {
     // Copy vm_area except for next and prev
@@ -142,53 +158,50 @@ int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd)
     }
 
     vma->pages->refcount = 1;
-    list_init(&vma->pages->head);
-    list_merge(&vma->pages->head, &page_range->list_entry);
+    vma->pages->pages = page_range;
     vma->vm_flags &= ~VM_COW;
 
     return arch_vm_copy_on_write(vma, pgd, page_range);
 }
 
-int vm_map(vm_area_t* vma, page_t* new_pages, pgd_t* pgd, int vm_apply_flags)
+typedef int (*apply_fn_t)(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags);
+
+static int vm_map_range_impl(vm_area_t* vma, uint32_t start, page_t* pages, pgd_t* pgd, apply_fn_t apply)
 {
     int errno;
-    uint32_t start, end;
+    uint32_t end = start + pages->pages_count * PAGE_SIZE;
 
-    start = vm_apply_flags & VM_APPLY_EXTEND ? vma->end : vma->start;
-    end = start + new_pages->pages_count * PAGE_SIZE;
-
-    if (unlikely(errno = arch_vm_apply(pgd, new_pages, start, end, vma->vm_flags)))
+    if (unlikely(errno = apply(pgd, pages, start, end, vma->vm_flags)))
     {
         log_debug(DEBUG_VM_APPLY, "failed %d", errno);
         return errno;
     }
 
-    vma->end = end;
-
+    // FIXME: this function does not know whether vma is related to the
+    // current process's pgd, so it shouldn't call pgd_reload
     pgd_reload();
 
-    return errno;
+    return 0;
+}
+
+int vm_map(vm_area_t* vma, page_t* pages, pgd_t* pgd)
+{
+    if (unlikely(vma->end - vma->start != pages->pages_count * PAGE_SIZE))
+    {
+        log_error("wrong size in vma:");
+        vm_area_log(KERN_ERR, vma);
+    }
+    return vm_map_range_impl(vma, vma->start, pages, pgd, &arch_vm_apply);
+}
+
+int vm_map_range(vm_area_t* vma, uint32_t start, page_t* pages, pgd_t* pgd)
+{
+    return vm_map_range_impl(vma, start, pages, pgd, &arch_vm_apply);
 }
 
 int vm_remap(vm_area_t* vma, page_t* pages, pgd_t* pgd)
 {
-    int errno;
-    uint32_t start, end;
-
-    start = vma->start;
-    end = start + pages->pages_count * PAGE_SIZE;
-
-    if (unlikely(errno = arch_vm_reapply(pgd, pages, start, end, vma->vm_flags)))
-    {
-        log_debug(DEBUG_VM_APPLY, "failed %d", errno);
-        return errno;
-    }
-
-    vma->end = end;
-
-    pgd_reload();
-
-    return errno;
+    return vm_map_range_impl(vma, vma->start, pages, pgd, &arch_vm_reapply);
 }
 
 static inline int address_within(uint32_t vaddr, vm_area_t* vma)
@@ -208,7 +221,7 @@ vm_area_t* vm_find(uint32_t vaddr, vm_area_t* vmas)
     return NULL;
 }
 
-int __vm_verify(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area_t* vma)
+int vm_verify_impl(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area_t* vma)
 {
     for (; vma; vma = vma->next)
     {
@@ -232,11 +245,7 @@ int __vm_verify(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area_t*
 
 int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
 {
-    // FIXME: hack for kernel processes
-    if (unlikely(!vma))
-    {
-        return 0;
-    }
+    VM_VERIFY_KERNEL_PROCESS_HACK();
 
     for (; vma; vma = vma->next)
     {

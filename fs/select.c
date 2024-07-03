@@ -24,7 +24,7 @@ static void do_poll_timeout(ktimer_t* timer)
     process_wake(timer->process);
 }
 
-static int do_poll(struct pollfd* fds, unsigned long nfds, timeval_t* timeout)
+static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* timeout)
 {
     int errno;
     flags_t flags;
@@ -108,19 +108,21 @@ static int do_poll(struct pollfd* fds, unsigned long nfds, timeval_t* timeout)
 
         if (signal_run(process_current))
         {
-            return -EINTR;
+            errno = -EINTR;
+            goto free_data;
         }
 
         if (!process_is_running(process_current))
         {
             // FIXME: I don't have any other idea for the moment; this makes sure that process won't
             // go to sleep (thus avoiding exit)
-            delete_array(data, nfds);
-            return -ERESTART;
+            errno = -ERESTART;
+            goto free_data;
         }
 
         if (timedout)
         {
+            delete_array(data, nfds);
             return 0;
         }
     }
@@ -138,12 +140,12 @@ error:
         }
     }
 
+free_data:
     if (data)
     {
         delete_array(data, nfds);
     }
     return errno;
-
 }
 
 int sys_poll(struct pollfd* fds, unsigned long nfds, int timeout)

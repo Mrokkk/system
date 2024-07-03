@@ -1,6 +1,5 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
-#include <kernel/process.h>
 #include <kernel/vm_print.h>
 
 int arch_vm_apply(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags)
@@ -119,8 +118,6 @@ static inline pgt_t* vm_remove(vm_area_t* vma, pgd_t* pgd, pgt_t* prev_pgt, oper
     bool free_pages = false;
     uint32_t vaddr, pde_index, pte_index;
 
-    /*vm_area_print(KERN_DEBUG, vma);*/
-
     if (!--vma->pages->refcount)
     {
         if (!(vma->vm_flags & VM_IO))
@@ -155,6 +152,34 @@ static inline pgt_t* vm_remove(vm_area_t* vma, pgd_t* pgd, pgt_t* prev_pgt, oper
     return prev_pgt;
 }
 
+int vm_unmap_range(vm_area_t*, uint32_t start, page_t* pages, pgd_t* pgd)
+{
+    pgt_t* pgt;
+    uint32_t end = start + pages->pages_count * PAGE_SIZE;
+    uint32_t vaddr, pde_index, pte_index;
+    pgt_t* prev_pgt = virt_ptr(pgd[pde_index(start)] & PAGE_ADDRESS);
+
+    for_each_vaddr(start, end)
+    {
+        vm_page_free(pgt, pte_index, true);
+        pgt[pte_index] = 0;
+        if (prev_pgt != pgt)
+        {
+            if (prev_pgt)
+            {
+                log_debug(DEBUG_EXIT, "freeing PGT %x", prev_pgt);
+                page_free(prev_pgt);
+            }
+            prev_pgt = pgt;
+            pgd[pde_index] = 0;
+        }
+    }
+
+    pgd_reload();
+
+    return 0;
+}
+
 int vm_unmap(vm_area_t* vma, pgd_t* pgd)
 {
     vm_remove(vma, pgd, NULL, UNMAP);
@@ -168,6 +193,14 @@ int vm_free(vm_area_t* vma_list, pgd_t* pgd)
 
     for (vm_area_t* vma = vma_list; vma;)
     {
+        page_t* pages = vma->pages->pages;
+        size_t vma_size = vma->end - vma->start;
+        if (unlikely(vma_size != pages->pages_count * PAGE_SIZE))
+        {
+            log_error("mismatch in vma size vs actual pages size: %u pages vs %u pages",
+                vma_size / PAGE_SIZE,
+                pages->pages_count);
+        }
         prev_pgt = vm_remove(vma, pgd, prev_pgt, DELETE);
         temp = vma;
         vma = vma->next;

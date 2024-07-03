@@ -1,6 +1,7 @@
 #include <arch/mmap.h>
 #include <kernel/fs.h>
 #include <kernel/vm.h>
+#include <kernel/list.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
@@ -101,7 +102,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         }
     }
 
-    vma = vm_create(vaddr, size, vm_flags_get(prot));
+    vma = vm_create(vaddr, vm_flags_get(prot));
 
     if (unlikely(!vma))
     {
@@ -116,7 +117,16 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         goto free_vma;
     }
 
-    list_merge(&vma->pages->head, &pages->list_entry);
+    if (unlikely(errno = vm_pages_add(vma, pages)))
+    {
+        goto free_vma;
+    }
+
+    if (unlikely(vma->end != vma->start + size))
+    {
+        current_log_error("mismatch in vma size: expected %u B", size);
+        vm_area_log(KERN_ERR, vma);
+    }
 
     if (flags & MAP_ANONYMOUS)
     {
@@ -151,7 +161,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 
     mutex_lock(&process_current->mm->lock);
 
-    if (unlikely(errno = vm_map(vma, pages, process_current->mm->pgd, 0)))
+    if (unlikely(errno = vm_map(vma, pages, process_current->mm->pgd)))
     {
         goto unlock_mm;
     }
@@ -171,7 +181,6 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 unlock_mm:
     mutex_unlock(&process_current->mm->lock);
 free_pages:
-    list_del(&vma->pages->head);
     pages_free(pages);
 free_vma:
     delete(vma);
@@ -221,12 +230,17 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
     vma->vm_flags = vm_flags_get(prot);
 
-    return vm_remap(vma, list_next_entry(&vma->pages->head, page_t, list_entry), process_current->mm->pgd);
+    return vm_remap(vma, vma->pages->pages, process_current->mm->pgd);
 }
 
 int sys_brk(void* addr)
 {
     int errno = 0;
+
+    if (unlikely(!addr))
+    {
+        return 0;
+    }
 
     scoped_mutex_lock(&process_current->mm->lock);
 
@@ -249,7 +263,7 @@ int sys_brk(void* addr)
 
     if (!new_brk_vma)
     {
-        new_brk_vma = vm_create(addr(addr), 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+        new_brk_vma = vm_create(addr(addr), VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
 
         if (unlikely(!new_brk_vma))
         {
@@ -273,10 +287,10 @@ int sys_brk(void* addr)
     return 0;
 }
 
-void* sys_sbrk(size_t incr)
+void* sys_sbrk(int incr)
 {
     int errno;
-    page_t* new_page;
+    page_t* brk_pages;
     vm_area_t* brk_vma;
     uint32_t previous_brk, current_brk, previous_page, next_page;
 
@@ -306,27 +320,46 @@ void* sys_sbrk(size_t incr)
     if (previous_page == next_page)
     {
         current_log_debug(DEBUG_BRK, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
-        process_current->mm->brk = current_brk;
-        return ptr(previous_brk);
+        goto finish;
+    }
+    else if (previous_page > next_page)
+    {
+        size_t size_diff = previous_page - next_page;
+        size_t diff = size_diff / PAGE_SIZE;
+        page_t* pages_to_free;
+        current_log_debug(DEBUG_BRK, "freeing %u pages", diff);
+
+        brk_pages = brk_vma->pages->pages;
+
+        if ((unlikely(!(pages_to_free = pages_split(brk_pages, diff)))))
+        {
+            current_log_error("sbrk: failed to split pages");
+            return ptr(-EINVAL);
+        }
+
+        brk_vma->end = next_page;
+
+        vm_unmap_range(brk_vma, next_page, pages_to_free, process_current->mm->pgd);
+
+        goto finish;
     }
 
-    new_page = page_alloc((next_page - previous_page) / PAGE_SIZE, PAGE_ALLOC_NO_KERNEL);
+    brk_pages = page_alloc((next_page - previous_page) / PAGE_SIZE, PAGE_ALLOC_NO_KERNEL);
 
-    if (unlikely(!new_page))
+    if (unlikely(!brk_pages))
     {
         return ptr(-ENOMEM);
     }
 
-    list_merge(&brk_vma->pages->head, &new_page->list_entry);
-    if (unlikely(errno = vm_map(brk_vma, new_page, process_current->mm->pgd, VM_APPLY_EXTEND)))
+    if (unlikely(errno = vm_map_range(brk_vma, previous_page, brk_pages, process_current->mm->pgd)))
     {
-        // FIXME: I should do a cleanup of pages merged to vma
         return ptr(errno);
     }
 
+    vm_pages_add(brk_vma, brk_pages);
+
+finish:
     process_current->mm->brk = current_brk;
-
     vm_area_log_debug(DEBUG_BRK, brk_vma);
-
     return ptr(previous_brk);
 }

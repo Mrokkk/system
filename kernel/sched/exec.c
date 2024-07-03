@@ -451,7 +451,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     p->mm->args_start = user_stack - argvec[ARGV].size;
     p->mm->args_end = user_stack;
 
-    vm_area_t* brk_vma = vm_create(bin->brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+    vm_area_t* brk_vma = vm_create(bin->brk, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
 
     if (unlikely(!brk_vma))
     {
