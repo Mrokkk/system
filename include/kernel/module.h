@@ -3,6 +3,7 @@
 #include <kernel/list.h>
 #include <kernel/compiler.h>
 
+typedef void (*ctor_t)();
 typedef int (*kmodule_init_t)();
 typedef int (*kmodule_deinit_t)();
 
@@ -14,6 +15,11 @@ struct kernel_module
     unsigned int     this_module;
     list_head_t      modules;
     void*            data;
+    ctor_t*          ctors;
+    size_t           ctors_count;
+    ctor_t*          dtors;
+    size_t           dtors_count;
+    int              padding[5];
 };
 
 typedef struct kernel_module kmod_t;
@@ -28,7 +34,6 @@ typedef struct kernel_module kmod_t;
         .name = #n, \
         .this_module = addr(&km_##n), \
         .modules = LIST_INIT(km_##n.modules), \
-        .data = NULL, \
     }; \
     static unsigned int MAYBE_UNUSED(this_module) = addr(&km_##n)
 

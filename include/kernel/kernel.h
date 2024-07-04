@@ -22,7 +22,6 @@
 
 int strtoi(const char* str);
 int sprintf(char*, const char*, ...);
-int fprintf(int fd, const char* fmt, ...);
 int vsprintf(char*, const char*, __builtin_va_list);
 
 #define fmtstr(buf, ...) \

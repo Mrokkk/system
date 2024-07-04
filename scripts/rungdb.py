@@ -90,9 +90,9 @@ class GdbContext:
         self.breakpoint_handlers = {}
 
 
-def sections_read(app : str) -> Dict[str, int]:
+def sections_read(binary : str) -> Dict[str, int]:
     readelf = subprocess.Popen(
-        ['/bin/readelf', '-S', app],
+        ['/bin/readelf', '-S', '-W', binary],
         errors='ignore',
         stdout=subprocess.PIPE,
         shell=False)
@@ -108,12 +108,20 @@ def sections_read(app : str) -> Dict[str, int]:
             continue
 
         line = line.removeprefix(match.group(0))
-        splitted = line.strip().split()[0:3]
+        splitted = line.strip().split()
         name = splitted[0]
+        flags = splitted[6]
         address = int('0x' + splitted[2], 16)
+        offset = int('0x' + splitted[3], 16)
 
-        if address == 0:
+        if not 'A' in flags:
             continue
+
+        if '.ko' in binary:
+            # In case of kernel module (which is a plain object file),
+            # actual address for all sections is 0, so I need to use
+            # offset
+            address = offset
 
         sections[name] = address
 
@@ -131,7 +139,7 @@ def symbol_file_load(binary : str, base_address : int) -> int:
         cmd += f' -s {section} {hex(address + base_address)}'
 
     print(f'loading {binary} @ {hex(base_address)}')
-    gdb.execute(cmd, to_string=True)
+    gdb.execute(cmd)
 
     return sections['.text']
 
@@ -155,6 +163,17 @@ class KernelBreakpoint(Breakpoint):
 
     def __call__(self) -> None:
         gdb.execute('finish')
+
+
+class ModuleBreakpoint(Breakpoint):
+
+    def __init__(self) -> None:
+        super().__init__('module_breakpoint')
+
+    def __call__(self) -> None:
+        binary = 'mnt' + gdb.parse_and_eval('name').string()
+        base_address = gdb.parse_and_eval('base_address')
+        symbol_file_load(binary, base_address)
 
 
 class LoaderBreakpoint(Breakpoint):
@@ -206,6 +225,7 @@ def gdb_main() -> None:
     symbol_file_load('mnt/lib/ld.so', 0x0)
 
     KernelBreakpoint()
+    ModuleBreakpoint()
     LoaderBreakpoint()
 
     gdb.events.stop.connect(stop_handler)

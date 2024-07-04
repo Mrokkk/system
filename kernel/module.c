@@ -1,3 +1,4 @@
+#include "kernel/printk.h"
 #include <kernel/fs.h>
 #include <kernel/elf.h>
 #include <kernel/path.h>
@@ -61,6 +62,13 @@ void modules_shutdown()
     list_for_each_entry(temp, &modules, modules)
     {
         temp->deinit();
+        if (temp->dtors)
+        {
+            for (size_t i = 0; i < temp->ctors_count; ++i)
+            {
+                temp->dtors[i]();
+            }
+        }
     }
 }
 
@@ -104,6 +112,14 @@ int sys_init_module(const char* name)
     }
 
     log_info("%s: initializing", name);
+
+    if (module->ctors)
+    {
+        for (size_t i = 0; i < module->ctors_count; ++i)
+        {
+            module->ctors[i]();
+        }
+    }
 
     if ((errno = module->init()))
     {

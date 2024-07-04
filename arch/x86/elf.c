@@ -379,6 +379,7 @@ int elf_locate_common_sections(
 
 #define GOT_ENTRIES 32
 
+typedef void (*ctor_t)();
 typedef struct elf_module_data elf_module_data_t;
 
 struct elf_module_data
@@ -386,6 +387,11 @@ struct elf_module_data
     page_t* module_pages;
     uint32_t* got;
 };
+
+static NOINLINE void module_breakpoint(const char* name, uintptr_t base_address)
+{
+    asm volatile("" :: "a" (name), "c" (base_address) : "memory");
+}
 
 int elf_module_load(const char* name, file_t* file, kmod_t** module)
 {
@@ -397,6 +403,10 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
     uint32_t* got = NULL;
     size_t size = file->inode->size;
     page_t* module_pages = page_alloc(page_align(size) / PAGE_SIZE, PAGE_ALLOC_CONT);
+    ctor_t* ctors = NULL;
+    size_t ctors_count = 0;
+    ctor_t* dtors = NULL;
+    size_t dtors_count = 0;
 
     if (unlikely(!module_pages))
     {
@@ -436,9 +446,22 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
     {
         elf32_shdr_t* shdr = &shdrt[i];
 
-        if (shdr->sh_type == SHT_PROGBITS && !strcmp(".modules_data", shstr + shdr->sh_name))
+        if (shdr->sh_type == SHT_PROGBITS)
         {
-            *module = shift_as(kmod_t*, header, shdr->sh_offset);
+            if (!strcmp(".modules_data", shstr + shdr->sh_name))
+            {
+                *module = shift_as(kmod_t*, header, shdr->sh_offset);
+            }
+            else if (!strcmp(".ctors", shstr + shdr->sh_name))
+            {
+                ctors = shift_as(ctor_t*, header, shdr->sh_offset);
+                ctors_count = shdr->sh_size / sizeof(*ctors);
+            }
+            else if (!strcmp(".dtors", shstr + shdr->sh_name))
+            {
+                dtors = shift_as(ctor_t*, header, shdr->sh_offset);
+                dtors_count = shdr->sh_size / sizeof(*dtors);
+            }
             continue;
         }
         else if (shdr->sh_type != SHT_REL)
@@ -461,13 +484,16 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
             elf32_sym_t* s = &symbols[ELF32_R_SYM(rel->r_info)];
             symbol_section = &shdrt[s->st_shndx];
 
+            // FIXME: there's a bug related to .bss - it has 0 size in the ELF itself, but it
+            // requires space in actual memory, so currently it's memory simply overlaps with
+            // the next section
             uint32_t relocated;
             int type = ELF32_R_TYPE(rel->r_info);
             const char* type_str = NULL;
             uint32_t P = real_addr + rel->r_offset;
-            uint32_t A = *(uint32_t*)P + s->st_value; // FIXME: should it be like that?
+            uint32_t A = *(uint32_t*)P;
             uint32_t GOT = addr(got);
-            uint32_t S = shift_as(uint32_t, header, symbol_section->sh_offset);
+            uint32_t S = shift_as(uint32_t, header, symbol_section->sh_offset) + s->st_value;
             uint32_t G = addr(got_ptr) - addr(got);
             ksym_t* kernel_symbol;
 
@@ -528,11 +554,17 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
                     continue;
             }
 
-            log_debug(DEBUG_ELF, "  %-16s %02x, off: %04x: %s: relocated %x", type_str, type, rel->r_offset,
-                s->st_name ? symstr + s->st_name : shstr + symbol_section->sh_name,
+            log_debug(DEBUG_ELF, "  %-16s %02x, off: %04x: %s: at %x (from section %s at offset %x): setting to %x",
+                type_str,
+                type,
+                rel->r_offset,
+                s->st_name ? symstr + s->st_name : "<unnamed>",
+                P,
+                shstr + symbol_section->sh_name,
+                s->st_value,
                 relocated);
 
-            *(uint32_t*)(real_addr + rel->r_offset) = relocated;
+            *(uint32_t*)P = relocated;
         }
     }
 
@@ -553,6 +585,12 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
     }
 
     (*module)->data = data;
+    (*module)->ctors = ctors;
+    (*module)->ctors_count = ctors_count;
+    (*module)->dtors = dtors;
+    (*module)->dtors_count = dtors_count;
+
+    module_breakpoint(name, page_virt(module_pages));
 
     return 0;
 

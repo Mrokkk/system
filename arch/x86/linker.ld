@@ -54,6 +54,7 @@ SECTIONS
         _rodata_end = .;
         _data_start = .;
         *(.data)
+        . = ALIGN(64);
         _smodules_data = .;
         KEEP(*(.modules_data))
         _emodules_data = .;

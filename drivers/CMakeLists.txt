@@ -15,7 +15,6 @@ function(module_build name)
 
     add_custom_target(module_${name}
         COMMAND cp $<TARGET_OBJECTS:mod_${name}> ${CMAKE_BINARY_DIR}/modules/${name}.ko
-        COMMAND strip -g ${CMAKE_BINARY_DIR}/modules/${name}.ko
         DEPENDS mod_${name}
     )
 

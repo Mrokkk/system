@@ -106,6 +106,10 @@ create_dir "${boot_dir}/grub"
 
 for binary in $(find bin -type f -executable)
 do
+    if [[ ${binary} == *".so" ]]
+    then
+        continue
+    fi
     copy ${binary} ${mountpoint}/bin
 done
 
