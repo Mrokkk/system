@@ -261,6 +261,12 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
         }
 
         bin->brk = page_align(phdr[i].p_vaddr + phdr[i].p_memsz + base);
+
+        if (phdr[i].p_flags & PF_X && !bin->code_start)
+        {
+            bin->code_start = vaddr_page_start;
+            bin->code_end = vaddr_page_end;
+        }
     }
 
     return 0;
@@ -294,26 +300,8 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
 
     log_debug(DEBUG_ELF, "entry: %x", bin->entry);
 
-    bin->inode = file->inode;
-
-    void* phdr_mapped = do_mmap(
-        NULL,
-        header->e_phentsize * header->e_phnum,
-        PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS,
-        NULL,
-        0);
-
-    if (unlikely(errno = errno_get(phdr_mapped)))
-    {
-        log_debug(DEBUG_ELF, "failed to map PHDR: %d", errno);
-        return errno;
-    }
-
-    memcpy(phdr_mapped, phdr, header->e_phentsize * header->e_phnum);
-
     if (!aux_insert(AT_ENTRY, addr(bin->entry), argvecs) ||
-        !aux_insert(AT_PHDR, addr(phdr_mapped), argvecs) ||
+        !aux_insert(AT_PHDR, base + header->e_phoff, argvecs) ||
         !aux_insert(AT_PHENT, header->e_phentsize, argvecs) ||
         !aux_insert(AT_BASE, base, argvecs) ||
         !aux_insert(AT_PHNUM, header->e_phnum, argvecs))

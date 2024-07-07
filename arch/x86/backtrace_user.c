@@ -8,7 +8,6 @@
 
 typedef struct bt_data
 {
-    uint32_t code_start, code_end;
     uint32_t stack_start, stack_end;
     uint32_t esp;
     uint32_t eip;
@@ -29,8 +28,6 @@ void* backtrace_user_start(struct process* p, uint32_t eip, uint32_t esp, uint32
         return NULL;
     }
 
-    data->code_start = p->mm->code_start;
-    data->code_end = p->mm->code_end;
     data->stack_start = p->mm->stack_start;
     data->stack_end = p->mm->stack_end;
     data->vm_areas = p->mm->vm_areas;

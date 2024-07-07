@@ -3,13 +3,17 @@
 import io
 import os
 import re
+import cmd
 import sys
 import time
 import select
+import signal
+import termios
 import argparse
 import traceback
 import subprocess
 from collections import deque
+from multiprocessing import Process
 from typing import List, Dict, Tuple, TypeAlias
 
 
@@ -82,8 +86,120 @@ class LineBuffer:
         return self.lines.popleft()
 
 
+def termios_disable_echo_icanon(file, t) -> None:
+    t[3] &= ~(termios.ECHO | termios.ICANON)
+    termios.tcsetattr(file.fileno(), termios.TCSANOW, t)
+
+
+def termios_set(file, t) -> None:
+    termios.tcsetattr(file.fileno(), termios.TCSANOW, t)
+
+
+class RestoreStdin:
+    def __init__(self, stdin, termios) -> None:
+        self.stdin = stdin
+        self.termios = termios.copy()
+
+    def __enter__(self) -> None:
+        termios_set(self.stdin, self.termios)
+        sys.stdin = os.fdopen(os.dup(self.stdin.fileno()), 'r', buffering=1)
+
+    def __exit__(self, exception_type, exception_value, traceback) -> None:
+        sys.stdin.close()
+        termios_disable_echo_icanon(self.stdin, self.termios)
+
+
+class QemuMon(Process):
+    buffer     : LineBuffer
+    mon_input  : io.TextIOWrapper
+    mon_output : io.TextIOWrapper
+
+
+    class Cmd(cmd.Cmd):
+        prompt = 'monitor> '
+
+        def __init__(self, qemu_mon) -> None:
+            super().__init__()
+            self.qemu_mon = qemu_mon
+
+        def do_exit(self, input) -> bool:
+            print('Closing cmdline; enter ":" to show it again', end='', flush=True)
+            return True
+
+        do_EOF = do_exit
+
+        def do_tlb(self, address) -> None:
+            '''print TLB mapping; optionally address can be passed to show single TLB entry'''
+            for line in self.qemu_mon.execute_and_read('info tlb'):
+                if not ':' in line:
+                    continue
+
+                splitted = line.split()
+                vaddr = int(splitted[0].strip(':'), 16)
+                paddr = int(splitted[1], 16)
+
+                if address:
+                    addr = int(address, 16)
+                    offset = addr & 0xfff
+                    if addr - offset != vaddr:
+                        continue
+                print(f'{vaddr:#010x}: {paddr:#010x} {splitted[2]}')
+
+        def default(self, command) -> None:
+            self.qemu_mon.execute(command)
+
+
+    def __init__(self) -> None:
+        self.termios = termios.tcgetattr(sys.stdin.fileno())
+        super().__init__(target=self._reader_loop)
+        self.start()
+
+    def execute_and_read(self, cmd : str) -> List[str]:
+        self.mon_input.write(cmd + '\n')
+        return self._readlines()
+
+    def execute(self, cmd : str) -> None:
+        for line in self.execute_and_read(cmd):
+            print(line)
+
+    def _readlines(self) -> List[str]:
+        lines : List[str] = []
+        while True:
+            output = self.buffer.readline()
+            if '(qemu)' in output:
+                break
+            lines.append(output)
+        return lines
+
+    def _reader_loop(self) -> None:
+        sys.stdin.close()
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        self.mon_input = open('qemumon.in', 'w', buffering=1)
+        self.mon_output = open('qemumon.out', 'r', buffering=1)
+        self.buffer = LineBuffer(self.mon_output)
+
+        stdin = open(os.ttyname(sys.stdout.fileno()), 'rb', buffering=0)
+        termios_disable_echo_icanon(stdin, self.termios.copy())
+
+        # Just to flush initial QEMU's prompt
+        self._readlines()
+
+        while True:
+            line = stdin.read(1).decode()
+
+            if line != ':': continue
+
+            with RestoreStdin(stdin, self.termios):
+                # FIXME: I can't force readline to handle escape
+                # sequences properly even though original termios
+                # is restored
+                self.Cmd(self).cmdloop(' ')
+
+
 class Qemu(subprocess.Popen):
-    buffer : LineBuffer
+    qemu_mon : QemuMon
+    buffer   : LineBuffer
 
     def __init__(self, qemu_args : List[str], args : argparse.Namespace) -> None:
         bufsize     : int = 1
@@ -95,10 +211,11 @@ class Qemu(subprocess.Popen):
             bufsize = 1
             qemu_stdout = subprocess.PIPE
 
-        super().__init__ (
+        super().__init__(
             qemu_args,
             errors='ignore',
             stdout=qemu_stdout,
+            stdin=subprocess.DEVNULL,
             bufsize=bufsize,
             shell=False,
             universal_newlines=True)
@@ -106,8 +223,14 @@ class Qemu(subprocess.Popen):
         if not args.raw:
             self.buffer = LineBuffer(self.stdout)
 
+        self.qemu_mon = QemuMon()
+
     def readline(self) -> str:
         return self.buffer.readline()
+
+    def stop(self) -> None:
+        self.communicate()
+        self.qemu_mon.terminate()
 
 
 FuncFileLine : TypeAlias = Tuple[str, str, str]
@@ -310,6 +433,9 @@ def main() -> None:
     qemu = Qemu(qemu_args, args)
     context = Context(args)
 
+    sys.stdin.close()
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     if not args.raw:
         while True:
             try:
@@ -322,7 +448,7 @@ def main() -> None:
 
             line_process(line, context)
 
-    qemu.communicate()
+    qemu.stop()
     print()
 
     exceptions_print(context)

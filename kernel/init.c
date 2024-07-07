@@ -210,7 +210,7 @@ UNMAP_AFTER_INIT static int root_mount(void)
         for (size_t j = 0; j < array_size(fs_types); ++j)
         {
             log_info("mounting root as %s on %s", fs_types[j], sources[i]);
-            if ((errno = mount(sources[i], "/", fs_types[j], 0, 0)))
+            if ((errno = do_mount(sources[i], "/", fs_types[j], 0)))
             {
                 log_info("mounting %s on %s failed with %d", fs_types[j], sources[i], errno);
             }
@@ -233,27 +233,27 @@ UNMAP_AFTER_INIT static void rootfs_prepare(void)
         panic("cannot mount root: %d", errno);
     }
 
-    if ((errno = chroot("/")))
+    if ((errno = do_chroot("/")))
     {
         panic("cannot set root; errno = %d", errno);
     }
 
-    if ((errno = chdir("/")))
+    if ((errno = do_chdir("/")))
     {
         panic("failed to chdir; errno = %d", errno);
     }
 
-    if ((errno = mount("none", "/dev", "devfs", 0, 0)))
+    if ((errno = do_mount("none", "/dev", "devfs", 0)))
     {
         panic("cannot mount devfs; errno = %d", errno);
     }
 
-    if ((errno = mount("none", "/proc", "proc", 0, 0)))
+    if ((errno = do_mount("none", "/proc", "proc", 0)))
     {
         panic("cannot mount proc; errno = %d", errno);
     }
 
-    if ((errno = mount("none", "/tmp", "ramfs", 0, 0)))
+    if ((errno = do_mount("none", "/tmp", "ramfs", 0)))
     {
         log_warning("cannot mount ramfs on /tmp");
     }

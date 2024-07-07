@@ -1,5 +1,6 @@
 #include <kernel/vm.h>
 #include <kernel/init.h>
+#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/reboot.h>
 #include <kernel/process.h>
@@ -12,7 +13,14 @@
 #include <arch/register.h>
 #include <arch/descriptor.h>
 
-#define DEBUG_USER_EXCEPTION 0
+#define DEBUG_USER_EXCEPTION    0
+#define DEBUG_PAGE_FAULT        0
+#define DEBUG_PAGE_FAULT_TRACE  0
+
+#if DEBUG_PAGE_FAULT_TRACE
+#define DEBUG_PAGE_FAULT_EIP    0 // Define EIP to be traced
+#define DEBUG_PAGE_FAULT_CR2    0 // Define CR2 to be traced
+#endif
 
 struct exception
 {
@@ -24,7 +32,7 @@ struct exception
 
 typedef struct exception exception_t;
 
-static void kernel_fault(const exception_t* exception, pt_regs_t* regs);
+static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs));
 static void page_fault_description_print(const char* severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
 static void general_protection_description_print(const char* severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header);
 
@@ -45,6 +53,8 @@ const exception_t exceptions[] = {
 };
 
 static int exception_ongoing;
+static uintptr_t prev_cr2;
+static bool prev_cr2_valid;
 
 static void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output)
 {
@@ -108,63 +118,120 @@ static inline printer_t printer_get(int nr)
 void do_exception(uint32_t nr, pt_regs_t regs)
 {
     char header[48];
+    vm_area_t* vma;
+    process_t* p = process_current;
 
     scoped_irq_lock();
-
-    const exception_t* exception = &exceptions[nr];
-    printer_t printer = printer_get(nr);
-
-    if (unlikely(regs.cs != USER_CS))
-    {
-        kernel_fault(exception, &regs);
-        return;
-    }
 
     uint32_t cr2 = cr2_get();
     uint32_t cr3 = cr3_get();
 
-    if (likely(nr == PAGE_FAULT))
+    if (unlikely(nr != PAGE_FAULT))
     {
-        vm_area_t* area = vm_find(cr2, process_current->mm->vm_areas);
-        if (area && area->vm_flags & VM_WRITE)
-        {
-            if (DEBUG_USER_EXCEPTION)
-            {
-                sprintf(header, "%s[%u]", process_current->name, process_current->pid);
-                log_debug(DEBUG_USER_EXCEPTION, "%s: COW at %x caused by write to %x", header, regs.eip, cr2);
-            }
+        goto handle_fault;
+    }
 
-            if (!vm_copy_on_write(area, process_current->mm->pgd))
-            {
-                return;
-            }
+    if (DEBUG_PAGE_FAULT_TRACE)
+    {
+        if (
+#ifdef DEBUG_PAGE_FAULT_EIP
+            regs.eip == DEBUG_PAGE_FAULT_EIP ||
+#endif
+#ifdef DEBUG_PAGE_FAULT_CR2
+            cr2 == DEBUG_PAGE_FAULT_CR2 ||
+#endif
+            0)
+        {
+            uintptr_t paddr = vm_paddr(cr2, p->mm->pgd);
+            current_log_info("page fault from %x caused by %x (paddr %x)", regs.eip, cr2, paddr);
         }
     }
 
-    sprintf(header, "%s[%u]", process_current->name, process_current->pid);
-
-    log_notice("%s: %s #%x at %x",
-        header,
-        exception->name,
-        regs.error_code,
-        regs.eip);
-
-    if (DEBUG_USER_EXCEPTION)
+    // FIXME
+    // There's a random "crash" of snake. It's not really a crash, but rather a page fault
+    // with stale CR2 from previous page fault in bash (valid COW case). My first hypothesis
+    // was that timer fires between exc_page_fault_handler entry and cli above and it seems
+    // to be partially correct. After saving jiffies and CR2 to process_t in SAVE_ALL
+    // (SAVE_ALL also started doing cli as the first instruction and sti after saving data
+    // to process_t) and printing it here I was able to see:
+    // [     112.595563] /bin/bash[2]: pf from 0xdc8e4, jiffies 11129, proc cr2 = 0xdc8e4, proc jiffies 11129
+    // [     112.602736] /bin/snake[35]: pf from 0xdc8e4, jiffies 11129, proc cr2 = 0xbf818800, proc jiffies 11128
+    //
+    // So in above case page fault for 0xbf818800 from snake was the first one, but got
+    // interrupted due to timer IRQ, which ran bash, which then triggered a page fault for
+    // 0xdc8e4. When CPU was taken from bash, snake was restarted at the exception handling
+    // and it read the stale CR2.
+    //
+    // But I was also able to reproduce following situation:
+    // [      29.005790] /bin/bash[2]: pf from 0xdc8e4, jiffies 2770, proc cr2 = 0xdc8e4, proc jiffies 2770
+    // [      29.011290] /bin/snake[22]: pf from 0xdc8e4, jiffies 2770, proc cr2 = 0xdc8e4, proc jiffies 2770
+    //
+    // In above case jiffies and proc jiffies are the same which means that there was no timer
+    // IRQ between cli in SAVE_ALL and cli above. It might mean that either:
+    // - there's IRQ firing just before calling cli in SAVE_ALL (very unlikely)
+    // - there's some other race condition or some misuse of MMU
+    //
+    // Until I figure out how to fix it properly, below WA is simply restarting page fault if
+    // previous page fault came from the same address
+    if (prev_cr2_valid && cr2 == prev_cr2)
     {
-        if (printer)
-        {
-            printer(KERN_INFO, &regs, cr2, cr3, header);
-        }
-
-        regs_print(header, &regs, log_info);
-        vm_areas_indent_log(KERN_INFO, process_current->mm->vm_areas, INDENT_LVL_1, "%s: vm areas:", header);
-        backtrace_user(log_notice, &regs);
+        prev_cr2_valid = false;
+        return;
     }
 
-    do_kill(process_current, exception->signal);
+    prev_cr2 = cr2;
+    prev_cr2_valid = true;
+
+    vma = vm_find(cr2, p->mm->vm_areas);
+
+    if (unlikely(!vma))
+    {
+        goto handle_fault;
+    }
+
+    current_log_debug(DEBUG_PAGE_FAULT, "page fault at %x caused by access to %x", regs.eip, cr2);
+
+    if (unlikely(vm_nopage(vma, p->mm->pgd, cr2, regs.error_code & PF_WRITE)))
+    {
+        goto handle_fault;
+    }
+
+    return;
+
+handle_fault:
+    {
+        const exception_t* exception = &exceptions[nr];
+        printer_t printer = printer_get(nr);
+
+        if (unlikely(regs.cs != USER_CS))
+        {
+            kernel_fault(exception, &regs);
+        }
+
+        sprintf(header, "%s[%u]", p->name, p->pid);
+        log_notice("%s: %s #%x at %x",
+            header,
+            exception->name,
+            regs.error_code,
+            regs.eip);
+
+        if (DEBUG_USER_EXCEPTION)
+        {
+            if (printer)
+            {
+                printer(KERN_INFO, &regs, cr2, cr3, header);
+            }
+
+            regs_print(header, &regs, log_info);
+            vm_areas_indent_log(KERN_INFO, p->mm->vm_areas, INDENT_LVL_1, "%s: vm areas:", header);
+            backtrace_user(log_notice, &regs);
+        }
+
+        do_kill(p, exception->signal);
+    }
 }
 
-static void kernel_fault(const exception_t* exception, pt_regs_t* regs)
+static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs))
 {
     const char* header = "kernel";
     char string[80];
@@ -173,8 +240,11 @@ static void kernel_fault(const exception_t* exception, pt_regs_t* regs)
     uint32_t cr3 = cr3_get();
     uint32_t cr4 = cr4_get();
     printer_t printer = printer_get(exception->nr);
+    process_t* p = process_current;
 
     ++exception_ongoing;
+
+    pgd_load(phys_ptr(init_pgd_get()));
 
     panic_mode_enter();
 
@@ -201,7 +271,7 @@ static void kernel_fault(const exception_t* exception, pt_regs_t* regs)
         exception->name,
         regs->error_code,
         regs->eip,
-        process_current->pid);
+        p->pid);
 
     if (printer)
     {

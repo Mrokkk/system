@@ -10,6 +10,9 @@
 #define __KERNEL_PAGE_INCLUDED
 #include <arch/page.h>
 
+#define DEBUG_PAGE          0
+#define DEBUG_PAGE_DETAILED 0 // Collects page_alloc caller address
+
 struct page;
 struct inode;
 struct buffer;
@@ -20,7 +23,7 @@ typedef struct vm_region vm_region_t;
 
 struct page
 {
-    uint16_t count;
+    uint16_t refcount;
     size_t pages_count;
     void* virtual;
 #if DEBUG_PAGE_DETAILED

@@ -13,7 +13,7 @@ FILE* stderr;
         if (UNLIKELY(__ret)) \
         { \
             asm volatile( \
-                "call 0xdeadbeef" \
+                "movl $0, 0" \
                 :: "a" (__ret), \
                    "b" (__LINE__), \
                    "c" (data)); \

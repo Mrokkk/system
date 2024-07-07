@@ -9,20 +9,30 @@ extern gdt_entry_t unpaged_gdt_entries[];
 
 gdt_entry_t* gdt_entries = virt_ptr(unpaged_gdt_entries);
 
-idt_entry_t idt_entries[256];
-
-idt_t idt = {
-    sizeof(idt_entry_t) * 256 - 1,
-    addr(&idt_entries)
+struct idt_data
+{
+    idt_entry_t entries[256];
+    idt_t idt;
+    uint8_t padding[PAGE_SIZE - 256 * sizeof(idt_entry_t) - sizeof(idt_t)];
+}
+ALIGN(PAGE_SIZE) idt = {
+    .entries = {},
+    .idt = {
+        .limit = sizeof(idt_entry_t) * 256 - 1,
+        .base = addr(&idt.entries),
+    },
+    .padding = {}
 };
+
+static_assert(offsetof(struct idt_data, idt) == IDT_OFFSET);
 
 static inline void idt_set_gate(uint8_t num, uint32_t base, uint16_t selector, uint32_t flags)
 {
-    idt_entries[num].base_lo = (base) & 0xFFFF;
-    idt_entries[num].base_hi = ((base) >> 16) & 0xFFFF;
-    idt_entries[num].sel = selector;
-    idt_entries[num].always0 = 0;
-    idt_entries[num].flags = flags | 0x80;
+    idt.entries[num].base_lo = (base) & 0xFFFF;
+    idt.entries[num].base_hi = ((base) >> 16) & 0xFFFF;
+    idt.entries[num].sel = selector;
+    idt.entries[num].always0 = 0;
+    idt.entries[num].flags = flags | 0x80;
 }
 
 UNMAP_AFTER_INIT void tss_init()
@@ -46,7 +56,20 @@ void idt_set(int nr, uint32_t addr)
 
 uint32_t idt_get(int nr)
 {
-    return (addr(idt_entries[nr].base_hi) << 16) | idt_entries[nr].base_lo;
+    return (addr(idt.entries[nr].base_hi) << 16) | idt.entries[nr].base_lo;
+}
+
+UNMAP_AFTER_INIT void idt_write_protect()
+{
+    uint32_t address = addr(&idt);
+    uint32_t pde_index = pde_index(address);
+    uint32_t pte_index = pte_index(address);
+
+    pgt_t* pgt = virt_ptr(init_pgd_get()[pde_index] & PAGE_ADDRESS);
+
+    pgt[pte_index] = (pgt[pte_index] & PAGE_ADDRESS) | PTE_PRESENT;
+
+    pgd_reload();
 }
 
 UNMAP_AFTER_INIT void idt_init()
@@ -90,5 +113,5 @@ UNMAP_AFTER_INIT void idt_init()
     #include <arch/isr.h>
     #include <arch/exception.h>
 
-    idt_load(&idt);
+    idt_load(&idt.idt);
 }

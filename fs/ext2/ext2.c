@@ -2,6 +2,7 @@
 #include "ext2.h"
 
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/kernel.h>
@@ -16,9 +17,10 @@ module_exit(ext2_deinit);
 static int ext2_lookup(inode_t* parent, const char* name, inode_t** result);
 static int ext2_open(file_t* file);
 static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add);
-static int ext2_mmap(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
+static int ext2_mmap(file_t* file, vm_area_t* vma);
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int ext2_read(file_t* file, char* buffer, size_t count);
+static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page);
 
 enum traverse_command
 {
@@ -71,6 +73,10 @@ static file_operations_t ext2_fops = {
 
 static inode_operations_t ext2_inode_ops = {
     .lookup = &ext2_lookup,
+};
+
+static vm_operations_t ext2_vmops = {
+    .nopage = &ext2_nopage,
 };
 
 static ext2_bgd_t* ext2_bgd_get(ext2_data_t* data, uint32_t ino)
@@ -497,18 +503,19 @@ static int ext2_read(file_t* file, char* buffer, size_t count)
     return res;
 }
 
-typedef struct mmap_context mmap_context_t;
+typedef struct readpage_context readpage_context_t;
 
-struct mmap_context
+struct readpage_context
 {
     size_t offset; // Offset within current page
     page_t* current_page;
 };
 
-static cmd_t ext2_mmap_block(void* block, size_t to_copy, void* data)
+static cmd_t ext2_nopage_block(void* block, size_t to_copy, void* data)
 {
-    mmap_context_t* ctx = data;
+    readpage_context_t* ctx = data;
     page_t* current_page = ctx->current_page;
+
     memcpy(shift(page_virt_ptr(current_page), ctx->offset), block, to_copy);
 
     if ((ctx->offset += to_copy) == PAGE_SIZE)
@@ -516,33 +523,44 @@ static cmd_t ext2_mmap_block(void* block, size_t to_copy, void* data)
         ctx->current_page = list_next_entry(&current_page->list_entry, page_t, list_entry);
         ctx->offset = 0;
     }
+
     return TRAVERSE_CONTINUE;
 }
 
-static int ext2_mmap(file_t* file, vm_area_t*, page_t* pages, size_t size, size_t offset)
+static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
 {
     int res, errno;
-    mmap_context_t ctx;
+    ext2_inode_t* inode = vma->inode->fs_data;
+    ext2_data_t* data = vma->inode->sb->fs_data;
 
-    ext2_inode_t* raw_inode = file->inode->fs_data;
-    ext2_data_t* data = file->inode->sb->fs_data;
+    *page = page_alloc1();
 
-    if (unlikely(!pages))
+    if (unlikely(!*page))
     {
-        log_debug(DEBUG_EXT2FS, "cannot allocate pages");
         return -ENOMEM;
     }
 
-    ctx.current_page = pages;
-    ctx.offset = 0;
+    readpage_context_t ctx = {
+        .current_page = *page,
+        .offset = 0,
+    };
 
-    res = ext2_traverse_blocks(data, raw_inode, offset, size, &ctx, &ext2_mmap_block);
+    off_t vma_off = address - vma->start;
+
+    res = ext2_traverse_blocks(data, inode, vma->offset + vma_off, PAGE_SIZE, &ctx, &ext2_nopage_block);
 
     if (unlikely(errno = errno_get(res)))
     {
+        pages_free(*page);
         return errno;
     }
 
+    return 0;
+}
+
+static int ext2_mmap(file_t*, vm_area_t* vma)
+{
+    vma->ops = &ext2_vmops;
     return 0;
 }
 

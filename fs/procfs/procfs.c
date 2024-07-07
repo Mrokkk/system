@@ -26,6 +26,7 @@ static int stack_show(seq_file_t* s);
 static int meminfo_show(seq_file_t* s);
 static int cmdline_show(seq_file_t* s);
 static int uptime_show(seq_file_t* s);
+static int environ_show(seq_file_t* s);
 int syslog_show(seq_file_t* s);
 int maps_show(seq_file_t* s);
 
@@ -103,6 +104,7 @@ PROCFS_ENTRY(comm);
 PROCFS_ENTRY(status);
 PROCFS_ENTRY(stack);
 PROCFS_ENTRY(maps);
+PROCFS_ENTRY(environ);
 
 static procfs_entry_t pid_entries[] = {
     DOT("."),
@@ -111,6 +113,8 @@ static procfs_entry_t pid_entries[] = {
     REG(status, S_IRUGO),
     REG(stack, S_IRUGO),
     REG(maps, S_IRUGO),
+    REG(environ, S_IRUGO),
+    REG(cmdline, S_IRUGO),
 };
 
 static inline procfs_entry_t* procfs_find(const char* name, procfs_entry_t* dir, size_t count)
@@ -415,8 +419,44 @@ static int meminfo_show(seq_file_t* s)
     return 0;
 }
 
+static const char* kernel_address_get(process_t* p, uintptr_t addr)
+{
+    uintptr_t paddr = vm_paddr(addr, p->mm->pgd);
+
+    if (!paddr)
+    {
+        return NULL;
+    }
+
+    return virt_ptr(paddr);
+}
+
+static void memory_to_seq_file(seq_file_t* s, const char* data, size_t n)
+{
+    for (size_t i = 0; i < n; ++i)
+    {
+        seq_putc(s, data[i]);
+    }
+}
+
 static int cmdline_show(seq_file_t* s)
 {
+    process_t* p = process_get(s);
+
+    if (p)
+    {
+        const char* env = kernel_address_get(p, p->mm->args_start);
+
+        if (unlikely(!env))
+        {
+            return -ENOMEM;
+        }
+
+        memory_to_seq_file(s, env, p->mm->args_end - p->mm->args_start);
+
+        return 0;
+    }
+
     seq_puts(s, cmdline);
     seq_putc(s, '\n');
     return 0;
@@ -427,5 +467,21 @@ static int uptime_show(seq_file_t* s)
     timeval_t ts;
     timestamp_get(&ts);
     seq_printf(s, "%u.%u\n", ts.tv_sec, ts.tv_usec);
+    return 0;
+}
+
+static int environ_show(seq_file_t* s)
+{
+    process_t* p = process_get(s);
+
+    const char* env = kernel_address_get(p, p->mm->env_start);
+
+    if (unlikely(!env))
+    {
+        return -ENOMEM;
+    }
+
+    memory_to_seq_file(s, env, p->mm->env_end - p->mm->env_start);
+
     return 0;
 }

@@ -226,8 +226,10 @@ TEST(sbrk3)
 {
     EXPECT_KILLED_BY(SIGSEGV)
     {
-        uint8_t* data = sbrk(-0x1000);
-        data[2] = 29;
+        uint32_t* data = sbrk(0) - 4;
+        *data = 2;
+        sbrk(-0x1000);
+        *data = 29;
         exit(FAILED_EXPECTATIONS());
     }
 }

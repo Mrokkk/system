@@ -5,7 +5,6 @@
 #include <kernel/page.h>
 #include <kernel/wait.h>
 #include <kernel/mutex.h>
-#include <kernel/binary.h>
 #include <kernel/dentry.h>
 #include <kernel/kernel.h>
 #include <kernel/signal.h>
@@ -96,7 +95,7 @@ struct files
 
 struct process
 {
-    struct context context;
+    context_t context;
     stat_t stat;
     list_head_t running;
     unsigned need_resched;
@@ -116,7 +115,6 @@ struct process
     struct signals* signals;
     int alarm;
     process_t* parent;
-    binary_t* bin;
     list_head_t timers;
     wait_queue_head_t wait_child;
     list_head_t children;
@@ -185,11 +183,8 @@ int process_find(int pid, struct process** p);
 void process_wake_waiting(struct process* p);
 int process_find_free_fd(struct process* p, int* fd);
 void scheduler();
-void exit(int);
-int fork(void);
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[]);
-vm_area_t* stack_create(uint32_t address, pgd_t* pgd);
 char* process_print(const struct process* p, char* str);
 vm_area_t* exec_prepare_initial_vma();
 
@@ -366,20 +361,6 @@ static inline void process_files_exit(struct process* p)
 static inline void process_fs_exit(struct process* p)
 {
     if (!--p->fs->count) delete(p->fs);
-}
-
-static inline void process_bin_exit(struct process* p)
-{
-    binary_t* bin = p->bin;
-    if (!bin)
-    {
-        return;
-    }
-
-    if (!--bin->count)
-    {
-        delete(bin);
-    }
 }
 
 static inline int current_can_kill(struct process* p)

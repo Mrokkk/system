@@ -22,28 +22,39 @@ static inline uint32_t pte_flags_get(int vm_flags)
 
 static inline uint32_t vm_paddr(uint32_t vaddr, const pgd_t* pgd)
 {
-    uint32_t offset = vaddr - page_beginning(vaddr);
+    uint32_t offset = vaddr & PAGE_MASK;
     uint32_t pde_index = pde_index(vaddr);
     uint32_t pte_index = pte_index(vaddr);
+
     if (!pgd[pde_index])
     {
         return 0;
     }
 
-    pgt_t* pgt = virt_ptr(pgd[pde_index] & ~PAGE_MASK);
-    return (pgt[pte_index] & ~PAGE_MASK) + offset;
+    pgt_t* pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS);
+    return (pgt[pte_index] & PAGE_ADDRESS) + offset;
 }
 
-static inline uint32_t vm_paddr_end(vm_area_t* vma, pgd_t* pgd)
+static inline page_t* vm_page(
+    const pgd_t* pgd,
+    const uintptr_t vaddr,
+    uint32_t* pde_index,
+    uint32_t* pte_index)
 {
-    uint32_t vaddr = page_beginning(vma->end - 1);
-    uint32_t pde_index = pde_index(vaddr);
-    uint32_t pte_index = pte_index(vaddr);
-    if (!pgd[pde_index])
+    *pde_index = pde_index(vaddr);
+    *pte_index = pte_index(vaddr);
+
+    if (!pgd[*pde_index])
     {
-        return 0;
+        return NULL;
     }
 
-    pgt_t* pgt = virt_ptr(pgd[pde_index] & ~PAGE_MASK);
-    return (pgt[pte_index] & ~PAGE_MASK) + PAGE_SIZE;
+    pgt_t* pgt = virt_ptr(pgd[*pde_index] & PAGE_ADDRESS);
+
+    if (!pgt[*pte_index])
+    {
+        return NULL;
+    }
+
+    return page(pgt[*pte_index] & PAGE_ADDRESS);
 }

@@ -13,7 +13,7 @@
 #include <kernel/sections.h>
 #include <kernel/backtrace.h>
 
-static inline void paranoia(struct process*, struct process* next)
+static inline void paranoia(process_t*, process_t* next)
 {
     uint32_t* stack;
     uint32_t stack_end;
@@ -74,7 +74,7 @@ static inline void paranoia(struct process*, struct process* next)
 
     if (next->context.eip == addr(&context_restore))
     {
-        struct context_switch_frame* regs = ptr(stack);
+        context_switch_frame_t* regs = ptr(stack);
         if (regs->gs != KERNEL_DS && regs->gs != USER_DS)
         {
             cli();
@@ -89,7 +89,7 @@ static inline void paranoia(struct process*, struct process* next)
     }
     else if (next->context.eip == addr(&exit_kernel))
     {
-        struct pt_regs* regs = ptr(stack);
+        pt_regs_t* regs = ptr(stack);
         switch (next->type)
         {
             #define CHECK(seg, val) \
@@ -126,7 +126,7 @@ static inline void paranoia(struct process*, struct process* next)
     }
 }
 
-static inline void process_switch(struct process* prev, struct process* next)
+static inline void process_switch(process_t* prev, process_t* next)
 {
 #if PARANOIA_SCHED
     paranoia(prev, next);
@@ -154,5 +154,6 @@ static inline void process_switch(struct process* prev, struct process* next)
           "=m" (prev->context.eip)
         : "m" (next->context.esp),
           "m" (next->context.eip),
-          "a" (prev), "d" (next));
+          "a" (prev), "d" (next)
+        : "memory");
 }

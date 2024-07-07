@@ -8,6 +8,7 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
 #include <kernel/page.h>
+#include <kernel/path.h>
 #include <kernel/debug.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
@@ -98,37 +99,15 @@ uint32_t kernel_process_setup_stack(
     return addr(dest_stack);
 }
 
-uint32_t user_process_setup_stack(
-    struct process* dest,
-    struct process* src,
-    struct pt_regs* src_regs)
+uint32_t user_process_setup_stack(process_t* dest, process_t*, pt_regs_t* src_regs)
 {
     uint32_t* kernel_stack;
-    vm_area_t* src_stack_vma = process_stack_vm_area(src);
-    vm_area_t* dest_stack_vma = process_stack_vm_area(dest);
-
-    uint32_t size = src_stack_vma->end - src_regs->esp;
-
-    // We can use virt addr of user space directly, as it should be mapped to our vm
-    uint32_t* src_stack_start = ptr(src_stack_vma->end);
-    uint32_t* dest_stack_start = virt_ptr(vm_paddr_end(dest_stack_vma, ptr(dest->mm->pgd)));
 
     dest->context.esp0 = addr(kernel_stack = dest->mm->kernel_stack);
 
-    log_debug(DEBUG_PROCESS, "src_user_stack=%x size=%u", src_stack_start, size);
-
-    stack_copy(
-        ptr(dest_stack_start),
-        src_stack_start,
-        size);
-
-    log_debug(DEBUG_PROCESS, "copied %u B; new dest esp=%x",
-        size,
-        dest_stack_vma->end - size);
-
     fork_kernel_stack_frame(
         &kernel_stack,
-        ptr(dest_stack_vma->end - size),
+        ptr(src_regs->esp),
         src_regs,
         0);
 
@@ -246,9 +225,23 @@ static inline void exec_kernel_stack_frame(
 
 int sys_execve(struct pt_regs regs)
 {
+    int errno;
+
     const char* pathname = cptr(regs.ebx);
     const char* const* argv = (const char* const*)(regs.ecx);
     const char* const* envp = (const char* const*)(regs.edx);
+
+    if ((errno = path_validate(pathname)))
+    {
+        return errno;
+    }
+
+    // FIXME: validate properly instead of checking only 4 bytes
+    if ((errno = vm_verify_array(VERIFY_READ, argv, 4, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
     return do_exec(pathname, argv, envp);
 }
 

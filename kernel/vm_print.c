@@ -193,7 +193,6 @@ static void vm_area_columns_fill(table_t* table)
     table_column_add(table, "size", "%08x", 10, ' ');
     table_column_add(table, "offset", "%08x", 10, ' ');
     table_column_add(table, "flag", "%s", 4, ' ');
-    table_column_add(table, "refcount", "%d", 8, ' ');
     table_column_add(table, "name", "%s", 0, '\0');
 }
 
@@ -214,7 +213,6 @@ static int vma_row_fill(table_context_t* ctx, void* data)
     table_column_write(ctx, vma->end - vma->start);
     table_column_write(ctx, vma->offset);
     table_column_write(ctx, vm_flags_string(buf, vma->vm_flags));
-    table_column_write(ctx, vma->pages->refcount);
     vm_file_path_read(vma, buf, 48);
     table_column_write(ctx, buf);
     d->vma = vma->next;
@@ -286,7 +284,7 @@ static inline char* vm_maps_flags_string(char* buffer, const vm_area_t* vma)
     *b++ = (vm_flags & VM_READ) ? 'r' : '-';
     *b++ = (vm_flags & VM_WRITE) ? 'w' : '-';
     *b++ = (vm_flags & VM_EXEC) ? 'x' : '-';
-    *b++ = (vma->pages->refcount == 1) ? 'p' : 's';
+    *b++ = (vm_flags & VM_SHARED) ? 's' : 'p';
     *b = '\0';
     return buffer;
 }

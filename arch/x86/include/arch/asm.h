@@ -30,7 +30,7 @@
     push %edx;          /* edx */ \
     push %ecx;          /* ecx */ \
     push %ebx;          /* ebx */ \
-    SAVE_USER_ESP;                \
+    SAVE_USER_ESP;
 
 #define SAVE_USER_ESP \
     cmpl $KERNEL_CS, REGS_CS(%esp); \

@@ -8,21 +8,18 @@
 struct procfs_inode;
 typedef struct procfs_inode procfs_inode_t;
 
-static inline struct process* process_get(seq_file_t* s)
+static inline process_t* process_get(seq_file_t* s)
 {
-    struct process* p = NULL;
-    short pid = s->file->inode->ino;
+    process_t* p = NULL;
+    int pid = s->file->inode->ino;
 
     if (pid == -1)
     {
         p = process_current;
     }
-    else
+    else if (process_find(pid, &p))
     {
-        if (process_find(pid, &p))
-        {
-            panic("no process with pid %u", pid);
-        }
+        return NULL;
     }
 
     return p;

@@ -15,11 +15,12 @@ module_init(iso9660_init);
 module_exit(iso9660_deinit);
 
 static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result);
-static int iso9660_mmap(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
+static int iso9660_mmap(file_t* file, vm_area_t* vma);
 static int iso9660_read(file_t* file, char* buffer, size_t count);
 static int iso9660_open(file_t* file);
 static int iso9660_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 static int iso9660_mount(super_block_t* sb, inode_t* inode, void*, int);
+static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page);
 
 static_assert(offsetof(iso9660_pvd_t, root) == 156 - 8);
 static_assert(offsetof(iso9660_dirent_t, name) == 33);
@@ -43,6 +44,10 @@ static file_operations_t iso9660_fops = {
     .open = &iso9660_open,
     .readdir = &iso9660_readdir,
     .mmap = &iso9660_mmap,
+};
+
+static vm_operations_t iso9660_vmops = {
+    .nopage = &iso9660_nopage,
 };
 
 static uint32_t block_nr_convert(uint32_t iso_block_nr)
@@ -351,10 +356,20 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
     return 0;
 }
 
-static int iso9660_mmap(file_t* file, vm_area_t*, page_t* pages, size_t size, size_t offset)
+static int iso9660_mmap(file_t*, vm_area_t* vma)
 {
-    iso9660_dirent_t* dirent = file->inode->fs_data;
-    iso9660_data_t* data = file->inode->sb->fs_data;
+    vma->ops= &iso9660_vmops;
+    return 0;
+}
+
+// FIXME: there is some bug somewhere when using iso:
+// [       5.534779] /bin/test[3]: page fault #0x4 at 0x4800 caused by 0x0
+// Under the eip is 0 (so it's "add %al, (%eax)"), so page was not properly
+// read
+static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
+{
+    iso9660_dirent_t* dirent = vma->inode->fs_data;
+    iso9660_data_t* data = vma->inode->sb->fs_data;
 
     if (unlikely(!dirent || !data))
     {
@@ -364,28 +379,22 @@ static int iso9660_mmap(file_t* file, vm_area_t*, page_t* pages, size_t size, si
 
     int errno;
     void* data_ptr;
+    off_t offset = vma->offset + address - vma->start;
     uint32_t pos = offset, data_size;
     uint32_t block_nr = offset / BLOCK_SIZE + block_nr_convert(GET(dirent->lba));
-    page_t* current_page;
-    size_t blocks_count = size / BLOCK_SIZE;
+    size_t blocks_count = PAGE_SIZE / BLOCK_SIZE;
     buffer_t* b;
 
-    if (unlikely(!(current_page = pages = page_alloc(size / PAGE_SIZE, PAGE_ALLOC_DISCONT))))
+    if (unlikely(!(*page = page_alloc1())))
     {
         log_debug(DEBUG_ISO9660, "cannot allocate pages");
         return -ENOMEM;
     }
 
-    data_ptr = page_virt_ptr(current_page);
+    data_ptr = page_virt_ptr(*page);
 
     for (size_t i = 0; i < blocks_count; ++i)
     {
-        if (i && i % 4 == 0)
-        {
-            current_page = list_next_entry(&current_page->list_entry, page_t, list_entry);
-            data_ptr = page_virt_ptr(current_page);
-        }
-
         b = block_read(data->dev, data->file, block_nr);
 
         if (unlikely(errno = errno_get(b)))
@@ -407,7 +416,8 @@ static int iso9660_mmap(file_t* file, vm_area_t*, page_t* pages, size_t size, si
     return 0;
 
 error:
-    pages_free(pages);
+    pages_free(*page);
+    *page = NULL;
     return errno;
 }
 

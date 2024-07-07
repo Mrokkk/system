@@ -1,7 +1,6 @@
 #pragma once
 
 #include <kernel/fs.h>
-#include <kernel/binary.h>
 #include <kernel/module.h>
 #include <kernel/api/elf.h>
 

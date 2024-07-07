@@ -2,9 +2,9 @@
 #include <kernel/page.h>
 #include <kernel/vm_print.h>
 
-#define COW_BROKEN 1
+#define DEBUG_NOPAGE 0
 
-vm_area_t* vm_create(uint32_t vaddr, int vm_flags)
+vm_area_t* vm_create(uint32_t vaddr, size_t size, int vm_flags)
 {
     vm_area_t* vma = alloc(vm_area_t);
 
@@ -14,17 +14,8 @@ vm_area_t* vm_create(uint32_t vaddr, int vm_flags)
         return NULL;
     }
 
-    vma->pages = alloc(pages_t);
-
-    if (unlikely(!vma->pages))
-    {
-        log_debug(DEBUG_VM, "cannot allocate vma->pages");
-        return NULL;
-    }
-
-    vma->pages->refcount = 1;
-    vma->pages->pages = NULL;
     vma->start = vma->end = vaddr;
+    vma->end += size;
     vma->vm_flags = vm_flags;
     vma->inode = NULL;
     vma->next = NULL;
@@ -82,129 +73,107 @@ void vm_del(vm_area_t* vma)
 {
     vma->next->prev = vma->prev;
     vma->prev->next = vma->next;
+    delete(vma);
 }
 
-int vm_pages_add(vm_area_t* vma, page_t* pages)
-{
-    vma->end += pages->pages_count * PAGE_SIZE;
-
-    if (vma->pages->pages)
-    {
-        vma->pages->pages->pages_count += pages->pages_count;
-        list_merge(&vma->pages->pages->list_entry, &pages->list_entry);
-    }
-    else
-    {
-        vma->pages->pages = pages;
-    }
-
-    return 0;
-}
-
-int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, const pgd_t* src_pgd)
+int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd)
 {
     // Copy vm_area except for next and prev
-    memcpy(dest_vma, src_vma, sizeof(vm_area_t) - 2 * sizeof(struct vm_area*));
+    memcpy(dest_vma, src_vma, sizeof(vm_area_t) - 2 * sizeof(vm_area_t*));
 
     dest_vma->next = NULL;
     dest_vma->prev = NULL;
-    dest_vma->pages->refcount++;
-    dest_vma->vm_flags |= VM_COW;
 
-    // FIXME: random bash crash was caused by COW implemented poorly -
-    // I wasn't  denying write access on parent pages, so parent could
-    // overwrite child's memory
-#if !COW_BROKEN
     return arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end);
-#else
-    int errno;
-    if ((errno = arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end)))
-    {
-        return errno;
-    }
-
-    return dest_vma->vm_flags & VM_WRITE
-        ? vm_copy_on_write(dest_vma, dest_pgd)
-        : 0;
-#endif
 }
 
-int vm_copy_on_write(vm_area_t* vma, const pgd_t* pgd)
+int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
 {
-    page_t* page_range;
+    int errno;
+    uint32_t pde_index, pte_index;
 
-    vm_area_log_debug(DEBUG_VM_COW, vma);
-
-    if (unlikely(!--vma->pages->refcount))
+    if (unlikely(write && !(vma->vm_flags & VM_WRITE)))
     {
-        log_error("cow on not shared pages!");
         return -EFAULT;
     }
 
-    page_range = page_alloc((vma->end - vma->start) / PAGE_SIZE, PAGE_ALLOC_CONT);
+    scoped_irq_lock();
 
-    if (unlikely(!page_range))
+    log_debug(DEBUG_NOPAGE, "address: %x, vma:", address);
+    vm_area_log_debug(DEBUG_NOPAGE, vma);
+
+    address = page_beginning(address);
+
+    page_t* page = vm_page(pgd, address, &pde_index, &pte_index);
+
+    if (vma->inode && !page)
     {
-        log_debug(DEBUG_VM_COW, "cannot allocate pages");
-        return -ENOMEM;
+        if (unlikely(!vma->ops))
+        {
+            log_warning("no vma ops, cannot map file");
+            return -ENOSYS;
+        }
+
+        errno = vma->ops->nopage(vma, address, &page);
+
+        if (unlikely(errno))
+        {
+            log_warning("ops->nopage failed: %d", errno);
+            return errno;
+        }
+
+        goto map_page;
     }
 
-    vma->pages = alloc(pages_t);
-
-    if (unlikely(!vma->pages))
+    if (!page)
     {
-        log_debug(DEBUG_VM_COW, "cannot allocate vma->pages");
-        return -ENOMEM;
+        page = page_alloc1();
+
+        if (unlikely(!page))
+        {
+            log_error("no memory available!");
+            return -ENOMEM;
+        }
+
+        memset(page_virt_ptr(page), 0, PAGE_SIZE);
+
+        goto map_page;
+    }
+    else
+    {
+        if (page->refcount > 1)
+        {
+            page_t* new_page = page_alloc1();
+
+            if (unlikely(!new_page))
+            {
+                return -ENOMEM;
+            }
+
+            memcpy(page_virt_ptr(new_page), ptr(address), PAGE_SIZE);
+
+            page->refcount--;
+            page = new_page;
+        }
+        else if (!write)
+        {
+            return -EFAULT;
+        }
     }
 
-    vma->pages->refcount = 1;
-    vma->pages->pages = page_range;
-    vma->vm_flags &= ~VM_COW;
-
-    return arch_vm_copy_on_write(vma, pgd, page_range);
-}
-
-typedef int (*apply_fn_t)(pgd_t* pgd, page_t* pages, uint32_t start, uint32_t end, int vm_flags);
-
-static int vm_map_range_impl(vm_area_t* vma, uint32_t start, page_t* pages, pgd_t* pgd, apply_fn_t apply)
-{
-    int errno;
-    uint32_t end = start + pages->pages_count * PAGE_SIZE;
-
-    if (unlikely(errno = apply(pgd, pages, start, end, vma->vm_flags)))
+map_page:
+    if (unlikely(errno = arch_vm_map_single(pgd, pde_index, pte_index, page, vma->vm_flags)))
     {
-        log_debug(DEBUG_VM_APPLY, "failed %d", errno);
+        log_warning("arch_vm_map_single failed with %d", errno);
         return errno;
     }
 
-    // FIXME: this function does not know whether vma is related to the
-    // current process's pgd, so it shouldn't call pgd_reload
     pgd_reload();
 
     return 0;
 }
 
-int vm_map(vm_area_t* vma, page_t* pages, pgd_t* pgd)
-{
-    if (unlikely(vma->end - vma->start != pages->pages_count * PAGE_SIZE))
-    {
-        log_error("wrong size in vma:");
-        vm_area_log(KERN_ERR, vma);
-    }
-    return vm_map_range_impl(vma, vma->start, pages, pgd, &arch_vm_apply);
-}
-
-int vm_map_range(vm_area_t* vma, uint32_t start, page_t* pages, pgd_t* pgd)
-{
-    return vm_map_range_impl(vma, start, pages, pgd, &arch_vm_apply);
-}
-
-int vm_remap(vm_area_t* vma, page_t* pages, pgd_t* pgd)
-{
-    return vm_map_range_impl(vma, vma->start, pages, pgd, &arch_vm_reapply);
-}
-
-static inline int address_within(uint32_t vaddr, vm_area_t* vma)
+static inline bool address_within(uint32_t vaddr, vm_area_t* vma)
 {
     return vaddr >= vma->start && vaddr < vma->end;
 }
@@ -245,8 +214,6 @@ int vm_verify_impl(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area
 
 int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
 {
-    VM_VERIFY_KERNEL_PROCESS_HACK();
-
     for (; vma; vma = vma->next)
     {
         if (addr(string) >= vma->start && addr(string) < vma->end)

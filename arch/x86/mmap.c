@@ -62,11 +62,9 @@ static inline int vm_flags_get(int prot)
 void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t offset)
 {
     int errno;
-    page_t* pages;
     uint32_t vaddr;
     vm_area_t* vma;
     size_t size = page_align(len);
-    size_t page_count = size / PAGE_SIZE;
 
     log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", addr, size, prot, flags, file);
 
@@ -79,6 +77,8 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     {
         return ptr(-EINVAL);
     }
+
+    scoped_mutex_lock(&process_current->mm->lock);
 
     if (flags & MAP_FIXED)
     {
@@ -93,39 +93,14 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         }
         vaddr = addr(addr);
     }
-    else
-    {
-        vaddr = address_space_find(size);
-        if (!vaddr)
-        {
-            return ptr(-ENOMEM);
-        }
-    }
-
-    vma = vm_create(vaddr, vm_flags_get(prot));
-
-    if (unlikely(!vma))
+    else if (unlikely(!(vaddr = address_space_find(size))))
     {
         return ptr(-ENOMEM);
     }
 
-    pages = page_alloc(page_count, PAGE_ALLOC_DISCONT);
-
-    if (unlikely(!pages))
+    if (unlikely(!(vma = vm_create(vaddr, size, vm_flags_get(prot)))))
     {
-        errno = -ENOMEM;
-        goto free_vma;
-    }
-
-    if (unlikely(errno = vm_pages_add(vma, pages)))
-    {
-        goto free_vma;
-    }
-
-    if (unlikely(vma->end != vma->start + size))
-    {
-        current_log_error("mismatch in vma size: expected %u B", size);
-        vm_area_log(KERN_ERR, vma);
+        return ptr(-ENOMEM);
     }
 
     if (flags & MAP_ANONYMOUS)
@@ -139,49 +114,30 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         {
             log_debug(DEBUG_MMAP, "no operation");
             errno = -ENOSYS;
-            goto free_pages;
+            goto free_vma;
         }
 
         log_debug(DEBUG_MMAP, "calling ops->mmap");
-        if ((errno = file->ops->mmap(file, vma, pages, page_count * PAGE_SIZE, offset)))
+        if ((errno = file->ops->mmap(file, vma)))
         {
             log_debug(DEBUG_MMAP, "ops->mmap failed");
-            goto free_pages;
+            goto free_vma;
         }
 
-        vma->inode = /*prot & PROT_WRITE ? NULL :*/ file->inode;
+        vma->inode = file->inode;
         vma->offset = offset;
-    }
-
-    if (prot & PROT_EXEC)
-    {
-        process_current->mm->code_start = vma->start;
-        process_current->mm->code_end = vma->end;
-    }
-
-    mutex_lock(&process_current->mm->lock);
-
-    if (unlikely(errno = vm_map(vma, pages, process_current->mm->pgd)))
-    {
-        goto unlock_mm;
     }
 
     if (unlikely(errno = vm_add(&process_current->mm->vm_areas, vma)))
     {
-        goto unlock_mm;
+        goto free_vma;
     }
-
-    mutex_unlock(&process_current->mm->lock);
 
     log_debug(DEBUG_MMAP, "returning %x; vm area:", vaddr);
     vm_area_log_debug(DEBUG_MMAP, vma);
 
     return ptr(vaddr);
 
-unlock_mm:
-    mutex_unlock(&process_current->mm->lock);
-free_pages:
-    pages_free(pages);
 free_vma:
     delete(vma);
     return ptr(errno);
@@ -210,7 +166,6 @@ void* sys_mmap(struct mmap_params* params)
 
 int sys_mprotect(void* addr, size_t len, int prot)
 {
-    UNUSED(addr); UNUSED(len); UNUSED(prot);
     vm_area_t* vma;
 
     scoped_mutex_lock(&process_current->mm->lock);
@@ -230,12 +185,12 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
     vma->vm_flags = vm_flags_get(prot);
 
-    return vm_remap(vma, vma->pages->pages, process_current->mm->pgd);
+    return 0;
 }
 
 int sys_brk(void* addr)
 {
-    int errno = 0;
+    int errno;
 
     if (unlikely(!addr))
     {
@@ -263,7 +218,7 @@ int sys_brk(void* addr)
 
     if (!new_brk_vma)
     {
-        new_brk_vma = vm_create(addr(addr), VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+        new_brk_vma = vm_create(addr(addr), 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
 
         if (unlikely(!new_brk_vma))
         {
@@ -289,8 +244,6 @@ int sys_brk(void* addr)
 
 void* sys_sbrk(int incr)
 {
-    int errno;
-    page_t* brk_pages;
     vm_area_t* brk_vma;
     uint32_t previous_brk, current_brk, previous_page, next_page;
 
@@ -311,55 +264,16 @@ void* sys_sbrk(int incr)
         process_vm_areas_log(KERN_ERR, process_current);
         return ptr(-ENOMEM);
     }
-    else if (brk_vma->pages->refcount > 1)
+
+    if (previous_page > next_page)
     {
-        // Get own pages
-        vm_copy_on_write(brk_vma, process_current->mm->pgd);
+        vm_unmap_range(brk_vma, next_page, previous_page, process_current->mm->pgd);
+        pgd_reload();
     }
 
-    if (previous_page == next_page)
-    {
-        current_log_debug(DEBUG_BRK, "no need to allocate a page; prev=%x; next=%x", previous_brk, current_brk);
-        goto finish;
-    }
-    else if (previous_page > next_page)
-    {
-        size_t size_diff = previous_page - next_page;
-        size_t diff = size_diff / PAGE_SIZE;
-        page_t* pages_to_free;
-        current_log_debug(DEBUG_BRK, "freeing %u pages", diff);
-
-        brk_pages = brk_vma->pages->pages;
-
-        if ((unlikely(!(pages_to_free = pages_split(brk_pages, diff)))))
-        {
-            current_log_error("sbrk: failed to split pages");
-            return ptr(-EINVAL);
-        }
-
-        brk_vma->end = next_page;
-
-        vm_unmap_range(brk_vma, next_page, pages_to_free, process_current->mm->pgd);
-
-        goto finish;
-    }
-
-    brk_pages = page_alloc((next_page - previous_page) / PAGE_SIZE, PAGE_ALLOC_NO_KERNEL);
-
-    if (unlikely(!brk_pages))
-    {
-        return ptr(-ENOMEM);
-    }
-
-    if (unlikely(errno = vm_map_range(brk_vma, previous_page, brk_pages, process_current->mm->pgd)))
-    {
-        return ptr(errno);
-    }
-
-    vm_pages_add(brk_vma, brk_pages);
-
-finish:
+    brk_vma->end = next_page;
     process_current->mm->brk = current_brk;
     vm_area_log_debug(DEBUG_BRK, brk_vma);
+
     return ptr(previous_brk);
 }

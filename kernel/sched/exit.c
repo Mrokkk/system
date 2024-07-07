@@ -3,7 +3,7 @@
 #include <kernel/process.h>
 #include <kernel/api/unistd.h>
 
-static inline void process_space_free(struct process* proc)
+static inline void process_space_free(process_t* proc)
 {
     pgd_t* pgd = proc->mm->pgd;
     uint32_t* kernel_stack_end = ptr(addr(proc->mm->kernel_stack) - PAGE_SIZE);
@@ -25,7 +25,7 @@ static inline void process_space_free(struct process* proc)
     delete(proc->mm);
 }
 
-static void process_delete(struct process* proc)
+static void process_delete(process_t* proc)
 {
     log_debug(DEBUG_EXIT, "");
     list_del(&proc->siblings);
@@ -38,7 +38,6 @@ static void process_delete(struct process* proc)
         arch_process_free(proc);
         process_fs_exit(proc);
         process_signals_exit(proc);
-        process_bin_exit(proc);
     }
 
     delete(proc);
@@ -46,7 +45,7 @@ static void process_delete(struct process* proc)
 
 int sys_waitpid(int pid, int* status, int wait_flags)
 {
-    struct process* proc;
+    process_t* proc;
 
     log_debug(DEBUG_EXIT, "called for %d; flags = %d", pid, wait_flags);
 
@@ -124,9 +123,9 @@ dont_wait:
     return proc->pid;
 }
 
-void process_wake_waiting(struct process* proc)
+void process_wake_waiting(process_t* proc)
 {
-    struct process* parent = proc->parent;
+    process_t* parent = proc->parent;
 
     if (unlikely(!parent))
     {
@@ -150,18 +149,18 @@ void process_wake_waiting(struct process* proc)
     log_debug(DEBUG_EXIT, "not waking %u", parent->pid);
 }
 
-void process_exit(struct process* p)
+void process_exit(process_t* p)
 {
-    flags_t flags;
-    irq_save(flags);
+    scoped_irq_lock();
+
     log_debug(DEBUG_EXIT, "%u exiting", p->pid);
+
     list_del(&p->running);
     process_files_exit(p);
     p->stat = PROCESS_ZOMBIE;
     process_wake_waiting(p);
     p->need_resched = true;
     process_ktimers_exit(p);
-    irq_restore(flags);
 }
 
 int sys_exit(int return_value)

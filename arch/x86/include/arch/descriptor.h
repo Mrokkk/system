@@ -100,14 +100,17 @@ void tss_init(void);
 void idt_init(void);
 void idt_set(int nr, uint32_t addr);
 uint32_t idt_get(int nr);
+void idt_write_protect(void);
 
 #endif // !__ASSEMBLER__
 
-#define TSS_ENTRY 5
-#define APM_CODE_ENTRY  6
-#define APM_CODE_16_ENTRY  7
-#define APM_DATA_ENTRY  8
-#define TIMER_IDT_ENTRY 32
+#define TSS_ENTRY           5
+#define APM_CODE_ENTRY      6
+#define APM_CODE_16_ENTRY   7
+#define APM_DATA_ENTRY      8
+#define TIMER_IDT_ENTRY     32
+
+#define IDT_OFFSET          2048
 
 #define descriptor_selector(num, ring) ((num << 3) | ring)
 #define tss_selector(num) ((num + TSS_ENTRY) << 3)

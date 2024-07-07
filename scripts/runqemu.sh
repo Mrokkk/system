@@ -15,7 +15,8 @@ args="\
 -device isa-debugcon,chardev=char0 \
 -chardev stdio,id=char0,mux=on,signal=off \
 -chardev pipe,id=char1,path=ttyS0 \
--mon chardev=char0 \
+-chardev pipe,id=char2,path=qemumon \
+-mon chardev=char2 \
 -serial chardev:char1 \
 -usb"
 kernel_params=
@@ -121,9 +122,11 @@ fi
 
 if [[ ! -p ttyS0.in ]]
 then
-    rm -rf ttyS0.in ttyS0.out
+    rm -rf ttyS0.in ttyS0.out qemumon.in qemumon.out
     mkfifo ttyS0.in
     mkfifo ttyS0.out
+    mkfifo qemumon.in
+    mkfifo qemumon.out
 fi
 
 for x in "${!kernel_params_dict[@]}"

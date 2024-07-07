@@ -241,19 +241,21 @@ static void argvecs_copy_to_user(uint32_t* dest, argvecs_t argvecs)
     vec[AUXV] = dest++;
 
     // String table is located after all entries of argv and envp, which
-    // both  have NULL entries at the end, thus "+1"s
+    // both have NULL entries at the end, thus "+1"s
     strings = ptr(dest + argvecs[ARGV].count + 1 + argvecs[ENVP].count + 1);
 
     for (int i = 0; i < 2; ++i)
     {
         // Set address of actual array to argv/envp
         *vec[i] = addr(dest);
+        argvecs[i].data = strings;
         list_for_each_entry(arg, &argvecs[i].head, list_entry)
         {
             // Put argv/envp[i] address and copy content of argv/envp[i]
             *dest++ = addr(strings);
             strcpy(strings, arg->arg);
             strings += arg->len;
+            argvecs[i].data_size += arg->len;
         }
 
         *dest++ = 0;
@@ -383,34 +385,21 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
 
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[])
 {
-    binary_t* bin;
     char copied_path[PATH_MAX];
     int errno;
     uint32_t user_stack;
     aux_t* execfn;
+    arg_t* argv0;
     struct process* p = process_current;
     ARGVECS_DECLARE(argvec);
-
-    if ((errno = path_validate(pathname)))
-    {
-        return errno;
-    }
-
-    // FIXME: validate properly instead of checking only 4 bytes
-    if ((errno = vm_verify_array(VERIFY_READ, argv, 4, p->mm->vm_areas)))
-    {
-        return errno;
-    }
-
-    if (!(bin = alloc(binary_t, memset(this, 0, sizeof(*this)))))
-    {
-        return -ENOMEM;
-    }
+    binary_t bin = {};
 
     strcpy(copied_path, pathname);
 
     args_get(argv, true, &argvec[ARGV]);
     args_get(envp, false, &argvec[ENVP]);
+
+    argv0 = list_next_entry(&argvec[ARGV].head, arg_t, list_entry);
 
     argvec[AUXV].size = sizeof(void*) + 2 * sizeof(uint32_t);
 
@@ -426,18 +415,15 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         argvec[ARGV].count,
         argvec[ENVP].count);
 
-    if ((errno = binary_image_load(pathname, bin, argvec)))
+    if ((errno = binary_image_load(pathname, &bin, argvec)))
     {
         return errno;
     }
 
-    strncpy(p->name, copied_path, PROCESS_NAME_LEN);
-    process_bin_exit(p);
+    strncpy(p->name, argv0->arg, PROCESS_NAME_LEN);
     //process_ktimers_exit(p);
-    p->bin = bin;
-    bin->count = 1;
 
-    if (unlikely(!bin->stack_vma))
+    if (unlikely(!bin.stack_vma))
     {
         do_kill(p, SIGSTKFLT);
         return -EFAULT;
@@ -445,13 +431,9 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     pgd_reload();
 
-    user_stack = bin->stack_vma->end;
+    user_stack = bin.stack_vma->end;
 
-    p->mm->brk = bin->brk;
-    p->mm->args_start = user_stack - argvec[ARGV].size;
-    p->mm->args_end = user_stack;
-
-    vm_area_t* brk_vma = vm_create(bin->brk, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+    vm_area_t* brk_vma = vm_create(bin.brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
 
     if (unlikely(!brk_vma))
     {
@@ -476,6 +458,16 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     user_stack -= ARGVECS_SIZE(argvec);
     argvecs_copy_to_user(ptr(user_stack), argvec);
 
+    p->mm->brk = bin.brk;
+    p->mm->code_start = bin.code_start;
+    p->mm->code_end = bin.code_end;
+
+    p->mm->env_start = addr(argvec[ENVP].data);
+    p->mm->env_end = p->mm->env_start + argvec[ENVP].data_size;
+
+    p->mm->args_start = addr(argvec[ARGV].data);
+    p->mm->args_end = p->mm->args_start + argvec[ARGV].data_size;
+
     argvecs_put(argvec);
 
     ASSERT(*(int*)user_stack == argvec[ARGV].count);
@@ -488,9 +480,27 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     }
 
     // TODO: maybe I should alloc a new stack?
-    arch_exec(bin->entry, p->mm->kernel_stack, user_stack);
+    arch_exec(bin.entry, p->mm->kernel_stack, user_stack);
 
-    return 0;
+    ASSERT_NOT_REACHED();
+}
+
+static vm_area_t* stack_create(uintptr_t address, process_t* proc)
+{
+    vm_area_t* stack_vma = vm_create(
+        address,
+        USER_STACK_SIZE,
+        VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
+
+    if (unlikely(!stack_vma))
+    {
+        return NULL;
+    }
+
+    vm_nopage(stack_vma, proc->mm->pgd, address, true);
+    vm_nopage(stack_vma, proc->mm->pgd, address + PAGE_SIZE, true);
+
+    return stack_vma;
 }
 
 vm_area_t* exec_prepare_initial_vma()
@@ -498,6 +508,8 @@ vm_area_t* exec_prepare_initial_vma()
     vm_area_t* prev;
     vm_area_t* temp;
     vm_area_t* stack_vma = process_stack_vm_area(process_current);
+
+    scoped_irq_lock();
 
     if (likely(stack_vma))
     {
@@ -523,7 +535,7 @@ vm_area_t* exec_prepare_initial_vma()
     }
     else if (process_is_kernel(process_current))
     {
-        stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, process_current->mm->pgd);
+        stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, process_current);
         process_current->mm->stack_start = stack_vma->start;
         process_current->mm->stack_end = stack_vma->end;
     }

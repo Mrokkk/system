@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <kernel/fs.h>
 #include <kernel/list.h>
-#include <kernel/binary.h>
 
 typedef struct arg arg_t;
 typedef struct aux aux_t;
@@ -40,19 +39,8 @@ struct argvec
     list_head_t head;
     int count;
     size_t size;
-};
-
-typedef argvec_t argvecs_t[4];
-
-struct binfmt
-{
-    const char* name;
-    char signature;
-    int (*prepare)(const char* name, file_t* file, string_t** interpreter, void** data);
-    int (*load)(file_t* file, binary_t* bin, void* data, argvecs_t argvecs);
-    int (*interp_load)(file_t* file, binary_t* bin, void* data, argvecs_t argvecs);
-    void (*cleanup)(void* data);
-    list_head_t list_entry;
+    const void* data;
+    size_t data_size;
 };
 
 #define ARGV     0
@@ -73,6 +61,30 @@ struct binfmt
         align((name)[ARGV].size + (name)[ENVP].size + (name)[AUXV].size, sizeof(uintptr_t)) + \
         align((name)[AUX_DATA].size, sizeof(uintptr_t)); \
     })
+
+typedef argvec_t argvecs_t[4];
+
+typedef struct binary binary_t;
+
+struct binary
+{
+    void* entry;
+    uintptr_t brk;
+    uintptr_t code_start;
+    uintptr_t code_end;
+    vm_area_t* stack_vma;
+};
+
+struct binfmt
+{
+    const char* name;
+    char signature;
+    int (*prepare)(const char* name, file_t* file, string_t** interpreter, void** data);
+    int (*load)(file_t* file, binary_t* bin, void* data, argvecs_t argvecs);
+    int (*interp_load)(file_t* file, binary_t* bin, void* data, argvecs_t argvecs);
+    void (*cleanup)(void* data);
+    list_head_t list_entry;
+};
 
 int binfmt_register(binfmt_t* binfmt);
 

@@ -18,44 +18,12 @@ static inline void process_forked(struct process* proc)
     ++total_forks;
 }
 
-vm_area_t* stack_create(uint32_t address, pgd_t* pgd)
-{
-    int errno;
-    vm_area_t* stack_vma;
-
-    page_t* pages = page_alloc(USER_STACK_SIZE / PAGE_SIZE, PAGE_ALLOC_CONT);
-
-    if (unlikely(!pages))
-    {
-        return NULL;
-    }
-
-    stack_vma = vm_create(
-        address,
-        VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
-
-    if (unlikely(!stack_vma ||
-        (errno = vm_pages_add(stack_vma, pages)) ||
-        (errno = vm_map(stack_vma, pages, pgd))))
-    {
-        goto error;
-    }
-
-    return stack_vma;
-
-error:
-    pages_free(pages);
-    return NULL;
-}
-
 static int process_space_copy(struct process* dest, struct process* src, int clone_flags)
 {
     int errno = -ENOMEM;
     void* pgd;
     vm_area_t* new_vma;
     vm_area_t* src_vma;
-    vm_area_t* src_stack_vma;
-    vm_area_t* dest_stack_vma;
     page_t* kernel_stack_page;
     uint32_t* kernel_stack_end;
 
@@ -118,16 +86,9 @@ static int process_space_copy(struct process* dest, struct process* src, int clo
 
     mutex_lock(&src->mm->lock);
 
-    src_stack_vma = process_stack_vm_area(src);
-
-    // Copy all vma except for stack
+    // Copy all vmas
     for (src_vma = src->mm->vm_areas; src_vma; src_vma = src_vma->next)
     {
-        if (src_vma == src_stack_vma)
-        {
-            continue;
-        }
-
         new_vma = alloc(vm_area_t);
 
         if (unlikely(!new_vma))
@@ -152,23 +113,10 @@ static int process_space_copy(struct process* dest, struct process* src, int clo
 
     mutex_unlock(&src->mm->lock);
 
-    dest_stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, pgd);
-
-    if (unlikely(!dest_stack_vma))
-    {
-        goto free_pgd;
-    }
-
-    vm_add(&dest->mm->vm_areas, dest_stack_vma);
-
-    /*log_debug(DEBUG_PROCESS, "new areas:", dest->pid);*/
-    /*vm_print(dest->mm->vm_areas, DEBUG_PROCESS);*/
-
     return 0;
 
 free_areas:
     // TODO
-free_pgd:
     page_free(pgd);
 free_kstack:
     pages_free(kernel_stack_page);
@@ -281,16 +229,6 @@ static inline int process_signals_copy(struct process* child, struct process* pa
     return 0;
 }
 
-static inline int process_bin_clone(struct process* child, struct process* parent)
-{
-    if (parent->bin)
-    {
-        ++parent->bin->count;
-    }
-    child->bin = parent->bin;
-    return 0;
-}
-
 int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
 {
     int errno = -ENOMEM;
@@ -304,7 +242,6 @@ int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
     if (process_fs_copy(child, parent, clone_flags)) goto fs_error;
     if (process_files_copy(child, parent, clone_flags)) goto files_error;
     if (process_signals_copy(child, parent, clone_flags)) goto signals_error;
-    if (process_bin_clone(child, parent)) goto arch_error;
     if (arch_process_copy(child, parent, regs)) goto arch_error;
 
     list_add_tail(&child->processes, &init_process.processes);
@@ -351,7 +288,6 @@ process_t* process_spawn(const char* name, process_entry_t entry, void* args, in
     if (process_fs_copy(child, parent, 0)) goto fs_error;
     if (process_files_copy(child, parent, 0)) goto files_error;
     if (process_signals_copy(child, parent, 0)) goto signals_error;
-    if (process_bin_clone(child, parent)) goto arch_error;
     if (arch_process_spawn(child, entry, args, flags)) goto arch_error;
 
     list_add_tail(&child->processes, &init_process.processes);

@@ -204,7 +204,8 @@ ENTRY(bios_call)
         ljmp $KERNEL_CS, $protected_paging_32
 
     protected_paging_32:
-        lidt (idt)
+        mov $idt + IDT_OFFSET, %eax
+        lidt (%eax)
         movl SAVED_STACK_ADDRESS, %esp // Restore ESP
         popf
         popa // Restore regs

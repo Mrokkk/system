@@ -5,6 +5,7 @@
 #include <kernel/mutex.h>
 #include <kernel/memory.h>
 #include <kernel/minmax.h>
+#include <kernel/process.h>
 
 #include <arch/segment.h>
 #include <arch/register.h>
@@ -65,8 +66,9 @@ static inline page_t* free_page_range_find_discont(const int count)
         }
 
         log_debug(DEBUG_PAGE, "[alloc] %x", page_phys(temp_page));
+
         list_del(&temp_page->list_entry);
-        temp_page->count = 1;
+        temp_page->refcount = 1;
 
         if (!first_page)
         {
@@ -93,7 +95,7 @@ static inline page_t* free_page_range_find(const int count)
 
     for (uint32_t i = 0; i < last_pfn; ++i)
     {
-        if (!page_map[i].count)
+        if (!page_map[i].refcount)
         {
             if (!first_page)
             {
@@ -120,7 +122,7 @@ static inline page_t* free_page_range_find(const int count)
     for (int i = 0; i < count; ++i)
     {
         log_debug(DEBUG_PAGE, "[alloc] %x", page_phys(&first_page[i]));
-        first_page[i].count = 1;
+        first_page[i].refcount = 1;
         first_page[i].pages_count = 0;
         list_del(&first_page[i].list_entry);
 
@@ -156,18 +158,22 @@ static inline void page_kernel_identity_mapping_range(page_t* page, int pte_flag
 static inline int frame_free(uint32_t address)
 {
     uint32_t frame = address / PAGE_SIZE;
+    int ret;
 
-    log_debug(DEBUG_PAGE, "[free] paddr=%x count_after_free=%u", address, page_map[frame].count - 1);
+    log_debug(DEBUG_PAGE, "[free] paddr=%x count_after_free=%u", address, page_map[frame].refcount - 1);
 
-    if (unlikely(!page_map[frame].count))
+    if (unlikely(!page_map[frame].refcount))
     {
         panic("frame is already free or reserved: %x", address);
     }
 
-    list_del(&page_map[frame].list_entry);
-    list_add(&page_map[frame].list_entry, &free_pages);
+    if (!(ret = --page_map[frame].refcount))
+    {
+        list_del(&page_map[frame].list_entry);
+        list_add(&page_map[frame].list_entry, &free_pages);
+    }
 
-    return --page_map[frame].count;
+    return ret;
 }
 
 page_t* __page_alloc(int count, alloc_flag_t flag)
@@ -479,7 +485,7 @@ void page_stats_print()
         for (uint32_t j = ma->start; j < ma->end; j += PAGE_SIZE)
         {
             if (ma->start > 0xffffffff) break;
-            if (!page_map[j / PAGE_SIZE].count)
+            if (!page_map[j / PAGE_SIZE].refcount)
             {
                 ++frames_free;
             }
@@ -516,12 +522,12 @@ void page_stats_print()
     log_info("count paddr      symbol");
     for (uint32_t i = 0; i < last_pfn; ++i)
     {
-        if (page_map[i].caller && page_map[i].count)
+        if (page_map[i].caller && page_map[i].refcount)
         {
             void* caller = page_map[i].caller;
             ksym_string(symbol, addr(caller));
             log_info("%- 5u %08x %s",
-                page_map[i].count,
+                page_map[i].refcount,
                 page_phys(&page_map[i]),
                 symbol);
         }
@@ -559,14 +565,14 @@ void pte_print(const uint32_t pte, char* output)
 
 static inline void page_set_used(uint32_t pfn)
 {
-    page_map[pfn].count = 1;
+    page_map[pfn].refcount = 1;
     page_map[pfn].virtual = virt_ptr(pfn * PAGE_SIZE);
     list_init(&page_map[pfn].list_entry);
 }
 
 static inline void page_set_unused(uint32_t pfn)
 {
-    page_map[pfn].count = 0;
+    page_map[pfn].refcount = 0;
     page_map[pfn].virtual = NULL;
     list_add_tail(&page_map[pfn].list_entry, &free_pages);
 }
@@ -726,12 +732,12 @@ UNMAP_AFTER_INIT int paging_init()
 
     pgd_load(phys_ptr(kernel_page_dir));
 
-    ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].count);
-    ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].count);
-    ASSERT(page_map[(phys_addr(virt_end) - PAGE_SIZE) / PAGE_SIZE].count);
+    ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].refcount);
+    ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].refcount);
+    ASSERT(page_map[(phys_addr(virt_end) - PAGE_SIZE) / PAGE_SIZE].refcount);
     ASSERT(page_table[phys_addr(virt_end) / PAGE_SIZE - 1]);
     ASSERT(kernel_page_dir[min(ram, GiB) / PAGE_SIZE / PTE_IN_PDE + KERNEL_PDE_OFFSET - 1]);
-    ASSERT(page_map[memory_areas->start / PAGE_SIZE + 2].count);
+    ASSERT(page_map[memory_areas->start / PAGE_SIZE + 2].refcount);
 
     return 0;
 }

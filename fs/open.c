@@ -293,16 +293,10 @@ int sys_creat(const char* pathname, int mode)
     return sys_open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
 
-int sys_chdir(const char* __user path)
+int do_chdir(const char* path)
 {
-    int errno;
     dentry_t* dentry;
     mode_t mode;
-
-    if ((errno = path_validate(path)))
-    {
-        return errno;
-    }
 
     if ((dentry = lookup(path)) == NULL)
     {
@@ -322,7 +316,20 @@ int sys_chdir(const char* __user path)
     }
 
     process_current->fs->cwd = dentry;
+
     return 0;
+}
+
+int sys_chdir(const char* __user path)
+{
+    int errno;
+
+    if ((errno = path_validate(path)))
+    {
+        return errno;
+    }
+
+    return do_chdir(path);
 }
 
 int sys_getcwd(char* __user buf, size_t size)

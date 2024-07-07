@@ -73,7 +73,7 @@ struct file_operations
     int (*read)(file_t* file, char* buf, size_t count);
     int (*write)(file_t* file, const char* buf, size_t count);
     int (*readdir)(file_t* file, void* buf, direntadd_t dirent_add);
-    int (*mmap)(file_t* file, vm_area_t* vma, page_t* pages, size_t size, size_t offset);
+    int (*mmap)(file_t* file, vm_area_t* vma);
     int (*ioctl)(file_t* file, unsigned long request, void* arg);
     int (*poll)(file_t* file, short events, short* revents, wait_queue_head_t** head);
     int (*open)(file_t* file);
@@ -139,10 +139,14 @@ extern inode_t* root;
 
 int file_system_register(file_system_t* fs);
 dentry_t* lookup(const char* filename);
+
+int do_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags);
+int do_chroot(const char* path);
+int do_chdir(const char* path);
 int do_read(file_t* file, size_t offset, void* buffer, size_t count);
-int do_mount(file_system_t* fs, const char* source, const char* mount_point, dev_t dev, file_t* device_file);
 int do_open(file_t** new_file, const char* filename, int flags, int mode);
 int do_close(file_t* file);
+
 int file_fd_allocate(file_t* file);
 
 // string_read - allocate string with count+1 capacity and read count bytes

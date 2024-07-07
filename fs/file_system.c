@@ -62,7 +62,7 @@ int file_system_get(const char* name, file_system_t** fs)
     return 1;
 }
 
-int do_mount(file_system_t* fs, const char* source, const char* mount_point, dev_t dev, file_t* file)
+static int mount_impl(file_system_t* fs, const char* source, const char* mount_point, dev_t dev, file_t* file)
 {
     int errno;
     inode_t* inode = NULL;
@@ -148,7 +148,7 @@ int do_mount(file_system_t* fs, const char* source, const char* mount_point, dev
     return 0;
 }
 
-int sys_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags)
+int do_mount(const char* source, const char* target, const char* filesystemtype, unsigned long)
 {
     int errno;
     dev_t dev = 0;
@@ -156,8 +156,6 @@ int sys_mount(const char* source, const char* target, const char* filesystemtype
     file_t* file = NULL;
     inode_t* fake_inode = NULL;
     file_operations_t* ops;
-
-    (void)mountflags;
 
     if (strcmp(source, "none"))
     {
@@ -200,18 +198,13 @@ int sys_mount(const char* source, const char* target, const char* filesystemtype
         }
     }
 
-    if ((errno = path_validate(target)))
-    {
-        return errno;
-    }
-
     if (file_system_get(filesystemtype, &fs))
     {
         errno = -ENODEV;
         goto error;
     }
 
-    return do_mount(fs, source, target, dev, file);
+    return mount_impl(fs, source, target, dev, file);
 
 error:
     if (file)
@@ -225,6 +218,20 @@ error:
     return errno;
 }
 
+int sys_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags)
+{
+    int errno;
+
+    if ((errno = path_validate(target)) ||
+        (errno = current_vm_verify_string(VERIFY_READ, target)) ||
+        (errno = current_vm_verify_string(VERIFY_READ, filesystemtype)))
+    {
+        return errno;
+    }
+
+    return do_mount(source, target, filesystemtype, mountflags);
+}
+
 int sys_umount(const char*)
 {
     return -ENOSYS;
@@ -235,15 +242,9 @@ int sys_umount2(const char*, int)
     return -ENOSYS;
 }
 
-int sys_chroot(const char* path)
+int do_chroot(const char* path)
 {
-    int errno;
     dentry_t* dentry;
-
-    if ((errno = path_validate(path)))
-    {
-        return errno;
-    }
 
     if (!process_current->fs->root)
     {
@@ -264,6 +265,18 @@ int sys_chroot(const char* path)
     process_current->fs->root = dentry;
 
     return 0;
+}
+
+int sys_chroot(const char* path)
+{
+    int errno;
+
+    if ((errno = path_validate(path)))
+    {
+        return errno;
+    }
+
+    return do_chroot(path);
 }
 
 int sys_statfs(const char* path, struct statfs* buf)
