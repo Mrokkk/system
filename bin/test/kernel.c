@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/syscall.h>
 
 #include "test.h"
 
@@ -40,6 +41,39 @@ TEST_SUITE(kernel);
             exit(0); \
         } \
     }
+
+int vsyscall(int nr, ...)
+{
+    int ret;
+    asm volatile(
+        "push %%edi;"
+        "push %%esi;"
+        "push %%edx;"
+        "push %%ecx;"
+        "push %%ebx;"
+        "push %%ebp;"
+        "mov $1f, %%edx;"
+        "mov %%esp, %%ecx;"
+        "sysenter;"
+        "1:"
+        "pop %%ebp;"
+        "pop %%ebx;"
+        "pop %%ecx;"
+        "pop %%edx;"
+        "pop %%esi;"
+        "pop %%edi;"
+        : "=a" (ret) : "a" (nr) : "memory");
+    return ret;
+}
+
+TEST(vsyscall)
+{
+    EXPECT_EXIT_WITH(0)
+    {
+        EXPECT_EQ(vsyscall(__NR_getpid), getpid());
+        exit(FAILED_EXPECTATIONS());
+    }
+}
 
 TEST(sse)
 {

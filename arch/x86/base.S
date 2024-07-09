@@ -5,9 +5,9 @@
 
 #include <kernel/debug.h>
 #include <kernel/api/errno.h>
+#include <kernel/api/syscall.h>
 
 #include <arch/isr.h>
-#include <kernel/syscall.h>
 #include <arch/exception.h>
 
 ENTRY(__semaphore_wake)
@@ -36,6 +36,19 @@ ENTRY(eip_get)
     pop %eax
     jmp *%eax
 ENDPROC(eip_get)
+
+ENTRY(vsyscall_handler)
+    push %edx
+    push %ecx
+    push %ebx
+    push %eax
+    call SYMBOL_NAME(do_vsyscall)
+    add $4, %esp
+    pop %ebx
+    pop %ecx
+    pop %edx
+    sysexit
+ENDPROC(vsyscall_handler)
 
 ENTRY(syscall_handler)
     SAVE_ALL(0)

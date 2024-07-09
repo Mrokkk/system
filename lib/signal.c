@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <unistd.h>
-#include <kernel/syscall.h>
+#include <kernel/api/syscall.h>
 
 int LIBC(raise)(int sig)
 {

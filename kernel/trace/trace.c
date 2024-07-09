@@ -6,10 +6,10 @@
 #include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/process.h>
-#include <kernel/syscall.h>
 #include <kernel/api/mman.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/api/types.h>
+#include <kernel/api/syscall.h>
 
 #define DEBUG_TRACE_BACKTRACE 0
 

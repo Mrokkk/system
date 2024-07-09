@@ -1,4 +1,8 @@
+#include <arch/cpuid.h>
+#include <kernel/cpu.h>
+#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/process.h>
 
 typedef int (*syscall_t)();
 
@@ -11,7 +15,7 @@ typedef int (*syscall_t)();
 #define __syscall4(...)         __syscall(__VA_ARGS__)
 #define __syscall5(...)         __syscall(__VA_ARGS__)
 #define __syscall6(...)         __syscall(__VA_ARGS__)
-#include <kernel/syscall.h>
+#include <kernel/api/syscall.h>
 
 #undef __syscall
 #undef __syscall0
@@ -33,5 +37,47 @@ typedef int (*syscall_t)();
 #define __syscall6(...)         __syscall(__VA_ARGS__)
 
 syscall_t syscalls[] = {
-#include <kernel/syscall.h>
+#include <kernel/api/syscall.h>
 };
+
+#define IA32_SYSENTER_CS  0x174
+#define IA32_SYSENTER_ESP 0x175
+#define IA32_SYSENTER_EIP 0x176
+
+extern void vsyscall_handler();
+
+int vsyscall_init(void)
+{
+    page_t* page;
+
+    if (!cpu_has(X86_FEATURE_SEP))
+    {
+        return 0;
+    }
+
+    page = page_alloc1();
+
+    if (!page)
+    {
+        return -1;
+    }
+
+    wrmsr(IA32_SYSENTER_ESP, page_virt(page), 0);
+    wrmsr(IA32_SYSENTER_CS, KERNEL_CS, 0);
+    wrmsr(IA32_SYSENTER_EIP, &vsyscall_handler, 0);
+
+    return 0;
+}
+
+int do_vsyscall(int nr, pt_regs_t)
+{
+    switch (nr)
+    {
+        case __NR_getpid:
+            return process_current->pid;
+        case __NR_getppid:
+            return process_current->parent->pid;
+        default:
+            return -ENOSYS;
+    }
+}

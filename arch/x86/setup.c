@@ -86,6 +86,8 @@ UNMAP_AFTER_INIT void arch_setup(void)
     }
 }
 
+int vsyscall_init(void);
+
 UNMAP_AFTER_INIT void arch_late_setup(void)
 {
     dmi_read();
@@ -117,6 +119,8 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     i8259_check();
 
     elf_register();
+
+    vsyscall_init();
 
     // Make sure IDT is not overwritten by buggy code
     idt_write_protect();

@@ -93,7 +93,7 @@ int syscall(int nr, ...)
     } \
     LIBC_ALIAS(name);
 
-#include <kernel/syscall.h>
+#include <kernel/api/syscall.h>
 
 WEAK_ALIAS(exit, _exit);
 WEAK_ALIAS(exit, _Exit);

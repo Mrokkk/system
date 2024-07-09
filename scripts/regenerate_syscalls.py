@@ -139,7 +139,7 @@ def main():
     include_dir : str = f'{os.path.dirname(os.path.realpath(__file__))}/../include/kernel'
     trace_dir : str = f'{os.path.dirname(os.path.realpath(__file__))}/../kernel/trace'
     input_file  : str = f'{include_dir}/syscall.in'
-    syscall_h_path : str = f'{include_dir}/syscall.h'
+    syscall_h_path : str = f'{include_dir}/api/syscall.h'
     trace_gen_c_path : str = f'{trace_dir}/trace_gen.c'
 
     with open(input_file, mode='r') as f:
