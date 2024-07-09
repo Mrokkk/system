@@ -194,12 +194,13 @@ class LoaderBreakpoint(Breakpoint):
             if context.requested_executable == binary:
                 address = symbol_file_load(binary, base_address)
                 context.loaded_executable = Executable(binary, address)
+            else:
+                gdb.execute('continue')
         elif '.so' in binary:
             if not binary in context.loaded_executable.libraries:
                 address = symbol_file_load(binary, base_address)
                 context.loaded_executable.libraries[binary] = address
-
-        gdb.execute('continue')
+            gdb.execute('continue')
 
 
 def stop_handler(event) -> None:
