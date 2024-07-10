@@ -50,7 +50,7 @@ static struct cpuid_cache cache[6];
 
 UNMAP_AFTER_INIT static void extended_functions_read()
 {
-    cpuid_regs_t cpuid_regs;
+    cpuid_regs_t cpuid_regs = {};
     uint32_t max_function;
 
     sprintf(cpu_info.producer, "Intel");
@@ -109,7 +109,7 @@ UNMAP_AFTER_INIT static void extended_functions_read()
 UNMAP_AFTER_INIT int cpu_detect(void)
 {
     uint32_t max_function, vendor;
-    cpuid_regs_t cpuid_regs;
+    cpuid_regs_t cpuid_regs = {};
 
     cpuid_read(0, &cpuid_regs);
 

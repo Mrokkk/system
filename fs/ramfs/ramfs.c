@@ -302,6 +302,12 @@ static int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t**
     else
     {
         page = ramfs_starting_page(parent_node, parent_node->size);
+
+        if (unlikely(!page))
+        {
+            return -EINVAL;
+        }
+
         new_node = shift_as(ram_node_t*, page_virt_ptr(page), parent_node->size % PAGE_SIZE);
     }
 

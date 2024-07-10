@@ -483,6 +483,7 @@ int sys_mknod(const char* pathname, mode_t mode, dev_t dev)
 
 int sys_fcntl(int fd, int cmd, ...)
 {
+    int ret = -ENOSYS;
     va_list args;
     file_t* file;
 
@@ -495,15 +496,18 @@ int sys_fcntl(int fd, int cmd, ...)
     {
         case F_DUPFD:
         {
-            return sys_dup2(fd, va_arg(args, int));
+            ret = sys_dup2(fd, va_arg(args, int));
+            break;
         }
         case F_GETFD:
         {
-            return 0;
+            ret = 0;
+            break;
         }
         case F_GETFL:
         {
-            return file->mode;
+            ret = file->mode;
+            break;
         }
         // FIXME: Bash calls it for stdout and tries to set O_WRONLY, which
         // breaks stdin, as stdin, stdout and stderr are using same file_t;
@@ -517,7 +521,7 @@ int sys_fcntl(int fd, int cmd, ...)
 
     va_end(args);
 
-    return -ENOSYS;
+    return ret;
 }
 
 int sys_lchown(const char* pathname, uid_t owner, gid_t group)

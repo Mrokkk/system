@@ -50,7 +50,7 @@ UNMAP_AFTER_INIT void pci_scan(void)
     {
         log_info("PCI BIOS entry: %04x:%08x", pci_bios_entry.seg, pci_bios_entry.addr);
 
-        regs_t regs;
+        regs_t regs = {};
 
         bios32_call(&pci_bios_entry, PCI_BIOS_CHECK(regs));
 

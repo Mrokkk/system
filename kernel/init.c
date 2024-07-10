@@ -287,6 +287,11 @@ UNMAP_AFTER_INIT static void read_some_data(void)
     char* buf = single_page();
     const char* dev = "/dev/sda";
 
+    if (unlikely(!buf))
+    {
+        return;
+    }
+
     memset(buf, 0, PAGE_SIZE);
 
     if ((errno = do_open(&file, dev, O_RDONLY, 0)))

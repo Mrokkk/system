@@ -3,6 +3,7 @@ project(system C)
 
 set(ARCH x86)
 set(FRAME_POINTER 1)
+set(STATIC_ANALYZER 0)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_program(CCACHE_PROGRAM ccache)
@@ -18,6 +19,10 @@ set(C_FLAGS_OPTIMIZATION "-O2")
 set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib -Wl,-no-pie -fno-pie -fno-PIC -nostartfiles -fno-asynchronous-unwind-tables -fno-stack-protector") # -fno-strength-reduce
 set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_FLAGS_DEBUG "-ggdb3")
+
+if(STATIC_ANALYZER)
+    set(C_FLAGS_WARNINGS "${C_FLAGS_WARNINGS} -fanalyzer -Wno-analyzer-va-arg-type-mismatch -Wno-analyzer-va-list-exhausted -Wno-error")
+endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     set(C_FLAGS_ADDITIONAL "-Wno-error -Wno-unused-command-line-argument -Wno-c2x-extensions -Wno-strict-prototypes -Wno-address-of-packed-member")

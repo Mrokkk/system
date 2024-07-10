@@ -28,7 +28,7 @@ UNMAP_AFTER_INIT int bios32_init(void)
 
 int bios32_find(uint32_t service, bios32_entry_t* service_entry)
 {
-    regs_t regs;
+    regs_t regs = {};
 
     if (!bios32_header)
     {

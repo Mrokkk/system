@@ -367,8 +367,13 @@ static int status_show(seq_file_t* s)
 {
     vm_area_t* vma;
     size_t code_size, stack_size, data_size;
-    struct process* p = process_get(s);
+    process_t* p = process_get(s);
     const char* state;
+
+    if (unlikely(!p))
+    {
+        return -ESRCH;
+    }
 
     switch (p->stat)
     {
@@ -473,6 +478,11 @@ static int uptime_show(seq_file_t* s)
 static int environ_show(seq_file_t* s)
 {
     process_t* p = process_get(s);
+
+    if (unlikely(!p))
+    {
+        return -ESRCH;
+    }
 
     const char* env = kernel_address_get(p, p->mm->env_start);
 

@@ -106,7 +106,9 @@ static int c_crash()
 {
     ASSERT(cr3_get() == phys_addr(process_current->mm->pgd));
     uint32_t* a = ptr(0);
+    DIAG_IGNORE("-Wanalyzer-null-dereference");
     *a = 234;
+    DIAG_RESTORE();
     return 0;
 }
 

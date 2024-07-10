@@ -438,7 +438,7 @@ static int ext2_traverse_blocks(
     block_cb_t cb)
 {
     int errno;
-    buffer_t* cur_block;
+    buffer_t* cur_block = NULL;
     level_t levels[4];
     level_t* cur_lvl;
 
@@ -449,6 +449,12 @@ static int ext2_traverse_blocks(
     if (unlikely(errno = ext2_traverse_blocks_init(data, raw_inode, block_nr, levels, &cur_lvl, &cur_block)))
     {
         return errno;
+    }
+
+    if (unlikely(!cur_block))
+    {
+        log_error("ext2_traverse_blocks_init returned NULL cur_block");
+        return -EINVAL;
     }
 
     for (left = count = min(count, raw_inode->size - offset);
@@ -698,15 +704,22 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
 
     if (unlikely(block_group_count != block_group_count2))
     {
-        delete(data);
         log_warning("bad fs");
-        return -EINVAL; // TODO pick better errno
+        delete(data);
+        return -EINVAL;
     }
 
     data->inodes_per_group = inodes_per_group;
     data->inodes_per_block = EXT2_BLOCK_SIZE / sizeof(ext2_inode_t);
 
     root = ext2_inode_get(data, EXT2_ROOT_INO);
+
+    if (unlikely(!root))
+    {
+        log_warning("cannot read root");
+        delete(data);
+        return -EINVAL;
+    }
 
     inode->ino = EXT2_ROOT_INO;
     inode->ops = &ext2_inode_ops;

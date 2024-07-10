@@ -3,6 +3,8 @@
 #ifndef __ASSEMBLER__
 #ifdef __GNUC__
 
+#include <kernel/macro.h>
+
 #define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__ * 10)
 
 #define bool    _Bool
@@ -17,6 +19,7 @@
 #define COMPILE_ERROR(msg)      __attribute__((__error__(msg)))
 #define CLEANUP(fn)             __attribute__((cleanup(fn)))
 #define MUST_CHECK(ret)         __attribute__((warn_unused_result)) ret
+#define RETURNS_NONNULL(fn)     __attribute__((returns_nonnull)) fn
 #define NORETURN(fn)            __attribute__((noreturn)) fn
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn
 #define ALIGN(x)                __attribute__((aligned(x)))
@@ -27,6 +30,47 @@
 #define EXPAND(x)               x
 #define PASTE(a, b)             a##b
 #define NOT_USED(x)             (void)(x)
+
+#ifndef __clang__
+
+#define DIAG_PUSH() \
+    _Pragma("GCC diagnostic push")
+
+#define DIAG_RESTORE() \
+    _Pragma("GCC diagnostic pop")
+
+#define _DIAG_IGNORE(x) \
+    _Pragma(STRINGIFY(GCC diagnostic ignored x))
+
+#define _DIAG_IGNORE_1(_1) \
+    DIAG_PUSH(); \
+    _DIAG_IGNORE(_1)
+
+#define _DIAG_IGNORE_2(_1, _2) \
+    _DIAG_IGNORE_1(_1); \
+    _DIAG_IGNORE(_2)
+
+#define _DIAG_IGNORE_3(_1, _2, _3) \
+    _DIAG_IGNORE_2(_1, _2); \
+    _DIAG_IGNORE(_3)
+
+#define _DIAG_IGNORE_4(_1, _2, _3, _4) \
+    _DIAG_IGNORE_3(_1, _2, _3); \
+    _DIAG_IGNORE(_4)
+
+#define DIAG_IGNORE(...) \
+    REAL_VAR_MACRO_4( \
+        _DIAG_IGNORE_1, \
+        _DIAG_IGNORE_2, \
+        _DIAG_IGNORE_3, \
+        _DIAG_IGNORE_4, \
+        __VA_ARGS__)
+
+#else
+#define DIAG_PUSH()
+#define DIAG_IGNORE(...)
+#define DIAG_RESTORE()
+#endif
 
 #define static_assert           _Static_assert
 #define fallthrough             __attribute__((__fallthrough__))

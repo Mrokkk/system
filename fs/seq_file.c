@@ -2,6 +2,8 @@
 #include <kernel/minmax.h>
 #include <kernel/seq_file.h>
 
+#define DEBUG_SEQFILE 0
+
 int seq_open(file_t* file, seq_show_t show)
 {
     seq_file_t* s = alloc(seq_file_t);
@@ -64,7 +66,6 @@ int seq_read(file_t* file, char* buffer, size_t count)
 
         if ((errno = s->show(s)))
         {
-            page_free(s->buffer);
             return errno;
         }
     }

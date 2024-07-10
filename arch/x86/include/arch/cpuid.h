@@ -10,7 +10,7 @@ struct cpuid_regs
     uint32_t ebx;
     uint32_t ecx;
     uint32_t edx;
-} PACKED;
+};
 
 typedef enum
 {
@@ -136,16 +136,12 @@ static inline const char* cache_type_string(cache_type_t t)
 
 static inline void cpuid_read(uint32_t function, cpuid_regs_t* regs)
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#pragma GCC diagnostic ignored "-Wuninitialized"
     asm volatile(
         "cpuid;"
         : "=a" (regs->eax), "=b" (regs->ebx), "=c" (regs->ecx), "=d" (regs->edx)
         : "a" (function), "c" (regs->ecx)
         : "cc"
     );
-#pragma GCC diagnostic pop
 }
 
 int cpu_detect(void);

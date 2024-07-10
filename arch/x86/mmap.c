@@ -110,7 +110,13 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     }
     else
     {
-        if (!file->ops || !file->ops->mmap)
+        if (unlikely(!file))
+        {
+            current_log_error("file is NULL");
+            return ptr(-EINVAL);
+        }
+
+        if (unlikely(!file->ops || !file->ops->mmap))
         {
             log_debug(DEBUG_MMAP, "no operation");
             errno = -ENOSYS;
@@ -118,7 +124,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         }
 
         log_debug(DEBUG_MMAP, "calling ops->mmap");
-        if ((errno = file->ops->mmap(file, vma)))
+        if (unlikely(errno = file->ops->mmap(file, vma)))
         {
             log_debug(DEBUG_MMAP, "ops->mmap failed");
             goto free_vma;

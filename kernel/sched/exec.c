@@ -536,13 +536,22 @@ vm_area_t* exec_prepare_initial_vma()
     else if (process_is_kernel(process_current))
     {
         stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, process_current);
+
+        if (unlikely(!stack_vma))
+        {
+            current_log_warning("cannot allocate stack; sending SIGSTKFLT");
+            do_kill(process_current, SIGSTKFLT);
+            ASSERT_NOT_REACHED();
+        }
+
         process_current->mm->stack_start = stack_vma->start;
         process_current->mm->stack_end = stack_vma->end;
     }
     else
     {
-        log_warning("process %u:%x without a stack; sending SIGSTKFLT", process_current->pid, process_current);
+        current_log_warning("no stack; sending SIGSTKFLT", process_current->pid, process_current);
         do_kill(process_current, SIGSTKFLT);
+        ASSERT_NOT_REACHED();
     }
 
     vm_add(&process_current->mm->vm_areas, stack_vma);
