@@ -509,12 +509,9 @@ int sys_fcntl(int fd, int cmd, ...)
             ret = file->mode;
             break;
         }
-        // FIXME: Bash calls it for stdout and tries to set O_WRONLY, which
-        // breaks stdin, as stdin, stdout and stderr are using same file_t;
-        // currently it's better to return error, as apparently it does not
-        // cause any problem for Bash
         case F_SETFD:
         {
+            ret = 0;
             break;
         }
     }
