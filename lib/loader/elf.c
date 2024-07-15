@@ -38,7 +38,7 @@ void* mmap_phdr(int exec_fd, size_t page_size, elf32_phdr_t* phdr, int add_prot,
 
     void* mapped = mmap_wrapper(
         PTR(vaddr_page_start),
-        ALIGN_TO(phdr->p_memsz, page_size),
+        vaddr_page_end - vaddr_page_start,
         mmap_flags_get(phdr->p_flags | add_prot),
         MAP_PRIVATE | MAP_FIXED,
         exec_fd,
