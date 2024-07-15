@@ -1,128 +1,112 @@
 #pragma once
 
-#ifndef isalnum
+#define _U 01
+#define _L 02
+#define _N 04
+#define _S 010
+#define _P 020
+#define _C 040
+#define _X 0100
+#define _B 0200
+
+extern char const _ctype_[257] __attribute__((visibility("default")));
+
+#undef isalnum
 static inline int isalnum(int c)
 {
-    return (c > 64 && c < 91) || (c > 96 && c < 123) || (c > 47 && c < 58);
+    return _ctype_[(unsigned char)(c) + 1] & (_U | _L | _N);
 }
-#endif
 
-#ifndef isalpha
+#undef isalpha
 static inline int isalpha(int c)
 {
-    return (c > 64 && c < 91) || (c > 96 && c < 123);
+    return _ctype_[(unsigned char)(c) + 1] & (_U | _L);
 }
-#endif
 
-#ifndef isascii
+#undef isascii
 static inline int isascii(int c)
 {
-    return (c < 256);
+    return c < 128;
 }
-#endif
 
-#ifndef isblank
+#undef isblank
 static inline int isblank(int c)
 {
     return (c == ' ') || (c == '\t');
 }
-#endif
 
-#ifndef isdigit
+#undef isdigit
 static inline int isdigit(int c)
 {
-    return ((c>='0') && (c<='9'));
+    return _ctype_[(unsigned char)(c) + 1] & (_N);
 }
-#endif
 
-#ifndef islower
+#undef islower
 static inline int islower(int c)
 {
-    return (c > 64 && c < 91);
+    return _ctype_[(unsigned char)(c) + 1] & (_L);
 }
-#endif
 
-#ifndef isspace
+#undef isspace
 static inline int isspace(int c)
 {
-    return (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\v' || c == '\r');
+    return _ctype_[(unsigned char)(c) + 1] & (_S);
 }
-#endif
 
-#ifndef isupper
+#undef isupper
 static inline int isupper(int c)
 {
-    return (c > 96 && c < 123);
+    return _ctype_[(unsigned char)(c) + 1] & (_U);
 }
-#endif
 
-#ifndef tolower
+#undef tolower
 static inline int tolower(int c)
 {
-    return islower(c)
-        ? c + ('a' - 'A')
-        : c;
+    if (c >= 'A' && c <= 'Z')
+    {
+        return c | 0x20;
+    }
+    return c;
 }
-#endif
 
-#ifndef toupper
+#undef toupper
 static inline int toupper(int c)
 {
-    return isupper(c)
-        ? c - ('a' - 'A')
-        : c;
+    if (c >= 'a' && c <= 'z')
+    {
+        return c & ~0x20;
+    }
+    return c;
 }
-#endif
 
-#ifndef isprint
-static inline int isprint(int c)
-{
-    return isalnum(c) || isblank(c);
-}
-#endif
-
-#ifndef iscntrl
+#undef iscntrl
 static inline int iscntrl(int c)
 {
-    return c < 0x20 || c == 0x7f;
+    return _ctype_[(unsigned char)(c) + 1] & (_C);
 }
-#endif
 
-#ifndef ispunct
+#undef ispunct
 static inline int ispunct(int c)
 {
-    const char* chars = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
-    for (unsigned i = 0; i < __builtin_strlen(chars); ++i)
-    {
-        if (c == chars[i])
-        {
-            return 1;
-        }
-    }
-    return 0;
+    return _ctype_[(unsigned char)(c) + 1] & (_P);
 }
-#endif
 
-#ifndef isxdigit
+#undef isprint
+static inline int isprint(int c)
+{
+    return _ctype_[(unsigned char)(c) + 1] & (_P | _U | _L | _N | _B);
+}
+
+#undef isxdigit
 static inline int isxdigit(int c)
 {
-    const char* chars = "0123456789abcdefABCDEF";
-    for (unsigned i = 0; i < __builtin_strlen(chars); ++i)
-    {
-        if (c == chars[i])
-        {
-            return 1;
-        }
-    }
-    return 0;
+    return _ctype_[(unsigned char)(c) + 1] & (_N | _X);
 }
-#endif
 
-#ifndef isgraph
+#undef isgraph
 static inline int isgraph(int c)
 {
-    return c > 0x1f && c < 0x7f;
+    return _ctype_[(unsigned char)(c) + 1] & (_P | _U | _L | _N);
 }
-#endif
 
 #define iswgraph isgraph
