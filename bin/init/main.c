@@ -112,11 +112,11 @@ static int shell_run(const char* pathname)
         parse_cmdline(&options, argv[1]);
     }
 
-    int fd = open(options.console_device, O_RDWR, 0);
-
-    if (fd != 0 || dup(0) || dup(0))
+    if ((open(options.console_device, O_RDONLY, 0) != STDIN_FILENO) ||
+        (open(options.console_device, O_WRONLY, 0) != STDOUT_FILENO) ||
+        (open(options.console_device, O_WRONLY, 0) != STDERR_FILENO))
     {
-        printf("cannot open console, fd = %d\n", fd);
+        printf("cannot open console\n");
         exit(EXIT_FAILURE);
     }
 
