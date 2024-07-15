@@ -209,12 +209,17 @@ static int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
     ext2_inode_t* parent_inode = parent->fs_data;
     ext2_data_t* data = parent->sb->fs_data;
 
-    if ((errno = ext2_lookup_raw(data, parent_inode, name, &child_inode, &ino)))
+    if (unlikely(parent->ino == EXT2_LOST_FOUND_INO))
+    {
+        return -ENOENT;
+    }
+
+    if (unlikely(errno = ext2_lookup_raw(data, parent_inode, name, &child_inode, &ino)))
     {
         return errno;
     }
 
-    if (unlikely((errno = inode_get(result))))
+    if (unlikely(errno = inode_get(result)))
     {
         return errno;
     }
@@ -587,6 +592,7 @@ struct readdir_context
     void* buf;
     direntadd_t dirent_add;
     int i;
+    ino_t parent_ino;
 };
 
 static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
@@ -608,6 +614,11 @@ static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
             dirent->rec_len,
             dirent->name_len);
 
+        if (ctx->parent_ino == EXT2_LOST_FOUND_INO && ctx->i == 2)
+        {
+            return TRAVERSE_STOP;
+        }
+
         over = ctx->dirent_add(ctx->buf, dirent->name, dirent->name_len, dirent->inode, ext2_file_type_convert(dirent->file_type));
 
         if (over)
@@ -623,9 +634,14 @@ static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     int res, errno;
     ext2_data_t* data = file->inode->sb->fs_data;
     ext2_inode_t* raw_inode = file->inode->fs_data;
-    readdir_context_t ctx = {.buf = buf, .dirent_add = dirent_add, .i = 0};
+    readdir_context_t ctx = {
+        .buf = buf,
+        .dirent_add = dirent_add,
+        .i = 0,
+        .parent_ino = file->inode->ino
+    };
 
-    if (!S_ISDIR(raw_inode->mode))
+    if (unlikely(!S_ISDIR(raw_inode->mode)))
     {
         return -ENOTDIR;
     }

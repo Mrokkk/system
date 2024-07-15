@@ -15,6 +15,7 @@
 #define EXT2_NAME_LEN           255
 #define EXT2_ROOT_INO           2
 #define EXT2_SIGNATURE          0xef53
+#define EXT2_LOST_FOUND_INO     11
 
 struct file;
 
