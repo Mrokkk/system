@@ -8,6 +8,9 @@
 
 #define _POSIX_VERSION 200809L
 
+#define _SC_ARG_MAX         1
+#define _SC_OPEN_MAX        2
+
 #ifndef __ASSEMBLER__
 
 int syscall(int nr, ...);
@@ -25,6 +28,8 @@ int gethostname(char* name, size_t namelen);
 int getpagesize(void);
 
 [[noreturn]] void _exit(int retcode);
+
+long sysconf(int name);
 
 extern char** environ;
 

@@ -89,6 +89,16 @@ void LIBC(tzset)(void)
 {
 }
 
+char* LIBC(ctime)(const time_t* timep)
+{
+    NOT_IMPLEMENTED(NULL, "%p", timep);
+}
+
+double LIBC(difftime)(time_t time1, time_t time0)
+{
+    return (double)(time1 - time0);
+}
+
 LIBC_ALIAS(strftime);
 LIBC_ALIAS(strftime_l);
 LIBC_ALIAS(gettimeofday);
@@ -98,3 +108,5 @@ LIBC_ALIAS(mktime);
 LIBC_ALIAS(clock);
 LIBC_ALIAS(utime);
 LIBC_ALIAS(tzset);
+LIBC_ALIAS(ctime);
+LIBC_ALIAS(difftime);

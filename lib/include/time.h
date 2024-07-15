@@ -48,6 +48,10 @@ int clock_settime(clockid_t clockid, struct timespec* tp);
 
 void tzset(void);
 
+char* ctime(const time_t* timep);
+
+double difftime(time_t time1, time_t time0);
+
 extern long     timezone;
 extern long     altzone;
 extern char*    tzname[2];

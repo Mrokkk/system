@@ -22,6 +22,7 @@ set(LIBC_SRC
     abort.c
     assert.c
     atexit.c
+    bsearch.c
     dirent.c
     env.c
     errno.c
@@ -48,6 +49,7 @@ set(LIBC_SRC
     strtod.c
     strtol.c
     syscall.c
+    sysconf.c
     termios.c
     time.c
     ttyname.c

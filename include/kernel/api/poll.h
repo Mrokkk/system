@@ -6,6 +6,7 @@
 #define POLLIN      0x0001
 #define POLLPRI     0x0002
 #define POLLOUT     0x0004
+#define POLLNVAL    0x0008
 
 #define FD_SETSIZE  32
 #define FD_SIZE     32

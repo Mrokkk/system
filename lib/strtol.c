@@ -1,3 +1,4 @@
+#include "libc.h"
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -131,7 +132,13 @@ unsigned long LIBC(strtoul)(
     STRTOL(long, 1, ULONG_MAX, ULONG_MAX, nptr, endptr, base);
 }
 
+double LIBC(atof)(const char* nptr)
+{
+    return LIBC(atoi)(nptr);
+}
+
 LIBC_ALIAS(atoi);
+LIBC_ALIAS(atof);
 LIBC_ALIAS(strtol);
 LIBC_ALIAS(strtoll);
 LIBC_ALIAS(strtoul);

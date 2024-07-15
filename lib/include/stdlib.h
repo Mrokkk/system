@@ -19,6 +19,7 @@ char* secure_getenv(const char* name);
 int atexit(void (*function)(void));
 
 int atoi(const char* nptr);
+double atof(const char* nptr);
 
 long strtol(
     const char* restrict nptr,
@@ -49,6 +50,13 @@ void qsort_r(
     size_t size,
     int (*compar)(const void*, const void*, void *),
     void* arg);
+
+void* bsearch(
+    const void* key,
+    const void* base,
+    size_t nmemb,
+    size_t size,
+    int (*compar)(const void*, const void*));
 
 int rand(void);
 void srand(unsigned int seed);

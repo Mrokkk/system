@@ -66,8 +66,9 @@
 #define __NR_fstatfs        63
 #define __NR_brk            64
 #define __NR_mprotect       65
+#define __NR_rmdir          66
 
-#define __NR_syscalls       66
+#define __NR_syscalls       67
 
 #ifndef __ASSEMBLER__
 
@@ -176,3 +177,4 @@ __syscall2(statfs, int, const char*, struct statfs*)
 __syscall2(fstatfs, int, int, struct statfs*)
 __syscall1(brk, int, void*)
 __syscall3(mprotect, int, void*, size_t, int)
+__syscall1(rmdir, int, const char*)

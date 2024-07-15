@@ -42,6 +42,8 @@
 #define SIG_IGN     ((void (*)(int))1)
 #define SIG_HOLD    ((void (*)(int))2)
 
+#define SA_RESTART  1
+
 typedef void (*sighandler_t)();
 typedef void (*sigrestorer_t)(void);
 

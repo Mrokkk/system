@@ -11,6 +11,12 @@
 #define X_OK        1   // Test for execute permission
 #define F_OK        0   // Test for existence
 
+#define _POSIX_ARG_MAX      4096
+#define ARG_MAX             _POSIX_ARG_MAX
+
+#define _POSIX_OPEN_MAX     32
+#define OPEN_MAX            _POSIX_OPEN_MAX
+
 int fork(void);
 int getpid(void);
 int getppid(void);
@@ -52,6 +58,7 @@ int pipe(int pipefd[2]);
 int lchown(const char* pathname, uid_t owner, gid_t group);
 int fchown(int fd, uid_t owner, gid_t group);
 int fsync(int fildes);
+int rmdir(const char* pathname);
 
 // FIXME: replace later with ptrace
 #define DTRACE_FOLLOW_FORK 2

@@ -29,7 +29,13 @@ int LIBC(ungetc)(int c, FILE* stream)
     NOT_IMPLEMENTED(EOF, "%u, %p", c, stream);
 }
 
+int LIBC(getchar)(void)
+{
+    return LIBC(fgetc)(stdin);
+}
+
 LIBC_ALIAS(fgetc);
 LIBC_ALIAS(fgets);
 LIBC_ALIAS(ungetc);
+LIBC_ALIAS(getchar);
 WEAK_ALIAS(fgetc, getc);

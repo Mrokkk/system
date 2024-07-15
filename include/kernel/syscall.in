@@ -65,3 +65,4 @@ statfs: int, const char*, struct statfs*
 fstatfs: int, int, struct statfs*
 brk: int, void*
 mprotect: int, void*, size_t, int
+rmdir: int, const char*

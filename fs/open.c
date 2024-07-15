@@ -535,3 +535,9 @@ int sys_fchown(int fd, uid_t owner, gid_t group)
     (void)fd; (void)owner; (void)group;
     return -ENOSYS;
 }
+
+int sys_rmdir(const char* pathname)
+{
+    (void)pathname;
+    return -ENOSYS;
+};
