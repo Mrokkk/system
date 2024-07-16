@@ -85,6 +85,12 @@ dentry_t* lookup(const char* filename)
                 {
                     return NULL;
                 }
+
+                if (!parent_inode->dev)
+                {
+                    parent_inode->dev = parent_inode->sb->dev;
+                }
+
                 dentry = dentry_create(parent_inode, parent_dentry, name);
                 parent_dentry = dentry;
             }

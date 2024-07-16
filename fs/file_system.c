@@ -86,7 +86,6 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
 
     sb->device_file = file;
     sb->dev = dev;
-    inode = NULL;
 
     dentry = lookup(mount_point);
 
@@ -100,6 +99,8 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
         log_info("mounting %s in inode = %x", fs->name, dentry->inode);
 
         errno = fs->mount(sb, dentry->inode, NULL, 0);
+
+        inode = dentry->inode;
     }
     else if (unlikely(!root))
     {
@@ -134,6 +135,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
     }
 
     sb->mounted = inode;
+    inode->dev = dev;
 
     ms->dir = slab_alloc(strlen(mount_point) + 1);
     ms->device = slab_alloc(strlen(source) + 1);
@@ -150,6 +152,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
 
 int do_mount(const char* source, const char* target, const char* filesystemtype, unsigned long)
 {
+    static int last_minor = 1;
     int errno;
     dev_t dev = 0;
     file_system_t* fs;
@@ -195,7 +198,13 @@ int do_mount(const char* source, const char* target, const char* filesystemtype,
             {
                 goto error;
             }
+
+            dev = file->inode->dev;
         }
+    }
+    else
+    {
+        dev = MKDEV(0, last_minor++);
     }
 
     if (file_system_get(filesystemtype, &fs))
