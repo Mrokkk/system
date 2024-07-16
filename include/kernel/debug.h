@@ -28,7 +28,6 @@
 #define DEBUG_READDIR       0
 
 #define DEBUG_DEVFS         0
-#define DEBUG_PROCFS        0
 #define DEBUG_RAMFS         0
 #define DEBUG_EXT2FS        0
 

@@ -8,16 +8,24 @@
 struct procfs_inode;
 typedef struct procfs_inode procfs_inode_t;
 
-static inline process_t* process_get(seq_file_t* s)
+#define PID_TO_INO(pid) \
+    ((pid) << 8)
+
+#define INO_TO_PID(ino) \
+    ((ino) >> 8)
+
+#define SELF_INO (1 << 31)
+
+static inline process_t* procfs_process_from_seqfile(seq_file_t* s)
 {
     process_t* p = NULL;
-    int pid = s->file->inode->ino;
+    int ino = s->file->inode->ino;
 
-    if (pid == -1)
+    if ((ino & SELF_INO) == SELF_INO)
     {
         p = process_current;
     }
-    else if (process_find(pid, &p))
+    else if (process_find(INO_TO_PID(ino), &p))
     {
         return NULL;
     }

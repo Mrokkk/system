@@ -10,6 +10,8 @@
 #include <kernel/seq_file.h>
 #include <kernel/vm_print.h>
 
+#define DEBUG_PROCFS 0
+
 static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int procfs_open(file_t* file);
 static int procfs_close(file_t* file);
@@ -35,7 +37,7 @@ int maps_show(seq_file_t* s);
         .name = NAME, \
         .len = sizeof(NAME), \
         .mode = MODE, \
-        .ino = 0x1000 + __COUNTER__, \
+        .ino = 2 + __COUNTER__, \
         .iops = IOPS, \
         .fops = FOPS, \
     }
@@ -153,7 +155,7 @@ static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int)
 
 static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
 {
-    int errno, pid;
+    int errno, pid = 0, pid_ino;
     inode_t* new_inode;
     procfs_entry_t* entry = NULL;
     struct process* p;
@@ -161,10 +163,12 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
     if (!strcmp(name, "self"))
     {
         pid = -1;
+        pid_ino = SELF_INO;
     }
     else
     {
         pid = strtoi(name);
+        pid_ino = PID_TO_INO(pid);
     }
 
     if (pid)
@@ -182,8 +186,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
 
         new_inode->ops = &procfs_pid_iops;
         new_inode->file_ops = &procfs_pid_fops;
-        new_inode->dev = 0;
-        new_inode->ino = pid;
+        new_inode->ino = pid_ino;
         new_inode->sb = dir->sb;
         new_inode->mode = S_IFDIR | S_IRUGO | S_IXUGO;
         new_inode->fs_data = NULL;
@@ -209,7 +212,6 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
 
     new_inode->ops = entry->iops;
     new_inode->file_ops = entry->fops;
-    new_inode->dev = 0;
     new_inode->ino = entry->ino;
     new_inode->sb = dir->sb;
     new_inode->mode = entry->mode;
@@ -316,8 +318,7 @@ static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result)
 
     new_inode->ops = entry->iops;
     new_inode->file_ops = entry->fops;
-    new_inode->dev = 0;
-    new_inode->ino = dir->ino;
+    new_inode->ino = dir->ino | entry->ino;
     new_inode->sb = dir->sb;
     new_inode->mode = entry->mode;
     new_inode->fs_data = entry;
@@ -358,7 +359,7 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 
 static int comm_show(seq_file_t* s)
 {
-    struct process* p = process_get(s);
+    struct process* p = procfs_process_from_seqfile(s);
     seq_puts(s, p->name);
     return 0;
 }
@@ -367,7 +368,7 @@ static int status_show(seq_file_t* s)
 {
     vm_area_t* vma;
     size_t code_size, stack_size, data_size;
-    process_t* p = process_get(s);
+    process_t* p = procfs_process_from_seqfile(s);
     const char* state;
 
     if (unlikely(!p))
@@ -414,7 +415,7 @@ static int status_show(seq_file_t* s)
 
 static int stack_show(seq_file_t* s)
 {
-    backtrace_process(process_get(s), seq_printf, s);
+    backtrace_process(procfs_process_from_seqfile(s), seq_printf, s);
     return 0;
 }
 
@@ -446,7 +447,7 @@ static void memory_to_seq_file(seq_file_t* s, const char* data, size_t n)
 
 static int cmdline_show(seq_file_t* s)
 {
-    process_t* p = process_get(s);
+    process_t* p = procfs_process_from_seqfile(s);
 
     if (p)
     {
@@ -477,7 +478,7 @@ static int uptime_show(seq_file_t* s)
 
 static int environ_show(seq_file_t* s)
 {
-    process_t* p = process_get(s);
+    process_t* p = procfs_process_from_seqfile(s);
 
     if (unlikely(!p))
     {

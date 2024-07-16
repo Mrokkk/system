@@ -323,7 +323,7 @@ int maps_show(seq_file_t* s)
     table_column_add(&table, "ino", "%d", 10, ' ');
     table_column_add(&table, "name", "%s", 0, '\0');
 
-    process_t* p = process_get(s);
+    process_t* p = procfs_process_from_seqfile(s);
 
     if (unlikely(!p))
     {
