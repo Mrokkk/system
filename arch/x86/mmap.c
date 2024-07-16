@@ -86,6 +86,10 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         {
             return ptr(-EINVAL);
         }
+        if (unlikely((uintptr_t)addr >= KERNEL_PAGE_OFFSET || (uintptr_t)addr + size > KERNEL_PAGE_OFFSET))
+        {
+            return ptr(-EFAULT);
+        }
         if (!current_vm_verify(VERIFY_READ, addr))
         {
             // Fail if address is already mapped

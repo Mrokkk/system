@@ -61,7 +61,7 @@ static inline void pgd_load(pgd_t* pgd)
         "mov $1f, %0;"
         "jmp *%0;"
         "1:"
-        :: "r" (pgd) : "memory");
+        :: "r" ((uint32_t)pgd - KERNEL_PAGE_OFFSET) : "memory");
 }
 
 static inline void pgd_reload(void)

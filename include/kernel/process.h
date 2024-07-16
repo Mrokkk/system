@@ -186,7 +186,6 @@ void scheduler();
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[]);
 char* process_print(const struct process* p, char* str);
-vm_area_t* RETURNS_NONNULL(exec_prepare_initial_vma());
 
 // Arch-dependent functions
 int arch_process_copy(struct process* dest, struct process* src, struct pt_regs* old_regs);

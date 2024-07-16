@@ -137,7 +137,7 @@ int arg_insert(const char* string, const size_t len, argvec_t* argvec, int flag)
 // @vec - original vector to copy from
 // @has_count - true for argv, false for envp
 // @argvec - output vector
-static int args_get(const char* const vec[], bool has_count, argvec_t* argvec)
+static void args_get(const char* const vec[], bool has_count, argvec_t* argvec)
 {
     int count = 0;
 
@@ -153,8 +153,6 @@ static int args_get(const char* const vec[], bool has_count, argvec_t* argvec)
 
     // Extend size for the NULL entry
     argvec->size += sizeof(char*);
-
-    return 0;
 }
 
 static void args_put(argvec_t* argvec)
@@ -390,14 +388,29 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     uint32_t user_stack;
     aux_t* execfn;
     arg_t* argv0;
-    struct process* p = process_current;
+    process_t* p = process_current;
     ARGVECS_DECLARE(argvec);
     binary_t bin = {};
 
-    strcpy(copied_path, pathname);
+    vm_area_t* brk_vma;
+    vm_area_t* stack_vma;
+    vm_area_t* old_vmas = p->mm->vm_areas;
+    pgd_t* old_pgd = p->mm->pgd;
+    pgd_t* new_pgd = pgd_alloc();
 
+    if (unlikely(!new_pgd))
+    {
+        return -ENOMEM;
+    }
+
+    strcpy(copied_path, pathname);
     args_get(argv, true, &argvec[ARGV]);
     args_get(envp, false, &argvec[ENVP]);
+
+    pgd_load(new_pgd);
+
+    p->mm->pgd = new_pgd;
+    p->mm->vm_areas = NULL;
 
     argv0 = list_next_entry(&argvec[ARGV].head, arg_t, list_entry);
 
@@ -407,7 +420,8 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     if (!aux_insert(AT_PAGESZ, PAGE_SIZE, argvec) || !execfn)
     {
-        return -ENOMEM;
+        errno = -ENOMEM;
+        goto restore;
     }
 
     log_debug(DEBUG_PROCESS, "%s, argc=%u, envc=%u",
@@ -415,50 +429,44 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         argvec[ARGV].count,
         argvec[ENVP].count);
 
-    if ((errno = binary_image_load(pathname, &bin, argvec)))
+    if ((errno = binary_image_load(copied_path, &bin, argvec)))
     {
-        return errno;
+        goto restore;
     }
 
     strncpy(p->name, argv0->arg, PROCESS_NAME_LEN);
     //process_ktimers_exit(p);
 
-    if (unlikely(!bin.stack_vma))
+    brk_vma = vm_create(bin.brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+    stack_vma = vm_create(USER_STACK_VIRT_ADDRESS, USER_STACK_SIZE, VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
+
+    if (unlikely(!brk_vma || !stack_vma))
     {
-        do_kill(p, SIGSTKFLT);
-        return -EFAULT;
+        errno = -ENOMEM;
+        goto restore;
     }
 
-    pgd_reload();
-
-    user_stack = bin.stack_vma->end;
-
-    vm_area_t* brk_vma = vm_create(bin.brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
-
-    if (unlikely(!brk_vma))
+    if (unlikely(
+        (errno = vm_add(&p->mm->vm_areas, brk_vma)) ||
+        (errno = vm_add(&p->mm->vm_areas, stack_vma))))
     {
-        // At this moment process is broken anyways
-        do_kill(p, SIGKILL);
-        return -ENOMEM;
+        errno = -ENOMEM;
+        goto restore;
     }
 
-    if (unlikely(errno = vm_add(&p->mm->vm_areas, brk_vma)))
-    {
-        // As above
-        do_kill(p, SIGKILL);
-        return errno;
-    }
+    user_stack = stack_vma->end;
 
-    p->mm->brk_vma = brk_vma;
+    user_stack -= ARGVECS_SIZE(argvec);
+    argvecs_copy_to_user(ptr(user_stack), argvec);
+
+    p->type = USER_PROCESS;
 
     p->signals->trapped = 0;
     p->signals->ongoing = 0;
     p->signals->pending = 0;
 
-    user_stack -= ARGVECS_SIZE(argvec);
-    argvecs_copy_to_user(ptr(user_stack), argvec);
-
     p->mm->brk = bin.brk;
+    p->mm->brk_vma = brk_vma;
     p->mm->code_start = bin.code_start;
     p->mm->code_end = bin.code_end;
 
@@ -468,95 +476,37 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     p->mm->args_start = addr(argvec[ARGV].data);
     p->mm->args_end = p->mm->args_start + argvec[ARGV].data_size;
 
+    p->mm->stack_start = stack_vma->start;
+    p->mm->stack_end = stack_vma->end;
+
     argvecs_put(argvec);
 
     ASSERT(*(int*)user_stack == argvec[ARGV].count);
-
-    p->type = USER_PROCESS;
 
     if (DEBUG_PROCESS)
     {
         process_vm_areas_indent_log(KERN_DEBUG, p, INDENT_LVL_1);
     }
 
-    // TODO: maybe I should alloc a new stack?
+    vm_free(old_vmas, old_pgd);
+    page_free(old_pgd);
+
     arch_exec(bin.entry, p->mm->kernel_stack, user_stack);
 
     ASSERT_NOT_REACHED();
-}
 
-static vm_area_t* stack_create(uintptr_t address, process_t* proc)
-{
-    vm_area_t* stack_vma = vm_create(
-        address,
-        USER_STACK_SIZE,
-        VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
+restore:
+    argvecs_put(argvec);
+    vm_free(p->mm->vm_areas, p->mm->pgd);
 
-    if (unlikely(!stack_vma))
+    p->mm->vm_areas = old_vmas;
+    p->mm->pgd = old_pgd;
+    pgd_load(old_pgd);
+    if (new_pgd)
     {
-        return NULL;
+        page_free(new_pgd);
     }
-
-    vm_nopage(stack_vma, proc->mm->pgd, address, true);
-    vm_nopage(stack_vma, proc->mm->pgd, address + PAGE_SIZE, true);
-
-    return stack_vma;
-}
-
-vm_area_t* exec_prepare_initial_vma()
-{
-    vm_area_t* prev;
-    vm_area_t* temp;
-    vm_area_t* stack_vma = process_stack_vm_area(process_current);
-
-    scoped_irq_lock();
-
-    if (likely(stack_vma))
-    {
-        for (temp = process_current->mm->vm_areas; temp;)
-        {
-            prev = temp;
-            if (temp != stack_vma)
-            {
-                vm_unmap(temp, process_current->mm->pgd);
-                temp = temp->next;
-                delete(prev);
-            }
-            else
-            {
-                temp = temp->next;
-                prev->next = NULL;
-            }
-        }
-
-        stack_vma->next = NULL;
-        stack_vma->prev = NULL;
-        process_current->mm->vm_areas = NULL;
-    }
-    else if (process_is_kernel(process_current))
-    {
-        stack_vma = stack_create(USER_STACK_VIRT_ADDRESS, process_current);
-
-        if (unlikely(!stack_vma))
-        {
-            current_log_warning("cannot allocate stack; sending SIGSTKFLT");
-            do_kill(process_current, SIGSTKFLT);
-            ASSERT_NOT_REACHED();
-        }
-
-        process_current->mm->stack_start = stack_vma->start;
-        process_current->mm->stack_end = stack_vma->end;
-    }
-    else
-    {
-        current_log_warning("no stack; sending SIGSTKFLT", process_current->pid, process_current);
-        do_kill(process_current, SIGSTKFLT);
-        ASSERT_NOT_REACHED();
-    }
-
-    vm_add(&process_current->mm->vm_areas, stack_vma);
-
-    return stack_vma;
+    return errno;
 }
 
 int binfmt_register(binfmt_t* binfmt)

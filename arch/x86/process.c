@@ -167,7 +167,7 @@ void FASTCALL(__process_switch(struct process*, struct process* next))
     // Reload TSS with the address of process's
     // context structure and load its pgd
     tss_load(tss_selector(0));
-    pgd_load(phys_ptr(next->mm->pgd));
+    pgd_load(next->mm->pgd);
 }
 
 void syscall_regs_check(struct pt_regs regs)

@@ -72,7 +72,6 @@ struct binary
     uintptr_t brk;
     uintptr_t code_start;
     uintptr_t code_end;
-    vm_area_t* stack_vma;
 };
 
 struct binfmt

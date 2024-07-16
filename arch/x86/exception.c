@@ -244,7 +244,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs)
 
     ++exception_ongoing;
 
-    pgd_load(phys_ptr(init_pgd_get()));
+    pgd_load(init_pgd_get());
 
     panic_mode_enter();
 

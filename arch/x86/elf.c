@@ -147,9 +147,6 @@ static int elf_prepare(const char* name, file_t* file, string_t** interpreter, v
         return -ENOEXEC;
     }
 
-    // FIXME: instead of allocating page for phdhr, reading it from fs, and
-    // then mmaping it for a user, I could do mmap here. But I need to cleanup
-    // the mess with exec_prepare_initial_vma
     if (unlikely(!(page = page_alloc1())))
     {
         log_debug(DEBUG_ELF, "%s: cannot allocate page for phdr", name);
@@ -279,11 +276,6 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
     elf32_header_t* header = &elf_data->header;
     elf32_phdr_t* phdr = page_virt_ptr(elf_data->header_page);
     uint32_t base = 0;
-
-    // FIXME: this breaks running process if there's some failure
-    // in do_mmap below. I should save previous vmas and restore
-    // then in case of failure
-    bin->stack_vma = exec_prepare_initial_vma();
 
     if (header->e_type == ET_DYN)
     {

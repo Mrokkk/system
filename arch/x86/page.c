@@ -461,7 +461,7 @@ void page_map_panic(uint32_t start, uint32_t end)
     {
         pgt[paddr / PAGE_SIZE] = paddr | PTE_WRITEABLE | PTE_PRESENT;
     }
-    pgd_load(phys_ptr(kernel_page_dir));
+    pgd_load(kernel_page_dir);
 }
 
 void page_stats_print()
@@ -730,7 +730,7 @@ UNMAP_AFTER_INIT int paging_init()
     pgt_init(temp_pgt, virt_end);
     page_map_init(virt_end);
 
-    pgd_load(phys_ptr(kernel_page_dir));
+    pgd_load(kernel_page_dir);
 
     ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].refcount);
     ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].refcount);

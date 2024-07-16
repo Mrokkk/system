@@ -42,6 +42,11 @@ static pgt_t* vm_remove_range_impl(
 
     for_each_vaddr(start, end)
     {
+        if (unlikely(!pgd[pde_index]))
+        {
+            continue;
+        }
+
         if (pgt[pte_index] && free_pages)
         {
             uint32_t paddr = pgt[pte_index] & PAGE_ADDRESS;
