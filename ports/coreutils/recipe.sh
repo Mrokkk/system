@@ -3,51 +3,18 @@ VERSION=
 BRANCH=
 APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep" "stty" "kill" "stat")
 
+[[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
+
 function build()
 {
-    local cross_gcc="${NATIVE_SYSROOT}/bin/i686-pc-phoenix-gcc"
-    export CC="ccache ${cross_gcc}"
-    export CFLAGS="-Wno-error -fdiagnostics-color=always -ggdb3 -fPIC"
-    export PATH="${NATIVE_SYSROOT}/bin:${PATH}"
-
-    [[ ! -f "${cross_gcc}" ]] && die "Toolchain not built"
-
-    if [[ ! -f "${SRC_DIR}/configure" ]]
-    then
-        pushd_silent "${SRC_DIR}"
-        ${SRC_DIR}/bootstrap --skip-po
-        popd_silent
-    fi
-
-    pushd_silent "${SRC_DIR}/gnulib"
-    if git diff --quiet
-    then
-        patch -p1 < "${CONF_DIR}/../gnulib/gnulib.patch"
-    fi
-    popd_silent
-
-    if [[ ! -f "Makefile" ]]
-    then
-        ${SRC_DIR}/configure \
-            --prefix=${SYSROOT} \
-            --host=i686-pc-phoenix \
-            --target=i686-pc-phoenix \
-            --disable-largefile \
-            --disable-nls \
-            --disable-threads \
-            --disable-acl \
-            --disable-xattr \
-            --disable-libsmack \
-            --disable-libcap \
-            --disable-werror \
-            --disable-multibyte \
-            --infodir="${NULL_DIR}" \
-            --localedir="${NULL_DIR}" \
-            --mandir="${NULL_DIR}" \
-            --docdir="${NULL_DIR}" \
-            --htmldir="${NULL_DIR}" \
-            --enable-no-install-program=arch,coreutils,hostname,chcon,runcon,df,pinky,users,who,nice || die "configuration failed"
-    fi
+    gnu_configuration \
+        --disable-largefile \
+        --disable-xattr \
+        --disable-libsmack \
+        --disable-libcap \
+        --disable-werror \
+        --disable-multibyte \
+        --enable-no-install-program=arch,coreutils,hostname,chcon,runcon,df,pinky,users,who,nice
 
     make -O -j${NPROC}
 

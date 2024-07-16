@@ -102,11 +102,11 @@ function _pkg_make()
     [[ -n "${rebuild}" ]] && rm -rf "${BUILD_DIR}"
     create_dir "${BUILD_DIR}"
 
-    _recipe_read
-    _prepare
-    _step_execute build
-    _step_execute install
-    _recipe_close
+    (_recipe_read; \
+    _prepare; \
+    _step_execute build; \
+    _step_execute install; \
+    _recipe_close) || exit
 
     unset PKG SRC_DIR BUILD_DIR
 }
