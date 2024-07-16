@@ -3,6 +3,8 @@
 
 #define static_assert _Static_assert
 
+#endif
+
 #undef assert
 
 #ifndef NDEBUG
@@ -17,7 +19,5 @@ void __assertion_failed(const char* file, unsigned long line, const char* err);
 #else
 
 #define assert(expr) ((void)0)
-
-#endif
 
 #endif
