@@ -15,14 +15,15 @@ void __libc_start_main(int, char* const argv[], char* const envp[])
     program_invocation_name = argv[0];
     short_name = strrchr(argv[0], '/');
     program_invocation_short_name = short_name ? short_name + 1 : argv[0];
+
     if (getenv("LIBC_DEBUG"))
     {
         libc_debug = 1;
     }
+
     signals_init();
     stdio_init();
 }
-
 
 #define STUB(name) \
     void name() {}

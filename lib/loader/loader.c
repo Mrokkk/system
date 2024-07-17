@@ -36,7 +36,7 @@ static LIST_DECLARE(libs);
 #define AUX_GET(a) \
     ({ saved_auxv._##a; })
 
-static __attribute__((used,noinline)) void loader_breakpoint(const char* name, uintptr_t base_address)
+static __attribute__((noinline)) void loader_breakpoint(const char* name, uintptr_t base_address)
 {
     asm volatile("" :: "a" (name), "c" (base_address) : "memory");
 }
@@ -124,24 +124,25 @@ static elf32_sym_t* elf_lookup(dynamic_t* dynamic, const char* symname)
     return NULL;
 }
 
-static void dynamic_read(int exec_fd, elf32_phdr_t* p, dynamic_t* dynamic, list_head_t* libs)
+static void dynamic_read(elf32_phdr_t* p, dynamic_t* dynamic, list_head_t* libs, uintptr_t base)
 {
-    dynamic->entries = alloc_read(exec_fd, dynamic->size = p->p_filesz, p->p_offset);
+    dynamic->size = p->p_filesz;
+    dynamic->entries = SHIFT_AS(elf32_dyn_t*, base, p->p_vaddr);
     dynamic->count = dynamic->size / sizeof(elf32_dyn_t);
 
     dynamic_store(dynamic, libs);
 
     dynamic->symtab.count = (dynamic->dynstr.offset - dynamic->symtab.offset) / dynamic->symtab.entsize;
-    dynamic->symtab.entries = alloc_read(exec_fd, dynamic->dynstr.offset - dynamic->symtab.offset, dynamic->symtab.offset);
-    dynamic->dynstr.strings = alloc_read(exec_fd, dynamic->dynstr.size, dynamic->dynstr.offset);
-    dynamic->rel.entries = alloc_read(exec_fd, dynamic->rel.size, dynamic->rel.offset);
+    dynamic->symtab.entries = SHIFT_AS(elf32_sym_t*, base, dynamic->symtab.offset);
+    dynamic->dynstr.strings = SHIFT_AS(const char*, base, dynamic->dynstr.offset);
+    dynamic->rel.entries = SHIFT_AS(elf32_rel_t*, base, dynamic->rel.offset);
     dynamic->rel.count = dynamic->rel.size / dynamic->rel.entsize;
     dynamic->hash.size =  dynamic->symtab.offset - dynamic->hash.offset;
-    dynamic->hash.data = alloc_read(exec_fd, dynamic->hash.size, dynamic->hash.offset);
+    dynamic->hash.data = SHIFT_AS(uintptr_t*, base, dynamic->hash.offset);
 
     if (dynamic->jmprel.offset)
     {
-        dynamic->jmprel.entries = alloc_read(exec_fd, dynamic->jmprel.size, dynamic->jmprel.offset);
+        dynamic->jmprel.entries = SHIFT_AS(elf32_rel_t*, base, dynamic->jmprel.offset);
         dynamic->jmprel.count = dynamic->jmprel.size / sizeof(elf32_rel_t);
     }
 }
@@ -322,7 +323,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
 
                 case PT_DYNAMIC:
                 {
-                    dynamic_read(lib_fd, p, &lib_dynamic, &lib_libs);
+                    dynamic_read(p, &lib_dynamic, &lib_libs, lib_base);
 
                     relocate(&lib_dynamic.rel, &lib_dynamic, lib_base, &missing_symbols);
                     relocate(&lib_dynamic.jmprel, &lib_dynamic, lib_base, &missing_symbols);
@@ -394,7 +395,7 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
         {
             case PT_DYNAMIC:
             {
-                dynamic_read(exec_fd, p, &dynamic, &libs);
+                dynamic_read(p, &dynamic, &libs, base_address);
                 break;
             }
 

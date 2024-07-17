@@ -67,8 +67,10 @@
 #define __NR_brk            64
 #define __NR_mprotect       65
 #define __NR_rmdir          66
+#define __NR_pread          67
+#define __NR_pwrite         68
 
-#define __NR_syscalls       67
+#define __NR_syscalls       69
 
 #ifndef __ASSEMBLER__
 
@@ -178,3 +180,5 @@ __syscall2(fstatfs, int, int, struct statfs*)
 __syscall1(brk, int, void*)
 __syscall3(mprotect, int, void*, size_t, int)
 __syscall1(rmdir, int, const char*)
+__syscall4(pread, int, int, void*, size_t, off_t)
+__syscall3(pwrite, int, const void*, size_t, off_t)

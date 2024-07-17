@@ -4,24 +4,57 @@
 #include <kernel/process.h>
 #include <kernel/api/unistd.h>
 
+enum
+{
+    _READ,
+    _WRITE,
+};
+
+static int access_init(int fd, const char* buffer, size_t size, int type, file_t** file)
+{
+    int errno;
+
+    if (unlikely(errno = current_vm_verify_array(type == _READ ? VERIFY_WRITE : VERIFY_READ, buffer, size)))
+    {
+        return errno;
+    }
+
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+
+    process_fd_get(process_current, fd, file);
+
+    if (unlikely(!*file)) return -EBADF;
+    if (unlikely(!(*file)->ops)) return -ENOSYS;
+    if (unlikely(type == _READ ? !(*file)->ops->read : !(*file)->ops->write)) return -ENOSYS;
+    if (unlikely(((*file)->mode & O_ACCMODE) == (type == _READ ? O_WRONLY : O_RDONLY))) return -EACCES;
+
+    return 0;
+}
+
 int sys_write(int fd, const char* buffer, size_t size)
 {
     int errno;
     file_t* file;
 
-    if ((errno = current_vm_verify_array(VERIFY_READ, buffer, size)))
+    if (unlikely(errno = access_init(fd, buffer, size, _WRITE, &file)))
     {
         return errno;
     }
 
-    if (fd_check_bounds(fd)) return -EBADF;
+    return file->ops->write(file, (char*)buffer, size);
+}
 
-    process_fd_get(process_current, fd, &file);
+int sys_pwrite(int fd, const void* buffer, size_t size, off_t offset)
+{
+    int errno;
+    file_t* file;
 
-    if (!file) return -EBADF;
-    if (!file->ops) return -ENOSYS;
-    if (!file->ops->write) return -ENOSYS;
-    if ((file->mode & O_ACCMODE) == O_RDONLY) return -EACCES;
+    if (unlikely(errno = access_init(fd, buffer, size, _WRITE, &file)))
+    {
+        return errno;
+    }
+
+    file->offset = offset;
 
     return file->ops->write(file, (char*)buffer, size);
 }
@@ -31,19 +64,25 @@ int sys_read(int fd, char* buffer, size_t size)
     int errno;
     file_t* file;
 
-    if ((errno = current_vm_verify_array(VERIFY_WRITE, buffer, size)))
+    if (unlikely(errno = access_init(fd, buffer, size, _READ, &file)))
     {
         return errno;
     }
 
-    if (fd_check_bounds(fd)) return -EBADF;
+    return file->ops->read(file, buffer, size);
+}
 
-    process_fd_get(process_current, fd, &file);
+int sys_pread(int fd, void* buffer, size_t size, off_t offset)
+{
+    int errno;
+    file_t* file;
 
-    if (!file) return -EBADF;
-    if (!file->ops) return -ENOSYS;
-    if (!file->ops->read) return -ENOSYS;
-    if ((file->mode & O_ACCMODE) == O_WRONLY) return -EACCES;
+    if (unlikely(errno = access_init(fd, buffer, size, _READ, &file)))
+    {
+        return errno;
+    }
+
+    file->offset = offset;
 
     return file->ops->read(file, buffer, size);
 }

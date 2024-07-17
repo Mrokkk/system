@@ -107,6 +107,14 @@ target_compile_options(c
 )
 
 add_library(crt0 OBJECT crt0.c)
+
+target_compile_options(crt0
+    PRIVATE
+        -fpie
+        -pie
+        -fPIC
+)
+
 add_library(crt0_shared OBJECT crt0_shared.c)
 
 add_subdirectory(loader)

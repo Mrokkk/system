@@ -12,6 +12,7 @@
 extern int libc_debug;
 
 #define UNUSED(x)   (void)x
+#define LIKELY(x)   __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #define FALLTHROUGH __attribute__((__fallthrough__))
 

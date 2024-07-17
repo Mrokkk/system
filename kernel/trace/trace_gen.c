@@ -466,4 +466,18 @@ syscall_t trace_syscalls[] = {
         .nargs  = 1,
         .args   = { TYPE_CONST_CHAR_PTR },
     },
+
+    {
+        .name   = "pread",
+        .ret    = TYPE_LONG,
+        .nargs  = 4,
+        .args   = { TYPE_LONG, TYPE_VOID_PTR, TYPE_UNSIGNED_LONG, TYPE_UNSIGNED_LONG },
+    },
+
+    {
+        .name   = "pwrite",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG, TYPE_UNSIGNED_LONG },
+    },
 };

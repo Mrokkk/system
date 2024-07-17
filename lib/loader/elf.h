@@ -158,7 +158,7 @@ static inline char* elf_phdr_type_get(uint32_t type)
 
 static inline void phdr_print(elf32_phdr_t* phdr, size_t phnum)
 {
-    if (!debug)
+    if (LIKELY(!debug))
     {
         return;
     }
