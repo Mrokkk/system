@@ -16,11 +16,11 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     inode_t* parent_inode = NULL;
     dentry_t* parent_dentry = NULL;
     const char* basename;
-    char parent[256];
+    char parent[PATH_MAX];
 
     dentry_t* dentry = lookup(filename);
 
-    if (dentry)
+    if (likely(dentry))
     {
         inode = dentry->inode;
         goto set_file;
@@ -48,22 +48,34 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
         }
         else
         {
-            // FIXME: There's a bug here - parent_dentry shouldn't be cwd. E.g. if
-            // cwd is / and filename is tmp/test and tmp is mounted as different fs,
-            // then create is called on root fs
-            parent_dentry = process_current->fs->cwd;
-            basename = filename;
+            dirname(filename, parent);
+
+            if (*parent == '/')
+            {
+                parent_dentry = process_current->fs->cwd;
+                basename = filename;
+            }
+            else
+            {
+                parent_dentry = lookup(parent);
+                basename = find_last_slash(filename) + 1;
+            }
+
+            if (unlikely(!parent_dentry))
+            {
+                return -ENOENT;
+            }
         }
     }
 
     parent_inode = parent_dentry->inode;
 
-    if (!parent_inode->ops->create)
+    if (unlikely(!parent_inode->ops->create))
     {
         return -ENOSYS;
     }
 
-    if ((errno = parent_inode->ops->create(parent_inode, basename, flags, mode, &inode)))
+    if (unlikely(errno = parent_inode->ops->create(parent_inode, basename, flags, mode, &inode)))
     {
         log_debug(DEBUG_OPEN, "create failed");
         return errno;
@@ -76,19 +88,19 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     }
 
 set_file:
-    if (!inode->file_ops || !inode->file_ops->open)
+    if (unlikely(!inode->file_ops || !inode->file_ops->open))
     {
         return -ENOSYS;
     }
 
-    if (S_ISDIR(inode->mode) && !(flags & O_DIRECTORY))
+    if (unlikely(S_ISDIR(inode->mode) && !(flags & O_DIRECTORY)))
     {
         return -EISDIR;
     }
 
     // TODO: check permissions
 
-    if (!(*new_file = alloc(file_t, list_add_tail(&this->files, &files))))
+    if (unlikely(!(*new_file = alloc(file_t, list_add_tail(&this->files, &files)))))
     {
         return -ENOMEM;
     }
@@ -102,7 +114,7 @@ set_file:
     (*new_file)->count = 1;
     (*new_file)->private = NULL;
 
-    if ((errno = (*new_file)->ops->open(*new_file)))
+    if (unlikely(errno = (*new_file)->ops->open(*new_file)))
     {
         list_del(&(*new_file)->files);
         delete(*new_file);
