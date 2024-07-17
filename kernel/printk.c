@@ -10,6 +10,7 @@
 #include <kernel/reboot.h>
 #include <kernel/seq_file.h>
 #include <kernel/backtrace.h>
+#include <kernel/api/syslog.h>
 
 #define JIFFIES     "\e[32m"
 #define INFO        "\e[34m"
@@ -77,14 +78,6 @@ void printk(const printk_entry_t* entry, const char *fmt, ...)
     int printed;
     const char* filename = entry->file;
     const char* log_color;
-
-    if (
-        0
-        //|| entry->log_level < LOGLEVEL_NOTICE
-        )
-    {
-        return;
-    }
 
     scoped_irq_lock();
 
@@ -215,5 +208,21 @@ void printk_early_register(void (*print)(const char* string))
 int syslog_show(seq_file_t* s)
 {
     seq_puts(s, printk_buffer);
+    return 0;
+}
+
+int sys__syslog(int priority, int option, const char* message)
+{
+    UNUSED(option);
+
+    struct printk_entry e = {
+        .log_level  = priority & 0xf,
+        .line       = 0,
+        .file       = "",
+        .function   = "",
+    };
+
+    printk(&e, "%s", message);
+
     return 0;
 }

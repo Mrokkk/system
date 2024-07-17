@@ -51,6 +51,7 @@ set(LIBC_SRC
     strtol.c
     syscall.c
     sysconf.c
+    syslog.c
     termios.c
     time.c
     ttyname.c

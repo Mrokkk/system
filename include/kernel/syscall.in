@@ -68,3 +68,4 @@ mprotect: int, void*, size_t, int
 rmdir: int, const char*
 pread: int, int, void*, size_t, off_t
 pwrite: int, const void*, size_t, off_t
+_syslog: int, int, int, const char*

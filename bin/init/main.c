@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/stat.h>
@@ -107,6 +108,8 @@ static int shell_run(const char* pathname)
         .console_device = "/dev/tty0",
     };
 
+    openlog("init", LOG_PID | LOG_CONS, LOG_USER);
+
     if (argc > 1)
     {
         parse_cmdline(&options, argv[1]);
@@ -116,7 +119,7 @@ static int shell_run(const char* pathname)
         (open(options.console_device, O_WRONLY, 0) != STDOUT_FILENO) ||
         (open(options.console_device, O_WRONLY, 0) != STDERR_FILENO))
     {
-        printf("cannot open console\n");
+        syslog(LOG_ERR, "cannot open console");
         exit(EXIT_FAILURE);
     }
 
@@ -130,7 +133,7 @@ static int shell_run(const char* pathname)
 
     if (!shell)
     {
-        printf("cannot find shell to run!\n");
+        syslog(LOG_ERR, "cannot find shell to run");
         exit(EXIT_FAILURE);
     }
 
