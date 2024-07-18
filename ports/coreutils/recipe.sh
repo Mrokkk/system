@@ -1,7 +1,7 @@
 REPO="https://github.com/coreutils/coreutils.git"
 VERSION=
 BRANCH=
-APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep" "stty" "kill" "stat")
+APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep" "stty" "kill" "stat" "dircolors" "du" "uniq" "sort")
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 
@@ -12,8 +12,6 @@ function build()
         --disable-xattr \
         --disable-libsmack \
         --disable-libcap \
-        --disable-werror \
-        --disable-multibyte \
         --enable-no-install-program=arch,coreutils,hostname,chcon,runcon,df,pinky,users,who,nice
 
     make -O -j${NPROC}

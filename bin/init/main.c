@@ -66,6 +66,7 @@ static int shell_run(const char* pathname)
     setenv("SHELL", pathname, 0);
     setenv("HOME", "/root", 0);
     setenv("LC_ALL", "C", 0);
+    setenv("TERM", "xterm-256color", 0);
 
     if ((child_pid = fork()) < 0)
     {

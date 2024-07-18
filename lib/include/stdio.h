@@ -59,6 +59,8 @@ size_t fwrite(const void* ptr, size_t size, size_t nmemb, FILE* restrict stream)
 
 FILE* fopen(const char* restrict pathname, const char* restrict mode);
 FILE* fdopen(int fd, const char* mode);
+FILE* freopen(const char* restrict pathname, const char* restrict mode, FILE* restrict stream);
+
 int fclose(FILE* stream);
 int fileno(FILE* stream);
 

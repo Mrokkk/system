@@ -5,7 +5,7 @@ export PATH="${NATIVE_SYSROOT}/bin:${PATH}"
 
 [[ ! -f "${CROSS_GCC}" ]] && die "Toolchain not built"
 
-function gnu_configuration()
+function gnu_configuration_raw()
 {
     if [[ ! -f "${SRC_DIR}/configure" ]]
     then
@@ -30,14 +30,20 @@ function gnu_configuration()
             --prefix=${SYSROOT} \
             --host=i686-pc-phoenix \
             --target=i686-pc-phoenix \
-            --disable-nls \
-            --disable-threads \
-            --disable-acl \
-            --infodir="${NULL_DIR}" \
-            --localedir="${NULL_DIR}" \
-            --mandir="${NULL_DIR}" \
-            --docdir="${NULL_DIR}" \
-            --htmldir="${NULL_DIR}" \
             ${@}|| die "configuration failed"
     fi
+}
+
+function gnu_configuration()
+{
+    gnu_configuration_raw \
+        --disable-nls \
+        --disable-threads \
+        --disable-acl \
+        --infodir="${NULL_DIR}" \
+        --localedir="${NULL_DIR}" \
+        --mandir="${NULL_DIR}" \
+        --docdir="${NULL_DIR}" \
+        --htmldir="${NULL_DIR}" \
+        ${@}
 }

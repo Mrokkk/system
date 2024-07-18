@@ -28,6 +28,8 @@ set(LIBC_SRC
     env.c
     errno.c
     error.c
+    exec.c
+    ftruncate.c
     getcwd.c
     gethostname.c
     getpagesize.c
@@ -93,6 +95,7 @@ set(LIBC_SRC
     string/strspn.c
     string/strstr.c
     string/strtok.c
+    string/strxfrm.c
 
     ../kernel/lib/bitset.c
 )

@@ -7,7 +7,6 @@ BRANCH=
 function build()
 {
     gnu_configuration \
-        --enable-minimal-config \
         --enable-alias \
         --enable-job-control \
         --enable-prompt-string-decoding \

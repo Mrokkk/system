@@ -7,10 +7,6 @@ BRANCH=
 function build()
 {
     gnu_configuration \
-        --disable-acl \
-        --disable-xattr \
-        --disable-libsmack \
-        --disable-libcap \
         --disable-largefile
 
     make -O -j${NPROC} || die "compilation failed"

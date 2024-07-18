@@ -22,6 +22,8 @@ static inline int execvp(const char* path, char* const argv[])
     return execve(path, argv, environ);
 }
 
+int execlp(const char* file, const char* arg, ...);
+
 unsigned int sleep(unsigned int seconds);
 
 int gethostname(char* name, size_t namelen);
@@ -30,6 +32,8 @@ int getpagesize(void);
 [[noreturn]] void _exit(int retcode);
 
 long sysconf(int name);
+
+int ftruncate(int fildes, off_t length);
 
 extern char** environ;
 

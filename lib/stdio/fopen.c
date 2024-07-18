@@ -85,5 +85,23 @@ FILE* LIBC(fdopen)(int fd, const char* mode)
     return file;
 }
 
+FILE* LIBC(freopen)(const char* pathname, const char* mode, FILE* stream)
+{
+    int flags;
+
+    VALIDATE_INPUT(FILE_CHECK(stream), NULL);
+
+    if (!pathname)
+    {
+        RETURN_ERROR_IF((flags = mode_parse(mode)) < 0, EINVAL, NULL);
+        stream->mode = flags;
+        return stream;
+    }
+
+    fclose(stream);
+    return fopen(pathname, mode);
+}
+
 LIBC_ALIAS(fopen);
 LIBC_ALIAS(fdopen);
+LIBC_ALIAS(freopen);

@@ -27,6 +27,7 @@ char* strstr(const char* haystack, const char* needle);
 char* strcat(char* restrict dst, const char* restrict src);
 char* strpbrk(const char* s, const char* accept);
 char* strdup(const char* s);
+size_t strxfrm(char* dest, char const* src, size_t n);
 
 char* strerror(int errnum);
 char* strsignal(int sig);
