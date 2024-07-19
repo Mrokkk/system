@@ -430,38 +430,20 @@ int LIBC(vsnprintf)(char* buf, size_t size, const char* fmt, va_list args)
 
     res = vsprintf_internal(&buffer, fmt, args);
 
+    // FIXME: if output is truncated this should return number of bytes which
+    // would have been written if there's no limit
     if (UNLIKELY(res == -1))
     {
         return res;
     }
 
-    string_putc(&buffer, 0);
-
-    return res;
-}
-
-int LIBC(snprintf)(char* str, size_t size, const char* format, ...)
-{
-    int res;
-    printf_buffer_t buffer = {
-        .start = str,
-        .end = str + size,
-        .current = str,
-        .putc = &string_putc,
-    };
-
-    string_putc(&buffer, 0);
-
-    va_list args;
-    va_start(args, format);
-    res = vsprintf_internal(&buffer, format, args);
-    va_end(args);
-
-    string_putc(&buffer, 0);
+    if (res < (int)size)
+    {
+        string_putc(&buffer, 0);
+    }
 
     return res;
 }
 
 LIBC_ALIAS(vsprintf);
 LIBC_ALIAS(vsnprintf);
-LIBC_ALIAS(snprintf);
