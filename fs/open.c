@@ -369,6 +369,9 @@ static void stat_fill(struct stat* statbuf, const dentry_t* dentry)
     statbuf->st_mode = dentry->inode->mode;
     statbuf->st_uid = dentry->inode->uid;
     statbuf->st_gid = dentry->inode->gid;
+    statbuf->st_ctime = dentry->inode->ctime;
+    statbuf->st_mtime = dentry->inode->mtime;
+    statbuf->st_atime = 0;
 }
 
 int sys_stat(const char* __user pathname, struct stat* __user statbuf)

@@ -10,6 +10,7 @@ static inline void spinlock_lock(spinlock_t* lock)
         "1: "
         "xchgl %0, %1;"
         "test %1, %1;"
+        "rep nop;"
         "jnz 1b;"
         : "=m" (lock->lock)
         : "r" (dummy)

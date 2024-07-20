@@ -35,22 +35,25 @@ typedef uint32_t flags_t;
     ({ asm volatile("hlt"); 1; })
 
 #define rdtsc(low, high) \
-     asm volatile("rdtsc" : "=a" (low), "=d" (high))
+    asm volatile("rdtsc" : "=a" (low), "=d" (high))
 
 #define rdtscl(val) \
-     asm volatile("rdtsc" : "=a" (val))
+    asm volatile("rdtsc" : "=a" (val))
 
 #define rdtscll(val) \
-     asm volatile("rdtsc" : "=A" (val))
+    asm volatile("rdtsc" : "=A" (val))
 
 #define rdtscp(hi, low, c) \
     asm volatile("rdtscp" : "=a" (low), "=c" (c), "=d" (hi))
 
 #define rdmsr(msr, low, high) \
-   asm volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr))
+    asm volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr))
 
 #define wrmsr(msr, low, high) \
-   asm volatile("wrmsr" :: "a" (low), "d" (high), "c" (msr))
+    asm volatile("wrmsr" :: "a" (low), "d" (high), "c" (msr))
+
+#define cpu_relax() \
+    asm volatile("rep; nop" ::: "memory")
 
 static inline void __flags_restore(flags_t* flags)
 {

@@ -11,7 +11,7 @@ use_nographic=
 args="\
 -boot once=c \
 -no-reboot \
--rtc base=localtime,clock=host \
+-rtc base=utc,clock=host \
 -device isa-debugcon,chardev=char0 \
 -chardev stdio,id=char0,mux=on,signal=off \
 -chardev pipe,id=char1,path=ttyS0 \

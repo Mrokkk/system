@@ -744,6 +744,8 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
     inode->size = root->size;
     inode->sb = sb;
     inode->mode = root->mode;
+    inode->ctime = root->ctime;
+    inode->mtime = root->mtime;
 
     return 0;
 }

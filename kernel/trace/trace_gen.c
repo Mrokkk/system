@@ -487,4 +487,25 @@ syscall_t trace_syscalls[] = {
         .nargs  = 3,
         .args   = { TYPE_LONG, TYPE_LONG, TYPE_CONST_CHAR_PTR },
     },
+
+    {
+        .name   = "gettimeofday",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_VOID_PTR, TYPE_VOID_PTR },
+    },
+
+    {
+        .name   = "clock_gettime",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_UNSIGNED_LONG, TYPE_VOID_PTR },
+    },
+
+    {
+        .name   = "clock_settime",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_UNSIGNED_LONG, TYPE_VOID_PTR },
+    },
 };

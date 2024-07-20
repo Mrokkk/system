@@ -70,8 +70,11 @@
 #define __NR_pread          67
 #define __NR_pwrite         68
 #define __NR__syslog        69
+#define __NR_gettimeofday   70
+#define __NR_clock_gettime  71
+#define __NR_clock_settime  72
 
-#define __NR_syscalls       70
+#define __NR_syscalls       73
 
 #ifndef __ASSEMBLER__
 
@@ -85,6 +88,7 @@ struct statfs;
 struct statvfs;
 struct timespec;
 struct timeval;
+struct timezone;
 
 #endif  // __ASSEMBLER__
 
@@ -167,7 +171,7 @@ __syscall2(signal, int, int, void (*)(int))
 __syscall1(sigreturn, int, int)
 __syscall2(stat, int, const char*, struct stat*)
 __syscall2(statvfs, int, const char*, struct statvfs*)
-__syscall1(time, time_t, void*)
+__syscall1(time, time_t, time_t*)
 __syscall1(umask, mode_t, mode_t)
 __syscall1(umount, int, const char*)
 __syscall2(umount2, int, const char*, int)
@@ -184,3 +188,6 @@ __syscall1(rmdir, int, const char*)
 __syscall4(pread, int, int, void*, size_t, off_t)
 __syscall3(pwrite, int, const void*, size_t, off_t)
 __syscall3(_syslog, int, int, int, const char*)
+__syscall2(gettimeofday, int, struct timeval*, struct timezone*)
+__syscall2(clock_gettime, int, clockid_t, struct timespec*)
+__syscall2(clock_settime, int, clockid_t, const struct timespec*)

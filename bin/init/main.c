@@ -1,3 +1,4 @@
+#include <time.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -131,6 +132,9 @@ static int shell_run(const char* pathname)
     printf("\e[38;2;35;135;39m...with colors :)"RESET"\n");
 
     const char* shell = shell_find();
+
+    time_t t = time(NULL);
+    printf("%s", ctime(&t));
 
     if (!shell)
     {

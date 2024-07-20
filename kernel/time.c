@@ -5,9 +5,12 @@
 #include <kernel/timer.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>
+#include <kernel/seqlock.h>
 
 volatile unsigned int jiffies;
+static seqlock_t timestamp_lock;
 timeval_t timestamp;
+static uint32_t realtime;
 
 // This is from Linux source code
 time_t mktime(
@@ -32,16 +35,17 @@ time_t mktime(
 
 static void ts_update(uint64_t useconds)
 {
+    seqlock_write_lock(&timestamp_lock);
     timestamp.tv_usec += useconds;
     ts_normalize(&timestamp);
+    seqlock_write_unlock(&timestamp_lock);
 }
 
 void timestamp_update(void)
 {
-    flags_t flags;
     uint64_t cycles_cur, diff;
 
-    irq_save(flags);
+    scoped_irq_lock();
 
     cycles_cur = monotonic_clock->read();
     diff = (cycles_cur - monotonic_clock->cycles_prev) & monotonic_clock->mask;
@@ -49,13 +53,18 @@ void timestamp_update(void)
     ts_update((diff * monotonic_clock->mult) >> monotonic_clock->shift);
 
     monotonic_clock->cycles_prev = cycles_cur;
-
-    irq_restore(flags);
 }
 
 void timestamp_get(timeval_t* ts)
 {
-    memcpy(ts, &timestamp, sizeof(*ts));
+    unsigned seq;
+
+    do
+    {
+        seq = seqlock_read_begin(&timestamp_lock);
+        __builtin_memcpy(ts, &timestamp, sizeof(*ts));
+    }
+    while (seqlock_read_check(&timestamp_lock, seq));
 }
 
 // FIXME: delay is still broken with i8253
@@ -116,24 +125,108 @@ static void io_delay_measure(void)
     log_info("dummy IO duration: %u ns", nseconds / IO_LOOPS);
 }
 
-time_t sys_time(void* tloc)
+time_t sys_time(time_t* tloc)
 {
-    time_t ret;
-    rtc_meas_t m;
-
-    if (tloc && current_vm_verify(VERIFY_WRITE, (time_t*)tloc))
+    if (tloc && current_vm_verify(VERIFY_WRITE, tloc))
     {
         return -EFAULT;
     }
 
-    rtc_clock->read_rtc(&m);
-    ret = mktime(m.year, m.month, m.day, m.hour, m.minute, m.second);
+    return realtime + timestamp.tv_sec;
+}
 
-    return ret;
+int sys_gettimeofday(struct timeval* tv, struct timezone* tz)
+{
+    if (tz)
+    {
+        if (unlikely(current_vm_verify(VERIFY_WRITE, tz)))
+        {
+            return -EFAULT;
+        }
+        tz->tz_dsttime = 0;
+        tz->tz_minuteswest = 0;
+    }
+
+    unsigned seq;
+
+    if (tv)
+    {
+        if (unlikely(current_vm_verify(VERIFY_WRITE, tv)))
+        {
+            return -EFAULT;
+        }
+
+        do
+        {
+            seq = seqlock_read_begin(&timestamp_lock);
+            tv->tv_sec = realtime + timestamp.tv_sec;
+            tv->tv_usec = timestamp.tv_usec;
+        }
+        while (seqlock_read_check(&timestamp_lock, seq));
+    }
+
+    return 0;
+}
+
+int sys_clock_gettime(clockid_t clockid, struct timespec* tp)
+{
+    int off = 0;
+
+    if (unlikely(clockid >= CLOCK_ID_COUNT)) return -EINVAL;
+    if (unlikely(current_vm_verify(VERIFY_WRITE, tp))) return -EFAULT;
+
+    int coarse = clockid & __CLOCK_COARSE;
+
+    if (!coarse)
+    {
+        timestamp_update();
+    }
+
+    unsigned seq;
+
+    switch (clockid & __CLOCK_MASK)
+    {
+        case CLOCK_REALTIME:
+            off = realtime;
+            fallthrough;
+        case CLOCK_MONOTONIC:
+            do
+            {
+                seq = seqlock_read_begin(&timestamp_lock);
+                tp->tv_sec = off + timestamp.tv_sec;
+                tp->tv_nsec = timestamp.tv_usec * 1000;
+            }
+            while (seqlock_read_check(&timestamp_lock, seq));
+            return 0;
+    }
+
+    return -EINVAL;
+}
+
+int sys_clock_settime(clockid_t clockid, const struct timespec* tp)
+{
+    if (unlikely(clockid >= CLOCK_ID_COUNT)) return -EINVAL;
+    if (unlikely(current_vm_verify(VERIFY_READ, tp))) return -EFAULT;
+
+    switch (clockid & __CLOCK_MASK)
+    {
+        case CLOCK_REALTIME:
+        {
+            timestamp_update();
+            realtime = tp->tv_sec - timestamp.tv_sec;
+            return 0;
+        }
+    }
+
+    return -EINVAL;
 }
 
 void time_setup(void)
 {
     read_overhead_measure();
     io_delay_measure();
+
+    rtc_meas_t m;
+    rtc_clock->read_rtc(&m);
+    realtime = mktime(m.year, m.month, m.day, m.hour, m.minute, m.second);
 }

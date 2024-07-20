@@ -52,7 +52,7 @@ signal: int, int, void (*)(int)
 sigreturn: int, int
 stat: int, const char*, struct stat*
 statvfs: int, const char*, struct statvfs*
-time: time_t, void*
+time: time_t, time_t*
 umask: mode_t, mode_t
 umount: int, const char*
 umount2: int, const char*, int
@@ -69,3 +69,6 @@ rmdir: int, const char*
 pread: int, int, void*, size_t, off_t
 pwrite: int, const void*, size_t, off_t
 _syslog: int, int, int, const char*
+gettimeofday: int, struct timeval*, struct timezone*
+clock_gettime: int, clockid_t, struct timespec*
+clock_settime: int, clockid_t, const struct timespec*

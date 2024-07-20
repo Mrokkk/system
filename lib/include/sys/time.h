@@ -17,7 +17,7 @@ struct itimerval
 };
 
 int getitimer(int which, struct itimerval* value);
-int gettimeofday(struct timeval* restrict tp, void* restrict tzp);
+
 int setitimer(
     int which,
     const struct itimerval* restrict value,

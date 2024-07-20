@@ -24,6 +24,7 @@
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn
 #define ALIGN(x)                __attribute__((aligned(x)))
 #define UNUSED(x)               (void)x
+#define ACCESS_ONCE(x)          (*(volatile typeof(x)*)&(x))
 
 #define __STRINGIFY(x)          #x
 #define STRINGIFY(x)            __STRINGIFY(x)
