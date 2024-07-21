@@ -6,7 +6,6 @@
 #include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/ksyms.h>
-#include <kernel/device.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>

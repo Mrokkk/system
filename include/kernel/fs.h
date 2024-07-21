@@ -33,6 +33,7 @@ struct inode
 {
     MAGIC_NUMBER;
     dev_t dev;
+    dev_t rdev;
     ino_t ino;
     mode_t mode;
     uid_t uid;
@@ -160,7 +161,6 @@ int string_read(file_t* file, size_t offset, size_t count, string_t** output);
 
 int inode_get(inode_t** inode);
 int inode_put(inode_t* inode);
-char* inode_print(const void* data, char* str);
 
 void file_systems_print(void);
 

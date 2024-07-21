@@ -6,7 +6,6 @@
 #include <kernel/irq.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
-#include <kernel/device.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
@@ -273,7 +272,7 @@ static void ahci_irq_handle()
 
 static int ahci_fs_open(file_t* file)
 {
-    int drive = BLK_DRIVE(MINOR(file->inode->dev));
+    int drive = BLK_DRIVE(MINOR(file->inode->rdev));
     if (!devices[drive].mbr.signature)
     {
         return -ENODEV;
@@ -284,9 +283,9 @@ static int ahci_fs_open(file_t* file)
 static int ahci_fs_read(file_t* file, char* buf, size_t count)
 {
     int errno;
-    int drive = BLK_DRIVE(MINOR(file->inode->dev));
+    int drive = BLK_DRIVE(MINOR(file->inode->rdev));
     ata_device_t* device = devices + drive;
-    int partition = BLK_PARTITION(MINOR(file->inode->dev));
+    int partition = BLK_PARTITION(MINOR(file->inode->rdev));
     uint32_t offset = file->offset / ATA_SECTOR_SIZE;
     uint32_t first_sector, last_sector, max_count;
 

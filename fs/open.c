@@ -372,6 +372,7 @@ static void stat_fill(struct stat* statbuf, const dentry_t* dentry)
     statbuf->st_ctime = dentry->inode->ctime;
     statbuf->st_mtime = dentry->inode->mtime;
     statbuf->st_atime = 0;
+    statbuf->st_rdev = dentry->inode->rdev;
 }
 
 int sys_stat(const char* __user pathname, struct stat* __user statbuf)

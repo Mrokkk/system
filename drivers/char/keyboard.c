@@ -2,7 +2,6 @@
 #include <arch/i8042.h>
 #include <kernel/irq.h>
 #include <kernel/wait.h>
-#include <kernel/device.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>

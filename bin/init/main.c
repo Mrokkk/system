@@ -58,7 +58,7 @@ static const char* shell_find(void)
     return NULL;
 }
 
-static int shell_run(const char* pathname)
+static int shell_run(const char* pathname, const char* console_device)
 {
     int child_pid;
     char* const argv[] = {(char*)pathname, NULL};
@@ -79,6 +79,17 @@ static int shell_run(const char* pathname)
         if (setsid())
         {
             perror("setsid");
+            exit(EXIT_FAILURE);
+        }
+
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+
+        if ((open(console_device, O_RDONLY, 0) != STDIN_FILENO) ||
+            (open(console_device, O_WRONLY, 0) != STDOUT_FILENO) ||
+            (open(console_device, O_WRONLY, 0) != STDERR_FILENO))
+        {
+            syslog(LOG_ERR, "cannot open console for shell");
             exit(EXIT_FAILURE);
         }
 
@@ -118,8 +129,7 @@ static int shell_run(const char* pathname)
     }
 
     if ((open(options.console_device, O_RDONLY, 0) != STDIN_FILENO) ||
-        (open(options.console_device, O_WRONLY, 0) != STDOUT_FILENO) ||
-        (open(options.console_device, O_WRONLY, 0) != STDERR_FILENO))
+        (open(options.console_device, O_WRONLY, 0) != STDOUT_FILENO))
     {
         syslog(LOG_ERR, "cannot open console");
         exit(EXIT_FAILURE);
@@ -148,7 +158,7 @@ static int shell_run(const char* pathname)
     {
         rerun = 0;
 
-        child_pid = shell_run(shell);
+        child_pid = shell_run(shell, options.console_device);
 
         waitpid(child_pid, &status, 0);
 

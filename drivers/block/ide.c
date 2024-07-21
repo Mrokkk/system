@@ -11,7 +11,6 @@
 #include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/mutex.h>
-#include <kernel/device.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
@@ -943,8 +942,8 @@ static void ide_irq(int nr)
 
 static int ide_fs_open(file_t* file)
 {
-    int drive = BLK_DRIVE(MINOR(file->inode->dev));
-    int partition = BLK_PARTITION(MINOR(file->inode->dev));
+    int drive = BLK_DRIVE(MINOR(file->inode->rdev));
+    int partition = BLK_PARTITION(MINOR(file->inode->rdev));
     if (partition != BLK_NO_PARTITION && !ide_devices[drive].mbr.signature)
     {
         return -ENODEV;
@@ -957,8 +956,8 @@ static request_t ide_request_create(int direction, file_t* file, char* buf, size
     int errno = 0;
     uint32_t first_sector, last_sector, max_count;
     size_t sectors      = count / ATA_SECTOR_SIZE;
-    int drive           = BLK_DRIVE(MINOR(file->inode->dev));
-    int partition       = BLK_PARTITION(MINOR(file->inode->dev));
+    int drive           = BLK_DRIVE(MINOR(file->inode->rdev));
+    int partition       = BLK_PARTITION(MINOR(file->inode->rdev));
     uint32_t offset     = file->offset / ATA_SECTOR_SIZE;
     mbr_t* mbr          = &ide_devices[drive].mbr;
 

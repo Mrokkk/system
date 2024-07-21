@@ -1,17 +1,14 @@
 #define log_fmt(fmt) "devfs: " fmt
 #include <kernel/fs.h>
-#include <kernel/device.h>
+#include <kernel/devfs.h>
 
 static int devfs_lookup(inode_t* dir, const char* name, inode_t** result);
 static int devfs_open(file_t* file);
 static int devfs_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 static int devfs_mount(super_block_t* sb, inode_t* inode, void*, int);
 
-struct dev_inode;
-
 typedef struct
 {
-    device_t* device;
     dev_t major, minor;
     file_operations_t* ops;
 } device_node_t;
@@ -136,16 +133,9 @@ UNMAP_AFTER_INIT int devfs_init()
     return 0;
 }
 
-int devfs_register(const char* name, dev_t major, dev_t minor)
+int devfs_register(const char* name, dev_t major, dev_t minor, file_operations_t* fops)
 {
-    device_t* chdev;
     dev_inode_t* new_node;
-
-    if (unlikely(!(chdev = char_device_get(major))))
-    {
-        log_error("no device with major %u", major);
-        return -ENODEV;
-    }
 
     if (unlikely(!(new_node = dev_inode_alloc())))
     {
@@ -158,8 +148,7 @@ int devfs_register(const char* name, dev_t major, dev_t minor)
     new_node->data->mode = S_IFCHR | S_IRUGO | S_IWUGO;
     new_node->data->dev.major = major;
     new_node->data->dev.minor = minor;
-    new_node->data->dev.device = chdev;
-    new_node->data->dev.ops = chdev->fops;
+    new_node->data->dev.ops = fops;
     strcpy(new_node->name, name);
 
     dev_add_to_dir(&dev_root->data->dir, new_node);
@@ -184,7 +173,6 @@ int devfs_blk_register(const char* name, dev_t major, dev_t minor, file_operatio
     new_node->data->mode = S_IFBLK | S_IRUGO | S_IWUGO;
     new_node->data->dev.major = major;
     new_node->data->dev.minor = minor;
-    new_node->data->dev.device = NULL;
     new_node->data->dev.ops = ops;
     strcpy(new_node->name, name);
 
@@ -277,7 +265,8 @@ static int devfs_lookup(inode_t* dir, const char* name, inode_t** result)
 
     new_inode->ops      = &devfs_inode_ops;
     new_inode->file_ops = device->ops;
-    new_inode->dev      = MKDEV(device->major, device->minor);
+    new_inode->dev      = dir->dev;
+    new_inode->rdev     = MKDEV(device->major, device->minor);
     new_inode->ino      = ++ino;
     new_inode->sb       = dir->sb;
     new_inode->mode     = child_node->data->mode;

@@ -5,7 +5,7 @@
 #include <kernel/fifo.h>
 #include <kernel/wait.h>
 #include <kernel/devfs.h>
-#include <kernel/device.h>
+#include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
 
@@ -70,8 +70,7 @@ UNMAP_AFTER_INIT static int mouse_init()
         log_warning("enabling packet streaming failed: %x", byte);
     }
 
-    return char_device_register(MAJOR_CHR_MOUSE, "mouse", &fops, 0, NULL)
-        || devfs_register("mouse", MAJOR_CHR_MOUSE, 0)
+    return devfs_register("mouse", MAJOR_CHR_MOUSE, 0, &fops)
         || irq_register(12, mouse_irs, "mouse", IRQ_DEFAULT);
 
     return 0;

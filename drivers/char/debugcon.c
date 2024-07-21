@@ -1,10 +1,10 @@
 #include <arch/io.h>
 
+#include <kernel/fs.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/string.h>
 #include <kernel/module.h>
-#include <kernel/device.h>
 
 #define PORT 0xe9
 #define debugcon_send(c) outb(c, PORT)
@@ -25,13 +25,7 @@ UNMAP_AFTER_INIT static int debugcon_init()
 {
     int errno;
 
-    if ((errno = char_device_register(MAJOR_CHR_DEBUG, "debug", &fops, 1, NULL)))
-    {
-        log_warning("failed to register char device: %d", errno);
-        return errno;
-    }
-
-    if ((errno = devfs_register("debug0", MAJOR_CHR_DEBUG, 0)))
+    if ((errno = devfs_register("debug0", MAJOR_CHR_DEBUG, 0, &fops)))
     {
         log_error("failed to register null to devfs: %d", errno);
         return errno;

@@ -1,8 +1,7 @@
 #include <kernel/fs.h>
 #include <kernel/kernel.h>
 
-LIST_DECLARE(mounted_inodes);
-LIST_DECLARE(free_inodes);
+static LIST_DECLARE(free_inodes);
 inode_t* root;
 
 int inode_get(inode_t** inode)
@@ -22,7 +21,7 @@ int inode_get(inode_t** inode)
         return -ENOMEM;
     }
 
-    memset(*inode, 0, sizeof(inode_t));
+    memset(*inode, 0, sizeof(**inode));
 
     list_init(&(*inode)->list);
 
@@ -37,11 +36,4 @@ int inode_put(inode_t* inode)
     list_del(&inode->list);
     list_add_tail(&inode->list, &free_inodes);
     return 0;
-}
-
-char* inode_print(const void* data, char* str)
-{
-    inode_t* inode = (inode_t*)data;
-    str += sprintf(str, "inode_t{addr=%x, fs_data=%O}", (uint32_t)inode, inode->fs_data);
-    return str;
 }

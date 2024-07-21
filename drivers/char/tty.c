@@ -4,7 +4,7 @@
 #include <kernel/irq.h>
 #include <kernel/ctype.h>
 #include <kernel/devfs.h>
-#include <kernel/device.h>
+#include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
 
@@ -60,6 +60,11 @@ static LIST_DECLARE(tty_list);
 
 UNMAP_AFTER_INIT static int tty_init()
 {
+    int errno;
+    if (unlikely(errno = devfs_register("tty", MAJOR_CHR_TTYAUX, 0, &fops)))
+    {
+        log_warning("cannot register /dev/tty device");
+    }
     console_init();
     return 0;
 }
@@ -82,13 +87,7 @@ int tty_driver_register(tty_driver_t* drv)
 
     log_info("registering %s, num = %u", drv->name, drv->num);
 
-    if ((errno = char_device_register(drv->major, drv->name, &fops, drv->num - 1, NULL)))
-    {
-        log_warning("failed to register char device");
-        delete(new_tty);
-        return errno;
-    }
-
+    new_tty->sid = 0;
     new_tty->driver = drv;
     new_tty->major = drv->major;
     new_tty->driver_special_key = -1;
@@ -105,7 +104,7 @@ int tty_driver_register(tty_driver_t* drv)
     for (dev_t minor = drv->minor_start; minor < drv->minor_start + drv->num; ++minor)
     {
         sprintf(namebuf, "%s%u", drv->name, minor);
-        if ((errno = devfs_register(namebuf, drv->major, minor)))
+        if ((errno = devfs_register(namebuf, drv->major, minor, &fops)))
         {
             log_error("failed to register %s: %d", namebuf, errno);
         }
@@ -129,8 +128,30 @@ static tty_t* tty_find(dev_t major)
 
 static int tty_open(file_t* file)
 {
-    int major = MAJOR(file->inode->dev);
-    tty_t* tty = tty_find(major);
+    int major = MAJOR(file->inode->rdev);
+    tty_t* tty;
+
+    if (unlikely(major == MAJOR_CHR_TTYAUX))
+    {
+        list_for_each_entry(tty, &tty_list, list_entry)
+        {
+            if (tty->sid && tty->sid == process_current->sid)
+            {
+                goto found;
+            }
+        }
+        return -ENODEV;
+    }
+    else
+    {
+        tty = tty_find(major);
+    }
+
+found:
+    if (process_current->sid == process_current->pid)
+    {
+        tty->sid = process_current->pid;
+    }
 
     if (tty->driver->initialized == TTY_INITIALIZED)
     {
@@ -176,7 +197,7 @@ static int tty_ioctl(file_t* file, unsigned long request, void* arg)
             return 0;
     }
 
-    if (!tty->driver->ioctl)
+    if (unlikely(!tty->driver->ioctl))
     {
         return -ENOSYS;
     }
@@ -205,8 +226,10 @@ void tty_string_insert(tty_t* tty, const char* string)
 
 int sys_setsid(void)
 {
+    if (process_current->sid == process_current->pid)
+    {
+        return -EPERM;
+    }
     process_current->sid = process_current->pid;
-    tty_t* tty = process_current->files->files[0]->private;
-    tty->sid = process_current->pid;
     return 0;
 }

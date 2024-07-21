@@ -3,7 +3,6 @@
 #include <kernel/fs.h>
 #include <kernel/init.h>
 #include <kernel/time.h>
-#include <kernel/device.h>
 #include <kernel/memory.h>
 #include <kernel/minmax.h>
 #include <kernel/process.h>

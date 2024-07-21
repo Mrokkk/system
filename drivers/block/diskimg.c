@@ -2,7 +2,6 @@
 #include <kernel/fs.h>
 #include <kernel/mbr.h>
 #include <kernel/devfs.h>
-#include <kernel/device.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 

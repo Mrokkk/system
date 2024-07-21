@@ -1,9 +1,9 @@
 #include <arch/io.h>
 
+#include <kernel/fs.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/string.h>
-#include <kernel/device.h>
 #include <kernel/module.h>
 
 #define MINOR_NULL 1
@@ -24,13 +24,7 @@ UNMAP_AFTER_INIT static int mem_init()
 {
     int errno;
 
-    if ((errno = char_device_register(MAJOR_CHR_MEM, "mem", &fops, 1, NULL)))
-    {
-        log_warning("failed to register char device: %d", errno);
-        return errno;
-    }
-
-    if ((errno = devfs_register("null", MAJOR_CHR_MEM, MINOR_NULL)))
+    if ((errno = devfs_register("null", MAJOR_CHR_MEM, MINOR_NULL, &fops)))
     {
         log_error("failed to register null to devfs: %d", errno);
         return errno;
@@ -46,7 +40,7 @@ static int mem_deinit()
 
 static int mem_open(file_t* file)
 {
-    switch (MINOR(file->inode->dev))
+    switch (MINOR(file->inode->rdev))
     {
         case MINOR_NULL:
             file->ops->read = &null_read;

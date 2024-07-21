@@ -6,7 +6,6 @@
 #include <kernel/mutex.h>
 #include <kernel/string.h>
 #include <kernel/module.h>
-#include <kernel/device.h>
 
 #include "framebuffer.h"
 

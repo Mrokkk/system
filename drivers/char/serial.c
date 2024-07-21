@@ -2,7 +2,6 @@
 
 #include <kernel/fs.h>
 #include <kernel/irq.h>
-#include <kernel/device.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>
@@ -86,7 +85,7 @@ static int serial_open(tty_t* tty, file_t* file)
     uint16_t port;
     int minor;
 
-    minor = MINOR(file->inode->dev);
+    minor = MINOR(file->inode->rdev);
 
     log_debug(DEBUG_SERIAL, "minor = %u", minor);
 
@@ -186,7 +185,7 @@ void serial_irs(void)
 static int serial_write(tty_t*, file_t* file, const char* buffer, size_t size)
 {
     size_t old = size;
-    int minor = MINOR(file->inode->dev);
+    int minor = MINOR(file->inode->rdev);
     while (size--)
     {
         serial_send(*buffer++, minor_to_port(minor));

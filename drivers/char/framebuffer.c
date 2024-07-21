@@ -4,7 +4,7 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
-#include <kernel/device.h>
+#include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
 
@@ -39,8 +39,7 @@ UNMAP_AFTER_INIT static int framebuffer_init()
 
     if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
     {
-        char_device_register(MAJOR_CHR_FB, "fb", &fops, 0, NULL);
-        devfs_register("fb0", MAJOR_CHR_FB, 0);
+        devfs_register("fb0", MAJOR_CHR_FB, 0, &fops);
         framebuffer.fb = region_map(addr(fb), pitch * height, "framebuffer");
     }
     else
