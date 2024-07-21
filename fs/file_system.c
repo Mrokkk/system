@@ -4,10 +4,9 @@
 #include <kernel/devfs.h>
 #include <kernel/process.h>
 
-LIST_DECLARE(file_systems);
-LIST_DECLARE(mounted_systems);
-
-dentry_t* root_dentry;
+static LIST_DECLARE(file_systems);
+static LIST_DECLARE(mounted_systems);
+static dentry_t* root_dentry;
 
 void fullpath_get(const char* path, char* full_path)
 {
@@ -110,6 +109,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
             return errno;
         }
 
+        inode->mode = S_IFDIR | 0755;
         errno = fs->mount(sb, inode, NULL, 0);
 
         if (!errno)
@@ -157,57 +157,22 @@ int do_mount(const char* source, const char* target, const char* filesystemtype,
     dev_t dev = 0;
     file_system_t* fs;
     file_t* file = NULL;
-    inode_t* fake_inode = NULL;
-    file_operations_t* ops;
 
     if (strcmp(source, "none"))
     {
-        // FIXME: this is a bad workaround for lack of devfs while mounting root
-        if (!root)
+        if (unlikely(errno = do_open(&file, source, O_RDWR, 0)))
         {
-            errno = inode_get(&fake_inode);
-
-            if (unlikely(errno))
-            {
-                log_warning("cannot allocate inode");
-                goto error;
-            }
-
-            if (!(ops = devfs_blk_get(strrchr(source, '/') + 1, &dev)))
-            {
-                errno = -ENODEV;
-                goto error;
-            }
-
-            file = alloc(file_t);
-
-            if (unlikely(!file))
-            {
-                errno = -ENOMEM;
-                goto error;
-            }
-
-            memset(file, 0, sizeof(*file));
-            file->ops = ops;
-            file->inode = fake_inode;
-            fake_inode->dev = dev;
+            goto error;
         }
-        else
-        {
-            if ((errno = do_open(&file, source, O_RDWR, 0)))
-            {
-                goto error;
-            }
 
-            dev = file->inode->dev;
-        }
+        dev = file->inode->dev;
     }
     else
     {
         dev = MKDEV(0, last_minor++);
     }
 
-    if (file_system_get(filesystemtype, &fs))
+    if (unlikely(file_system_get(filesystemtype, &fs)))
     {
         errno = -ENODEV;
         goto error;
@@ -219,10 +184,6 @@ error:
     if (file)
     {
         delete(file);
-    }
-    if (fake_inode)
-    {
-        inode_put(fake_inode);
     }
     return errno;
 }
@@ -255,7 +216,7 @@ int do_chroot(const char* path)
 {
     dentry_t* dentry;
 
-    if (!process_current->fs->root)
+    if (unlikely(!process_current->fs->root && !path))
     {
         process_current->fs->root = root_dentry;
         return 0;

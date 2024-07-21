@@ -23,7 +23,7 @@ static inline void get_next_dir(char** path, char* output)
 
 dentry_t* lookup(const char* filename)
 {
-    char name[256];
+    char name[PATH_MAX];
     char* path = (char*)filename;
     inode_t* parent_inode = NULL;
     dentry_t* parent_dentry = NULL;
@@ -62,9 +62,12 @@ dentry_t* lookup(const char* filename)
         }
         else if (!strcmp(name, ".."))
         {
-            dentry = dentry->parent
-                ? dentry->parent
-                : dentry;
+            if (dentry != process_current->fs->root)
+            {
+                dentry = dentry->parent
+                    ? dentry->parent
+                    : dentry;
+            }
         }
         else if (!strlen(name) && parent_dentry)
         {

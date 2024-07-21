@@ -43,6 +43,13 @@ int path_construct(dentry_t* dentry, char* output, size_t size)
         path->name = dentry->name;
         path->next = *it;
         *it = path;
+
+        if (dentry == process_current->fs->root)
+        {
+            path->name = "/";
+            break;
+        }
+
         dentry = dentry->parent;
     }
 

@@ -146,7 +146,7 @@ static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int)
     inode->ops = &procfs_root_iops;
     inode->fs_data = NULL;
     inode->file_ops = &procfs_root_fops;
-    inode->size = sizeof(*root);
+    inode->size = 0;
     inode->sb = sb;
 
     return 0;

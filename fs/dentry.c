@@ -1,7 +1,7 @@
 #include <kernel/fs.h>
 #include <kernel/dentry.h>
 
-LIST_DECLARE(dentry_cache);
+static LIST_DECLARE(dentry_cache);
 
 void dentry_init(dentry_t* dentry)
 {
@@ -47,33 +47,24 @@ dentry_t* dentry_lookup(dentry_t* parent_dentry, const char* name)
 {
     dentry_t* dentry;
 
-    if (!parent_dentry)
+    if (unlikely(!parent_dentry))
     {
-        list_for_each_entry(dentry, &dentry_cache, cache)
-        {
-            if (!strcmp(dentry->name, name))
-            {
-                log_debug(DEBUG_DENTRY, "found %O", dentry);
-                return dentry;
-            }
-        }
+        return NULL;
     }
-    else
+
+    list_for_each_entry(dentry, &parent_dentry->subdirs, child)
     {
-        list_for_each_entry(dentry, &parent_dentry->subdirs, child)
+        if (!strcmp(dentry->name, name))
         {
-            if (!strcmp(dentry->name, name))
-            {
-                log_debug(DEBUG_DENTRY, "found %O", dentry);
-                return dentry;
-            }
+            log_debug(DEBUG_DENTRY, "found %O", dentry);
+            return dentry;
         }
     }
 
     return NULL;
 }
 
-dentry_t* dentry_get(struct inode* inode)
+dentry_t* dentry_get(inode_t* inode)
 {
     dentry_t* dentry;
     list_for_each_entry(dentry, &dentry_cache, cache)
@@ -84,11 +75,4 @@ dentry_t* dentry_get(struct inode* inode)
         }
     }
     return NULL;
-}
-
-char* dentry_print(const void* data, char* str)
-{
-    const dentry_t* dentry = data;
-    str += sprintf(str, "dentry_t{addr=%x, inode=%O, name=%S}", addr(dentry), dentry->inode, dentry->name);
-    return str;
 }

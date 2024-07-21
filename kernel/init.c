@@ -210,7 +210,7 @@ UNMAP_AFTER_INIT static int root_mount(void)
         for (size_t j = 0; j < array_size(fs_types); ++j)
         {
             log_info("mounting root as %s on %s", fs_types[j], sources[i]);
-            if ((errno = do_mount(sources[i], "/", fs_types[j], 0)))
+            if ((errno = do_mount(sources[i], "/root", fs_types[j], 0)))
             {
                 log_info("mounting %s on %s failed with %d", fs_types[j], sources[i], errno);
             }
@@ -224,39 +224,45 @@ UNMAP_AFTER_INIT static int root_mount(void)
     return errno;
 }
 
+#define MUST_SUCCEED(title, fn, ...) \
+    do \
+    { \
+        int errno = fn(__VA_ARGS__); \
+        panic_if(errno, title ": failed with %d", errno); \
+    } \
+    while (0)
+
+#define MAY_FAIL(title, fn, ...) \
+    do \
+    { \
+        int errno = fn(__VA_ARGS__); \
+        if (unlikely(errno)) \
+        { \
+            log_warning(title ": failed with %d", errno); \
+        } \
+    } \
+    while (0)
+
+UNMAP_AFTER_INIT static void fake_root_prepare(void)
+{
+    MUST_SUCCEED("mounting fake root", do_mount, "none", "/", "ramfs", 0);
+    MUST_SUCCEED("chroot to fake root", do_chroot, NULL);
+    MUST_SUCCEED("chdir to fake root", do_chdir, "/");
+    MUST_SUCCEED("creating /root", do_mkdir, "/root", 0555);
+    MUST_SUCCEED("creating fake /dev", do_mkdir, "/dev", 0555);
+    MUST_SUCCEED("mounting fake /dev", do_mount, "none", "/dev", "devfs", 0);
+}
+
 UNMAP_AFTER_INIT static void rootfs_prepare(void)
 {
-    int errno;
+    fake_root_prepare();
 
-    if (unlikely((errno = root_mount())))
-    {
-        panic("cannot mount root: %d", errno);
-    }
-
-    if ((errno = do_chroot("/")))
-    {
-        panic("cannot set root; errno = %d", errno);
-    }
-
-    if ((errno = do_chdir("/")))
-    {
-        panic("failed to chdir; errno = %d", errno);
-    }
-
-    if ((errno = do_mount("none", "/dev", "devfs", 0)))
-    {
-        panic("cannot mount devfs; errno = %d", errno);
-    }
-
-    if ((errno = do_mount("none", "/proc", "proc", 0)))
-    {
-        panic("cannot mount proc; errno = %d", errno);
-    }
-
-    if ((errno = do_mount("none", "/tmp", "ramfs", 0)))
-    {
-        log_warning("cannot mount ramfs on /tmp");
-    }
+    MUST_SUCCEED("mounting real root", root_mount);
+    MUST_SUCCEED("chroot to real root", do_chroot, "/root");
+    MUST_SUCCEED("chdir to real root", do_chdir, "/");
+    MUST_SUCCEED("mounting /dev", do_mount, "none", "/dev", "devfs", 0);
+    MUST_SUCCEED("mounting /proc", do_mount, "none", "/proc", "proc", 0);
+    MAY_FAIL("mounting /tmp", do_mount, "none", "/tmp", "ramfs", 0);
 }
 
 UNMAP_AFTER_INIT static void syslog_configure(void)

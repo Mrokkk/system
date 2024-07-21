@@ -147,6 +147,7 @@ int do_chdir(const char* path);
 int do_read(file_t* file, size_t offset, void* buffer, size_t count);
 int do_open(file_t** new_file, const char* filename, int flags, int mode);
 int do_close(file_t* file);
+int do_mkdir(const char* path, int mode);
 
 int file_fd_allocate(file_t* file);
 

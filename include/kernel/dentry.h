@@ -22,4 +22,3 @@ void dentry_init(dentry_t* dentry);
 dentry_t* dentry_create(struct inode* inode, dentry_t* parent_dentry, const char* name);
 dentry_t* dentry_lookup(dentry_t* parent_dentry, const char* name);
 dentry_t* dentry_get(struct inode* inode);
-char* dentry_print(const void* data, char* str);

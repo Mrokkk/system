@@ -192,7 +192,7 @@ static int devfs_mount(super_block_t* sb, inode_t* inode, void*, int)
     inode->ops = &devfs_inode_ops;
     inode->fs_data = dev_root;
     inode->file_ops = &devfs_fops;
-    inode->size = sizeof(*root);
+    inode->size = sizeof(*dev_root);
     inode->sb = sb;
 
     return 0;

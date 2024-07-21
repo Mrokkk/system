@@ -231,7 +231,7 @@ int sys_close(int fd)
     return 0;
 }
 
-int sys_mkdir(const char* __user path, int mode)
+int do_mkdir(const char* path, int mode)
 {
     int errno;
     inode_t* inode;
@@ -239,11 +239,6 @@ int sys_mkdir(const char* __user path, int mode)
     dentry_t* parent_dentry;
     char dir_name[64];
     const char* basename;
-
-    if ((errno = path_validate(path)))
-    {
-        return errno;
-    }
 
     if (path_is_absolute(path))
     {
@@ -289,6 +284,18 @@ int sys_mkdir(const char* __user path, int mode)
     }
 
     return 0;
+}
+
+int sys_mkdir(const char* __user path, int mode)
+{
+    int errno;
+
+    if ((errno = path_validate(path)))
+    {
+        return errno;
+    }
+
+    return do_mkdir(path, mode);
 }
 
 int sys_creat(const char* pathname, int mode)
