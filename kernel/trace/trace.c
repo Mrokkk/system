@@ -358,7 +358,6 @@ int trace_syscall(unsigned long nr, ...)
         return 0;
     }
 
-    flags_t flags;
     const syscall_t* call = &trace_syscalls[nr];
     va_list args;
     char buf[256];
@@ -405,17 +404,15 @@ int trace_syscall(unsigned long nr, ...)
 
     strcpy(it, ")");
 
-    irq_save(flags);
+    scoped_irq_lock();
 
     log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
 
     if (DEBUG_TRACE_BACKTRACE)
     {
         const pt_regs_t* regs = ptr_get(addr(&nr));
-        backtrace_user(log_info, regs, "\t");
+        backtrace_user(KERN_INFO, regs, "\t");
     }
-
-    irq_restore(flags);
 
     return nr;
 }
@@ -424,7 +421,6 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 {
     char buf[128];
     char* it = buf;
-    flags_t flags;
     int errno;
 
     if (trace_syscalls[nr].ret == TYPE_VOID)
@@ -432,7 +428,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
         return;
     }
 
-    irq_save(flags);
+    scoped_irq_lock();
 
     if (DEBUG_TRACE_BACKTRACE)
     {
@@ -460,6 +456,4 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
     {
         log_continue("%s", buf);
     }
-
-    irq_restore(flags);
 }

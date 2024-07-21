@@ -306,8 +306,8 @@ UNMAP_AFTER_INIT static void read_some_data(void)
     {
         log_info("reading data from %s", dev);
         do_read(file, 0, buf, PAGE_SIZE);
-        memory_dump(log_info, buf, 5);
-        memory_dump(log_info, buf + 508, 1);
+        memory_dump(KERN_INFO, buf, 5);
+        memory_dump(KERN_INFO, buf + 508, 1);
     }
 
     page_free(buf);

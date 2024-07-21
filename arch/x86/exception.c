@@ -224,7 +224,7 @@ handle_fault:
 
             regs_print(header, &regs, log_info);
             vm_areas_indent_log(KERN_INFO, p->mm->vm_areas, INDENT_LVL_1, "%s: vm areas:", header);
-            backtrace_user(log_notice, &regs);
+            backtrace_user(KERN_INFO, &regs, "");
         }
 
         do_kill(p, exception->signal);

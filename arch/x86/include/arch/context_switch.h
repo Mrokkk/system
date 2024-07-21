@@ -51,7 +51,7 @@ static inline void paranoia(process_t*, process_t* next)
     if (unlikely(addr(stack) < stack_end))
     {
         cli();
-        memory_dump(log_critical, stack, 32);
+        memory_dump(KERN_CRIT, stack, 32);
         panic("process %u:%x: kernel stack overflow at %x; esp = %x, stack_end = %x",
             next->pid,
             next,
@@ -63,7 +63,7 @@ static inline void paranoia(process_t*, process_t* next)
     if (unlikely(*(uint32_t*)stack_end != STACK_MAGIC))
     {
         cli();
-        memory_dump(log_critical, stack, 32);
+        memory_dump(KERN_CRIT, stack, 32);
         panic("process %u:%x: memory corruption; %x = %x; expected: %x",
             next->pid,
             next,
@@ -78,7 +78,7 @@ static inline void paranoia(process_t*, process_t* next)
         if (regs->gs != KERNEL_DS && regs->gs != USER_DS)
         {
             cli();
-            memory_dump(log_critical, stack, 32);
+            memory_dump(KERN_CRIT, stack, 32);
             panic("process %u:%x gs = %x, expected = %x or %x;",
                 next->pid,
                 next,
@@ -96,7 +96,7 @@ static inline void paranoia(process_t*, process_t* next)
                 if (seg != val) \
                 { \
                     cli(); \
-                    memory_dump(log_critical, stack, 32); panic(#seg " = %x", seg); \
+                    memory_dump(KERN_CRIT, stack, 32); panic(#seg " = %x", seg); \
                 }
 
             case USER_PROCESS:

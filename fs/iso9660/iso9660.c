@@ -429,7 +429,7 @@ static int iso9660_read(file_t* file, char* buffer, size_t count)
     if (unlikely(!dirent || !data))
     {
         log_error("internal error: sb->fs_data=%x, inode->fs_data=%x", data, dirent);
-        backtrace_dump(log_error);
+        backtrace_dump(KERN_ERR);
         return -EINVAL;
     }
 

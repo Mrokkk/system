@@ -415,7 +415,7 @@ static int status_show(seq_file_t* s)
 
 static int stack_show(seq_file_t* s)
 {
-    backtrace_process(procfs_process_from_seqfile(s), seq_printf, s);
+    backtrace_process(procfs_process_from_seqfile(s), (void*)seq_printf, s);
     return 0;
 }
 

@@ -7,12 +7,12 @@
 #include <kernel/process.h>
 #include <kernel/backtrace.h>
 
-void* backtrace_start(void)
+static inline void* backtrace_start(void)
 {
     return ptr(ebp_get());
 }
 
-void* backtrace_next(void** frame_ptr)
+static void* backtrace_next(void** frame_ptr)
 {
     void* ret;
     stack_frame_t* frame = *frame_ptr;
@@ -28,7 +28,7 @@ void* backtrace_next(void** frame_ptr)
     return ret;
 }
 
-size_t do_backtrace_process(struct process* p, void** buffer, size_t count)
+static inline size_t do_backtrace_process(const process_t* p, void** buffer, size_t count)
 {
     void* ret;
     unsigned depth = 0;
@@ -45,19 +45,19 @@ size_t do_backtrace_process(struct process* p, void** buffer, size_t count)
     }
     else if (p->context.eip == addr(&exit_kernel))
     {
-        struct pt_regs* regs = ptr(stack);
+        pt_regs_t* regs = ptr(stack);
         frame.next = ptr(regs->ebp);
         frame.ret = ptr(eip);
     }
     else if (p->context.eip == addr(&context_restore))
     {
-        struct context_switch_frame* regs = ptr(stack);
+        context_switch_frame_t* regs = ptr(stack);
         frame.next = ptr(regs->ebp);
         frame.ret = ptr(eip);
     }
     else
     {
-        struct pt_regs* regs = ptr(stack);
+        pt_regs_t* regs = ptr(stack);
         frame.next = ptr(regs->ebp);
         frame.ret = ptr(eip);
     }
@@ -71,7 +71,33 @@ size_t do_backtrace_process(struct process* p, void** buffer, size_t count)
     return depth;
 }
 
-void backtrace_exception(struct pt_regs* regs)
+void backtrace_dump(const char* severity)
+{
+    void* data = backtrace_start();
+    void* ret;
+    char buffer[BACKTRACE_SYMNAME_LEN];
+    unsigned depth = 0;
+    log_severity(severity, "backtrace:");
+    while ((ret = backtrace_next(&data)) && depth < BACKTRACE_MAX_RECURSION)
+    {
+        ksym_string(buffer, addr(ret));
+        log_severity(severity, "%s", buffer);
+        ++depth;
+    }
+}
+
+void backtrace_process(const process_t* p, int (*print_func)(), void* arg0)
+{
+    char buffer[BACKTRACE_SYMNAME_LEN];
+    void* bt[BACKTRACE_MAX_RECURSION];
+    for (size_t i = 0; i < do_backtrace_process(p, bt, BACKTRACE_MAX_RECURSION); ++i)
+    {
+        ksym_string(buffer, addr(bt[i]));
+        print_func(arg0, "%s\n", buffer);
+    }
+}
+
+void backtrace_exception(const pt_regs_t* regs)
 {
     char buffer[BACKTRACE_SYMNAME_LEN];
 

@@ -50,7 +50,7 @@
         if (unlikely(!a)) \
         { \
             log_error("%s:%u: assertion "#cond" failed", __builtin_strrchr(__FILE__, '/') + 1, __LINE__); \
-            backtrace_dump(log_error); \
+            backtrace_dump(KERN_ERR); \
         } \
         1; \
     })

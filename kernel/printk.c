@@ -155,7 +155,7 @@ void panic(const char *fmt, ...)
 
     log(KERN_CRIT, "Kernel panic: %s", buf);
 
-    backtrace_dump(log_critical);
+    backtrace_dump(KERN_CRIT);
 
     panic_mode_die();
 

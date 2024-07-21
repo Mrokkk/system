@@ -6,24 +6,34 @@
 #include <kernel/vm_print.h>
 #include <kernel/backtrace.h>
 
-typedef struct bt_data
+struct user_address
+{
+    uint32_t vaddr;
+    uint32_t file_offset;
+    char     path[PATH_MAX];
+};
+
+typedef struct user_address user_address_t;
+
+struct bt_data
 {
     uint32_t stack_start, stack_end;
     uint32_t esp;
     uint32_t eip;
     stack_frame_t* frame;
     vm_area_t* vm_areas;
-} bt_data_t;
+};
+
+typedef struct bt_data bt_data_t;
 
 #define is_within(a, start, end) \
     ({ addr(a) >= start && addr(a) < end; })
 
-void* backtrace_user_start(struct process* p, uint32_t eip, uint32_t esp, uint32_t ebp)
+static void* backtrace_user_start(struct process* p, uint32_t eip, uint32_t esp, uint32_t ebp)
 {
-    bt_data_t* data;
+    bt_data_t* data = fmalloc(sizeof(struct bt_data));
 
-    data = fmalloc(sizeof(struct bt_data));
-    if (!data)
+    if (unlikely(!data))
     {
         return NULL;
     }
@@ -34,7 +44,7 @@ void* backtrace_user_start(struct process* p, uint32_t eip, uint32_t esp, uint32
     data->esp = esp;
     data->eip = eip;
 
-    if (is_within(ebp, data->stack_start, data->stack_end))
+    if (likely(is_within(ebp, data->stack_start, data->stack_end)))
     {
         data->frame = ptr(ebp);
     }
@@ -50,7 +60,7 @@ static int address_fill(uint32_t eip, vm_area_t* vm_areas, user_address_t* addr)
 {
     vm_area_t* vma = vm_find(addr(eip), vm_areas);
 
-    if (!vma)
+    if (unlikely(!vma))
     {
         return 1;
     }
@@ -63,12 +73,12 @@ static int address_fill(uint32_t eip, vm_area_t* vm_areas, user_address_t* addr)
     return 0;
 }
 
-void backtrace_user_format(user_address_t* addr, char* buffer)
+static void backtrace_user_format(user_address_t* addr, char* buffer)
 {
     sprintf(buffer, "USER:%08x %08x %s:", addr->vaddr, addr->file_offset, addr->path);
 }
 
-void* backtrace_user_next(void** data_ptr, user_address_t* addr)
+static void* backtrace_user_next(void** data_ptr, user_address_t* addr)
 {
     void* ret;
     bt_data_t* data = *data_ptr;
@@ -80,7 +90,6 @@ void* backtrace_user_next(void** data_ptr, user_address_t* addr)
 
         if (address_fill(addr(ret), data->vm_areas, addr))
         {
-            ffree(data, sizeof(struct bt_data));
             return NULL;
         }
 
@@ -90,18 +99,34 @@ void* backtrace_user_next(void** data_ptr, user_address_t* addr)
     if (!is_within(data->frame, data->stack_start, data->stack_end) ||
         address_fill(addr(ret = data->frame->ret - 4), data->vm_areas, addr))
     {
-        ffree(data, sizeof(struct bt_data));
         return NULL;
     }
 
-    stack_frame_t* prev = data->frame;
     data->frame = data->frame->next;
 
-    if (data->frame == prev)
-    {
-        ffree(data, sizeof(struct bt_data));
-        return NULL;
-    }
-
     return ret;
+}
+
+static void backtrace_user_end(void* data)
+{
+    ffree(data, sizeof(struct bt_data));
+}
+
+void backtrace_user(const char* severity, const pt_regs_t* regs, const char* prefix)
+{
+    char buffer[BACKTRACE_SYMNAME_LEN];
+    log_severity(severity, "%sbacktrace: ", prefix);
+    user_address_t addr;
+    void* data = backtrace_user_start(process_current, regs->eip, regs->esp, regs->ebp);
+    if (data)
+    {
+        unsigned depth = 0;
+        while ((backtrace_user_next(&data, &addr)) && depth < BACKTRACE_MAX_RECURSION)
+        {
+            backtrace_user_format(&addr, buffer);
+            log_severity(severity, "%s%s", prefix, buffer);
+            ++depth;
+        }
+        backtrace_user_end(data);
+    }
 }
