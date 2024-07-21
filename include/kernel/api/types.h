@@ -9,7 +9,7 @@ typedef uint32_t    blkcnt_t;
 typedef size_t      blksize_t;
 typedef uint32_t    clock_t;
 typedef uint32_t    clockid_t;
-typedef uint16_t    dev_t;
+typedef uint32_t    dev_t;
 typedef uint32_t    fsblkcnt_t;
 typedef uint32_t    fsfilcnt_t;
 typedef int         gid_t;

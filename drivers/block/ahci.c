@@ -577,7 +577,7 @@ static int ahci_device_register(ata_device_t* device)
 
         devfs_blk_register(
             fmtstr(buf, "%s%u", drive_dev_name, part_id),
-            MAJOR_BLK_IDE,
+            MAJOR_BLK_AHCI,
             BLK_MINOR(part_id, device->id),
             &ops);
     }

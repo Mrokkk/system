@@ -165,7 +165,7 @@ int do_mount(const char* source, const char* target, const char* filesystemtype,
             goto error;
         }
 
-        dev = file->inode->dev;
+        dev = file->inode->rdev;
     }
     else
     {

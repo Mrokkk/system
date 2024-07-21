@@ -1,11 +1,10 @@
 #pragma once
 
-#include <kernel/api/types.h>
+#include <kernel/api/dev.h>
 
-#define MINOR(dev) ((dev) & 0xff)
-#define MAJOR(dev) ((dev) >> 8)
-#define MKDEV(maj, min) (((maj) << 8) | (min))
-#define NODEV    0xffff
+#define MINOR(dev)          _MINOR(dev)
+#define MAJOR(dev)          _MAJOR(dev)
+#define MKDEV(maj, min)     _MKDEV(maj, min)
 
 #define MAJOR_CHR_FB        3
 #define MAJOR_CHR_TTY       4
@@ -19,8 +18,8 @@
 #define MAJOR_BLK_IDE       257
 #define MAJOR_BLK_AHCI      258
 
-#define BLK_NO_PARTITION                0xf
-#define BLK_MINOR_DRIVE(drive)          (drive | (BLK_NO_PARTITION << 4))
-#define BLK_MINOR(partition, drive)     ((drive) | (partition << 4))
-#define BLK_PARTITION(minor)            (((minor) >> 4) & 0xf)
-#define BLK_DRIVE(minor)                ((minor) & 0xf)
+#define BLK_NO_PARTITION                -1
+#define BLK_MINOR_DRIVE(drive)          (drive)
+#define BLK_MINOR(partition, drive)     (((drive) << 4) | ((partition) + 1))
+#define BLK_PARTITION(minor)            (((minor) & 0xf) - 1)
+#define BLK_DRIVE(minor)                (((minor) >> 4) & 0xf)

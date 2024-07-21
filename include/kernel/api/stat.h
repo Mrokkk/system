@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/dev.h>
+#include <kernel/api/dev.h>
 #include <kernel/api/types.h>
 
 #define S_IFMT  00170000
