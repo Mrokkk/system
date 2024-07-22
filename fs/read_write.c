@@ -89,21 +89,31 @@ int sys_pread(int fd, void* buffer, size_t size, off_t offset)
 
 int do_read(file_t* file, size_t offset, void* buffer, size_t count)
 {
+    int errno;
     int retval;
 
     file->offset = offset;
     retval = file->ops->read(file, buffer, count);
 
-    if (retval < 0 && retval >= -ERRNO_MAX)
+    if (unlikely(errno = errno_get(retval)))
     {
-        return retval;
+        return errno;
     }
 
-    // FIXME: this is wrong; such situation is normal
-    if ((size_t)retval != count)
+    return 0;
+}
+
+int do_write(file_t* file, size_t offset, const void* buffer, size_t count)
+{
+    int errno;
+    int retval;
+
+    file->offset = offset;
+    retval = file->ops->write(file, buffer, count);
+
+    if (unlikely(errno = errno_get(retval)))
     {
-        log_warning("retval = %d, count = %u", retval, count);
-        return -EIO;
+        return errno;
     }
 
     return 0;

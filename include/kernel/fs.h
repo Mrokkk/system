@@ -145,9 +145,11 @@ int do_mount(const char* source, const char* target, const char* filesystemtype,
 int do_chroot(const char* path);
 int do_chdir(const char* path);
 int do_read(file_t* file, size_t offset, void* buffer, size_t count);
+int do_write(file_t* file, size_t offset, const void* buffer, size_t count);
 int do_open(file_t** new_file, const char* filename, int flags, int mode);
 int do_close(file_t* file);
 int do_mkdir(const char* path, int mode);
+int do_ioctl(file_t* file, unsigned long request, void* arg);
 
 int file_fd_allocate(file_t* file);
 

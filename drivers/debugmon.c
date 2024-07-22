@@ -22,15 +22,16 @@ KERNEL_MODULE(debugmon);
 module_init(debugmon_init);
 module_exit(debugmon_deinit);
 
-static int fd;
+static file_t* file;
 static char* printf_buf;
 
 static int initialize(void);
 
 static inline void read_line(char* line)
 {
-    int size = read(fd, line, 32);
-    line[size - 1] = 0;
+    do_read(file, 0, line, 32);
+    char* newline = __builtin_strrchr(line, '\n');
+    *newline = 0;
 }
 
 static int printf(const char* fmt, ...)
@@ -42,7 +43,7 @@ static int printf(const char* fmt, ...)
     printed = vsprintf(printf_buf, fmt, args);
     va_end(args);
 
-    write(fd, printf_buf, strlen(printf_buf));
+    do_write(file, 0, printf_buf, strlen(printf_buf));
 
     return printed;
 }
@@ -74,7 +75,6 @@ static int c_ps()
 
 static int c_cpu()
 {
-
     print_string(cpu_info.vendor);
     print_string(cpu_info.producer);
     print_string(cpu_info.name);
@@ -187,6 +187,7 @@ struct process* process_get(int pid)
 
 static int initialize(void)
 {
+    int errno;
     page_t* page = page_alloc(1, PAGE_ALLOC_DISCONT);
 
     if (unlikely(!page))
@@ -197,20 +198,24 @@ static int initialize(void)
 
     printf_buf = page_virt_ptr(page);
 
-    fd = open("/dev/ttyS0", O_RDWR, 0);
+    do_chroot(NULL);
+    do_chroot("/root");
+    do_chdir("/");
 
-    if (fd < 0)
+    errno = do_open(&file, "/dev/ttyS0", O_RDWR, 0);
+
+    if (unlikely(errno))
     {
-        log_error("cannot open: %d", fd);
+        log_error("cannot open: %d", errno);
         return -1;
     }
 
     termios_t termios;
-    ioctl(fd, TCGETA, &termios);
+    do_ioctl(file, TCGETA, &termios);
 
     termios.c_lflag &= ~ECHO;
 
-    ioctl(fd, TCSETA, &termios);
+    do_ioctl(file, TCSETA, &termios);
 
     return 0;
 }
@@ -246,7 +251,7 @@ static void line_handle(const char* line)
         }
 
         str = process_print(p, printf_buf);
-        write(fd, printf_buf, str - printf_buf);
+        do_write(file, 0, printf_buf, str - printf_buf);
         printf("\n");
         return;
     }
