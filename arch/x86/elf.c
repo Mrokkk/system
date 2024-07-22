@@ -52,6 +52,7 @@ static inline char* elf_get_type(uint8_t v)
     {
         case ET_REL: return "relocatable";
         case ET_EXEC: return "executable";
+        case ET_DYN: return "dynamic";
         default: return "unknown type";
     }
 }
@@ -507,9 +508,9 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
 
                     if (unlikely(!kernel_symbol))
                     {
-                        log_info("%s: undefined reference to %s", name, symstr + s->st_name);
+                        log_warning("%s: undefined reference to %s", name, symstr + s->st_name);
                         errno = -ENOEXEC;
-                        goto error;
+                        continue;
                     }
 
                     relocated = kernel_symbol->address + A - P;
@@ -521,9 +522,9 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
 
                     if (unlikely(!kernel_symbol))
                     {
-                        log_info("%s: undefined reference to %s", name, symstr + s->st_name);
+                        log_warning("%s: undefined reference to %s", name, symstr + s->st_name);
                         errno = -ENOEXEC;
-                        goto error;
+                        continue;
                     }
 
                     *got_ptr++ = kernel_symbol->address;
@@ -546,6 +547,11 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
 
             *(uint32_t*)P = relocated;
         }
+    }
+
+    if (unlikely(errno))
+    {
+        goto error;
     }
 
     if (unlikely(!*module))
