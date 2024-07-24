@@ -12,6 +12,7 @@
 #define UNLIKELY(x)             __builtin_expect(!!(x), 0)
 #define __STRINGIFY(x)          #x
 #define STRINGIFY(x)            __STRINGIFY(x)
+#define ARRAY_SIZE(a)           ((sizeof(a) / sizeof(*a)))
 
 typedef enum comp comp_t;
 typedef enum type type_t;
@@ -114,7 +115,8 @@ void string_check(
     value_t* actual,
     value_t* expected,
     const char* file,
-    size_t line);
+    size_t line,
+    int* assert_failed);
 
 void failure_print(
     value_t* actual,
@@ -212,7 +214,7 @@ void failure_print(
             .name = #A, \
             .type = TYPE_CHAR_PTR, \
         }; \
-        string_check(&actual_value, &expected_value, __FILE__, __LINE__); \
+        string_check(&actual_value, &expected_value, __FILE__, __LINE__, __assert_failed); \
     } \
     while (0)
 

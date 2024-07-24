@@ -194,35 +194,37 @@ static void string_failure_print(
 
     if (*(char**)actual->value)
     {
-        it += sprintf(it, "\"%s\"\n", *(char**)actual->value);
+        it += sprintf(it, "\"%s\"", *(char**)actual->value);
     }
     else
     {
         it += print_value(it, actual->value, actual->type);
     }
 
-    it += sprintf(it, "    to be equal to %s\n"
+    it += sprintf(it, "\n"
+                      "    to be equal to %s\n"
                       "        which is ",
                       expected->name);
 
     if (*(char**)expected->value)
     {
-        it += sprintf(it, "\"%s\"\n", *(char**)expected->value);
+        it += sprintf(it, "\"%s\"", *(char**)expected->value);
     }
     else
     {
         it += print_value(it, expected->value, expected->type);
     }
 
-    sprintf(it, "\n");
     fputs(buf, stdout);
+    putc('\n', stdout);
 }
 
 void string_check(
     value_t* actual,
     value_t* expected,
     const char* file,
-    size_t line)
+    size_t line,
+    int* assert_failed)
 {
     const char* a = *(char**)actual->value;
     const char* e = *(char**)expected->value;
@@ -232,11 +234,13 @@ void string_check(
         if (UNLIKELY(a != e))
         {
             string_failure_print(actual, expected, file, line);
+            (*assert_failed)++;
         }
     }
     else if (UNLIKELY(strcmp(a, e)))
     {
         string_failure_print(actual, expected, file, line);
+        (*assert_failed)++;
     }
 }
 

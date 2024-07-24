@@ -32,6 +32,7 @@ set(LIBC_SRC
     ftruncate.c
     getcwd.c
     gethostname.c
+    getopt.c
     getpagesize.c
     grp.c
     inttypes.c

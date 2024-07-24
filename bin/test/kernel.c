@@ -66,6 +66,11 @@ int vsyscall(int nr, ...)
     return ret;
 }
 
+TEST(bss_is_zeroed)
+{
+    EXPECT_EQ(data, 0);
+}
+
 TEST(vsyscall)
 {
     EXPECT_EXIT_WITH(0)

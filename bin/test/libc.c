@@ -2,20 +2,14 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <getopt.h>
 #include <limits.h>
 #include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio_ext.h>
 
-static int data;
-
 TEST_SUITE(libc);
-
-TEST(bss_is_zeroed)
-{
-    EXPECT_EQ(data, 0);
-}
 
 TEST(strlen)
 {
@@ -481,6 +475,261 @@ TEST(fdopen)
         EXPECT_NE(f, NULL);
         EXPECT_EQ(__fmode(f), O_RDONLY);
         fclose(f);
+    }
+}
+
+#define _GETOPT_CONDITION() \
+    ({ \
+        int res = _; _ = 0; \
+        if (!res) { optind = 0; opterr = 0; argc = ARRAY_SIZE(argv); } \
+        !res; \
+    })
+
+#define GETOPT_TEST_CASE(...) \
+    for (char* argv[] = {__VA_ARGS__}; _GETOPT_CONDITION(); ++_)
+
+#define GETOPT_INIT() \
+    int _ = 0, argc
+
+TEST(getopt)
+{
+    GETOPT_INIT();
+
+    // Reading positional argument
+    GETOPT_TEST_CASE("app", "test")
+    {
+        EXPECT_EQ(getopt(argc, argv, "-"), 1);
+        EXPECT_STR_EQ(optarg, "test");
+
+        EXPECT_EQ(getopt(argc, argv, "-"), -1);
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Option with argument in the same argv entry
+    GETOPT_TEST_CASE("app", "-otest")
+    {
+        const char* optstring = "o:";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_STR_EQ(optarg, "test");
+
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Option with argument in the next argv entry
+    GETOPT_TEST_CASE("app", "-o", "test")
+    {
+        const char* optstring = "o:";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_STR_EQ(optarg, "test");
+
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Missing argument
+    GETOPT_TEST_CASE("app", "-o")
+    {
+        const char* optstring = "o:";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), '?');
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Unknown option
+    GETOPT_TEST_CASE("app", "-i")
+    {
+        const char* optstring = "o";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), '?');
+        EXPECT_EQ(optarg, NULL);
+        EXPECT_EQ(optopt, 'i');
+    }
+
+    // Option with optional argument; without argument
+    GETOPT_TEST_CASE("app", "-o")
+    {
+        const char* optstring = "o::";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_EQ(optarg, NULL);
+
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Option with optional argument; with argument
+    GETOPT_TEST_CASE("app", "-otest")
+    {
+        const char* optstring = "o::";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_STR_EQ(optarg, "test");
+
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Option with ignored positional arguments
+    GETOPT_TEST_CASE("app", "arg1", "arg2", "arg3", "-a")
+    {
+        const char* optstring = "a";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'a');
+        EXPECT_EQ(optarg, NULL);
+
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(optarg, NULL);
+    }
+
+    // Option with not ignored positional arguments
+    GETOPT_TEST_CASE("app", "arg1", "arg2", "-o")
+    {
+        const char* optstring = "-o:";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 1);
+        EXPECT_STR_EQ(optarg, "arg1");
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 1);
+        EXPECT_STR_EQ(optarg, "arg2");
+
+        EXPECT_EQ(getopt(argc, argv, optstring), '?');
+
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+    }
+
+    // Option with ignored positional arguments; mixed
+    GETOPT_TEST_CASE("app", "-o", "arg1", "arg2", "arg3", "-o")
+    {
+        const char* optstring = "o";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+    }
+
+    // Multiple options in single argv entry
+    GETOPT_TEST_CASE("app", "-abc")
+    {
+        const char* optstring = "abc";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'a');
+        EXPECT_EQ(getopt(argc, argv, optstring), 'b');
+        EXPECT_EQ(getopt(argc, argv, optstring), 'c');
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+    }
+
+    // Multiple options intertwined with random - and --
+    GETOPT_TEST_CASE("app", "-i-o", "--", "-i", "-")
+    {
+        const char* optstring = "io";
+
+        EXPECT_EQ(getopt(argc, argv, optstring), 'i');
+        EXPECT_EQ(getopt(argc, argv, optstring), '?');
+        EXPECT_EQ(getopt(argc, argv, optstring), 'o');
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(getopt(argc, argv, optstring), 'i');
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+        EXPECT_EQ(getopt(argc, argv, optstring), -1);
+    }
+
+    // argc lower than 2
+    GETOPT_TEST_CASE("app")
+    {
+        EXPECT_EQ(getopt(0, argv, ""), -1);
+        EXPECT_EQ(getopt(1, argv, ""), -1);
+    }
+}
+
+TEST(getopt_long)
+{
+    GETOPT_INIT();
+
+    GETOPT_TEST_CASE("app", "--test=aaa", "--test2", "bbb", "--test3")
+    {
+        const char* optstring = "";
+        int optindex = -1;
+
+        const struct option longopts[] = {
+            {"test", required_argument, 0, 0},
+            {"test2", required_argument, 0, 0},
+            {"test3", optional_argument, 0, 0},
+            {0, 0, 0, 0}
+        };
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 0);
+        EXPECT_STR_EQ(optarg, "aaa");
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 1);
+        EXPECT_STR_EQ(optarg, "bbb");
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 2);
+        EXPECT_STR_EQ(optarg, NULL);
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), -1);
+    }
+
+    GETOPT_TEST_CASE("app", "--test=aaa", "-tbbb", "ccc")
+    {
+        const char* optstring = "-t:";
+        int optindex = -1;
+
+        const struct option longopts[] = {
+            {"test", required_argument, 0, 0},
+            {0, 0, 0, 0}
+        };
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 0);
+        EXPECT_STR_EQ(optarg, "aaa");
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 't');
+        EXPECT_STR_EQ(optarg, "bbb");
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 1);
+        EXPECT_STR_EQ(optarg, "ccc");
+
+        EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), -1);
+    }
+}
+
+TEST(getopt_long_only)
+{
+    GETOPT_INIT();
+
+    GETOPT_TEST_CASE("app", "-test=aaa", "-test2", "bbb", "-test3")
+    {
+        const char* optstring = "";
+        int optindex = -1;
+        opterr = 1;
+
+        const struct option longopts[] = {
+            {"test", required_argument, 0, 0},
+            {"test2", required_argument, 0, 0},
+            {"test3", optional_argument, 0, 0},
+            {0, 0, 0, 0}
+        };
+
+        EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 0);
+        EXPECT_STR_EQ(optarg, "aaa");
+
+        EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 1);
+        EXPECT_STR_EQ(optarg, "bbb");
+
+        EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), 0);
+        EXPECT_EQ(optindex, 2);
+        EXPECT_STR_EQ(optarg, NULL);
+
+        EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), -1);
     }
 }
 
