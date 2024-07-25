@@ -113,7 +113,7 @@ void idt_write_protect(void);
 #define IDT_OFFSET          2048
 
 #define descriptor_selector(num, ring) ((num << 3) | ring)
-#define tss_selector(num) ((num + TSS_ENTRY) << 3)
+#define TSS_SELECTOR ((TSS_ENTRY) << 3)
 
 #define GDT_LOW_LIMIT(limit) \
     ((limit) & 0xFFFF)

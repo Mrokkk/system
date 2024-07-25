@@ -18,19 +18,14 @@
 
 extern void exit_kernel();
 
-static inline void fork_kernel_stack_frame(
-    uint32_t** kernel_stack,
-    uint32_t* user_stack,
-    pt_regs_t* regs,
-    uint32_t ebp)
+static void fork_kernel_stack_frame(uint32_t** kernel_stack, pt_regs_t* regs)
 {
 #define pushk(v) push((v), *kernel_stack)
-    ebp = ebp ? : regs->ebp;
     uint32_t eflags = regs->eflags | EFL_IF;
     if (regs->cs == USER_CS)
     {
         pushk(USER_DS);     // ss
-        pushk(user_stack);  // esp
+        pushk(regs->esp);   // esp
     }
     pushk(eflags);      // eflags
     pushk(regs->cs);    // cs
@@ -41,7 +36,7 @@ static inline void fork_kernel_stack_frame(
     pushk(regs->es);    // es
     pushk(regs->ds);    // ds
     pushk(0);           // eax; return value in child
-    pushk(ebp);         // ebp
+    pushk(regs->ebp);   // ebp
     pushk(regs->edi);   // edi
     pushk(regs->esi);   // esi
     pushk(regs->edx);   // edx
@@ -50,18 +45,10 @@ static inline void fork_kernel_stack_frame(
 #undef pushk
 }
 
-uint32_t user_process_setup_stack(process_t* dest, process_t*, pt_regs_t* src_regs)
+static uint32_t user_process_setup_stack(process_t* dest, process_t*, pt_regs_t* src_regs)
 {
-    uint32_t* kernel_stack;
-
-    dest->context.esp0 = addr(kernel_stack = dest->mm->kernel_stack);
-
-    fork_kernel_stack_frame(
-        &kernel_stack,
-        ptr(src_regs->esp),
-        src_regs,
-        0);
-
+    uint32_t* kernel_stack = dest->mm->kernel_stack;
+    fork_kernel_stack_frame(&kernel_stack, src_regs);
     return addr(kernel_stack);
 }
 
@@ -71,14 +58,9 @@ int arch_process_copy(
     pt_regs_t* src_regs)
 {
     dest->context.esp = user_process_setup_stack(dest, src, src_regs);
-
     dest->context.eip = addr(&exit_kernel);
-    dest->context.iomap_offset = IOMAP_OFFSET;
-    dest->context.ss0 = KERNEL_DS;
+    dest->context.esp0 = addr(dest->mm->kernel_stack);
     dest->context.esp2 = src_regs->esp;
-
-    memcpy(dest->context.io_bitmap, src->context.io_bitmap, IO_BITMAP_SIZE);
-
     return 0;
 }
 
@@ -109,13 +91,12 @@ void arch_process_free(process_t*)
 // [       2.576500] [<0xc011c358>] timer_handler+0x48/0x4b
 void FASTCALL(__process_switch(process_t*, process_t* next))
 {
-    // Change TSS and clear busy bit
-    descriptor_set_base(gdt_entries, TSS_ENTRY, addr(&next->context));
-    gdt_entries[TSS_ENTRY].access &= 0xf9;
+    scoped_irq_lock();
 
-    // Reload TSS with the address of process's
-    // context structure and load its pgd
-    tss_load(tss_selector(0));
+    tss.esp = next->context.esp;
+    tss.esp0 = next->context.esp0;
+    tss.esp2 = next->context.esp2;
+
     pgd_load(next->mm->pgd);
 }
 
@@ -210,7 +191,7 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     pushk(KERNEL_DS);   // fs
     pushk(KERNEL_DS);   // es
     pushk(KERNEL_DS);   // ds
-    pushk(0);           // eax; return value in child
+    pushk(0);           // eax
     pushk(0);           // ebp
     pushk(0);           // edi
     pushk(0);           // esi
@@ -222,10 +203,6 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     child->context.esp0 = 0;
     child->context.esp = addr(kernel_stack);
     child->context.eip = addr(&exit_kernel);
-    child->context.iomap_offset = IOMAP_OFFSET;
-    child->context.ss0 = KERNEL_DS;
-
-    memcpy(child->context.io_bitmap, init_process.context.io_bitmap, IO_BITMAP_SIZE);
 
     return 0;
 }
@@ -242,11 +219,18 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
 
 int NORETURN(arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack))
 {
-    flags_t flags;
-    irq_save(flags);
+    cli();
+
     process_current->context.esp0 = addr(process_current->mm->kernel_stack);
+
     exec_kernel_stack_frame(&kernel_stack, user_stack, addr(entry));
+
+    tss.esp = addr(kernel_stack);
+    tss.esp0 = process_current->context.esp0;
+    tss.esp2 = addr(user_stack);
+
     context_set(kernel_stack, &exit_kernel);
+
     ASSERT_NOT_REACHED();
 }
 
@@ -258,6 +242,8 @@ void NORETURN(sys_sigreturn(pt_regs_t))
 
     process_current->context.esp0 = addr(frame->prev);
     process_current->need_signal = !!process_current->signals->ongoing;
+
+    tss.esp0 = addr(frame->prev);
 
     context_set(frame->context, &exit_kernel);
 
@@ -294,10 +280,11 @@ void do_signals(pt_regs_t regs)
         // back to original esp0
         proc->context.esp0 = addr(&frame);
 
-        // Currently only void(int sig) signal handler
-        // are supported
+        // Currently only void(int sig) signal handlers are supported
         push(sig, user_stack);
         push(proc->signals->sigrestorer, user_stack);
+
+        tss.esp0 = addr(&frame);
 
         asm volatile(
             "pushl "ASM_VALUE(USER_DS)";" // ss

@@ -10,7 +10,7 @@
 #define IO_BITMAP_SIZE 128
 #define IOMAP_OFFSET   104
 
-struct context
+struct tss
 {
    uint32_t prev_tss;
    uint32_t esp0;
@@ -42,7 +42,17 @@ struct context
    uint8_t io_bitmap[IO_BITMAP_SIZE];
 } PACKED;
 
+struct context
+{
+    uint32_t eip;
+    uint32_t esp;
+    uint32_t esp0;
+    uint32_t esp2;
+};
+
 typedef struct context context_t;
+typedef struct tss tss_t;
+extern tss_t tss;
 
 struct pt_regs
 {
@@ -150,15 +160,13 @@ typedef struct { uint16_t off, seg; } farptr_t;
 #define REGS_ESP    60
 #define REGS_SS     64
 
-#define CONTEXT_ESP2 20
+#define CONTEXT_ESP2 12
 
 #define INIT_PROCESS_STACK_SIZE 1024 // number of uint32_t's
 
 #define INIT_PROCESS_CONTEXT(name) \
     { \
-        .iomap_offset = IOMAP_OFFSET, \
         .esp = (uint32_t)&name##_stack[INIT_PROCESS_STACK_SIZE], \
-        .ss0 = KERNEL_DS, \
     }
 
-#define NEED_RESCHED_SIGNAL_OFFSET  232
+#define NEED_RESCHED_SIGNAL_OFFSET  16

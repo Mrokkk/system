@@ -425,7 +425,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     }
 
     log_debug(DEBUG_PROCESS, "%s, argc=%u, envc=%u",
-        pathname,
+        copied_path,
         argvec[ARGV].count,
         argvec[ENVP].count);
 

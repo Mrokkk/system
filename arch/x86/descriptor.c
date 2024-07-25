@@ -24,6 +24,8 @@ ALIGN(PAGE_SIZE) idt = {
     .padding = {}
 };
 
+tss_t tss;
+
 static_assert(offsetof(struct idt_data, idt) == IDT_OFFSET);
 
 static inline void idt_set_gate(uint8_t num, uint32_t base, uint16_t selector, uint32_t flags)
@@ -37,16 +39,21 @@ static inline void idt_set_gate(uint8_t num, uint32_t base, uint16_t selector, u
 
 UNMAP_AFTER_INIT void tss_init()
 {
-    uint32_t base = addr(&process_current->context);
-    uint32_t limit = sizeof(struct context) - IO_BITMAP_SIZE;
+    uint32_t base = addr(&tss);
+    uint32_t limit = sizeof(tss_t) - IO_BITMAP_SIZE;
 
     descriptor_set_base(gdt_entries, TSS_ENTRY, base);
     descriptor_set_limit(gdt_entries, TSS_ENTRY, limit);
 
-    // Disable all ports
-    memset(process_current->context.io_bitmap, 0xff, IO_BITMAP_SIZE);
+    tss.iomap_offset = IOMAP_OFFSET;
+    tss.ss0 = KERNEL_DS;
+    tss.ss2 = USER_DS;
+    tss.esp = init_process.context.esp;
 
-    tss_load(tss_selector(0));
+    // Disable all ports
+    memset(tss.io_bitmap, 0xff, IO_BITMAP_SIZE);
+
+    tss_load(TSS_SELECTOR);
 }
 
 void idt_set(int nr, uint32_t addr)

@@ -16,7 +16,7 @@ typedef struct process process_t;
 #define PROCESS_FILES       32
 #define PROCESS_NAME_LEN    16
 
-typedef enum a
+typedef enum
 {
     PROCESS_RUNNING = 0,
     PROCESS_WAITING = 1,
@@ -97,37 +97,36 @@ struct process
 {
     // Cacheline 0
     context_t context;
-
-    // Cacheline 3
     unsigned _need_resched[0];
     unsigned need_resched:1;
     unsigned need_signal:1;
     task_type_t type:1;
     stat_t stat:2;
+    int trace:2;
     list_head_t running;
     unsigned context_switches;
     unsigned forks;
     pid_t pid;
     pid_t ppid;
-
-    // Cacheline 4
     int pgid;
     int sid;
-    int trace;
     int exit_code;
     uid_t uid;
     gid_t gid;
+    int alarm;
+
+    // Cacheline 1
     char name[PROCESS_NAME_LEN];
     struct mm* mm;
     struct fs* fs;
     struct files* files;
     struct signals* signals;
-    int alarm;
     process_t* parent;
-
-    // Cacheline 5
     list_head_t timers;
     wait_queue_head_t wait_child;
+    unsigned padding;
+
+    // Cacheline 2
     list_head_t children;
 
     // Don't iterate over those lists
