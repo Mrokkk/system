@@ -18,17 +18,6 @@
 
 extern void exit_kernel();
 
-static void* stack_copy(
-    uint32_t* dest,
-    uint32_t* src,
-    uint32_t size)
-{
-    void* dest_begin = ptr(addr(dest) - size);
-    void* src_begin = ptr(addr(src) - size);
-
-    return memcpy(dest_begin, src_begin, size);
-}
-
 static inline void fork_kernel_stack_frame(
     uint32_t** kernel_stack,
     uint32_t* user_stack,
@@ -61,44 +50,6 @@ static inline void fork_kernel_stack_frame(
 #undef pushk
 }
 
-uint32_t kernel_process_setup_stack(
-    process_t* dest,
-    process_t* src,
-    pt_regs_t* src_regs)
-{
-    uint32_t* dest_stack = dest->mm->kernel_stack;
-    uint32_t* temp;
-
-    // If we'are not changing privilege level, which we don't do in that case
-    // (privilege levels in the process and in the handler are the same), we
-    // don't have the EIP value in the pt_regs (exactly we have but it points
-    // to some random value). But we can figure out its address. If CPU doesn't
-    // change privileges in the exception entry, it doesn't change stacks, so
-    // it simply pushes appropriate values (EFLAGS, CS and EIP) on the
-    // currently used stack. So, the ESP value that has been used in the
-    // process before exception is the address 4 bytes after EFLAGS, which
-    // is the address of the ESP field in the pt_regs.
-
-    dest_stack = stack_copy(
-        dest_stack,
-        src->mm->kernel_stack,
-        addr(src->mm->kernel_stack) - addr(&src_regs->esp));
-
-    temp = dest_stack;
-    dest->context.esp0 = 0;
-
-    // FIXME: this should not be done; ideally, all stacks should be mapped to same
-    // virtual address; and they are for user processes, but not the kernel ones
-    uint32_t ebp_offset = addr(src->mm->kernel_stack) - src_regs->ebp;
-    uint32_t ebp = addr(dest->mm->kernel_stack) - ebp_offset;
-
-    fork_kernel_stack_frame(&dest_stack, temp, src_regs, ebp);
-
-    log_debug(DEBUG_PROCESS, "stack=%x", dest_stack);
-
-    return addr(dest_stack);
-}
-
 uint32_t user_process_setup_stack(process_t* dest, process_t*, pt_regs_t* src_regs)
 {
     uint32_t* kernel_stack;
@@ -119,14 +70,12 @@ int arch_process_copy(
     process_t* src,
     pt_regs_t* src_regs)
 {
-    dest->context.esp = process_is_kernel(dest)
-        ? kernel_process_setup_stack(dest, src, src_regs)
-        : user_process_setup_stack(dest, src, src_regs);
+    dest->context.esp = user_process_setup_stack(dest, src, src_regs);
 
     dest->context.eip = addr(&exit_kernel);
     dest->context.iomap_offset = IOMAP_OFFSET;
     dest->context.ss0 = KERNEL_DS;
-    dest->context.esp2 = 0;
+    dest->context.esp2 = src_regs->esp;
 
     memcpy(dest->context.io_bitmap, src->context.io_bitmap, IO_BITMAP_SIZE);
 
@@ -368,14 +317,10 @@ void do_signals(pt_regs_t regs)
             : "memory");
     }
 
-    // FIXME: There are some race conditions which causes
-    // to enter do_signals with zero signals->ongoing
-    log_warning("%s: %u: signals->ongoing = %x, need_signal = %u",
-        __func__,
-        proc->pid,
-        proc->signals->ongoing,
-        proc->need_signal);
+    ASSERT_NOT_REACHED();
+}
 
-    sti();
-    /*ASSERT_NOT_REACHED();*/
+int arch_process_init(void)
+{
+    return 0;
 }

@@ -200,6 +200,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 char* process_print(const struct process* p, char* str);
 
 // Arch-dependent functions
+int arch_process_init(void);
 int arch_process_copy(struct process* dest, struct process* src, struct pt_regs* old_regs);
 int arch_process_spawn(struct process* child, process_entry_t entry, void* args, int flags);
 void arch_process_free(struct process* p);

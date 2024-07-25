@@ -158,5 +158,6 @@ int processes_init()
     init_process.mm->vm_areas = NULL;
     mutex_init(&init_process.mm->lock);
     list_add_tail(&init_process.running, &running);
+    arch_process_init();
     return 0;
 }
