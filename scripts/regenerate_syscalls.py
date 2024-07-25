@@ -128,7 +128,7 @@ def type_convert(t : str):
     elif t == 'short': return 'TYPE_SHORT'
     elif t == 'char': return 'TYPE_CHAR'
     elif t in ('unsigned long', 'unsigned int', 'size_t', 'off_t', 'uint32_t', 'time_t', 'clockid_t', 'timer_t'): return 'TYPE_UNSIGNED_LONG'
-    elif t in ('unsigned short', 'mode_t', 'uid_t', 'dev_t'): return 'TYPE_UNSIGNED_SHORT'
+    elif t in ('unsigned short', 'mode_t', 'uid_t', 'dev_t', 'pid_t'): return 'TYPE_UNSIGNED_SHORT'
     elif t == 'void': return 'TYPE_VOID'
     else:
         print(f'Unknown type: {t}')

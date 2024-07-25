@@ -508,4 +508,18 @@ syscall_t trace_syscalls[] = {
         .nargs  = 2,
         .args   = { TYPE_UNSIGNED_LONG, TYPE_VOID_PTR },
     },
+
+    {
+        .name   = "getpgrp",
+        .ret    = TYPE_UNSIGNED_SHORT,
+        .nargs  = 0,
+        .args   = {  },
+    },
+
+    {
+        .name   = "setpgrp",
+        .ret    = TYPE_UNSIGNED_SHORT,
+        .nargs  = 0,
+        .args   = {  },
+    },
 };

@@ -4,11 +4,10 @@
 #include <kernel/process.h>
 
 PROCESS_DECLARE(init_process);
-LIST_DECLARE(running);
 
-int process_find(int pid, struct process** p)
+int process_find(int pid, process_t** p)
 {
-    struct process* proc;
+    process_t* proc;
 
     for_each_process(proc)
     {
@@ -23,7 +22,7 @@ int process_find(int pid, struct process** p)
     return 1;
 }
 
-int process_find_free_fd(struct process* proc, int* fd)
+int process_find_free_fd(process_t* proc, int* fd)
 {
     struct file* dummy;
     int i;
@@ -88,6 +87,16 @@ int sys_setgid(gid_t)
     return 0;
 }
 
+pid_t sys_setpgrp(void)
+{
+    return -1;
+}
+
+pid_t sys_getpgrp(void)
+{
+    return process_current->pgid;
+}
+
 char* mm_print(const struct mm* mm, char* str)
 {
     str += sprintf(str,
@@ -119,7 +128,7 @@ char* fs_print(const void* data, char* str)
     return str;
 }
 
-char* process_print(const struct process* p, char* str)
+char* process_print(const process_t* p, char* str)
 {
     str += sprintf(str,
         "process{\n"
@@ -147,7 +156,6 @@ int processes_init()
     init_process.mm->pgd = init_pgd_get();
     init_process.mm->kernel_stack = ptr(&init_process_stack[INIT_PROCESS_STACK_SIZE]);
     init_process.mm->vm_areas = NULL;
-    need_resched = &init_process.need_resched;
     mutex_init(&init_process.mm->lock);
     list_add_tail(&init_process.running, &running);
     return 0;

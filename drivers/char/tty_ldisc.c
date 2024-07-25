@@ -140,7 +140,7 @@ void tty_ldisc_putch(tty_t* tty, int c)
 
         if (process_current->sid != tty->sid)
         {
-            *need_resched = true;
+            process_current->need_resched = true;
         }
 
         return;
@@ -172,7 +172,7 @@ void tty_ldisc_putch(tty_t* tty, int c)
             process_wake(p);
             if (p != process_current)
             {
-                *need_resched = true;
+                process_current->need_resched = true;
             }
         }
     }

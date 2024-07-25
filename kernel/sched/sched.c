@@ -1,14 +1,16 @@
 #include <kernel/process.h>
 #include <arch/context_switch.h>
 
-struct process* process_current = &init_process;
+static_assert(NEED_RESCHED_SIGNAL_OFFSET == offsetof(process_t, _need_resched));
+
+process_t* process_current = &init_process;
+LIST_DECLARE(running);
 unsigned int context_switches;
-unsigned* need_resched;
 
 // Simple RR scheduler
-void scheduler()
+void scheduler(void)
 {
-    struct process* last = process_current;
+    process_t* last = process_current;
 
     if (list_empty(&running))
     {
@@ -20,7 +22,7 @@ void scheduler()
 
     if (!process_is_running(process_current))
     {
-        process_current = list_entry(running.next, struct process, running);
+        process_current = list_entry(running.next, process_t, running);
     }
     else
     {
@@ -29,7 +31,7 @@ void scheduler()
         {
             temp = temp->next;
         }
-        process_current = list_entry(temp, struct process, running);
+        process_current = list_entry(temp, process_t, running);
     }
 
 #if PARANOIA_SCHED
@@ -52,7 +54,6 @@ end:
 
     context_switches++;
     last->context_switches++;
-    need_resched = &process_current->need_resched;
 
     process_switch(last, process_current);
 }

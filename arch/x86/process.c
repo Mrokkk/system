@@ -32,7 +32,7 @@ static void* stack_copy(
 static inline void fork_kernel_stack_frame(
     uint32_t** kernel_stack,
     uint32_t* user_stack,
-    struct pt_regs* regs,
+    pt_regs_t* regs,
     uint32_t ebp)
 {
 #define pushk(v) push((v), *kernel_stack)
@@ -62,9 +62,9 @@ static inline void fork_kernel_stack_frame(
 }
 
 uint32_t kernel_process_setup_stack(
-    struct process* dest,
-    struct process* src,
-    struct pt_regs* src_regs)
+    process_t* dest,
+    process_t* src,
+    pt_regs_t* src_regs)
 {
     uint32_t* dest_stack = dest->mm->kernel_stack;
     uint32_t* temp;
@@ -115,9 +115,9 @@ uint32_t user_process_setup_stack(process_t* dest, process_t*, pt_regs_t* src_re
 }
 
 int arch_process_copy(
-    struct process* dest,
-    struct process* src,
-    struct pt_regs* src_regs)
+    process_t* dest,
+    process_t* src,
+    pt_regs_t* src_regs)
 {
     dest->context.esp = process_is_kernel(dest)
         ? kernel_process_setup_stack(dest, src, src_regs)
@@ -133,7 +133,7 @@ int arch_process_copy(
     return 0;
 }
 
-void arch_process_free(struct process*)
+void arch_process_free(process_t*)
 {
 }
 
@@ -158,7 +158,7 @@ void arch_process_free(struct process*)
 // [       2.574609] backtrace:
 // [       2.575240] [<0xc0118d92>] __process_switch+0x22/0x3e
 // [       2.576500] [<0xc011c358>] timer_handler+0x48/0x4b
-void FASTCALL(__process_switch(struct process*, struct process* next))
+void FASTCALL(__process_switch(process_t*, process_t* next))
 {
     // Change TSS and clear busy bit
     descriptor_set_base(gdt_entries, TSS_ENTRY, addr(&next->context));
@@ -170,7 +170,7 @@ void FASTCALL(__process_switch(struct process*, struct process* next))
     pgd_load(next->mm->pgd);
 }
 
-void syscall_regs_check(struct pt_regs regs)
+void syscall_regs_check(pt_regs_t regs)
 {
     ASSERT(cs_get() == KERNEL_CS);
     ASSERT(ds_get() == KERNEL_DS);
@@ -192,7 +192,7 @@ void syscall_regs_check(struct pt_regs regs)
     }
 }
 
-int sys_clone(struct pt_regs regs)
+int sys_clone(pt_regs_t regs)
 {
     return process_clone(process_current, &regs, regs.ebx);
 }
@@ -223,7 +223,7 @@ static inline void exec_kernel_stack_frame(
 #undef pushk
 }
 
-int sys_execve(struct pt_regs regs)
+int sys_execve(pt_regs_t regs)
 {
     int errno;
 
@@ -245,7 +245,7 @@ int sys_execve(struct pt_regs regs)
     return do_exec(pathname, argv, envp);
 }
 
-int arch_process_spawn(struct process* child, process_entry_t entry, void* args, int)
+int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
 {
     uint32_t* kernel_stack = child->mm->kernel_stack;
     uint32_t eflags = EFL_IF;
@@ -301,7 +301,7 @@ int NORETURN(arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack)
     ASSERT_NOT_REACHED();
 }
 
-void NORETURN(sys_sigreturn(struct pt_regs))
+void NORETURN(sys_sigreturn(pt_regs_t))
 {
     signal_frame_t* frame = ptr(process_current->context.esp0);
 

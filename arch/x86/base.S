@@ -96,14 +96,14 @@ ENDPROC(timer_handler)
 
 ENTRY(exit_kernel)
     cli
-    mov SYMBOL_NAME(need_resched), %eax
-    mov (%eax), %edx
-    test %edx, %edx
+    mov SYMBOL_NAME(process_current), %eax
+    movzbl NEED_RESCHED_SIGNAL_OFFSET(%eax), %edx
+    and $1, %edx
     jne run_scheduler
 
 check_signals:
-    mov 4(%eax), %edx
-    test %edx, %edx
+    mov NEED_RESCHED_SIGNAL_OFFSET(%eax), %edx
+    and $2, %edx
     jne run_signals
 
 leave_kernel:
@@ -117,7 +117,7 @@ run_scheduler:
     call SYMBOL_NAME(scheduler)
 
     cli
-    mov SYMBOL_NAME(need_resched), %eax
+    mov SYMBOL_NAME(process_current), %eax
     jmp check_signals
 
 run_signals:

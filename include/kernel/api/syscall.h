@@ -73,8 +73,10 @@
 #define __NR_gettimeofday   70
 #define __NR_clock_gettime  71
 #define __NR_clock_settime  72
+#define __NR_getpgrp        73
+#define __NR_setpgrp        74
 
-#define __NR_syscalls       73
+#define __NR_syscalls       75
 
 #ifndef __ASSEMBLER__
 
@@ -191,3 +193,5 @@ __syscall3(_syslog, int, int, int, const char*)
 __syscall2(gettimeofday, int, struct timeval*, struct timezone*)
 __syscall2(clock_gettime, int, clockid_t, struct timespec*)
 __syscall2(clock_settime, int, clockid_t, const struct timespec*)
+__syscall0(getpgrp, pid_t)
+__syscall0(setpgrp, pid_t)

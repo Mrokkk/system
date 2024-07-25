@@ -171,7 +171,7 @@ int sys_exit(int return_value)
         return_value);
 
     process_current->exit_code = EXITCODE(return_value, 0);
-    strcpy(process_current->name, "<defunct>");
+    process_name_set(process_current, "<defunct>");
     process_exit(process_current);
     return 0;
 }

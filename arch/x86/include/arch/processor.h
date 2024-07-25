@@ -160,3 +160,5 @@ typedef struct { uint16_t off, seg; } farptr_t;
         .esp = (uint32_t)&name##_stack[INIT_PROCESS_STACK_SIZE], \
         .ss0 = KERNEL_DS, \
     }
+
+#define NEED_RESCHED_SIGNAL_OFFSET  232

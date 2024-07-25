@@ -136,10 +136,11 @@ static inline void process_init(struct process* child, struct process* parent)
     child->context_switches = 0;
     child->forks = 0;
     child->sid = parent->sid;
+    child->pgid = parent->pgid;
     child->need_resched = false;
     child->need_signal = false;
     child->alarm = 0;
-    strcpy(child->name, parent->name);
+    process_name_set(child, parent->name);
     wait_queue_head_init(&child->wait_child);
     list_init(&child->children);
     list_init(&child->siblings);
@@ -294,7 +295,7 @@ process_t* process_spawn(const char* name, process_entry_t entry, void* args, in
     process_parent_child_link(parent, child);
     process_forked(parent);
 
-    strcpy(child->name, name);
+    process_name_set(child, name);
     child->trace = 0;
     child->stat = PROCESS_RUNNING;
     list_add_tail(&child->running, &running);

@@ -14,7 +14,7 @@ typedef struct process process_t;
 
 #define STACK_MAGIC 0xdeadc0de
 #define PROCESS_FILES       32
-#define PROCESS_NAME_LEN    32
+#define PROCESS_NAME_LEN    16
 
 typedef enum a
 {
@@ -31,8 +31,8 @@ typedef enum a
 
 typedef enum
 {
-    USER_PROCESS        = 1,
-    KERNEL_PROCESS      = 2,
+    USER_PROCESS        = 0,
+    KERNEL_PROCESS      = 1,
 } task_type_t;
 
 #define CLONE_FS            (1 << 0)
@@ -95,19 +95,28 @@ struct files
 
 struct process
 {
+    // Cacheline 0
     context_t context;
-    stat_t stat;
+
+    // Cacheline 3
+    unsigned _need_resched[0];
+    unsigned need_resched:1;
+    unsigned need_signal:1;
+    task_type_t type:1;
+    stat_t stat:2;
     list_head_t running;
-    unsigned need_resched;
-    int need_signal;
-    pid_t pid, ppid;
+    unsigned context_switches;
+    unsigned forks;
+    pid_t pid;
+    pid_t ppid;
+
+    // Cacheline 4
+    int pgid;
+    int sid;
     int trace;
     int exit_code;
     uid_t uid;
     gid_t gid;
-    int sid;
-    task_type_t type;
-    unsigned context_switches, forks;
     char name[PROCESS_NAME_LEN];
     struct mm* mm;
     struct fs* fs;
@@ -115,9 +124,12 @@ struct process
     struct signals* signals;
     int alarm;
     process_t* parent;
+
+    // Cacheline 5
     list_head_t timers;
     wait_queue_head_t wait_child;
     list_head_t children;
+
     // Don't iterate over those lists
     list_head_t siblings;
     list_head_t processes;
@@ -193,6 +205,12 @@ int arch_process_spawn(struct process* child, process_entry_t entry, void* args,
 void arch_process_free(struct process* p);
 int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
 
+static inline void process_name_set(process_t* p, const char* name)
+{
+    strncpy(p->name, name, PROCESS_NAME_LEN);
+    p->name[PROCESS_NAME_LEN - 1] = 0;
+}
+
 static inline char process_state_char(int s)
 {
     return PROCESS_STATE_STRING[s];
@@ -223,7 +241,7 @@ static inline void process_stop(struct process* p)
     irq_restore(flags);
     if (p == process_current)
     {
-        *need_resched = true;
+        p->need_resched = true;
     }
 }
 
