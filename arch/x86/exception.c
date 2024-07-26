@@ -32,7 +32,7 @@ struct exception
 
 typedef struct exception exception_t;
 
-static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs));
+static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs));
 static void page_fault_description_print(const char* severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
 static void general_protection_description_print(const char* severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header);
 
@@ -79,30 +79,30 @@ static void page_fault_description_print(const char* severity, const pt_regs_t* 
 
     pf_reason_print(regs->error_code, cr2, buffer);
     log_severity(severity, "%s: %s", header, buffer);
-    log_severity(severity, "%s: pgd = cr3 = %08x", header, cr3);
+    log_severity(severity, "%s: pgd: cr3 = %08x", header, cr3);
 
     const uint32_t pgt = pgd[pde_index];
     pde_print(pgt, buffer);
 
-    log_severity(severity, "%s: pgd[%u] = %s", header, pde_index, buffer);
+    log_severity(severity, "%s: pgd[%u]: %s", header, pde_index, buffer);
 
     const pgt_t* pgt_ptr = virt_cptr(pgt & PAGE_ADDRESS);
 
     if (!vm_paddr(addr(pgt_ptr), pgd))
     {
-        log_severity(severity, "%s: pgt not mapped", header);
+        log_severity(severity, "%s: pgt: not mapped", header);
     }
     else
     {
         const uint32_t pg = pgt_ptr[pte_index];
         pte_print(pg, buffer);
-        log_severity(severity, "%s: pgt[%u] = %s", header, pte_index, buffer);
+        log_severity(severity, "%s: pgt[%u]: %s", header, pte_index, buffer);
     }
 }
 
 static void general_protection_description_print(const char* severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header)
 {
-    log_severity(severity, "%s: error code = %x", header, regs->error_code);
+    log_severity(severity, "%s: error code: %x", header, regs->error_code);
 }
 
 static inline printer_t printer_get(int nr)
@@ -212,7 +212,7 @@ handle_fault:
         log_notice("%s: %s #%x at %x",
             header,
             exception->name,
-            regs.error_code,
+            exception->has_error_code ? regs.error_code : 0,
             regs.eip);
 
         if (DEBUG_USER_EXCEPTION)
@@ -222,7 +222,7 @@ handle_fault:
                 printer(KERN_INFO, &regs, cr2, cr3, header);
             }
 
-            regs_print(header, &regs, log_info);
+            regs_print(KERN_INFO, &regs, header);
             vm_areas_indent_log(KERN_INFO, p->mm->vm_areas, INDENT_LVL_1, "%s: vm areas:", header);
             backtrace_user(KERN_INFO, &regs, "");
         }
@@ -231,7 +231,7 @@ handle_fault:
     }
 }
 
-static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs))
+static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs))
 {
     const char* header = "kernel";
     char string[80];
@@ -252,7 +252,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs)
     {
         log_critical("%s: %s #%x during another exception handling at %x...",
             header, exception->name, regs->error_code, regs->eip);
-        regs_print("kernel", regs, log_critical);
+        regs_print("kernel", regs, KERN_CRIT);
         for (;; halt());
     }
 
@@ -269,7 +269,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs)
     log_critical("%s: %s #%x from %x in pid %u",
         header,
         exception->name,
-        regs->error_code,
+        exception->has_error_code ? regs->error_code : 0,
         regs->eip,
         p->pid);
 
@@ -278,14 +278,10 @@ static void NORETURN(kernel_fault(const exception_t* exception, pt_regs_t* regs)
         printer(KERN_CRIT, regs, cr2, cr3, header);
     }
 
-    regs_print(header, regs, log_critical);
-
-    cr0_bits_string_get(cr0, string);
-    log_critical("%s: CR0 = %08x = (%s)", header, cr0, string);
-    log_critical("%s: CR2 = %08x", header, cr2, string);
-    log_critical("%s: CR3 = %08x", header, cr3);
-    cr4_bits_string_get(cr4, string);
-    log_critical("%s: CR4 = %08x = (%s)", header, cr4, string);
+    regs_print(KERN_CRIT, regs, header);
+    log_critical("%s: cr0: %08x: (%s)", header, cr0, cr0_bits_string_get(cr0, string));
+    log_critical("%s: cr2: %08x cr3: %08x", header, cr2, cr3);
+    log_critical("%s: cr4: %08x: (%s)", header, cr4, cr4_bits_string_get(cr4, string));
 
     backtrace_exception(regs);
 

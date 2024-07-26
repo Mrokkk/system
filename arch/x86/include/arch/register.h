@@ -83,9 +83,11 @@ struct regs
 
 typedef struct regs regs_t;
 
-int eflags_bits_string_get(uint32_t eflags, char* buffer);
-int cr0_bits_string_get(uint32_t cr0, char* buffer);
-int cr4_bits_string_get(uint32_t cr4, char* buffer);
+void regs_print(const char* severity, const pt_regs_t* regs, const char* header);
+
+const char* eflags_bits_string_get(uint32_t eflags, char* buffer);
+const char* cr0_bits_string_get(uint32_t cr0, char* buffer);
+const char* cr4_bits_string_get(uint32_t cr4, char* buffer);
 
 extern uint32_t eip_get(void);
 

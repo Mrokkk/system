@@ -1,83 +1,77 @@
+#include <arch/register.h>
 #include <kernel/kernel.h>
 #include <kernel/string.h>
-#include <arch/register.h>
+#include <kernel/bitflag.h>
 
-char* eflags_lobits[] = {
+static const char* eflags_bits[] = {
     "cf", 0, "pf", 0, "af", 0, "zf", "sf", "tf", "if", "df", "of", 0, 0, "nt", 0, "rf", "vm", "ac", 0, 0, "id"
 };
 
-char* eflags_hibits[] = {
-    "CF", 0, "PF", 0, "AF", 0, "ZF", "SF", "TF", "IF", "DF", "OF", 0, 0, "NT", 0, "RF", "VM", "AC", 0, 0, "ID"
-};
-
-char* cr0_lobits[] = {
+static const char* cr0_bits[] = {
     "pe", "mp", "em", "ts", "et", "ne", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "wp", "am", "nw", "cd", "pg"
 };
 
-char* cr0_hibits[] = {
-    "PE", "MP", "EM", "TS", "ET", "NE", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "WP", "AM", "NW", "CD", "PG"
-};
-
-char* cr4_lobits[] = {
+static const char* cr4_bits[] = {
     "vme", "pvi", "tsd", "de", "pse", "pae", "mce", "pge", "pce", "osfxsr", "osxmmexcpt", 0, 0, "vmxe",
     "smxe", 0, 0, "pcide", "osxsave", 0, "smep", "smap"
 };
 
-char* cr4_hibits[] = {
-    "VME", "PVI", "TSD", "DE", "PSE", "PAE", "MCE", "PGE", "PCE", "OSFXSR", "OSXMMEXCPT", 0, 0, "VMXE",
-    "SMXE", 0, 0, "PCIDE", "OSXSAVE", 0, "SMEP", "SMAP"
-};
-
-int eflags_bits_string_get(uint32_t eflags, char* buffer)
+const char* eflags_bits_string_get(uint32_t eflags, char* buffer)
 {
-    int len = 0;
-
-    for (size_t i = 0; i < array_size(eflags_hibits); i++)
-    {
-        if (eflags_lobits[i])
-        {
-            eflags & (1 << i)
-                ? sprintf(buffer + len, "%s ", eflags_hibits[i])
-                : sprintf(buffer + len, "%s ", eflags_lobits[i]);
-            len += strlen(eflags_lobits[i]) + 1;
-        }
-    }
-
-    return len;
+    bitflags_string(buffer, eflags_bits, eflags);
+    return buffer;
 }
 
-int cr0_bits_string_get(uint32_t cr0, char* buffer)
+const char* cr0_bits_string_get(uint32_t cr0, char* buffer)
 {
-    int len = 0;
-
-    for (int i = 0; i < 21; i++)
-    {
-        if (cr0_lobits[i])
-        {
-            cr0 & (1 << i)
-                ? sprintf(buffer + len, "%s ", cr0_hibits[i])
-                : sprintf(buffer + len, "%s ", cr0_lobits[i]);
-            len += strlen(cr0_lobits[i]) + 1;
-        }
-    }
-
-    return len;
+    bitflags_string(buffer, cr0_bits, cr0);
+    return buffer;
 }
 
-int cr4_bits_string_get(uint32_t cr4, char* buffer)
+const char* cr4_bits_string_get(uint32_t cr4, char* buffer)
 {
-    int len = 0;
+    bitflags_string(buffer, cr4_bits, cr4);
+    return buffer;
+}
 
-    for (int i = 0; i < 22; i++)
+void regs_print(const char* severity, const pt_regs_t* regs, const char* header)
+{
+    char buffer[64];
+    char header_buffer[32];
+
+    if (header)
     {
-        if (cr4_lobits[i])
-        {
-            cr4 & (1 << i)
-                ? sprintf(buffer + len, "%s ", cr4_hibits[i])
-                : sprintf(buffer + len, "%s ", cr4_lobits[i]);
-            len += strlen(cr4_lobits[i]) + 1;
-        }
+        sprintf(header_buffer, "%s: ", header);
+    }
+    else
+    {
+        *header_buffer = 0;
     }
 
-    return len;
+    log_severity(severity, "%seax: %08x ebx: %08x ecx: %08x", header_buffer, regs->eax, regs->ebx, regs->ecx);
+    log_severity(severity, "%sedx: %08x esi: %08x edi: %08x", header_buffer, regs->edx, regs->esi, regs->edi);
+
+    log_severity(severity, "%sebp: %08x esp: %02x:%08x",
+        header_buffer,
+        regs->ebp,
+        regs->cs == KERNEL_CS ? ss_get() : regs->ss,
+        regs->esp);
+
+    log_severity(severity, "%seip: %02x:%08x",
+        header_buffer,
+        regs->cs,
+        regs->eip);
+
+    log_severity(severity, "%sds: %02x; es: %02x; fs: %02x; gs: %02x",
+        header_buffer,
+        regs->ds,
+        regs->es,
+        regs->fs,
+        regs->gs);
+
+    log_severity(severity, "%seflags: %08x: (iopl=%d %s)",
+        header_buffer,
+        regs->eflags,
+        (regs->eflags >> 12) & 0x3,
+        eflags_bits_string_get(regs->eflags, buffer));
 }

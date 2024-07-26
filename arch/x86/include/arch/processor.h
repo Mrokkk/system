@@ -106,38 +106,6 @@ typedef struct { uint16_t off, seg; } farptr_t;
 
 #define farptr(v) ptr((v).seg * 0x10 + (v).off)
 
-#define __regs_print(regs, print_function, header) \
-    do { \
-        char buffer[64]; \
-        print_function("%s: eax = %08x", header, (regs)->eax); \
-        print_function("%s: ebx = %08x", header, (regs)->ebx); \
-        print_function("%s: ecx = %08x", header, (regs)->ecx); \
-        print_function("%s: edx = %08x", header, (regs)->edx); \
-        print_function("%s: esi = %08x", header, (regs)->esi); \
-        print_function("%s: edi = %08x", header, (regs)->edi); \
-        print_function("%s: esp = %04x:%08x", header, (regs)->ss, (regs)->esp); \
-        print_function("%s: ebp = %08x", header, (regs)->ebp); \
-        print_function("%s: eip = %04x:%08x", header, (regs)->cs, (regs)->eip); \
-        print_function("%s: ds = %04x; es = %04x; fs = %04x; gs = %04x", \
-            header, \
-            (regs)->ds, \
-            (regs)->es, \
-            (regs)->fs, \
-            (regs)->gs); \
-        eflags_bits_string_get((regs)->eflags, buffer); \
-        print_function("%s: eflags = %08x = (iopl=%d %s)", \
-            header, \
-            (regs)->eflags, \
-            ((uint32_t)(regs)->eflags >> 12) & 0x3, \
-            buffer); \
-    } while (0)
-
-#define PRINT_REGS_1(header, regs)                  __regs_print((regs), log_debug, header)
-#define PRINT_REGS_2(header, regs, print_function)  __regs_print((regs), print_function, header)
-
-#define regs_print(...) \
-    REAL_VAR_MACRO_3(PRINT_REGS_1, PRINT_REGS_1, PRINT_REGS_2, __VA_ARGS__)
-
 #define CACHELINE_ALIGN ALIGN(CACHELINE_SIZE)
 
 #endif // __ASSEMBLER__
