@@ -38,13 +38,20 @@ static inline int skip_atoi(const char** s)
 // we are called with base 8, 10 or 16, only, thus don't need "G..."
 static const char digits[16] = "0123456789ABCDEF";
 
+#define PUTC(c) \
+    ({ if (likely(str < end)) { *str++ = c; }; 0; })
+
+#define PUTS(s) \
+    ({ const char* _s = s; while (*_s) { PUTC(*_s); ++_s; }; 0; })
+
 static char* number(
     char* str,
     long num,
     int base,
     int size,
     int precision,
-    int type)
+    int type,
+    const char* end)
 {
     char tmp[66];
     char c, sign, locase;
@@ -115,50 +122,50 @@ static char* number(
     size -= precision;
     if (!(type & (ZEROPAD + LEFT)))
     {
-        for (; size-- > 0; *str++ = ' ');
+        for (; size-- > 0; PUTC(' '));
     }
 
     if (sign)
     {
-        *str++ = sign;
+        PUTC(sign);
     }
 
     if (type & SPECIAL)
     {
         if (base == 8)
         {
-            *str++ = '0';
+            PUTC('0');
         }
         else if (base == 16)
         {
-            *str++ = '0';
-            *str++ = ('X' | locase);
+            PUTC('0');
+            PUTC('X' | locase);
         }
     }
 
     if (!(type & LEFT))
     {
-        for (; size-- > 0; *str++ = c);
+        for (; size-- > 0; PUTC(c));
     }
 
     while (i < precision--)
     {
-        *str++ = '0';
+        PUTC('0');
     }
 
     while (i-- > 0)
     {
-        *str++ = tmp[i];
+        PUTC(tmp[i]);
     }
 
     while (size-- > 0)
     {
-        *str++ = ' ';
+        PUTC(' ');
     }
     return str;
 }
 
-int vsprintf(char* buf, const char* fmt, va_list args)
+static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list args)
 {
     int len;
     unsigned long num;
@@ -175,7 +182,7 @@ int vsprintf(char* buf, const char* fmt, va_list args)
     {
         if (*fmt != '%')
         {
-            *str++ = *fmt;
+            PUTC(*fmt);
             continue;
         }
 
@@ -263,34 +270,43 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 {
                     while (--field_width > 0)
                     {
-                        *str++ = ' ';
+                        PUTC(' ');
                     }
                 }
-                *str++ = (unsigned char)va_arg(args, int);
+
+                PUTC((char)va_arg(args, int));
+
                 while (--field_width > 0)
                 {
-                    *str++ = ' ';
+                    PUTC(' ');
                 }
                 continue;
 
             case 's':
                 s = va_arg(args, char*);
+
+                if (unlikely(!s))
+                {
+                    PUTS("(null)");
+                    continue;
+                }
+
                 len = strnlen(s, precision);
 
                 if (!(flags & LEFT))
                 {
                     while (len < field_width--)
                     {
-                        *str++ = ' ';
+                        PUTC(' ');
                     }
                 }
                 for (i = 0; i < len; ++i)
                 {
-                    *str++ = *s++;
+                    PUTC(*s++);
                 }
                 while (len < field_width--)
                 {
-                    *str++ = ' ';
+                    PUTC(' ');
                 }
                 continue;
 
@@ -306,7 +322,8 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                     16,
                     field_width,
                     precision,
-                    flags);
+                    flags,
+                    end);
                 continue;
 
             case 'n':
@@ -323,19 +340,19 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 continue;
 
             case '%':
-                *str++ = '%';
+                PUTC('%');
                 continue;
 
             case 'b':
-                *str++ = '0';
-                *str++ = 'b';
+                PUTC('0');
+                PUTC('b');
                 base = 2;
                 break;
 
             case 'B':
             {
                 int b = va_arg(args, int);
-                str += sprintf(str, b ? "true" : "false");
+                PUTS(b ? "true" : "false");
                 continue;
             }
 
@@ -345,8 +362,8 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 break;
 
             case 'x':
-                *str++ = '0';
-                *str++ = 'x';
+                PUTC('0');
+                PUTC('x');
                 fallthrough;
             case 'X':
                 base = 16;
@@ -362,7 +379,7 @@ int vsprintf(char* buf, const char* fmt, va_list args)
             case 'S':
                 s = va_arg(args, char*);
                 len = strnlen(s, precision);
-                str += sprintf(str, "string{\"%s\", len=%u, ptr=%x}", s, len, (uint32_t)s);
+                str += snprintf(str, end - str, "string{\"%s\", len=%u, ptr=%x}", s, len, (uint32_t)s);
                 continue;
 
             case 'O':
@@ -370,21 +387,21 @@ int vsprintf(char* buf, const char* fmt, va_list args)
                 const magic_t* magic = va_arg(args, magic_t*);
                 if (magic == NULL)
                 {
-                    str = strcpy(str, "<null>") - 1;
+                    str += snprintf(str, end - str, "(null)");
                     continue;
                 }
                 else
                 {
-                    str += sprintf(str, "<%x>", (uint32_t)magic);
+                    str += snprintf(str, end - str, "<%x>", (uint32_t)magic);
                     continue;
                 }
             }
 
             default:
-                *str++ = '%';
+                PUTC('%');
                 if (*fmt)
                 {
-                    *str++ = *fmt;
+                    PUTC(*fmt);
                 }
                 else
                 {
@@ -412,8 +429,8 @@ int vsprintf(char* buf, const char* fmt, va_list args)
         else if (qualifier == ('l' | 'l' << 8))
         {
             uint64_t num = va_arg(args, uint64_t);
-            str = number(str, (uint32_t)(num >> 32), base, field_width, precision, flags);
-            str = number(str, (uint32_t)(num & ~0UL), base, field_width, precision, flags);
+            str = number(str, (uint32_t)(num >> 32), base, field_width, precision, flags, end);
+            str = number(str, (uint32_t)(num & ~0UL), base, field_width, precision, flags, end);
             goto next;
         }
         else
@@ -421,7 +438,7 @@ int vsprintf(char* buf, const char* fmt, va_list args)
             num = va_arg(args, unsigned int);
         }
 
-        str = number(str, num, base, field_width, precision, flags);
+        str = number(str, num, base, field_width, precision, flags, end);
 next:
     }
 
@@ -435,10 +452,32 @@ int sprintf(char* buf, const char* fmt, ...)
     int i;
 
     va_start(args, fmt);
-    i = vsprintf(buf, fmt, args);
+    i = vsnprintf_impl(buf, (const char*)-1, fmt, args);
     va_end(args);
 
     return i;
+}
+
+int snprintf(char* buf, size_t size, const char* fmt, ...)
+{
+    va_list args;
+    int i;
+
+    va_start(args, fmt);
+    i = vsnprintf_impl(buf, buf + size, fmt, args);
+    va_end(args);
+
+    return i;
+}
+
+int vsprintf(char* buf, const char* fmt, va_list args)
+{
+    return vsnprintf_impl(buf, (const char*)-1, fmt, args);
+}
+
+int vsnprintf(char* buf, size_t size, const char* fmt, va_list args)
+{
+    return vsnprintf_impl(buf, buf + size, fmt, args);
 }
 
 int strtoi(const char* str)

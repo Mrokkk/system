@@ -81,21 +81,21 @@ void printk_early_register(void (*print)(const char* string));
 #define process_log(severity_name, fmt, proc, ...) \
     log_##severity_name(PROCESS_FMT fmt, PROCESS_PARAMS(proc), ##__VA_ARGS__)
 
-#define process_log_debug(flag, fmt, proc, ...)  log_debug(flag, PROCESS_FMT fmt, PROCESS_PARAMS(proc), ##__VA_ARGS__)
-#define process_log_info(fmt, proc, ...)         process_log(info, fmt, proc, ##__VA_ARGS__)
-#define process_log_notice(fmt, proc, ...)       process_log(notice, fmt, proc, ##__VA_ARGS__)
-#define process_log_warning(fmt, proc, ...)      process_log(warning, fmt, proc, ##__VA_ARGS__)
-#define process_log_error(fmt, proc, ...)        process_log(error, fmt, proc, ##__VA_ARGS__)
-#define process_log_exception(fmt, proc, ...)    log_exception(exception, fmt, proc, ##__VA_ARGS__)
-#define process_log_critical(fmt, proc, ...)     log_critical(PROCESS_FMT fmt, proc, ##__VA_ARGS__)
+#define process_log_debug(flag, fmt, proc, ...) log_debug(flag, PROCESS_FMT fmt, PROCESS_PARAMS(proc), ##__VA_ARGS__)
+#define process_log_info(fmt, proc, ...)        process_log(info, fmt, proc, ##__VA_ARGS__)
+#define process_log_notice(fmt, proc, ...)      process_log(notice, fmt, proc, ##__VA_ARGS__)
+#define process_log_warning(fmt, proc, ...)     process_log(warning, fmt, proc, ##__VA_ARGS__)
+#define process_log_error(fmt, proc, ...)       process_log(error, fmt, proc, ##__VA_ARGS__)
+#define process_log_exception(fmt, proc, ...)   log_exception(exception, fmt, proc, ##__VA_ARGS__)
+#define process_log_critical(fmt, proc, ...)    log_critical(PROCESS_FMT fmt, proc, ##__VA_ARGS__)
 
-#define current_log_debug(flag, fmt, ...)  log_debug(flag, PROCESS_FMT fmt, PROCESS_PARAMS(process_current), ##__VA_ARGS__)
-#define current_log_info(fmt, ...)         process_log_info(fmt, process_current, ##__VA_ARGS__)
-#define current_log_notice(fmt, ...)       process_log_notice(fmt, process_current, ##__VA_ARGS__)
-#define current_log_warning(fmt, ...)      process_log_warning(fmt, process_current, ##__VA_ARGS__)
-#define current_log_error(fmt, ...)        process_log_error(fmt, process_current, ##__VA_ARGS__)
-#define current_log_exception(fmt, ...)    process_log_exception(fmt, process_current, ##__VA_ARGS__)
-#define current_log_critical(fmt, ...)     process_log_critical(fmt, process_current, ##__VA_ARGS__)
+#define current_log_debug(flag, fmt, ...)       log_debug(flag, PROCESS_FMT fmt, PROCESS_PARAMS(process_current), ##__VA_ARGS__)
+#define current_log_info(fmt, ...)              process_log_info(fmt, process_current, ##__VA_ARGS__)
+#define current_log_notice(fmt, ...)            process_log_notice(fmt, process_current, ##__VA_ARGS__)
+#define current_log_warning(fmt, ...)           process_log_warning(fmt, process_current, ##__VA_ARGS__)
+#define current_log_error(fmt, ...)             process_log_error(fmt, process_current, ##__VA_ARGS__)
+#define current_log_exception(fmt, ...)         process_log_exception(fmt, process_current, ##__VA_ARGS__)
+#define current_log_critical(fmt, ...)          process_log_critical(fmt, process_current, ##__VA_ARGS__)
 
 #define panic_if(condition, ...) \
     do \

@@ -20,7 +20,7 @@
 #define RESET       "\e[0m"
 
 #define PANIC_LINE_LEN          256
-#define PRINTK_LINE_LEN         512
+#define PRINTK_LINE_LEN         256
 #define EARLY_PRINTK_BUF_SIZE   (16 * KiB)
 #define BUFFER_FULL_MESSAGE     "\n"WARNING"<buffer full; dropping further messages>"RESET
 #define PRINTK_INITIALIZED      0xFEED
@@ -35,9 +35,10 @@ static file_t* printk_file;
 
 static int printk_initialized;
 static char printk_buffer[EARLY_PRINTK_BUF_SIZE];
-static int printk_index;
 static int printk_buffer_full;
 static const char* prev_color;
+
+static int printk_index;
 
 static inline void push_entry(char* buffer, int len, int* index, char* logger_buffer, printk_write_t write)
 {
@@ -104,7 +105,7 @@ void printk(const printk_entry_t* entry, const char *fmt, ...)
     switch (entry->log_level)
     {
         case LOGLEVEL_DEBUG:
-            printed = sprintf(buffer, "\n"JIFFIES"[%8u.%06u] %s%s:%u:%s: ",
+            printed = snprintf(buffer, PRINTK_LINE_LEN, "\n"JIFFIES"[%8u.%06u] %s%s:%u:%s: ",
                 ts.tv_sec,
                 ts.tv_usec,
                 log_color,
@@ -114,10 +115,10 @@ void printk(const printk_entry_t* entry, const char *fmt, ...)
             break;
         case LOGLEVEL_CONT:
             log_color = prev_color;
-            printed = sprintf(buffer, prev_color);
+            printed = snprintf(buffer, PRINTK_LINE_LEN, prev_color);
             break;
         default:
-            printed = sprintf(buffer, "\n"JIFFIES"[%8u.%06u] %s",
+            printed = snprintf(buffer, PRINTK_LINE_LEN, "\n"JIFFIES"[%8u.%06u] %s",
                 ts.tv_sec,
                 ts.tv_usec,
                 log_color);
@@ -125,14 +126,14 @@ void printk(const printk_entry_t* entry, const char *fmt, ...)
     }
 
     va_start(args, fmt);
-    printed += vsprintf(buffer + printed, fmt, args);
+    printed += vsnprintf(buffer + printed, PRINTK_LINE_LEN - printed, fmt, args);
     va_end(args);
 
-    printed += sprintf(buffer + printed, RESET);
+    printed += snprintf(buffer + printed, PRINTK_LINE_LEN - printed, RESET);
 
     if (printed >= PRINTK_LINE_LEN)
     {
-        panic("overflow");
+        strcpy(buffer + PRINTK_LINE_LEN - 4, "...");
     }
 
     prev_color = log_color;
@@ -148,12 +149,12 @@ void panic(const char *fmt, ...)
     cli();
 
     va_start(args, fmt);
-    vsprintf(buf, fmt, args);
+    vsnprintf(buf, PANIC_LINE_LEN, fmt, args);
     va_end(args);
 
     panic_mode_enter();
 
-    log(KERN_CRIT, "Kernel panic: %s", buf);
+    log_severity(KERN_CRIT, "Kernel panic: %s", buf);
 
     backtrace_dump(KERN_CRIT);
 
@@ -207,7 +208,7 @@ void printk_early_register(void (*print)(const char* string))
 
 int syslog_show(seq_file_t* s)
 {
-    seq_puts(s, printk_buffer);
+    seq_puts(s, printk_buffer + 1);
     return 0;
 }
 

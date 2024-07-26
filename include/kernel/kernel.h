@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -22,7 +23,10 @@
 
 int strtoi(const char* str);
 int sprintf(char*, const char*, ...);
-int vsprintf(char*, const char*, __builtin_va_list);
+int snprintf(char* buf, size_t size, const char* fmt, ...);
+
+int vsprintf(char*, const char*, va_list);
+int vsnprintf(char*, size_t, const char*, va_list);
 
 #define fmtstr(buf, ...) \
     ({ sprintf(buf, __VA_ARGS__); buf; })
