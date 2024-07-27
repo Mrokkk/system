@@ -241,7 +241,8 @@ void vm_area_log_internal(const printk_entry_t* entry, vm_area_t* vma, int inden
     table_print(&table, indent_lvl, &data);
 }
 
-void vm_areas_log_internal(const printk_entry_t* entry,
+void vm_areas_log_internal(
+    const printk_entry_t* entry,
     vm_area_t* vm_areas,
     int indent_lvl,
     const char* header_fmt,

@@ -236,26 +236,21 @@ int __page_free(void* ptr)
 int __pages_free(page_t* pages)
 {
     int count = 0;
-    list_head_t* temp;
-    list_head_t* temp2;
     page_t* temp_page;
+    uintptr_t paddr;
 
     mutex_lock(&page_mutex);
 
-    page_t* first_page = pages;
-    int pages_count = first_page->pages_count;
-
-    for (temp = &first_page->list_entry; count < pages_count;)
+    list_for_each_entry_safe(temp_page, &pages->list_entry, list_entry)
     {
-        ++count;
-        temp_page = list_entry(temp, page_t, list_entry);
-
-        temp2 = temp;
-        temp = temp->next;
-        list_del(temp2);
-
-        frame_free(page_phys(temp_page));
+        paddr = page_phys(temp_page);
+        list_del(&temp_page->list_entry);
+        frame_free(paddr);
     }
+
+    paddr = page_phys(pages);
+    ASSERT(list_empty(&pages->list_entry));
+    frame_free(paddr);
 
     mutex_unlock(&page_mutex);
 

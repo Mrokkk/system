@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <kernel/limits.h>
+#include <kernel/printk.h>
 #include <arch/processor.h>
 
 #define BACKTRACE_MAX_RECURSION 32
@@ -20,10 +21,10 @@ struct stack_frame
 
 void backtrace_process(const struct process* p, int (*print_func)(), void* arg0);
 void backtrace_exception(const pt_regs_t* regs);
-void backtrace_dump(const char* severity);
-void backtrace_user(const char* severity, const pt_regs_t* regs, const char* prefix);
+void backtrace_dump(loglevel_t severity);
+void backtrace_user(loglevel_t severity, const pt_regs_t* regs, const char* prefix);
 
-void memory_dump_impl(const char* severity, const uint32_t* addr, size_t count);
+void memory_dump_impl(int severity, const uint32_t* addr, size_t count);
 
 #define memory_dump(severity, addr, count) \
     memory_dump_impl(severity, (uint32_t*)(addr), count)

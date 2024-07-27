@@ -29,7 +29,7 @@ typedef struct bt_data bt_data_t;
 #define is_within(a, start, end) \
     ({ addr(a) >= start && addr(a) < end; })
 
-static void* backtrace_user_start(struct process* p, uint32_t eip, uint32_t esp, uint32_t ebp)
+static void* backtrace_user_start(process_t* p, uint32_t eip, uint32_t esp, uint32_t ebp)
 {
     bt_data_t* data = fmalloc(sizeof(struct bt_data));
 
@@ -112,10 +112,10 @@ static void backtrace_user_end(void* data)
     ffree(data, sizeof(struct bt_data));
 }
 
-void backtrace_user(const char* severity, const pt_regs_t* regs, const char* prefix)
+void backtrace_user(loglevel_t severity, const pt_regs_t* regs, const char* prefix)
 {
     char buffer[BACKTRACE_SYMNAME_LEN];
-    log_severity(severity, "%sbacktrace: ", prefix);
+    log(severity, "%sbacktrace: ", prefix);
     user_address_t addr;
     void* data = backtrace_user_start(process_current, regs->eip, regs->esp, regs->ebp);
     if (data)
@@ -124,7 +124,7 @@ void backtrace_user(const char* severity, const pt_regs_t* regs, const char* pre
         while ((backtrace_user_next(&data, &addr)) && depth < BACKTRACE_MAX_RECURSION)
         {
             backtrace_user_format(&addr, buffer);
-            log_severity(severity, "%s%s", prefix, buffer);
+            log(severity, "%s%s", prefix, buffer);
             ++depth;
         }
         backtrace_user_end(data);

@@ -8,7 +8,7 @@
 #include <termios.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <kernel/reboot.h>
+#include <kernel/api/reboot.h>
 
 #define MAX_CMDLINE_LEN 128
 

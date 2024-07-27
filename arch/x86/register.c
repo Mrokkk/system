@@ -34,7 +34,7 @@ const char* cr4_bits_string_get(uint32_t cr4, char* buffer)
     return buffer;
 }
 
-void regs_print(const char* severity, const pt_regs_t* regs, const char* header)
+void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
 {
     char buffer[64];
     char header_buffer[32];
@@ -48,28 +48,28 @@ void regs_print(const char* severity, const pt_regs_t* regs, const char* header)
         *header_buffer = 0;
     }
 
-    log_severity(severity, "%seax: %08x ebx: %08x ecx: %08x", header_buffer, regs->eax, regs->ebx, regs->ecx);
-    log_severity(severity, "%sedx: %08x esi: %08x edi: %08x", header_buffer, regs->edx, regs->esi, regs->edi);
+    log(severity, "%seax: %08x ebx: %08x ecx: %08x", header_buffer, regs->eax, regs->ebx, regs->ecx);
+    log(severity, "%sedx: %08x esi: %08x edi: %08x", header_buffer, regs->edx, regs->esi, regs->edi);
 
-    log_severity(severity, "%sebp: %08x esp: %02x:%08x",
+    log(severity, "%sebp: %08x esp: %02x:%08x",
         header_buffer,
         regs->ebp,
         regs->cs == KERNEL_CS ? ss_get() : regs->ss,
         regs->esp);
 
-    log_severity(severity, "%seip: %02x:%08x",
+    log(severity, "%seip: %02x:%08x",
         header_buffer,
         regs->cs,
         regs->eip);
 
-    log_severity(severity, "%sds: %02x; es: %02x; fs: %02x; gs: %02x",
+    log(severity, "%sds: %02x; es: %02x; fs: %02x; gs: %02x",
         header_buffer,
         regs->ds,
         regs->es,
         regs->fs,
         regs->gs);
 
-    log_severity(severity, "%seflags: %08x: (iopl=%d %s)",
+    log(severity, "%seflags: %08x: (iopl=%d %s)",
         header_buffer,
         regs->eflags,
         (regs->eflags >> 12) & 0x3,

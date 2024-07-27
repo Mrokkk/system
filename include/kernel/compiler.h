@@ -23,6 +23,7 @@
 #define NORETURN(fn)            __attribute__((noreturn)) fn
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn
 #define ALIGN(x)                __attribute__((aligned(x)))
+#define WEAK                    __attribute__((weak))
 #define UNUSED(x)               (void)x
 #define ACCESS_ONCE(x)          (*(volatile typeof(x)*)&(x))
 

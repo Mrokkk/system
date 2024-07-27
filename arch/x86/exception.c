@@ -31,12 +31,11 @@ struct exception
 };
 
 typedef struct exception exception_t;
+typedef void (*printer_t)(loglevel_t severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
 
-static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs));
-static void page_fault_description_print(const char* severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
-static void general_protection_description_print(const char* severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header);
-
-typedef void (*printer_t)(const char* severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
+static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs, const printer_t printer));
+static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
+static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header);
 
 #define __exception(EXC, NR, EC, NAME, SIG) \
     [NR] = { \
@@ -70,7 +69,7 @@ static void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output)
         : "in kernel space");
 }
 
-static void page_fault_description_print(const char* severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header)
+static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header)
 {
     char buffer[256];
     const pgd_t* pgd = virt_cptr(cr3);
@@ -78,31 +77,31 @@ static void page_fault_description_print(const char* severity, const pt_regs_t* 
     const uint32_t pte_index = pte_index(cr2);
 
     pf_reason_print(regs->error_code, cr2, buffer);
-    log_severity(severity, "%s: %s", header, buffer);
-    log_severity(severity, "%s: pgd: cr3 = %08x", header, cr3);
+    log(severity, "%s: %s", header, buffer);
+    log(severity, "%s: pgd: cr3 = %08x", header, cr3);
 
     const uint32_t pgt = pgd[pde_index];
     pde_print(pgt, buffer);
 
-    log_severity(severity, "%s: pgd[%u]: %s", header, pde_index, buffer);
+    log(severity, "%s: pgd[%u]: %s", header, pde_index, buffer);
 
     const pgt_t* pgt_ptr = virt_cptr(pgt & PAGE_ADDRESS);
 
     if (!vm_paddr(addr(pgt_ptr), pgd))
     {
-        log_severity(severity, "%s: pgt: not mapped", header);
+        log(severity, "%s: pgt: not mapped", header);
     }
     else
     {
         const uint32_t pg = pgt_ptr[pte_index];
         pte_print(pg, buffer);
-        log_severity(severity, "%s: pgt[%u]: %s", header, pte_index, buffer);
+        log(severity, "%s: pgt[%u]: %s", header, pte_index, buffer);
     }
 }
 
-static void general_protection_description_print(const char* severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header)
+static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header)
 {
-    log_severity(severity, "%s: error code: %x", header, regs->error_code);
+    log(severity, "%s: error code: %x", header, regs->error_code);
 }
 
 static inline printer_t printer_get(int nr)
@@ -205,7 +204,7 @@ handle_fault:
 
         if (unlikely(regs.cs != USER_CS))
         {
-            kernel_fault(exception, &regs);
+            kernel_fault(exception, &regs, printer);
         }
 
         sprintf(header, "%s[%u]", p->name, p->pid);
@@ -231,7 +230,7 @@ handle_fault:
     }
 }
 
-static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs))
+static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs, const printer_t printer))
 {
     const char* header = "kernel";
     char string[80];
@@ -239,7 +238,6 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
     uint32_t cr2 = cr2_get();
     uint32_t cr3 = cr3_get();
     uint32_t cr4 = cr4_get();
-    printer_t printer = printer_get(exception->nr);
     process_t* p = process_current;
 
     ++exception_ongoing;
@@ -252,7 +250,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
     {
         log_critical("%s: %s #%x during another exception handling at %x...",
             header, exception->name, regs->error_code, regs->eip);
-        regs_print("kernel", regs, KERN_CRIT);
+        regs_print(KERN_CRIT, regs, "kernel");
         for (;; halt());
     }
 

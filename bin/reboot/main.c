@@ -1,4 +1,4 @@
-#include <kernel/reboot.h>
+#include <kernel/api/reboot.h>
 
 int main()
 {

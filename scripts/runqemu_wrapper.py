@@ -199,10 +199,9 @@ class QemuMon(Process):
 
 class Qemu(subprocess.Popen):
     qemu_mon : QemuMon
-    buffer   : LineBuffer
 
     def __init__(self, qemu_args : List[str], args : argparse.Namespace) -> None:
-        bufsize     : int = 1
+        bufsize     : int
         qemu_stdout : int = None
 
         if args.raw:
@@ -220,13 +219,10 @@ class Qemu(subprocess.Popen):
             shell=False,
             universal_newlines=True)
 
-        if not args.raw:
-            self.buffer = LineBuffer(self.stdout)
-
         self.qemu_mon = QemuMon()
 
     def readline(self) -> str:
-        return self.buffer.readline()
+        return self.stdout.readline().rstrip()
 
     def stop(self) -> None:
         self.communicate()
@@ -304,7 +300,6 @@ def color_wrap(string : str, color : str) -> str:
 
 
 def gdb_stacktrace_line(
-    timestamp : str,
     number    : int,
     addr      : str,
     func      : str,
@@ -312,7 +307,6 @@ def gdb_stacktrace_line(
     line      : str
 ) -> str:
     formatted_line = [
-        f'{timestamp}{Color.clear}',
         f'#{number} ',
         color_wrap(addr, Color.blue),
         ' in ',
@@ -330,8 +324,12 @@ def exception_save(context : Context) -> int:
     return id
 
 
-def line_print(line : str) -> None:
-    line = f'\n{line}'.encode()
+def line_print(line : str, continuation=False) -> None:
+    if continuation:
+        line = line.encode()
+    else:
+        line = f'\n{line}'.encode()
+
     length = len(line)
     index = 0
 
@@ -350,8 +348,30 @@ def line_print(line : str) -> None:
                 pass
 
 
-def backtrace_print(addr: str, binary : str, timestamp : str, context : Context) -> None:
+def line_continuation_print(line : str) -> None:
+    line = f'{line}'.encode()
+    length = len(line)
+    index = 0
+
+    while True:
+        _, writes, _ = select.select([], [sys.stdout], [])
+
+        if sys.stdout in writes:
+            try:
+                res = os.write(sys.stdout.fileno(), line[index:])
+                length -= res
+                if length:
+                    index += res
+                    continue
+                break
+            except BlockingIOError:
+                pass
+
+
+def backtrace_get(addr: str, binary : str, context : Context) -> List[str]:
     try:
+        lines : List[str] = []
+
         addr2line = context.addr2line(binary)
 
         entries = addr2line.resolve(addr)
@@ -362,22 +382,48 @@ def backtrace_print(addr: str, binary : str, timestamp : str, context : Context)
         for func, file, linenr in entries:
             context.bt_number += 1
 
-            stacktrace_line = gdb_stacktrace_line(timestamp, context.bt_number, addr, func, file, linenr)
-            line_print(stacktrace_line)
+            stacktrace_line = gdb_stacktrace_line(context.bt_number, addr, func, file, linenr)
+            lines.append(stacktrace_line)
 
     except Exception as e:
         id = exception_save(context)
         line_print(f'>> Internal exception #{id} encountered for {binary} at {addr}')
 
+    return lines
 
+
+line_regex = re.compile(r'^([0-9]),([0-9]*),([0-9]*\.[0-9]*);(.*)$')
+
+loglevel_to_color = [
+    '\033[38;5;245m',
+    Color.blue,
+    Color.blue,
+    Color.yellow,
+    Color.red,
+    Color.red
+]
 
 def line_process(line : str, context : Context) -> None:
 
-    if 'backtrace:' in line:
-        context.bt_number = 0
-        line_print(line)
+    if line[0] == ' ':
+        line_print(line[1:], continuation=True)
+        return
 
-    elif match := re.search(r'USER:([x0-9a-f]*) ([x0-9a-f]*) (.*):', line):
+    match = re.match(line_regex, line)
+
+    loglevel = int(match.group(1))
+    sequence = int(match.group(2))
+    timestamp = match.group(3)
+    content = match.group(4)
+
+    if not match:
+        print(f'Not matched: "{line}"')
+        return
+
+    if 'backtrace:' in content:
+        context.bt_number = 0
+
+    if match := re.search(r'USER:([x0-9a-f]*) ([x0-9a-f]*) (.*):', content):
         # FIXME: how to properly detect non-dynamic executable
         # and print both addresses as the same in kernel?
         if 'ld.so' in line:
@@ -386,10 +432,10 @@ def line_process(line : str, context : Context) -> None:
             addr = match.group(2)
 
         binary = f'mnt{match.group(3)}'
-        splitted = re.split('USER:', line)
-        timestamp = splitted[0]
 
-        backtrace_print(addr, binary, timestamp, context)
+        for content in backtrace_get(addr, binary, context):
+            line = f'{Color.green}[{timestamp:>14}] {Color.clear}{content}'
+            line_print(line)
 
     # Format of backtrace printed by kernel:
     # [       2.767291] [<0x0000baf2>] __libc_strcspn+0x52/0x94
@@ -398,12 +444,12 @@ def line_process(line : str, context : Context) -> None:
         addr = splitted[1]
         binary = 'system'
 
-        backtrace_print(addr, binary, splitted[0][:-1], context)
+        for content in backtrace_get(addr, binary, context):
+            line = f'{Color.green}[{timestamp:>14}] {Color.clear}{content}'
+            line_print(line)
 
-    elif '(qemu)' in line:
-        line_print(line)
-
-    elif line.startswith('\x1b'):
+    else:
+        line = f'{Color.green}[{timestamp:>14}] {loglevel_to_color[loglevel]}{content}'
         line_print(line)
 
 
@@ -438,13 +484,10 @@ def main() -> None:
 
     if not args.raw:
         while True:
-            try:
-                line = qemu.readline()
-            except EOF:
+            line = qemu.readline()
+
+            if not line:
                 break
-            except Exception as e:
-                id = exception_save(context)
-                line_print(f'>> Internal exception #{id} encountered when reading line')
 
             line_process(line, context)
 

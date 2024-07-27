@@ -14,7 +14,7 @@ module_init(debugcon_init);
 module_exit(debugcon_deinit);
 
 static int debugcon_open(file_t* file);
-static int debugcon_write(file_t* file, const char* buffer, size_t size);
+int debugcon_write(file_t* file, const char* buffer, size_t size);
 
 static file_operations_t fops = {
     .open = &debugcon_open,
@@ -44,7 +44,7 @@ static int debugcon_open(file_t*)
     return 0;
 }
 
-static int debugcon_write(file_t*, const char* buffer, size_t size)
+int debugcon_write(file_t*, const char* buffer, size_t size)
 {
     size_t old = size;
     while (size--)
@@ -52,9 +52,4 @@ static int debugcon_write(file_t*, const char* buffer, size_t size)
         debugcon_send(*buffer++);
     }
     return old;
-}
-
-void debug_print(const char* string)
-{
-    for (; *string; debugcon_send(*string++));
 }

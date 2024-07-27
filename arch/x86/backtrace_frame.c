@@ -71,17 +71,17 @@ static inline size_t do_backtrace_process(const process_t* p, void** buffer, siz
     return depth;
 }
 
-void backtrace_dump(const char* severity)
+void backtrace_dump(loglevel_t severity)
 {
     void* data = backtrace_start();
     void* ret;
     char buffer[BACKTRACE_SYMNAME_LEN];
     unsigned depth = 0;
-    log_severity(severity, "backtrace:");
+    log(severity, "backtrace:");
     while ((ret = backtrace_next(&data)) && depth < BACKTRACE_MAX_RECURSION)
     {
         ksym_string(buffer, addr(ret));
-        log_severity(severity, "%s", buffer);
+        log(severity, "%s", buffer);
         ++depth;
     }
 }

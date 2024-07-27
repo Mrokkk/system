@@ -18,7 +18,7 @@ static void prepare(void)
     clock_sources_shutdown();
 }
 
-void machine_shutdown(void)
+void NORETURN(machine_shutdown(void))
 {
     prepare();
 
@@ -32,7 +32,7 @@ void machine_shutdown(void)
     machine_halt();
 }
 
-void machine_reboot(void)
+void NORETURN(machine_reboot(void))
 {
     prepare();
 
@@ -50,12 +50,8 @@ void machine_reboot(void)
     machine_halt();
 }
 
-void machine_halt(void)
+void NORETURN(machine_halt(void))
 {
     cli();
-
-    for (;;)
-    {
-        halt();
-    }
+    for (;; halt());
 }

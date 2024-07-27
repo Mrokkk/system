@@ -53,6 +53,8 @@
 
 #ifndef __ASSEMBLER__
 
+#include <kernel/printk.h>
+
 #define general_reg_union(letter) \
     { \
         uint32_t e##letter##x; \
@@ -83,7 +85,7 @@ struct regs
 
 typedef struct regs regs_t;
 
-void regs_print(const char* severity, const pt_regs_t* regs, const char* header);
+void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header);
 
 const char* eflags_bits_string_get(uint32_t eflags, char* buffer);
 const char* cr0_bits_string_get(uint32_t cr0, char* buffer);

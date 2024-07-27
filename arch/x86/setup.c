@@ -135,6 +135,7 @@ void panic_mode_enter(void)
         return;
     }
 
+    cli();
     ensure_printk_will_print();
 
     // Identity map first 1MiB so that
