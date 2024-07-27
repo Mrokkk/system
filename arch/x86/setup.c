@@ -1,5 +1,6 @@
 #include <arch/io.h>
 #include <arch/apm.h>
+#include <arch/asm.h>
 #include <arch/dmi.h>
 #include <arch/irq.h>
 #include <arch/nmi.h>
@@ -83,6 +84,14 @@ UNMAP_AFTER_INIT void arch_setup(void)
             "or $(3 << 9), %ax;"
             "mov %eax, %cr4;"
             "movb $1, (%eax);");
+    }
+
+    if (cpu_has(X86_FEATURE_PGE))
+    {
+        asm volatile(
+            "mov %cr4, %eax;"
+            "or "ASM_VALUE(CR4_PGE)", %eax;"
+            "mov %eax, %cr4;");
     }
 }
 

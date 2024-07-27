@@ -13,11 +13,6 @@
 #define DEBUG_PAGE          0
 #define DEBUG_PAGE_DETAILED 0 // Collects page_alloc caller address
 
-struct page;
-struct inode;
-struct buffer;
-struct vm_region;
-
 typedef struct page page_t;
 typedef struct vm_region vm_region_t;
 
@@ -29,11 +24,8 @@ struct page
 #if DEBUG_PAGE_DETAILED
     void* caller;
 #endif
-    struct inode* inode;
     list_head_t list_entry;
 };
-
-extern page_t* page_map;
 
 struct vm_region
 {
@@ -44,8 +36,8 @@ struct vm_region
     uint32_t paddr;
 };
 
-#define page(phys)              (page_map + ((phys) / PAGE_SIZE))
-#define pfn(p)                  ((p) - page_map)
+#define page(phys)              ({ extern page_t* page_map; page_map + ((phys) / PAGE_SIZE); })
+#define pfn(p)                  ({ extern page_t* page_map; (p) - page_map; })
 #define page_phys(p)            (pfn(p) * PAGE_SIZE)
 #define page_phys_ptr(p)        (ptr(pfn(p) * PAGE_SIZE))
 #define page_virt(p)            (addr((p)->virtual))
@@ -83,8 +75,6 @@ page_t* pages_split(page_t* pages, size_t pages_to_keep);
 MUST_CHECK(pgd_t*) pgd_alloc(void);
 MUST_CHECK(pgt_t*) pgt_alloc(void);
 MUST_CHECK(pgd_t*) init_pgd_get(void);
-
-void pages_unmap(page_t* pages);
 
 void* region_map(uint32_t paddr, uint32_t size, const char* name);
 

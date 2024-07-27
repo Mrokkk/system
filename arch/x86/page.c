@@ -1,4 +1,5 @@
 #define log_fmt(fmt) "page: " fmt
+#include <kernel/cpu.h>
 #include <kernel/list.h>
 #include <kernel/page.h>
 #include <kernel/ksyms.h>
@@ -179,10 +180,11 @@ static inline int frame_free(uint32_t address)
 page_t* __page_alloc(int count, alloc_flag_t flag)
 {
     page_t* first_page;
+    int pte_flags;
 
     ASSERT(count);
 
-    mutex_lock(&page_mutex);
+    scoped_mutex_lock(&page_mutex);
 
     first_page = flag & PAGE_ALLOC_CONT
         ? free_page_range_find(count)
@@ -190,14 +192,15 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
 
     if (unlikely(!first_page))
     {
-        mutex_unlock(&page_mutex);
         return NULL;
     }
 
     first_page->pages_count = count;
     if (!(flag & PAGE_ALLOC_NO_KERNEL))
     {
-        page_kernel_identity_mapping_range(first_page, flag & PAGE_ALLOC_UNCACHED ? PTE_CACHEDIS : 0);
+        pte_flags = flag & PAGE_ALLOC_UNCACHED ? PTE_CACHEDIS : 0;
+        pte_flags |= cpu_has(X86_FEATURE_PGE) ? PTE_GLOBAL : 0;
+        page_kernel_identity_mapping_range(first_page, pte_flags);
     }
 
 #if DEBUG_PAGE_DETAILED
@@ -210,8 +213,6 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
     }
 #endif
 
-    mutex_unlock(&page_mutex);
-
     return first_page;
 }
 
@@ -219,7 +220,7 @@ int __page_free(void* ptr)
 {
     uint32_t frame;
 
-    mutex_lock(&page_mutex);
+    scoped_mutex_lock(&page_mutex);
 
     frame = phys_addr(ptr) / PAGE_SIZE;
 
@@ -229,7 +230,6 @@ int __page_free(void* ptr)
         invlpg(ptr);
     }
 
-    mutex_unlock(&page_mutex);
     return 0;
 }
 
@@ -239,20 +239,17 @@ int __pages_free(page_t* pages)
     page_t* temp_page;
     uintptr_t paddr;
 
-    mutex_lock(&page_mutex);
+    scoped_mutex_lock(&page_mutex);
 
     list_for_each_entry_safe(temp_page, &pages->list_entry, list_entry)
     {
         paddr = page_phys(temp_page);
-        list_del(&temp_page->list_entry);
         frame_free(paddr);
     }
 
     paddr = page_phys(pages);
     ASSERT(list_empty(&pages->list_entry));
     frame_free(paddr);
-
-    mutex_unlock(&page_mutex);
 
     return count;
 }
@@ -362,28 +359,6 @@ static inline void* page_map_region(uint32_t paddr_start, uint32_t vaddr_start, 
 
     pgd_reload();
     return ptr(vaddr_start);
-}
-
-void pages_unmap(page_t* pages)
-{
-    pgt_t* pgt;
-    uint32_t pde_index;
-    uint32_t pte_index;
-    page_t* temp = pages;
-
-    for (uint32_t vaddr = page_virt(temp);; )
-    {
-        pde_index = pde_index(vaddr);
-        pte_index = pte_index(vaddr);
-        pgt = virt_ptr(kernel_page_dir[pde_index] & PAGE_ADDRESS);
-        pgt[pte_index] = 0;
-        invlpg(ptr(vaddr));
-        temp = list_next_entry(&temp->list_entry, page_t, list_entry);
-        if (temp == pages)
-        {
-            break;
-        }
-    }
 }
 
 void* region_map(uint32_t paddr, uint32_t size, const char* name)
@@ -628,9 +603,14 @@ static inline int section_page_flags(int flags)
 
 static inline void pgt_init(pgt_t* prev_pgt, uint32_t virt_end)
 {
-    uint32_t pte_index, pde_index, flags, start, end = 0;
+    uint32_t pte_index, pde_index, flags, additional_flags = 0, start, end = 0;
     uint32_t pfn_end = phys_addr(virt_end) / PAGE_SIZE;
     section_t* section = sections;
+
+    if (cpu_has(X86_FEATURE_PGE))
+    {
+        additional_flags = PTE_GLOBAL;
+    }
 
     // Set up currently used page tables so it will cover required space to setup pages for 4G
     for (pte_index = phys_addr(_end) / PAGE_SIZE; pte_index < min(INIT_PGT_SIZE * PAGES_IN_PTE, pfn_end); ++pte_index)
@@ -653,13 +633,18 @@ static inline void pgt_init(pgt_t* prev_pgt, uint32_t virt_end)
         // Set up section pages as present with proper protection
         for (uint32_t addr = start; addr < end; addr += PAGE_SIZE, ++pte_index)
         {
-            pte_set(pte_index, pte_index * PAGE_SIZE | flags);
+            pte_set(pte_index, pte_index * PAGE_SIZE | flags | additional_flags);
         }
     }
 
     for (; pte_index < pfn_end; ++pte_index)
     {
-        pte_set(pte_index, pte_index * PAGE_SIZE | PAGE_KERNEL_FLAGS);
+        pte_set(pte_index, pte_index * PAGE_SIZE | PAGE_KERNEL_FLAGS | additional_flags);
+    }
+
+    for (; pte_index < PAGES_IN_PTE; ++pte_index)
+    {
+        pte_set(pte_index, 0);
     }
 
     // Set up page directory
