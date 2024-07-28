@@ -1,6 +1,7 @@
 #define log_fmt(fmt) "init: " fmt
 #include <stdarg.h>
 #include <kernel/cpu.h>
+#include <kernel/tty.h>
 #include <kernel/init.h>
 #include <kernel/time.h>
 #include <kernel/devfs.h>
@@ -283,7 +284,15 @@ UNMAP_AFTER_INIT static void syslog_configure(void)
         log_error("failed to open syslog output device: %s", device);
     }
 
-    printk_register(file);
+    tty_t* tty = tty_from_file(file);
+
+    if (unlikely(!tty))
+    {
+        log_warning("%s: not a tty device", device);
+        return;
+    }
+
+    printk_register(tty);
 }
 
 UNMAP_AFTER_INIT static void read_some_data(void)

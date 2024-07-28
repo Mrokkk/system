@@ -97,6 +97,16 @@ pid_t sys_getpgrp(void)
     return process_current->pgid;
 }
 
+int sys_setsid(void)
+{
+    if (process_current->sid == process_current->pid)
+    {
+        return -EPERM;
+    }
+    process_current->sid = process_current->pid;
+    return 0;
+}
+
 char* mm_print(const struct mm* mm, char* str)
 {
     str += sprintf(str,

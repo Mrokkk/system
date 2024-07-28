@@ -1,9 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <kernel/fs.h>
-
-#include "tty.h"
+#include <kernel/tty.h>
 
 int tty_ldisc_open(tty_t* tty, file_t* file);
 int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count);

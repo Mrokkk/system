@@ -68,9 +68,9 @@ int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
     return i;
 }
 
-int tty_ldisc_write(tty_t* tty, file_t* file, const char* buffer, size_t count)
+int tty_ldisc_write(tty_t* tty, file_t*, const char* buffer, size_t count)
 {
-    return tty->driver->write(tty, file, buffer, count);
+    return tty->driver->write(tty, buffer, count);
 }
 
 int tty_ldisc_poll(tty_t* tty, file_t*, short events, short* revents, wait_queue_head_t** head)

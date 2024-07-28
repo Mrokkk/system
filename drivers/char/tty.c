@@ -1,7 +1,7 @@
-#include "tty.h"
-
 #include <kernel/fs.h>
+#include <kernel/dev.h>
 #include <kernel/irq.h>
+#include <kernel/tty.h>
 #include <kernel/ctype.h>
 #include <kernel/devfs.h>
 #include <kernel/module.h>
@@ -56,7 +56,8 @@ module_init(tty_init);
 module_exit(tty_deinit);
 KERNEL_MODULE(tty);
 
-static LIST_DECLARE(tty_list);
+LIST_DECLARE(ttys);
+static tty_t earlycon;
 
 UNMAP_AFTER_INIT static int tty_init()
 {
@@ -78,47 +79,66 @@ int tty_driver_register(tty_driver_t* drv)
 {
     int errno;
     char namebuf[32];
-    tty_t* new_tty = alloc(tty_t);
-
-    if (unlikely(!new_tty))
-    {
-        return -ENOMEM;
-    }
+    tty_t* new_tty;
 
     log_info("registering %s, num = %u", drv->name, drv->num);
 
-    new_tty->sid = 0;
-    new_tty->driver = drv;
-    new_tty->major = drv->major;
-    new_tty->driver_special_key = -1;
-    new_tty->special_mode = 0;
-    new_tty->termios.c_iflag = DEFAULT_C_IFLAG;
-    new_tty->termios.c_oflag = DEFAULT_C_OFLAG;
-    new_tty->termios.c_cflag = DEFAULT_C_CFLAG;
-    new_tty->termios.c_lflag = DEFAULT_C_LFLAG;
-    memcpy((char*)new_tty->termios.c_cc, DEFAULT_C_CC, NCCS);
-
-    list_init(&new_tty->list_entry);
-    list_add_tail(&new_tty->list_entry, &tty_list);
-
     for (dev_t minor = drv->minor_start; minor < drv->minor_start + drv->num; ++minor)
     {
+        // earlycon is handled differently, as it registers itself before paging and
+        // allocators are init, so I need to use a statically allocated one
+        new_tty = drv->major == MAJOR_CHR_EARLYCON
+            ? &earlycon
+            : alloc(tty_t);
+
+        if (unlikely(!new_tty))
+        {
+            return -ENOMEM;
+        }
+
+        new_tty->sid = 0;
+        new_tty->driver = drv;
+        new_tty->major = drv->major;
+        new_tty->minor = minor;
+        new_tty->driver_special_key = -1;
+        new_tty->special_mode = 0;
+        new_tty->termios.c_iflag = DEFAULT_C_IFLAG;
+        new_tty->termios.c_oflag = DEFAULT_C_OFLAG;
+        new_tty->termios.c_cflag = DEFAULT_C_CFLAG;
+        new_tty->termios.c_lflag = DEFAULT_C_LFLAG;
+        memcpy((char*)new_tty->termios.c_cc, DEFAULT_C_CC, NCCS);
+
+        fifo_init(&new_tty->buf);
+        wait_queue_head_init(&new_tty->wq);
+
+        list_init(&new_tty->list_entry);
+        list_add_tail(&new_tty->list_entry, &ttys);
+
+        // earlycon also is not exposed to the user
+        if (drv->major == MAJOR_CHR_EARLYCON)
+        {
+            continue;
+        }
+
         sprintf(namebuf, "%s%u", drv->name, minor);
-        if ((errno = devfs_register(namebuf, drv->major, minor, &fops)))
+
+        if (unlikely(errno = devfs_register(namebuf, drv->major, minor, &fops)))
         {
             log_error("failed to register %s: %d", namebuf, errno);
+            delete(new_tty);
+            continue;
         }
     }
 
     return 0;
 }
 
-static tty_t* tty_find(dev_t major)
+static tty_t* tty_find(dev_t major, dev_t minor)
 {
     tty_t* tty;
-    list_for_each_entry(tty, &tty_list, list_entry)
+    list_for_each_entry(tty, &ttys, list_entry)
     {
-        if (tty->major == major)
+        if (tty->major == major && tty->minor == minor)
         {
             return tty;
         }
@@ -129,11 +149,12 @@ static tty_t* tty_find(dev_t major)
 static int tty_open(file_t* file)
 {
     int major = MAJOR(file->inode->rdev);
-    tty_t* tty;
+    int minor = MINOR(file->inode->rdev);
+    tty_t* tty = NULL;
 
     if (unlikely(major == MAJOR_CHR_TTYAUX))
     {
-        list_for_each_entry(tty, &tty_list, list_entry)
+        list_for_each_entry(tty, &ttys, list_entry)
         {
             if (tty->sid && tty->sid == process_current->sid)
             {
@@ -144,10 +165,20 @@ static int tty_open(file_t* file)
     }
     else
     {
-        tty = tty_find(major);
+        tty = tty_find(major, minor);
+    }
+
+    if (unlikely(!tty))
+    {
+        return -ENODEV;
     }
 
 found:
+    if (unlikely(!tty->driver->open))
+    {
+        return -ENOSYS;
+    }
+
     if (process_current->sid == process_current->pid)
     {
         tty->sid = process_current->pid;
@@ -158,14 +189,6 @@ found:
         file->private = tty;
         return 0;
     }
-
-    if (!tty->driver->open)
-    {
-        return -ENOSYS;
-    }
-
-    fifo_init(&tty->buf);
-    wait_queue_head_init(&tty->wq);
 
     file->private = tty;
 
@@ -224,12 +247,39 @@ void tty_string_insert(tty_t* tty, const char* string)
     }
 }
 
-int sys_setsid(void)
+void tty_write_to_all(const char* buffer, size_t len, tty_t* excluded)
 {
-    if (process_current->sid == process_current->pid)
+    tty_t* tty;
+
+    list_for_each_entry(tty, &ttys, list_entry)
     {
-        return -EPERM;
+        if (!tty->driver->initialized || tty == excluded)
+        {
+            continue;
+        }
+
+        tty->driver->write(tty, buffer, len);
     }
-    process_current->sid = process_current->pid;
-    return 0;
+}
+
+tty_t* tty_from_file(file_t* file)
+{
+    tty_t* tty;
+    const dev_t major = MAJOR(file->inode->rdev);
+    const dev_t minor = MINOR(file->inode->rdev);
+
+    list_for_each_entry(tty, &ttys, list_entry)
+    {
+        if (tty->major == major && tty->minor == minor)
+        {
+            return tty;
+        }
+    }
+
+    return NULL;
+}
+
+void tty_write_to(tty_t* tty, const char* buffer, size_t len)
+{
+    tty->driver->write(tty, buffer, len);
 }

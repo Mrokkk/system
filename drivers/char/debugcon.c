@@ -1,6 +1,7 @@
 #include <arch/io.h>
 
 #include <kernel/fs.h>
+#include <kernel/tty.h>
 #include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/string.h>
@@ -13,25 +14,27 @@ KERNEL_MODULE(debugcon);
 module_init(debugcon_init);
 module_exit(debugcon_deinit);
 
-static int debugcon_open(file_t* file);
-int debugcon_write(file_t* file, const char* buffer, size_t size);
+static int debugcon_open(tty_t* tty, file_t* file);
+static int debugcon_close(tty_t* tty, file_t* file);
+int debugcon_write(tty_t* tty, const char* buffer, size_t size);
+static void debugcon_putch(tty_t* tty, int c);
 
-static file_operations_t fops = {
+static tty_driver_t tty_driver = {
+    .name = "debug",
+    .major = MAJOR_CHR_DEBUG,
+    .minor_start = 0,
+    .num = 1,
+    .driver_data = NULL,
     .open = &debugcon_open,
+    .close = &debugcon_close,
     .write = &debugcon_write,
+    .putch = &debugcon_putch,
+    .initialized = 0,
 };
 
 UNMAP_AFTER_INIT static int debugcon_init()
 {
-    int errno;
-
-    if ((errno = devfs_register("debug0", MAJOR_CHR_DEBUG, 0, &fops)))
-    {
-        log_error("failed to register null to devfs: %d", errno);
-        return errno;
-    }
-
-    return 0;
+    return tty_driver_register(&tty_driver);
 }
 
 static int debugcon_deinit()
@@ -39,12 +42,17 @@ static int debugcon_deinit()
     return 0;
 }
 
-static int debugcon_open(file_t*)
+static int debugcon_open(tty_t*, file_t*)
 {
     return 0;
 }
 
-int debugcon_write(file_t*, const char* buffer, size_t size)
+static int debugcon_close(tty_t*, file_t*)
+{
+    return 0;
+}
+
+int debugcon_write(tty_t*, const char* buffer, size_t size)
 {
     size_t old = size;
     while (size--)
@@ -52,4 +60,9 @@ int debugcon_write(file_t*, const char* buffer, size_t size)
         debugcon_send(*buffer++);
     }
     return old;
+}
+
+static void debugcon_putch(tty_t*, int c)
+{
+    debugcon_send(c);
 }

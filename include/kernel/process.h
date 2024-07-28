@@ -424,6 +424,28 @@ static inline vm_area_t* process_brk_vm_area(struct process* p)
     return NULL;
 }
 
+#define PROCESS_FMT        "%s[%u]: "
+#define PROCESS_PARAMS(p)  (p)->name, (p)->pid
+
+#define process_log(severity_name, fmt, proc, ...) \
+    log_##severity_name(PROCESS_FMT log_fmt(fmt), PROCESS_PARAMS(proc), ##__VA_ARGS__)
+
+#define process_log_debug(flag, fmt, proc, ...) log_debug(flag, PROCESS_FMT fmt, PROCESS_PARAMS(proc), ##__VA_ARGS__)
+#define process_log_info(fmt, proc, ...)        process_log(info, fmt, proc, ##__VA_ARGS__)
+#define process_log_notice(fmt, proc, ...)      process_log(notice, fmt, proc, ##__VA_ARGS__)
+#define process_log_warning(fmt, proc, ...)     process_log(warning, fmt, proc, ##__VA_ARGS__)
+#define process_log_error(fmt, proc, ...)       process_log(error, fmt, proc, ##__VA_ARGS__)
+#define process_log_exception(fmt, proc, ...)   process_log(exception, fmt, proc, ##__VA_ARGS__)
+#define process_log_critical(fmt, proc, ...)    process_log(PROCESS_FMT fmt, proc, ##__VA_ARGS__)
+
+#define current_log_debug(flag, fmt, ...)       log_debug(flag, PROCESS_FMT fmt, PROCESS_PARAMS(process_current), ##__VA_ARGS__)
+#define current_log_info(fmt, ...)              process_log_info(fmt, process_current, ##__VA_ARGS__)
+#define current_log_notice(fmt, ...)            process_log_notice(fmt, process_current, ##__VA_ARGS__)
+#define current_log_warning(fmt, ...)           process_log_warning(fmt, process_current, ##__VA_ARGS__)
+#define current_log_error(fmt, ...)             process_log_error(fmt, process_current, ##__VA_ARGS__)
+#define current_log_exception(fmt, ...)         process_log_exception(fmt, process_current, ##__VA_ARGS__)
+#define current_log_critical(fmt, ...)          process_log_critical(fmt, process_current, ##__VA_ARGS__)
+
 // For explanation of vm_verify* macros, check kernel/vm.h. Below only wraps those
 // macros to pass current process vm areas as vma parameter
 #define current_vm_verify(flag, data_ptr) \

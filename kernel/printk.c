@@ -1,6 +1,8 @@
 #include <stdarg.h>
 
 #include <kernel/fs.h>
+#include <kernel/dev.h>
+#include <kernel/tty.h>
 #include <kernel/time.h>
 #include <kernel/debug.h>
 #include <kernel/minmax.h>
@@ -13,40 +15,43 @@
 #define PANIC_LINE_LEN           256
 #define PRINTK_LINE_LEN          256
 #define PRINTK_BUFFER_SIZE       (16 * KiB)
-#define PRINTK_INITIALIZED       0xFEED
-#define PRINTK_EARLY_INITIALIZED 0xFEEE
+#define PRINTK_INITIALIZED       0xfeed
 
-typedef int (*printk_write_t)(file_t*, const char*, size_t);
+typedef int (*write_t)(tty_t*, const char*, size_t);
 
-static void (*printk_early)(const char *string);
-static printk_write_t printk_fallback;
-static printk_write_t printk_write;
-static file_t* printk_file;
-static logseq_t printk_sequence;
-static off_t printk_start;
-static off_t printk_end;
-static off_t printk_gap;
-static off_t printk_iterator;
-static off_t printk_prev_iterator;
-static int printk_initialized;
-static char printk_buffer[PRINTK_BUFFER_SIZE];
+struct printk_state
+{
+    tty_t*     dedicated_tty;
+    write_t    fallback_write;
+    logseq_t   sequence;
+    off_t      start;
+    off_t      end;
+    off_t      gap;
+    off_t      cur;
+    off_t      prev_cur;
+    loglevel_t prev_loglevel;
+    int        initialized;
+    char       buffer[PRINTK_BUFFER_SIZE];
+};
 
-static void push_entry(char* buffer, size_t len)
+static struct printk_state CACHELINE_ALIGN state;
+
+static void printk_shift_start_end(char* buffer, size_t len)
 {
     const char* start;
 
-    if (printk_iterator > printk_prev_iterator)
+    if (state.cur > state.prev_cur)
     {
-        if (printk_end < printk_start)
+        if (state.end < state.start)
         {
             start = strchr(buffer + len + 1, '\n');
 
-            printk_start = start
-                ? start - printk_buffer + 1
+            state.start = start
+                ? start - state.buffer + 1
                 : 0;
         }
 
-        printk_end += len;
+        state.end += len;
     }
     else
     {
@@ -57,22 +62,33 @@ static void push_entry(char* buffer, size_t len)
             __builtin_trap();
         }
 
-        printk_end = len;
-        printk_start = start - printk_buffer + 1;
+        state.end = len;
+        state.start = start - state.buffer + 1;
+    }
+}
+
+static void printk_emit(loglevel_t log_level, char* buffer, size_t len, int content_start)
+{
+    if (likely(state.dedicated_tty))
+    {
+        tty_write_to(state.dedicated_tty, buffer, len);
+    }
+    else if (state.fallback_write)
+    {
+        state.fallback_write(NULL, buffer, len);
     }
 
-    if (likely(printk_write))
+    if (log_level >= KERN_NOTICE || (state.prev_loglevel >= KERN_NOTICE && log_level == KERN_CONT))
     {
-        printk_write(printk_file, buffer, len);
-    }
-    else if (printk_fallback)
-    {
-        printk_fallback(NULL, buffer, len);
-    }
-
-    if (printk_early)
-    {
-        printk_early(buffer);
+        if (*buffer == ' ')
+        {
+            tty_write_to_all(buffer + content_start, len - content_start - 1, state.dedicated_tty);
+        }
+        else
+        {
+            tty_write_to_all("\n", 1, state.dedicated_tty);
+            tty_write_to_all(buffer + content_start, len - content_start - 1, state.dedicated_tty);
+        }
     }
 }
 
@@ -80,20 +96,20 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
 {
     timeval_t ts;
     va_list args;
-    int printed;
+    int len, content_start;
 
     scoped_irq_lock();
 
-    printk_prev_iterator = printk_iterator;
+    state.prev_cur = state.cur;
 
-    if (PRINTK_BUFFER_SIZE - printk_iterator < PRINTK_LINE_LEN)
+    if (array_size(state.buffer) - state.cur < PRINTK_LINE_LEN)
     {
-        printk_gap = printk_iterator;
-        printk_iterator = 0;
+        state.gap = state.cur;
+        state.cur = 0;
     }
 
-    char* const buffer = printk_buffer + printk_iterator;
-    logseq_t current_seq = printk_sequence;
+    char* const buffer = state.buffer + state.cur;
+    logseq_t current_seq = state.sequence;
 
     timestamp_update();
     timestamp_get(&ts);
@@ -101,9 +117,9 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
     switch (entry->log_level)
     {
         case KERN_DEBUG:
-            printed = snprintf(buffer, PRINTK_LINE_LEN, "%u,%u,%u.%06u;%s:%u:%s: ",
+            len = snprintf(buffer, PRINTK_LINE_LEN, "%u,%u,%u.%06u;%s:%u:%s: ",
                 KERN_DEBUG,
-                printk_sequence++,
+                state.sequence++,
                 ts.tv_sec,
                 ts.tv_usec,
                 entry->file,
@@ -111,31 +127,39 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
                 entry->function);
             break;
         case KERN_CONT:
-            printed = snprintf(buffer, PRINTK_LINE_LEN, " ");
+            len = snprintf(buffer, PRINTK_LINE_LEN, " ");
             break;
         default:
-            printed = snprintf(buffer, PRINTK_LINE_LEN, "%u,%u,%u.%06u;",
+            len = snprintf(buffer, PRINTK_LINE_LEN, "%u,%u,%u.%06u;",
                 entry->log_level,
-                printk_sequence++,
+                state.sequence++,
                 ts.tv_sec,
                 ts.tv_usec);
             break;
     }
 
+    content_start = len;
+
     va_start(args, fmt);
-    printed += vsnprintf(buffer + printed, PRINTK_LINE_LEN - printed, fmt, args);
+    len += vsnprintf(buffer + len, PRINTK_LINE_LEN - len, fmt, args);
     va_end(args);
 
-    printed += snprintf(buffer + printed, PRINTK_LINE_LEN - printed, "\n");
+    len += snprintf(buffer + len, PRINTK_LINE_LEN - len, "\n");
 
-    if (unlikely(printed >= PRINTK_LINE_LEN))
+    if (unlikely(len >= PRINTK_LINE_LEN))
     {
         strcpy(buffer + PRINTK_LINE_LEN - 5, "...\n");
     }
 
-    printk_iterator += printed;
+    state.cur += len;
 
-    push_entry(buffer, printed);
+    printk_shift_start_end(buffer, len);
+    printk_emit(entry->log_level, buffer, len, content_start);
+
+    if (entry->log_level != KERN_CONT)
+    {
+        state.prev_loglevel = entry->log_level;
+    }
 
     return current_seq;
 }
@@ -160,74 +184,60 @@ void NORETURN(panic(const char* fmt, ...))
     machine_halt();
 }
 
-static size_t printk_buffer_dump(file_t* file, const printk_write_t write)
+#define BUFFER_DUMP(func, param) \
+    ({ \
+        size_t size = 0; \
+        if (state.start > state.end) \
+        { \
+            func(param, state.buffer + state.start, size = state.gap - state.start); \
+        } \
+        func(param, state.buffer, state.end); \
+        size += state.end; \
+    })
+
+static size_t printk_buffer_dump(tty_t* tty)
 {
-    size_t size = 0;
-
-    if (printk_start > printk_end)
-    {
-        (*write)(file, printk_buffer + printk_start, size = printk_gap - printk_start);
-    }
-
-    (*write)(file, printk_buffer, size += printk_end);
-
-    return size;
+    return BUFFER_DUMP(tty_write_to, tty);
 }
 
 void ensure_printk_will_print(void)
 {
-    if (printk_initialized == PRINTK_INITIALIZED)
+    if (state.initialized == PRINTK_INITIALIZED)
     {
         return;
     }
 
-    scoped_irq_lock();
+    extern int debugcon_write(tty_t* tty, const char* buffer, size_t size);
 
-    extern int debugcon_write(file_t*, const char* buffer, size_t size);
+    state.fallback_write = &debugcon_write;
+    state.initialized = PRINTK_INITIALIZED;
 
-    printk_initialized = PRINTK_INITIALIZED;
-    printk_fallback = &debugcon_write;
-
-    printk_buffer_dump(NULL, printk_fallback);
+    BUFFER_DUMP(state.fallback_write, NULL);
 }
 
-void printk_register(struct file* file)
+void printk_register(tty_t* tty)
 {
-    if (printk_initialized == PRINTK_INITIALIZED)
+    if (state.initialized == PRINTK_INITIALIZED)
     {
         return;
     }
 
     scoped_irq_lock();
 
-    printk_file = file;
-    printk_write = file->ops->write;
-    printk_initialized = PRINTK_INITIALIZED;
+    state.dedicated_tty = tty;
+    state.initialized = PRINTK_INITIALIZED;
 
-    size_t size = printk_buffer_dump(printk_file, printk_write);
+    size_t size = printk_buffer_dump(state.dedicated_tty);
     log_notice("printk: dumped buffer; size = %d", size);
-}
-
-void printk_early_register(void (*print)(const char* string))
-{
-    if (!print)
-    {
-        printk_early = NULL;
-        printk_initialized = 0;
-        return;
-    }
-
-    printk_initialized = PRINTK_EARLY_INITIALIZED;
-    printk_early = print;
 }
 
 int syslog_show(seq_file_t* s)
 {
-    if (printk_start > printk_end)
+    if (state.start > state.end)
     {
-        seq_puts(s, printk_buffer + printk_start);
+        seq_puts(s, state.buffer + state.start);
     }
-    seq_puts(s, printk_buffer);
+    seq_puts(s, state.buffer);
     return 0;
 }
 

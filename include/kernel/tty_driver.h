@@ -10,15 +10,18 @@ struct file;
 struct tty_driver
 {
     const char* name;
-    dev_t major;
-    dev_t minor_start, num;
-    void* driver_data;
-    int initialized;
+    dev_t       major;
+    dev_t       minor_start;
+    size_t      num;
+    void*       driver_data;
+    int         initialized;
+
     int (*open)(struct tty* tty, struct file* file);
     int (*close)(struct tty* tty, struct file* file);
-    int (*write)(struct tty* tty, struct file* file, const char* buf, size_t count);
+    int (*write)(struct tty* tty, const char* buf, size_t count);
     int (*ioctl)(struct tty* tty, unsigned long request, void* arg);
     void (*putch)(struct tty* tty, int c);
+
     list_head_t drivers;
 };
 

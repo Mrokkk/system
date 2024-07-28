@@ -222,7 +222,7 @@ class Qemu(subprocess.Popen):
         self.qemu_mon = QemuMon()
 
     def readline(self) -> str:
-        return self.stdout.readline().rstrip()
+        return self.stdout.readline().rstrip('\n')
 
     def stop(self) -> None:
         self.communicate()
@@ -395,6 +395,7 @@ def backtrace_get(addr: str, binary : str, context : Context) -> List[str]:
 line_regex = re.compile(r'^([0-9]),([0-9]*),([0-9]*\.[0-9]*);(.*)$')
 
 loglevel_to_color = [
+    '',
     '\033[38;5;245m',
     Color.blue,
     Color.blue,
@@ -411,14 +412,14 @@ def line_process(line : str, context : Context) -> None:
 
     match = re.match(line_regex, line)
 
+    if not match:
+        line_print(line)
+        return
+
     loglevel = int(match.group(1))
     sequence = int(match.group(2))
     timestamp = match.group(3)
     content = match.group(4)
-
-    if not match:
-        print(f'Not matched: "{line}"')
-        return
 
     if 'backtrace:' in content:
         context.bt_number = 0

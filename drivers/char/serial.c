@@ -2,12 +2,10 @@
 
 #include <kernel/fs.h>
 #include <kernel/irq.h>
+#include <kernel/tty.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>
-
-#include "tty.h"
-#include "tty_driver.h"
 
 #define SERIAL_MINORS 4
 #define COM1 0x3f8
@@ -22,7 +20,7 @@ module_exit(serial_deinit);
 void serial_send(char a, uint16_t port);
 static int serial_open(tty_t* tty, file_t* file);
 static int serial_close(tty_t* tty, file_t* file);
-static int serial_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
+static int serial_write(tty_t* tty, const char* buffer, size_t size);
 static void serial_putch(tty_t* tty, int c);
 static void serial_irs(void);
 
@@ -182,13 +180,13 @@ void serial_irs(void)
     }
 }
 
-static int serial_write(tty_t*, file_t* file, const char* buffer, size_t size)
+static int serial_write(tty_t* tty, const char* buffer, size_t size)
 {
     size_t old = size;
-    int minor = MINOR(file->inode->rdev);
+    int port = minor_to_port(tty->minor);
     while (size--)
     {
-        serial_send(*buffer++, minor_to_port(minor));
+        serial_send(*buffer++, port);
     }
     return old;
 }

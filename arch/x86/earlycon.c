@@ -1,9 +1,13 @@
 #define log_fmt(fmt) "earlycon: " fmt
 #include <arch/io.h>
 #include <arch/bios.h>
+#include <kernel/fs.h>
+#include <kernel/dev.h>
+#include <kernel/tty.h>
 #include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <arch/earlycon.h>
 
 #define VIDEOMEM            ((uint16_t*)0xb8000)
 #define MODE                0x03
@@ -42,65 +46,68 @@
     })
 
 static void cls(void);
-static void csr_move(uint16_t off);
-static void earlycon_print(const char* s, size_t len);
-static void earlycon_char_print(size_t row, size_t col, char c);
-static void earlycon_syslog_print(const char* s);
+static void csr_move(void);
 
-static uint8_t curx, cury;
-static unsigned long line_nr;
-static bool disabled;
+static int earlycon_open(tty_t* tty, file_t* file);
+static int earlycon_close(tty_t* tty, file_t* file);
+static int earlycon_write(tty_t* tty, const char* buffer, size_t size);
+static void earlycon_putch(tty_t* tty, int c);
 
-UNMAP_AFTER_INIT int earlycon_init(param_t*)
+static bool escape_seq;
+static uint16_t curx;
+static uint16_t cury;
+static unsigned line_nr;
+
+static tty_driver_t tty_driver = {
+    .name = "earlycon",
+    .major = MAJOR_CHR_EARLYCON,
+    .minor_start = 0,
+    .num = 1,
+    .driver_data = NULL,
+    .open = &earlycon_open,
+    .close = &earlycon_close,
+    .write = &earlycon_write,
+    .putch = &earlycon_putch,
+};
+
+UNMAP_AFTER_INIT void earlycon_init(void)
 {
-    regs_t regs;
-
-    bios_call(BIOS_VIDEO, VIDEO_MODE_GET(regs));
-
-    log_info("current mode: %x", regs.al, regs.ah);
-
-    if (regs.al != MODE)
-    {
-        log_info("setting mode %02x", MODE);
-        bios_call(BIOS_VIDEO, VIDEO_MODE_SET(regs));
-    }
-
-    cls();
-    csr_move(0);
-
-    printk_early_register(&earlycon_syslog_print);
-
-    return 0;
+    tty_driver_register(&tty_driver);
+    param_call_if_set(KERNEL_PARAM("earlycon"), &earlycon_enable);
 }
 
 UNMAP_AFTER_INIT void earlycon_disable(void)
 {
-    printk_early_register(NULL);
-    disabled = true;
+    tty_driver.initialized = false;
 }
 
-void earlycon_enable(void)
+int earlycon_enable(void)
 {
     regs_t regs;
 
-    if (disabled)
+    if (!tty_driver.initialized)
     {
-        line_nr = curx = cury = 0;
-        csr_move(0);
-        bios_call(BIOS_VIDEO, VIDEO_MODE_SET(regs));
+        bios_call(BIOS_VIDEO, VIDEO_MODE_GET(regs));
+
+        log_info("current mode: %x", regs.al, regs.ah);
+
+        if (regs.al != MODE)
+        {
+            log_info("setting mode %02x", MODE);
+            bios_call(BIOS_VIDEO, VIDEO_MODE_SET(regs));
+        }
+
+        line_nr = 0;
+        tty_driver.initialized = true;
         cls();
     }
 
-    printk_early_register(&earlycon_syslog_print);
+    return 0;
 }
 
-static inline void videomem_write(uint16_t data, uint16_t offset)
+static void csr_move(void)
 {
-    writew(data | (ATTR << 8), VIDEOMEM + offset);
-}
-
-static void csr_move(uint16_t off)
-{
+    uint16_t off = cury * RESX + curx;
     outb(14, 0x3d4);
     outb(off >> 8, 0x3d5);
     outb(15, 0x3d4);
@@ -109,15 +116,15 @@ static void csr_move(uint16_t off)
 
 static void cls(void)
 {
+    curx = cury = 0;
     memsetw(VIDEOMEM, 0x720, RESX * RESY);
-    csr_move(0);
+    csr_move();
 }
 
 static inline void earlycon_char_print(size_t row, size_t col, char c)
 {
     uint16_t off = row * RESX + col;
-    videomem_write(c, off);
-    csr_move(off + 1);
+    writew(c | (ATTR << 8), VIDEOMEM + off);
 }
 
 char earlycon_read(void)
@@ -127,78 +134,87 @@ char earlycon_read(void)
     return regs.al;
 }
 
-static void earlycon_print(const char* s, size_t len)
+static int earlycon_open(tty_t*, file_t*)
 {
-    regs_t regs;
-    bool escape_seq = false;
-    for (; len; ++s, --len)
-    {
-        if (cury >= RESY)
-        {
-            bios_call(BIOS_VIDEO, VIDEO_SCROLL_UP(regs));
-            --cury;
-            curx = 0;
-        }
-
-        if (*s == '\n')
-        {
-            cury++;
-            line_nr++;
-            curx = 0;
-            continue;
-        }
-        else if (escape_seq)
-        {
-            if (*s == 'm')
-            {
-                escape_seq = false;
-            }
-            continue;
-        }
-        else if (*s == '\e')
-        {
-            escape_seq = true;
-            continue;
-        }
-        else if (*s < 0x20)
-        {
-            continue;
-        }
-
-        earlycon_char_print(cury, curx++, *s);
-
-        if (curx >= RESX)
-        {
-            curx = 0;
-            ++cury;
-        }
-    }
+    return 0;
 }
 
-static void earlycon_syslog_print(const char* s)
+static int earlycon_close(tty_t*, file_t*)
 {
-    size_t len = strlen(s);
-    if (*s == ' ')
+    return 0;
+}
+
+static void earlycon_putch_impl(int c)
+{
+    regs_t regs;
+
+    if (cury >= RESY)
     {
-        earlycon_print(s + 1, len - 2);
+        bios_call(BIOS_VIDEO, VIDEO_SCROLL_UP(regs));
+        --cury;
+        curx = 0;
+    }
+
+    if (c == '\n')
+    {
+        cury++;
+        line_nr++;
+        curx = 0;
+        return;
+    }
+    else if (escape_seq)
+    {
+        if (c == 'm')
+        {
+            escape_seq = false;
+        }
+        return;
+    }
+    else if (c == '\e')
+    {
+        escape_seq = true;
+        return;
+    }
+    else if (c < 0x20)
+    {
         return;
     }
 
-    const char* semicolon = strchr(s, ';');
+    earlycon_char_print(cury, curx++, c);
 
-    if (unlikely(!semicolon))
+    if (curx >= RESX)
     {
-        earlycon_print(s, len);
+        curx = 0;
+        ++cury;
+    }
+}
+
+static int earlycon_write(tty_t* tty, const char* buffer, size_t size)
+{
+    size_t old = size;
+
+    if (unlikely(!tty_driver.initialized))
+    {
+        return 0;
     }
 
-    if (line_nr != 0)
+    while (size--)
     {
-        earlycon_print("\n", 1);
-    }
-    else
-    {
-        line_nr++;
+        earlycon_putch(tty, *buffer++);
     }
 
-    earlycon_print(semicolon + 1, len - (semicolon - s) - 2);
+    csr_move();
+
+    return old;
+}
+
+static void earlycon_putch(tty_t*, int c)
+{
+    if (unlikely(!tty_driver.initialized))
+    {
+        return;
+    }
+
+    earlycon_putch_impl(c);
+    csr_move();
 }

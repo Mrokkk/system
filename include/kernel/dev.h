@@ -6,6 +6,7 @@
 #define MAJOR(dev)          _MAJOR(dev)
 #define MKDEV(maj, min)     _MKDEV(maj, min)
 
+#define MAJOR_CHR_EARLYCON  2
 #define MAJOR_CHR_FB        3
 #define MAJOR_CHR_TTY       4
 #define MAJOR_CHR_TTYAUX    5

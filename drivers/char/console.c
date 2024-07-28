@@ -7,16 +7,15 @@
 #include <arch/rtc.h>
 
 #include <kernel/fs.h>
+#include <kernel/tty.h>
 #include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/kernel.h>
 #include <kernel/api/ioctl.h>
 
-#include "tty.h"
 #include "fbcon.h"
 #include "egacon.h"
 #include "keyboard.h"
-#include "tty_driver.h"
 #include "framebuffer.h"
 
 #define INITIAL_CAPACITY 128
@@ -24,7 +23,7 @@
 static int console_open(tty_t* tty, file_t* file);
 static int console_setup(console_driver_t* driver);
 static int console_close(tty_t* tty, file_t* file);
-static int console_write(tty_t* tty, file_t* file, const char* buffer, size_t size);
+static int console_write(tty_t* tty, const char* buffer, size_t size);
 static int console_ioctl(tty_t* tty, unsigned long request, void* arg);
 static void console_putch_internal(tty_t* tty, int c, int* movecsr);
 static void console_putch(tty_t* tty, int c);
@@ -682,7 +681,7 @@ static int console_close(tty_t*, file_t*)
     return 0;
 }
 
-static int console_write(tty_t* tty, file_t*, const char* buffer, size_t size)
+static int console_write(tty_t* tty, const char* buffer, size_t size)
 {
     int movecsr = 0;
     console_t* console = tty->driver->driver_data;

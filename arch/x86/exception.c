@@ -208,7 +208,7 @@ handle_fault:
         }
 
         sprintf(header, "%s[%u]", p->name, p->pid);
-        log_notice("%s: %s #%x at %x",
+        log_info("%s: %s #%x at %x",
             header,
             exception->name,
             exception->has_error_code ? regs.error_code : 0,
