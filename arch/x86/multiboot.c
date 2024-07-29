@@ -1,3 +1,4 @@
+#include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/memory.h>
@@ -5,13 +6,13 @@
 
 #include <arch/multiboot.h>
 
-char* bootloader_name;
-struct framebuffer* framebuffer_ptr;
+#define DEBUG_MULTIBOOT 0
+
 void* disk_img;
 void* ksyms_start;
 void* ksyms_end;
 
-static inline void multiboot_modules_read(multiboot_info_t* mb)
+static void multiboot_modules_read(multiboot_info_t* mb)
 {
     char* name;
     uint32_t module_start = 0, module_end = 0;

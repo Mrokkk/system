@@ -591,7 +591,7 @@ static inline void page_map_init(uint32_t virt_end)
     }
 
     pages_set(end, phys_end, USED);
-    pages_set(phys_end, ram, FREE);
+    pages_set(phys_end, last_phys_address, FREE);
 }
 
 static inline int section_page_flags(int flags)
@@ -649,7 +649,7 @@ static inline void pgt_init(pgt_t* prev_pgt, uint32_t virt_end)
 
     // Set up page directory
     for (pde_index = KERNEL_PDE_OFFSET, pte_index = 0;
-        pde_index < min(align(ram / PAGE_SIZE, PAGES_IN_PTE) / PAGES_IN_PTE + KERNEL_PDE_OFFSET, PTE_IN_PDE);
+        pde_index < min(align(last_phys_address / PAGE_SIZE, PAGES_IN_PTE) / PAGES_IN_PTE + KERNEL_PDE_OFFSET, PTE_IN_PDE);
         pde_index++, pte_index += PTE_IN_PDE)
     {
         pde_set(pde_index, phys_addr(&page_table[pte_index]) | PAGE_KERNEL_FLAGS);
@@ -677,12 +677,12 @@ UNMAP_AFTER_INIT int paging_init()
     pgt_t* temp_pgt;
     uint32_t virt_end, pgt_size, page_map_size;
 
-    last_pfn = ram / PAGE_SIZE;
+    last_pfn = last_phys_address / PAGE_SIZE;
     temp_pgt = virt_ptr(page0);
     kernel_page_dir = virt_ptr(page_dir);
 
     page_map_size = page_align(last_pfn * sizeof(page_t));
-    pgt_size = page_align(min(GiB, page_align(ram)) / PAGES_IN_PTE);
+    pgt_size = page_align(min(GiB, page_align(last_phys_address)) / PAGES_IN_PTE);
 
     virt_end = virt_end_get();
 
@@ -716,7 +716,7 @@ UNMAP_AFTER_INIT int paging_init()
     ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].refcount);
     ASSERT(page_map[(phys_addr(virt_end) - PAGE_SIZE) / PAGE_SIZE].refcount);
     ASSERT(page_table[phys_addr(virt_end) / PAGE_SIZE - 1]);
-    ASSERT(kernel_page_dir[min(ram, GiB) / PAGE_SIZE / PTE_IN_PDE + KERNEL_PDE_OFFSET - 1]);
+    ASSERT(kernel_page_dir[min(last_phys_address, GiB) / PAGE_SIZE / PTE_IN_PDE + KERNEL_PDE_OFFSET - 1]);
     ASSERT(page_map[memory_areas->start / PAGE_SIZE + 2].refcount);
 
     return 0;

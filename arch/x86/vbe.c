@@ -35,6 +35,7 @@
 static mode_info_t* desired_mode;
 static mode_info_t* current_mode;
 static mode_info_t* modes;
+struct framebuffer* framebuffer_ptr;
 
 struct
 {

@@ -75,7 +75,6 @@ struct module
 
 char* multiboot_read(va_list args);
 
-extern char* bootloader_name;
 extern struct framebuffer* framebuffer_ptr;
 extern void* disk_img;
 extern void* ksyms_module;

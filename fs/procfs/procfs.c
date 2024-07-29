@@ -420,7 +420,7 @@ static int stack_show(seq_file_t* s)
 
 static int meminfo_show(seq_file_t* s)
 {
-    seq_printf(s, "MemTotal: %u kB\n", ram / KiB);
+    seq_printf(s, "MemTotal: %u kB\n", usable_ram / KiB);
     return 0;
 }
 

@@ -37,7 +37,6 @@
 #define DEBUG_CON_SCROLL    0
 #define DEBUG_KEYBOARD      0
 
-#define DEBUG_MULTIBOOT     0
 #define DEBUG_ASSERT        1
 
 #define crash() { int* i = (int*)0; *i = 2137; }

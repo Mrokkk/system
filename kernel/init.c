@@ -23,7 +23,8 @@
 static void init(const char* cmdline);
 
 unsigned init_in_progress = INIT_IN_PROGRESS;
-char cmdline[128];
+char cmdline[CMDLINE_SIZE];
+char* bootloader_name;
 static param_t* params;
 
 void breakpoint(void)
@@ -45,12 +46,10 @@ NOINLINE static void NORETURN(spawn_init_and_go_idle(void))
     ASSERT_NOT_REACHED();
 }
 
-UNMAP_AFTER_INIT static void params_read(char* tmp_cmdline, param_t* output)
+UNMAP_AFTER_INIT static param_t* params_read(char buffer[CMDLINE_SIZE], param_t output[CMDLINE_PARAMS_COUNT])
 {
-    strcpy(tmp_cmdline, cmdline);
-
     char* save_ptr;
-    char* tmp = tmp_cmdline;
+    char* tmp = buffer;
     char* previous_token = NULL;
     char* new_token = NULL;
     size_t count = 0;
@@ -60,10 +59,10 @@ UNMAP_AFTER_INIT static void params_read(char* tmp_cmdline, param_t* output)
         new_token = strtok_r(tmp, "= ", &save_ptr);
         if (previous_token)
         {
-            bool value_param = cmdline[new_token - tmp_cmdline - 1] == '=';
-            output[count].name      = previous_token;
-            output[count++].value   = value_param ? new_token : NULL;
-            previous_token          = value_param ? NULL : new_token;
+            bool value_param      = cmdline[new_token - buffer - 1] == '=';
+            output[count].name    = previous_token;
+            output[count++].value = value_param ? new_token : NULL;
+            previous_token        = value_param ? NULL : new_token;
         }
         else
         {
@@ -71,14 +70,16 @@ UNMAP_AFTER_INIT static void params_read(char* tmp_cmdline, param_t* output)
         }
         tmp = NULL;
     }
-    while (new_token);
+    while (new_token && count < CMDLINE_PARAMS_COUNT - 1);
+
+    return output;
 }
 
-param_t* param_get(const char* name)
+param_t* param_get(param_name_t name)
 {
     for (param_t* p = params; p->name; ++p)
     {
-        if (!strcmp(p->name, name))
+        if (!strcmp(p->name, name.name))
         {
             return p;
         }
@@ -86,24 +87,24 @@ param_t* param_get(const char* name)
     return NULL;
 }
 
-const char* param_value_get(const char* name)
+const char* param_value_get(param_name_t name)
 {
     param_t* param = param_get(name);
     return param ? param->value : NULL;
 }
 
-const char* param_value_or_get(const char* name, const char* def)
+const char* param_value_or_get(param_name_t name, const char* def)
 {
     param_t* param = param_get(name);
     return param ? param->value : def;
 }
 
-int param_bool_get(const char* name)
+bool param_bool_get(param_name_t name)
 {
     return !!param_get(name);
 }
 
-void param_call_if_set(const char* name, int (*action)())
+void param_call_if_set(param_name_t name, int (*action)())
 {
     param_t* p;
     int error;
@@ -116,47 +117,53 @@ void param_call_if_set(const char* name, int (*action)())
     }
 }
 
-UNMAP_AFTER_INIT void boot_params_print(void)
+UNMAP_AFTER_INIT static void boot_params_print(void)
 {
     log_notice("bootloader: %s", bootloader_name);
     log_notice("cmdline: %s", cmdline);
 }
 
-UNMAP_AFTER_INIT void ram_print(void)
+UNMAP_AFTER_INIT static void memory_print(void)
 {
     uint32_t ram_hi = addr(full_ram >> 32);
-    uint32_t ram_low = addr(full_ram & ~0UL);
+    uint32_t ram_low = addr(full_ram);
     uint32_t mib = 4096 * ram_hi + ram_low / MiB;
+
     log_notice("RAM: %u MiB", mib);
-    log_notice("RAM end: %u MiB (%u B)", ram / MiB, ram);
+
+    if (full_ram != (uint64_t)usable_ram)
+    {
+        log_continue("; usable %u MiB (%u B)", usable_ram / MiB, usable_ram);
+    }
+
+    memory_areas_print();
+    sections_print();
 }
 
 UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 {
+    va_list args;
+    timeval_t ts;
+    const char* temp_cmdline;
+    char buffer[CMDLINE_SIZE];
+    param_t parameters[CMDLINE_PARAMS_COUNT];
+
     bss_zero();
 
-    char tmp_cmdline[128];
-    param_t parameters[32];
-    params = parameters;
+    va_start(args, data);
+    temp_cmdline = multiboot_read(args);
+    va_end(args);
 
-    {
-        va_list args;
-        va_start(args, data);
-        const char* temp_cmdline = multiboot_read(args);
-        va_end(args);
-        strcpy(cmdline, temp_cmdline);
-    }
-
-    params_read(tmp_cmdline, parameters);
+    strcpy(cmdline, temp_cmdline);
+    strcpy(buffer, temp_cmdline);
 
     boot_params_print();
 
+    params = params_read(buffer, parameters);
+
     arch_setup();
 
-    ram_print();
-    memory_areas_print();
-    sections_print();
-
+    memory_print();
     paging_init();
     ksyms_load(ksyms_start, ksyms_end);
     fmalloc_init();
@@ -172,7 +179,6 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     ASSERT(init_in_progress == INIT_IN_PROGRESS);
     init_in_progress = 0;
 
-    timeval_t ts;
     timestamp_get(&ts);
 
     if (ts.tv_sec || ts.tv_usec)
@@ -184,21 +190,6 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 
     ASSERT_NOT_REACHED();
 }
-
-// I left this comment even though this issue no longer exists (as init is doing exec("/bin/init")).
-// FIXME: idea to fork in kernel with kernel stacks mapped to different vaddr is broken.
-// In such situation any register might reference a previous stack. In this case argv for exec was passed from ebx, which
-// had value referencing parent's stack
-//
-// │    0xc0107f2d <init+605>   push   %eax
-// │    0xc0107f2e <init+606>   xor    %ecx,%ecx        ---> setting ecx as 0
-// │    0xc0107f30 <init+608>   push   %eax
-// │    0xc0107f31 <init+609>   push   %ebx             ---> second param for exec, which is address from previous stack
-// │    0xc0107f32 <init+610>   push   $0xc0113aec      ---> first param for exec
-// │    0xc0107f37 <init+615>   mov    %ecx,-0x18(%ebp) ---> zeroing first element in array which is supposed to be argv
-// │    0xc0107f3a <init+618>   call   0xc010ef60 <exec>
-//
-// When this is non-inline, compiler will generate new frame, thus argv will be properly filled
 
 UNMAP_AFTER_INIT static int root_mount(void)
 {
@@ -246,47 +237,47 @@ UNMAP_AFTER_INIT static int root_mount(void)
 
 UNMAP_AFTER_INIT static void fake_root_prepare(void)
 {
-    MUST_SUCCEED("mounting fake root", do_mount, "none", "/", "ramfs", 0);
+    MUST_SUCCEED("mounting fake root",  do_mount, "none", "/", "ramfs", 0);
     MUST_SUCCEED("chroot to fake root", do_chroot, NULL);
-    MUST_SUCCEED("chdir to fake root", do_chdir, "/");
-    MUST_SUCCEED("creating /root", do_mkdir, "/root", 0555);
-    MUST_SUCCEED("creating fake /dev", do_mkdir, "/dev", 0555);
-    MUST_SUCCEED("mounting fake /dev", do_mount, "none", "/dev", "devfs", 0);
+    MUST_SUCCEED("chdir to fake root",  do_chdir, "/");
+    MUST_SUCCEED("creating /root",      do_mkdir, "/root", 0555);
+    MUST_SUCCEED("creating fake /dev",  do_mkdir, "/dev", 0555);
+    MUST_SUCCEED("mounting fake /dev",  do_mount, "none", "/dev", "devfs", 0);
 }
 
 UNMAP_AFTER_INIT static void rootfs_prepare(void)
 {
     fake_root_prepare();
 
-    MUST_SUCCEED("mounting real root", root_mount);
+    MUST_SUCCEED("mounting real root",  root_mount);
     MUST_SUCCEED("chroot to real root", do_chroot, "/root");
-    MUST_SUCCEED("chdir to real root", do_chdir, "/");
-    MUST_SUCCEED("mounting /dev", do_mount, "none", "/dev", "devfs", 0);
-    MUST_SUCCEED("mounting /proc", do_mount, "none", "/proc", "proc", 0);
-    MAY_FAIL("mounting /tmp", do_mount, "none", "/tmp", "ramfs", 0);
+    MUST_SUCCEED("chdir to real root",  do_chdir, "/");
+    MUST_SUCCEED("mounting /dev",       do_mount, "none", "/dev", "devfs", 0);
+    MUST_SUCCEED("mounting /proc",      do_mount, "none", "/proc", "proc", 0);
+    MAY_FAIL("mounting /tmp",           do_mount, "none", "/tmp", "ramfs", 0);
 }
 
 UNMAP_AFTER_INIT static void syslog_configure(void)
 {
     int errno;
+    tty_t* tty;
     file_t* file;
-    const char* device = param_value_get(KERNEL_PARAM("syslog"));
+    const char* device = param_value_or_get(KERNEL_PARAM("syslog"), "none");
 
-    log_notice("syslog output: %s", device ? device : "none");
+    log_notice("syslog output: %s", device);
 
-    if (!device || !strcmp(device, "none"))
+    if (!strcmp(device, "none"))
     {
         return;
     }
 
-    if ((errno = do_open(&file, device, O_RDWR, 0)))
+    if (unlikely(errno = do_open(&file, device, O_RDWR, 0)))
     {
         log_error("failed to open syslog output device: %s", device);
+        return;
     }
 
-    tty_t* tty = tty_from_file(file);
-
-    if (unlikely(!tty))
+    if (unlikely(!(tty = tty_from_file(file))))
     {
         log_warning("%s: not a tty device", device);
         return;
