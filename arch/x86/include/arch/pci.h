@@ -54,6 +54,21 @@ struct base_address_register
 
 typedef struct base_address_register bar_t;
 
+enum pci_cap_id
+{
+    PCI_CAP_ID_VNDR = 0x9
+};
+
+struct pci_cap
+{
+    uint8_t id;
+    uint8_t next;
+    uint8_t len;
+    uint8_t data;
+};
+
+typedef struct pci_cap pci_cap_t;
+
 struct pci_device
 {
     uint16_t vendor_id;
@@ -203,8 +218,8 @@ enum pci_vendor
 };
 
 void pci_scan(void);
-uint16_t pci_config_read_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset);
-uint32_t pci_config_read_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset);
-void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val);
+
+int pci_device_initialize(pci_device_t* device);
+int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size);
 void pci_device_print(pci_device_t* device);
 pci_device_t* pci_device_get(uint8_t class, uint8_t subclass);

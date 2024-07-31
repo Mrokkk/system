@@ -310,20 +310,13 @@ static void ide_device_detect(int drive, bool use_dma)
     }
 }
 
-static int ide_pci_initialize(void)
+static int ide_pci_interface_check(void)
 {
-    pci_device_print(ide_pci);
-
     if (ide_pci->prog_if & 0x01)
     {
         log_warning("PCI native mode not supported yet");
         return -ENODEV;
     }
-
-    ide_pci->command |= (1 << 2) | (1 << 1) | 1;
-    ASSERT(ide_pci->command & (1 << 2));
-    ASSERT(ide_pci->command & (1 << 1));
-    ASSERT(ide_pci->command & 1);
 
     return 0;
 }
@@ -393,7 +386,10 @@ int ide_initialize(void)
     ide_buf = shift_as(void*, ide_devices, PAGE_SIZE - ATA_SECTOR_SIZE);
     memset(ide_devices, 0, PAGE_SIZE);
 
-    if (execute(ide_pci_initialize(), "initializing PCI") ||
+    pci_device_print(ide_pci);
+
+    if (execute(ide_pci_interface_check(), "checking prog if") ||
+        execute(pci_device_initialize(ide_pci), "initializing PCI") ||
         execute_no_ret(ide_pci_bm_initialize(&use_dma)) ||
         execute_no_ret(ide_channels_initialize()) ||
         execute_no_ret(ide_devices_detect(use_dma)))

@@ -321,18 +321,6 @@ static int ahci_fs_read(file_t* file, char* buf, size_t count)
     return count;
 }
 
-static int ahci_pci_initialize(void)
-{
-    pci_device_print(ahci_pci);
-
-    ahci_pci->command |= (1 << 2) | (1 << 1) | 1;
-    ASSERT(ahci_pci->command & (1 << 2));
-    ASSERT(ahci_pci->command & (1 << 1));
-    ASSERT(ahci_pci->command & 1);
-
-    return !(ahci_pci->command & 1);
-}
-
 static int ahci_mode_set(void)
 {
     ahci->ghc.ae = 1;
@@ -633,15 +621,17 @@ int ahci_init(void)
     (void)ahci_irq_enable;
     (void)ahci_irq_handle;
 
-    if (execute(ahci_pci_initialize(),      "initialize PCI") ||
-        execute(ahci_mode_set(),            "set AHCI mode") ||
-        execute(ahci_ownership_take(),      "take ownership") ||
+    pci_device_print(ahci_pci);
+
+    if (execute(pci_device_initialize(ahci_pci), "initialize PCI") ||
+        execute(ahci_mode_set(),                 "set AHCI mode") ||
+        execute(ahci_ownership_take(),           "take ownership") ||
 #if AHCI_RESET
-        execute(ahci_reset(),               "perform reset") ||
-        execute(ahci_mode_set(),            "set AHCI mode after reset") ||
+        execute(ahci_reset(),                    "perform reset") ||
+        execute(ahci_mode_set(),                 "set AHCI mode after reset") ||
 #endif
         execute_no_ret(ahci_controller_print()) ||
-        execute(ahci_ports_initialize(),    "initialize ports"))
+        execute(ahci_ports_initialize(),         "initialize ports"))
     {
         log_warning("cannot initialize AHCI controller");
         ahci_dump(ahci);

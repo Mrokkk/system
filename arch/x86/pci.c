@@ -25,7 +25,7 @@ static LIST_DECLARE(pci_devices);
         &regs; \
     })
 
-bios32_entry_t pci_bios_entry;
+static bios32_entry_t pci_bios_entry;
 
 static int pci_devices_list(void)
 {
@@ -35,6 +35,55 @@ static int pci_devices_list(void)
     {
         pci_device_print(device);
     }
+    return 0;
+}
+
+static uint16_t pci_config_read_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
+{
+    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc), PCI_CONFIG_ADDRESS);
+    return inl(PCI_CONFIG_DATA) >> ((offset & 2) * 8) & 0xffff;
+}
+
+static uint32_t pci_config_read_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
+{
+    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | offset, PCI_CONFIG_ADDRESS);
+    return inl(PCI_CONFIG_DATA);
+}
+
+static void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val)
+{
+    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | offset, PCI_CONFIG_ADDRESS);
+    outl(val, PCI_CONFIG_DATA);
+}
+
+int pci_device_initialize(pci_device_t* device)
+{
+    device->command |= (1 << 2) | (1 << 1) | 1;
+    ASSERT(device->command & (1 << 2));
+    ASSERT(device->command & (1 << 1));
+    ASSERT(device->command & 1);
+
+    return !(device->command & 1);
+}
+
+int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size)
+{
+    uint32_t* buf = buffer;
+    for (; size >= 4; size -= 4, buf++, offset += 4)
+    {
+        *buf = pci_config_read_u32(device->bus, device->slot, device->func, offset);
+    }
+    uint16_t* buf16 = ptr(buf);
+    for (; size >= 2; size -= 2, buf16++, offset += 2)
+    {
+        *buf16 = pci_config_read_u16(device->bus, device->slot, device->func, offset);
+    }
+
+    if (size)
+    {
+        return -1;
+    }
+
     return 0;
 }
 
@@ -95,24 +144,6 @@ skip_pci_bios:
     }
 
     param_call_if_set(KERNEL_PARAM("pciprint"), &pci_devices_list);
-}
-
-uint16_t pci_config_read_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
-{
-    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc), PCI_CONFIG_ADDRESS);
-    return inl(PCI_CONFIG_DATA) >> ((offset & 2) * 8) & 0xffff;
-}
-
-uint32_t pci_config_read_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
-{
-    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | offset, PCI_CONFIG_ADDRESS);
-    return inl(PCI_CONFIG_DATA);
-}
-
-void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val)
-{
-    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | offset, PCI_CONFIG_ADDRESS);
-    outl(val, PCI_CONFIG_DATA);
 }
 
 static inline char* pci_device_description(char* buf, pci_device_t* device)

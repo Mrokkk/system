@@ -8,11 +8,11 @@ use_ide=
 use_kvm=
 use_cdrom=
 use_nographic=
+use_isa_debugcon=
 args="\
 -boot once=c \
 -no-reboot \
 -rtc base=utc,clock=host \
--device isa-debugcon,chardev=char0 \
 -chardev stdio,id=char0,mux=on,signal=off \
 -chardev pipe,id=char1,path=ttyS0 \
 -chardev pipe,id=char2,path=qemumon \
@@ -36,7 +36,7 @@ supported_kernel_params_bool=(
 )
 
 declare -A kernel_params_dict
-kernel_params_dict["syslog"]="/dev/debug0"
+kernel_params_dict["syslog"]="/dev/vcon0"
 kernel_params_dict["console"]="/dev/tty0"
 
 while [[ $# -gt 0 ]]; do
@@ -63,6 +63,9 @@ while [[ $# -gt 0 ]]; do
         --cdrom)
             use_cdrom=1
             ;;
+        --isa-debugcon)
+            use_isa_debugcon=1
+            ;;
         *)
             param="${1#--}"
             if [[ ${supported_kernel_params_value[@]} =~ ${param} ]]
@@ -85,6 +88,14 @@ qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
 if [[ -z "${qemu_path}" ]]
 then
     qemu_path="$(which qemu-system-i386 || which qemu-system-x86_64)"
+fi
+
+if [[ -n "${use_isa_debugcon}" ]]
+then
+    args="${args} -device isa-debugcon,chardev=char0"
+    kernel_params_dict["syslog"]="/dev/debug0"
+else
+    args="${args} -device virtio-serial -device virtconsole,chardev=char0,name=serial0"
 fi
 
 if [[ -z "${use_ide}" ]]
