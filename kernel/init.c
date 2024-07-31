@@ -154,8 +154,8 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     temp_cmdline = multiboot_read(args);
     va_end(args);
 
-    strcpy(cmdline, temp_cmdline);
-    strcpy(buffer, temp_cmdline);
+    strlcpy(cmdline, temp_cmdline, sizeof(cmdline));
+    strlcpy(buffer, temp_cmdline, sizeof(buffer));
 
     boot_params_print();
 

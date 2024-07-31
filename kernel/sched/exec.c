@@ -434,7 +434,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         goto restore;
     }
 
-    strncpy(p->name, argv0->arg, PROCESS_NAME_LEN);
+    strlcpy(p->name, argv0->arg, PROCESS_NAME_LEN);
     //process_ktimers_exit(p);
 
     brk_vma = vm_create(bin.brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));

@@ -259,7 +259,7 @@ static void ram_node_init(ram_node_t* this, mode_t mode, const char* name)
     this->inode = NULL;
     this->size = 0;
     this->max_capacity = 0;
-    strcpy(this->name, name);
+    strlcpy(this->name, name, sizeof(this->name));
 }
 
 static int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t** result, mode_t mode)

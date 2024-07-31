@@ -307,3 +307,17 @@ char* strtok_r(char* str, const char* delim, char** saveptr)
 
     return begin;
 }
+
+size_t strlcpy(char* dst, const char* src, size_t size)
+{
+    size_t len = strlen(src);
+
+    if (size)
+    {
+        len = (len >= size) ? size - 1 : len;
+        memcpy(dst, src, len);
+        dst[len] = 0;
+    }
+
+    return len;
+}

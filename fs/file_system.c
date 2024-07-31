@@ -8,11 +8,6 @@ static LIST_DECLARE(file_systems);
 static LIST_DECLARE(mounted_systems);
 static dentry_t* root_dentry;
 
-void fullpath_get(const char* path, char* full_path)
-{
-    strcpy(full_path, path);
-}
-
 int file_system_register(file_system_t* fs)
 {
     if (!fs->mount || !fs->name)

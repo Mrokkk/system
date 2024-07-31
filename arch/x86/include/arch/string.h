@@ -22,7 +22,7 @@ static inline char* __strcpy(char* dest, const char* src)
 #define strcpy(d, s) (__builtin_constant_p(s) ? __builtin_strcpy(d, s) : __strcpy(d, s))
 
 #define __HAVE_ARCH_STRNCPY
-static inline char* strncpy(char* dest, const char* src, size_t count)
+static inline char* __strncpy(char* dest, const char* src, size_t count)
 {
     int d0, d1, d2, d3;
     asm volatile(
@@ -40,6 +40,7 @@ static inline char* strncpy(char* dest, const char* src, size_t count)
         : "0" (src), "1" (dest), "2" (count) : "memory");
     return (char*)d1; // FIXME: non-standard return value
 }
+#define strncpy(d, s, n) (__builtin_constant_p(s) ? __builtin_strncpy(d, s, n) : __strncpy(d, s, n))
 
 #define __HAVE_ARCH_STRLEN
 static inline size_t strlen(const char* s)

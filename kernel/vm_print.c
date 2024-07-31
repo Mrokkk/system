@@ -152,7 +152,7 @@ void vm_file_path_read(vm_area_t* vma, char* buffer, size_t max_len)
         }
         else
         {
-            __builtin_strcpy(buffer, "missing dentry");
+            strcpy(buffer, "missing dentry");
         }
     }
     else
@@ -160,10 +160,10 @@ void vm_file_path_read(vm_area_t* vma, char* buffer, size_t max_len)
         switch (type)
         {
             case VM_TYPE_HEAP:
-                __builtin_strcpy(buffer, "[heap]");
+                strlcpy(buffer, "[heap]", max_len);
                 break;
             case VM_TYPE_STACK:
-                __builtin_strcpy(buffer, "[stack]");
+                strlcpy(buffer, "[stack]", max_len);
                 break;
             default:
                 *buffer = '\0';
@@ -174,7 +174,7 @@ void vm_file_path_read(vm_area_t* vma, char* buffer, size_t max_len)
 static void vm_header_print(const printk_entry_t* entry, const char* fmt, va_list args)
 {
     char buf[128];
-    vsprintf(buf, fmt, args);
+    vsnprintf(buf, sizeof(buf), fmt, args);
     printk(entry, buf);
 }
 
@@ -213,7 +213,7 @@ static int vma_row_fill(table_context_t* ctx, void* data)
     table_column_write(ctx, vma->end - vma->start);
     table_column_write(ctx, vma->offset);
     table_column_write(ctx, vm_flags_string(buf, vma->vm_flags));
-    vm_file_path_read(vma, buf, 48);
+    vm_file_path_read(vma, buf, sizeof(buf));
     table_column_write(ctx, buf);
     d->vma = vma->next;
     d->count--;

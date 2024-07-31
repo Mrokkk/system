@@ -39,7 +39,7 @@ void ata_device_initialize(ata_device_t* device, uint8_t* buf, uint8_t id, void*
     {
         if (identb(ATA_IDENT_MODEL + i + 1) < 0x20 || identb(ATA_IDENT_MODEL + i + 1) > 0x7e)
         {
-            strcpy(device->model, "<garbage>");
+            strlcpy(device->model, "<garbage>", sizeof(device->model));
             return;
         }
         device->model[i] = identb(ATA_IDENT_MODEL + i + 1);

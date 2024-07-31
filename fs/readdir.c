@@ -23,7 +23,7 @@ int dirent_add(void* buf, const char* name, size_t len, ino_t ino, char type)
         return 1;
     }
 
-    strncpy(dirent->d_name, name, len);
+    strlcpy(dirent->d_name, name, len + 1);
     dirent->d_ino       = ino;
     dirent->d_off       = 0;
     dirent->d_reclen    = dirent_size;

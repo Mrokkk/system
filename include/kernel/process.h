@@ -207,8 +207,7 @@ int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
 
 static inline void process_name_set(process_t* p, const char* name)
 {
-    strncpy(p->name, name, PROCESS_NAME_LEN);
-    p->name[PROCESS_NAME_LEN - 1] = 0;
+    strlcpy(p->name, name, PROCESS_NAME_LEN);
 }
 
 static inline char process_state_char(int s)
