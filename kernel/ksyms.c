@@ -71,7 +71,7 @@ void ksym_string(char* buffer, uint32_t addr)
     }
 }
 
-static inline size_t ksyms_count_get(char* symbols, char* end)
+static size_t ksyms_count_get(char* symbols, char* end)
 {
     char* temp = symbols;
     size_t count = 0;
@@ -84,14 +84,14 @@ static inline size_t ksyms_count_get(char* symbols, char* end)
     return count;
 }
 
-static inline int ksym_read(char** symbols, char** buf_start, char** buf, ksym_t** prev_symbol)
+static int ksym_read(char** symbols, char** buf_start, char** buf, ksym_t** prev_symbol)
 {
     ksym_t* symbol = NULL;
     size_t len;
     char str_type[4];
     char str_size[16] = "\0";
     char str_address[12];
-    char namebuf[32];
+    char namebuf[64];
 
     *symbols = word_read(*symbols, str_address);
     if (!isalpha(**symbols))

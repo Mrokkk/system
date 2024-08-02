@@ -55,6 +55,14 @@ static int exception_ongoing;
 static uintptr_t prev_cr2;
 static bool prev_cr2_valid;
 
+extern uintptr_t __stack_chk_guard;
+uintptr_t __stack_chk_guard __attribute__((used));
+
+void NORETURN(__stack_chk_fail(void))
+{
+    panic("Stack smashing detected!");
+}
+
 static void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output)
 {
     output += sprintf(output, (error_code & PF_WRITE)
