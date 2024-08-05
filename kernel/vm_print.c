@@ -3,11 +3,10 @@
 #include <kernel/path.h>
 #include <kernel/procfs.h>
 #include <kernel/printk.h>
+#include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/seq_file.h>
 #include <kernel/vm_print.h>
-
-#define DEBUG_VM_PRINT_PAGES 0
 
 #define MAX_COLUMNS 10
 
@@ -26,6 +25,7 @@ struct table_context
 {
     column_t* column;
     char*     it;
+    char*     end;
     size_t    indent;
 };
 
@@ -62,9 +62,9 @@ static void table_column_add(table_t* t, const char* name, const char* fmt, size
     t->count++;
 }
 
-static inline void spaces_fill(char** it, int count)
+static inline void spaces_fill(char** it, size_t count, size_t size)
 {
-    for (int i = 0; i < count; ++i)
+    for (size_t i = 0; i < min(count, size); ++i)
     {
         *(*it)++ = ' ';
     }
@@ -79,15 +79,14 @@ static void table_column_write(table_context_t* ctx, ...)
     const char* start = ctx->it;
     int diff;
 
-    ctx->it += sprintf(ctx->it, ctx->column->fmt, data);
+    ctx->it += snprintf(ctx->it, ctx->end - ctx->it, ctx->column->fmt, data);
 
     if ((diff = ctx->column->len - (ctx->it - start)) > 0)
     {
-        spaces_fill(&ctx->it, diff);
+        spaces_fill(&ctx->it, diff, ctx->end - ctx->it);
     }
 
-    *ctx->it++ = ctx->column->separator;
-    *ctx->it = '\0';
+    ctx->it += snprintf(ctx->it, ctx->end - ctx->it, "%c", ctx->column->separator);
     ctx->column++;
 }
 
@@ -98,20 +97,21 @@ static void table_print(table_t* t, int flag, void* data)
     char buffer[256];
     buffer[0] = 0;
     char* it = buffer;
+    const char* end = buffer + sizeof(buffer);
     size_t indent = (flag & 0xf) * 2;
 
     if (!(flag & TABLE_NO_HEADER))
     {
-        spaces_fill(&it, indent);
+        spaces_fill(&it, indent, end - it);
         for (size_t i = 0; i < t->count; ++i)
         {
             column_t* c = &t->columns[i];
 
-            it += sprintf(it, "%s", c->name);
+            it += snprintf(it, end - it, "%s", c->name);
 
             if (c->len)
             {
-                spaces_fill(&it, c->len - c->name_len);
+                spaces_fill(&it, c->len - c->name_len, end - it);
                 *it++ = ' ';
             }
 
@@ -127,9 +127,13 @@ static void table_print(table_t* t, int flag, void* data)
     {
         it = buffer;
 
-        spaces_fill(&it, indent);
+        spaces_fill(&it, indent, end - it);
 
-        table_context_t ctx = {.column = t->columns, .it = it};
+        table_context_t ctx = {
+            .column = t->columns,
+            .it = it,
+            .end = buffer + sizeof(buffer)
+        };
 
         if (t->row_fill(&ctx, data))
         {
@@ -152,7 +156,7 @@ void vm_file_path_read(vm_area_t* vma, char* buffer, size_t max_len)
         }
         else
         {
-            strcpy(buffer, "missing dentry");
+            strlcpy(buffer, "missing dentry", max_len);
         }
     }
     else
@@ -196,6 +200,18 @@ static void vm_area_columns_fill(table_t* table)
     table_column_add(table, "name", "%s", 0, '\0');
 }
 
+static inline char* vm_flags_string(int vm_flags, char* buffer, size_t size)
+{
+    char* b = buffer;
+    ASSERT(size >= 5);
+    *b++ = (vm_flags & VM_READ) ? 'r' : '-';
+    *b++ = (vm_flags & VM_WRITE) ? 'w' : '-';
+    *b++ = (vm_flags & VM_EXEC) ? 'x' : '-';
+    *b++ = (vm_flags & VM_IO) ? 'i' : '-';
+    *b = '\0';
+    return buffer;
+}
+
 static int vma_row_fill(table_context_t* ctx, void* data)
 {
     struct vma_printer_data* d = data;
@@ -212,7 +228,7 @@ static int vma_row_fill(table_context_t* ctx, void* data)
     table_column_write(ctx, vma->end);
     table_column_write(ctx, vma->end - vma->start);
     table_column_write(ctx, vma->offset);
-    table_column_write(ctx, vm_flags_string(buf, vma->vm_flags));
+    table_column_write(ctx, vm_flags_string(vma->vm_flags, buf, sizeof(buf)));
     vm_file_path_read(vma, buf, sizeof(buf));
     table_column_write(ctx, buf);
     d->vma = vma->next;

@@ -520,7 +520,7 @@ static int ahci_device_register(ata_device_t* device)
     ata_device_print(device);
 
     devfs_blk_register(
-        fmtstr(drive_dev_name, "sd%c", device->id + 'a'),
+        ssnprintf(drive_dev_name, sizeof(drive_dev_name), "sd%c", device->id + 'a'),
         MAJOR_BLK_AHCI, BLK_MINOR_DRIVE(device->id),
         &ops);
 
@@ -564,7 +564,7 @@ static int ahci_device_register(ata_device_t* device)
             part_id, p->type, p->lba_start, p->lba_start + p->sectors);
 
         devfs_blk_register(
-            fmtstr(buf, "%s%u", drive_dev_name, part_id),
+            ssnprintf(buf, 32, "%s%u", drive_dev_name, part_id),
             MAJOR_BLK_AHCI,
             BLK_MINOR(part_id, device->id),
             &ops);

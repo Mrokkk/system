@@ -17,17 +17,6 @@ void vm_areas_log_internal(
     const char* header_fmt,
     ...);
 
-static inline char* vm_flags_string(char* buffer, int vm_flags)
-{
-    char* b = buffer;
-    *b++ = (vm_flags & VM_READ) ? 'r' : '-';
-    *b++ = (vm_flags & VM_WRITE) ? 'w' : '-';
-    *b++ = (vm_flags & VM_EXEC) ? 'x' : '-';
-    *b++ = (vm_flags & VM_IO) ? 'i' : '-';
-    *b = '\0';
-    return buffer;
-}
-
 #define INDENT_LVL_0    0
 #define INDENT_LVL_1    1
 #define INDENT_LVL_2    2

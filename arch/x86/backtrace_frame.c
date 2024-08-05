@@ -80,7 +80,7 @@ void backtrace_dump(loglevel_t severity)
     log(severity, "backtrace:");
     while ((ret = backtrace_next(&data)) && depth < BACKTRACE_MAX_RECURSION)
     {
-        ksym_string(buffer, addr(ret));
+        ksym_string(addr(ret), buffer, sizeof(buffer));
         log(severity, "%s", buffer);
         ++depth;
     }
@@ -92,7 +92,7 @@ void backtrace_process(const process_t* p, int (*print_func)(), void* arg0)
     void* bt[BACKTRACE_MAX_RECURSION];
     for (size_t i = 0; i < do_backtrace_process(p, bt, BACKTRACE_MAX_RECURSION); ++i)
     {
-        ksym_string(buffer, addr(bt[i]));
+        ksym_string(addr(bt[i]), buffer, sizeof(buffer));
         print_func(arg0, "%s\n", buffer);
     }
 }
@@ -116,7 +116,7 @@ void backtrace_exception(const pt_regs_t* regs)
         {
             break;
         }
-        ksym_string(buffer, addr(ret));
+        ksym_string(addr(ret), buffer, sizeof(buffer));
         log_exception("%s", buffer);
         frame = frame->next;
     }

@@ -3,13 +3,9 @@
 #ifndef __ASSEMBLER__
 #ifdef __GNUC__
 
+#include <stdint.h>
+#include <stdbool.h>
 #include <kernel/macro.h>
-
-#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__ * 10)
-
-#define bool    _Bool
-#define true    1
-#define false   0
 
 #define MAYBE_UNUSED(var)       __attribute__((unused)) var
 #define ALIAS(name)             __attribute__((alias(#name)))
@@ -24,6 +20,7 @@
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn
 #define ALIGN(x)                __attribute__((aligned(x)))
 #define WEAK                    __attribute__((weak))
+#define FORMAT(...)             __attribute__((format(__VA_ARGS__)))
 #define UNUSED(x)               (void)x
 #define ACCESS_ONCE(x)          (*(volatile typeof(x)*)&(x))
 
@@ -80,7 +77,7 @@
 #define unlikely(x)             __builtin_expect(!!(x), 0)
 #define cptr(a)                 ((const void*)(a))
 #define ptr(a)                  ((void*)(a))
-#define addr(a)                 ((unsigned int)(a))
+#define addr(a)                 ((uintptr_t)(a))
 #define shift(ptr, off)         ((typeof(ptr))(addr(ptr) + (off)))
 #define shift_as(t, ptr, off)   ((t)(addr(ptr) + (off)))
 #define array_size(a)           (sizeof(a) / sizeof((a)[0]))

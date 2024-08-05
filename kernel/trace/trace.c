@@ -151,26 +151,25 @@ static const char* errors[] = {
     ERRNO(EHWPOISON),
 };
 
-static int string_print(char* buffer, const char* string, int limit)
+static int string_print(const char* string, int limit, char* buffer, const char* end)
 {
     char* it = buffer;
     size_t len = limit != -1 ? (size_t)limit : strlen(string);
     size_t to_print = min(len, 64);
 
-    *it++ = '\"';
+    it = csnprintf(it, end, "\"");
 
     for (size_t i = 0; i < to_print; ++i)
     {
-        it += sprintf(it, isprint(string[i]) ? "%c" : "\\%u", string[i]);
+        it = csnprintf(it, end, isprint(string[i]) ? "%c" : "\\%u", string[i]);
     }
 
     if (len > to_print)
     {
-        it += sprintf(it, "...");
+        it = csnprintf(it, end, "...");
     }
 
-    *it++ = '\"';
-    *it = 0;
+    it = csnprintf(it, end, "\"");
 
     return it - buffer;
 }
@@ -214,20 +213,23 @@ static int* parameters_get(int* buf, va_list args, size_t count)
 }
 
 #define FLAG(f) \
-    case f: *it += sprintf(*it, #f); return 1
+    case f: *it = csnprintf(*it, end, #f); return 1
 
 #define BITFLAG_EMPTY(v, c) \
     if (!(v)) \
     { \
-        *it += sprintf(*it, "%s", #c); \
+        *it = csnprintf(*it, end, "%s", #c); \
         continuation = 1; \
     }
 
 #define BITFLAG(f) \
     if (value & (f)) \
     { \
-        if (continuation) *(*it)++ = '|'; \
-        *it += sprintf(*it, #f); \
+        if (continuation) \
+        { \
+            *it = csnprintf(*it, end, "|"); \
+        } \
+        *it = csnprintf(*it, end, #f); \
         value ^= f; \
         continuation = 1; \
     }
@@ -235,7 +237,7 @@ static int* parameters_get(int* buf, va_list args, size_t count)
 #define BITFLAG_LEFT() \
     if (value) \
     { \
-        *it += sprintf(*it, "%s%x", continuation ? "|" : "", value); \
+        *it = csnprintf(*it, end, "%s%x", continuation ? "|" : "", value); \
     }
 
 #define FOR_ARGUMENT(nr, ...) \
@@ -245,7 +247,7 @@ static int* parameters_get(int* buf, va_list args, size_t count)
     } \
     while (0)
 
-static int special_parameter(int nr, size_t id, int value, char** it)
+static int special_parameter(int nr, size_t id, int value, char** it, const char* end)
 {
     int continuation = 0;
     switch (nr)
@@ -253,13 +255,13 @@ static int special_parameter(int nr, size_t id, int value, char** it)
         case __NR_signal:
         case __NR_sigaction:
             FOR_ARGUMENT(0,
-                *it += sprintf(*it, "%s", signame(value));
+                *it = csnprintf(*it, end, "%s", signame(value));
                 return 1);
             break;
 
         case __NR_kill:
             FOR_ARGUMENT(1,
-                *it += sprintf(*it, "%s", signame(value));
+                *it = csnprintf(*it, end, "%s", signame(value));
                 return 1);
             break;
 
@@ -362,6 +364,7 @@ int trace_syscall(unsigned long nr, ...)
     va_list args;
     char buf[256];
     char* it = buf;
+    const char* end = buf + sizeof(buf);
     *it = 0;
     int* params;
     int params_buf[8];
@@ -370,14 +373,14 @@ int trace_syscall(unsigned long nr, ...)
     params = parameters_get(params_buf, args, call->nargs);
     va_end(args);
 
-    it += sprintf(it, "%s(", call->name);
+    it = csnprintf(it, end, "%s(", call->name);
 
-    for (size_t i = 0; i < call->nargs; ++i, ({ i < call->nargs ? it += sprintf(it, ", ") : 0; }))
+    for (size_t i = 0; i < call->nargs; ++i, ({ i < call->nargs ? it += snprintf(it, end - it, ", ") : 0; }))
     {
         type_t arg = call->args[i];
         int value = params[i];
 
-        if (special_parameter(nr, i, value, &it))
+        if (special_parameter(nr, i, value, &it, end))
         {
             continue;
         }
@@ -390,13 +393,14 @@ int trace_syscall(unsigned long nr, ...)
         {
             case TYPE_CONST_CHAR_PTR:
             {
-                it += string_print(it, (const char*)value, size_limit);
+                it += string_print((const char*)value, size_limit, it, end);
                 break;
             }
+
             default:
             {
                 const char* fmt = format_get(arg, value);
-                it += sprintf(it, fmt, value);
+                it = csnprintf(it, end, fmt, value);
                 break;
             }
         }
@@ -421,6 +425,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 {
     char buf[128];
     char* it = buf;
+    const char* end = buf + sizeof(buf);
     int errno;
 
     if (trace_syscalls[nr].ret == TYPE_VOID)
@@ -432,20 +437,20 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 
     if (DEBUG_TRACE_BACKTRACE)
     {
-        it += sprintf(it, "%s returned ", trace_syscalls[nr].name);
+        it = csnprintf(it, end, "%s returned ", trace_syscalls[nr].name);
     }
     else
     {
-        it += sprintf(it, " = ");
+        it = csnprintf(it, end, " = ");
     }
 
     if ((errno = errno_get(retval)))
     {
-        it += sprintf(it, "%d %s", retval, errors[-errno]);
+        it = csnprintf(it, end, "%d %s", retval, errors[-errno]);
     }
     else
     {
-        it += sprintf(it, format_get(trace_syscalls[nr].ret, retval), retval);
+        it = csnprintf(it, end, format_get(trace_syscalls[nr].ret, retval), retval);
     }
 
     if (DEBUG_TRACE_BACKTRACE)

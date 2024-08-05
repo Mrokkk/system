@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include <kernel/kernel.h>
 
@@ -20,4 +21,4 @@ struct ksym
 ksym_t* ksym_find_by_name(const char *name);
 ksym_t* ksym_find(uint32_t address);
 int ksyms_load(void* start, void* end);
-void ksym_string(char* buffer, uint32_t addr);
+void ksym_string(uint32_t addr, char* buffer, size_t size);

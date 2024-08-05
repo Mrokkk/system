@@ -120,7 +120,7 @@ int tty_driver_register(tty_driver_t* drv)
             continue;
         }
 
-        sprintf(namebuf, "%s%u", drv->name, minor);
+        snprintf(namebuf, sizeof(namebuf), "%s%u", drv->name, minor);
 
         if (unlikely(errno = devfs_register(namebuf, drv->major, minor, &fops)))
         {

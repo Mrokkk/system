@@ -194,7 +194,7 @@ static void ide_device_register(ata_device_t* device)
     ata_device_print(device);
 
     devfs_blk_register(
-        fmtstr(drive_dev_name, "hd%c", device_id + 'a'),
+        ssnprintf(drive_dev_name, sizeof(drive_dev_name), "hd%c", device_id + 'a'),
         MAJOR_BLK_IDE,
         BLK_MINOR_DRIVE(device_id),
         &ops);
@@ -245,7 +245,7 @@ static void ide_device_register(ata_device_t* device)
             part_id, p->type, p->lba_start, p->lba_start + p->sectors);
 
         devfs_blk_register(
-            fmtstr(buf, "%s%u", drive_dev_name, part_id),
+            ssnprintf(buf, sizeof(buf), "%s%u", drive_dev_name, part_id),
             MAJOR_BLK_IDE,
             BLK_MINOR(part_id, device_id),
             &ops);
@@ -916,7 +916,7 @@ static void ide_irq(int nr)
 
     bm_writeb(channel, BM_REG_CMD, 0);
 
-    struct process* proc = wait_queue_front(&channels[channel].queue);
+    process_t* proc = wait_queue_front(&channels[channel].queue);
 
     if (unlikely(!proc))
     {

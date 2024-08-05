@@ -73,7 +73,7 @@ int sys_signal(int signum, sighandler_t handler)
     return 0;
 }
 
-static void default_sighandler(struct process* p, int signum)
+static void default_sighandler(process_t* p, int signum)
 {
     switch (signum)
     {
@@ -100,7 +100,7 @@ static void default_sighandler(struct process* p, int signum)
     }
 }
 
-int signal_run(struct process* proc)
+int signal_run(process_t* proc)
 {
     uint32_t* pending = &proc->signals->pending;
     int signals = 0;
@@ -120,7 +120,7 @@ int signal_run(struct process* proc)
     return signals;
 }
 
-int signal_deliver(struct process* proc, int signum)
+int signal_deliver(process_t* proc, int signum)
 {
     if (proc->signals->ongoing & (1 << signum))
     {
@@ -150,7 +150,7 @@ int signal_deliver(struct process* proc, int signum)
     return 0;
 }
 
-int do_kill(struct process* proc, int signum)
+int do_kill(process_t* proc, int signum)
 {
     log_debug(DEBUG_SIGNAL, "%s to %s[%u]", signame(signum), proc->name, proc->pid);
 
@@ -176,7 +176,7 @@ int do_kill(struct process* proc, int signum)
 
 int sys_kill(int pid, int signum)
 {
-    struct process* p;
+    process_t* p;
 
     if (process_find(pid, &p))
     {

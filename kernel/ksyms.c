@@ -5,12 +5,29 @@
 
 static ksym_t* kernel_symbols;
 
-static uint32_t hex2uint32(const char* s)
+static const char* next_word_read(const char* string, const char** output, size_t* size)
+{
+    const char* start = string;
+
+    while (*string != '\n' && *string != '\0' && *string != ' ')
+    {
+        string++;
+    }
+
+    string++;
+
+    *size = string - start;
+    *output = start;
+
+    return string;
+}
+
+static uint32_t hex_to_u32(const char* s, size_t len)
 {
     uint32_t result = 0;
     int c;
 
-    while (*s)
+    while (len--)
     {
         result = result << 4;
         if (c = (*s - '0'), (c >= 0 && c <= 9)) result |= c;
@@ -19,6 +36,7 @@ static uint32_t hex2uint32(const char* s)
         else break;
         ++s;
     }
+
     return result;
 }
 
@@ -35,7 +53,7 @@ ksym_t* ksym_find_by_name(const char* name)
     return NULL;
 }
 
-static inline int ksym_address(uint32_t address, ksym_t* ksym)
+static inline int ksym_address(uint32_t address, const ksym_t* ksym)
 {
     return (address <= ksym->address + ksym->size) && address >= ksym->address;
 }
@@ -53,13 +71,13 @@ ksym_t* ksym_find(uint32_t address)
     return NULL;
 }
 
-void ksym_string(char* buffer, uint32_t addr)
+void ksym_string(uint32_t addr, char* buffer, size_t size)
 {
     ksym_t* symbol = ksym_find(addr);
 
     if (symbol)
     {
-        sprintf(buffer, "[<%08x>] %s+%x/%x",
+        snprintf(buffer, size, "[<%08x>] %s+%x/%x",
             addr,
             symbol->name,
             addr - symbol->address,
@@ -67,13 +85,13 @@ void ksym_string(char* buffer, uint32_t addr)
     }
     else
     {
-        sprintf(buffer, "[<%08x>] unknown", addr);
+        snprintf(buffer, size, "[<%08x>] unknown", addr);
     }
 }
 
-static size_t ksyms_count_get(char* symbols, char* end)
+static size_t ksyms_count_get(const char* symbols, const char* end)
 {
-    char* temp = symbols;
+    const char* temp = symbols;
     size_t count = 0;
 
     while (temp < end)
@@ -84,46 +102,59 @@ static size_t ksyms_count_get(char* symbols, char* end)
     return count;
 }
 
-static int ksym_read(char** symbols, char** buf_start, char** buf, ksym_t** prev_symbol)
+static int ksym_read(const char** symbols, char** buf_start, char** buf, ksym_t** prev_symbol)
 {
     ksym_t* symbol = NULL;
     size_t len;
-    char str_type[4];
-    char str_size[16] = "\0";
-    char str_address[12];
-    char namebuf[64];
+    size_t str_type_len = 0;
+    size_t str_size_len = 0;
+    size_t str_address_len = 0;
+    size_t name_len = 0;
+    const char* str_type;
+    const char* str_size;
+    const char* str_address;
+    const char* name;
 
-    *symbols = word_read(*symbols, str_address);
+    *symbols = next_word_read(*symbols, &str_address, &str_address_len);
+
     if (!isalpha(**symbols))
     {
-        *symbols = word_read(*symbols, str_size);
+        *symbols = next_word_read(*symbols, &str_size, &str_size_len);
     }
-    *symbols = word_read(*symbols, str_type);
-    *symbols = word_read(*symbols, namebuf);
+
+    *symbols = next_word_read(*symbols, &str_type, &str_type_len);
+    *symbols = next_word_read(*symbols, &name, &name_len);
 
     // Ignore symbols on rodata and symbols w/o size
-    if (*str_type == 'r' || !*str_size)
+    if (*str_type == 'r' || !str_size_len)
     {
         return 0;
     }
 
-    len = align(sizeof(ksym_t) + strlen(namebuf) + 1, sizeof(uint32_t));
+    if (unlikely(!str_type_len || !str_size_len || !str_address_len))
+    {
+        log_error("incorrect format of kernel symbols");
+        return -1;
+    }
+
+    len = align(sizeof(ksym_t) + name_len, sizeof(uint32_t));
 
     if (*buf - *buf_start + len > PAGE_SIZE)
     {
         if (!(*buf = *buf_start = single_page()))
         {
-            log_error("no mem for next syms");
+            log_error("cannot allocate page for next symbols");
             return -ENOMEM;
         }
     }
 
     symbol = ptr(*buf);
-    symbol->address = hex2uint32(str_address);
+    symbol->address = hex_to_u32(str_address, str_address_len - 1);
     symbol->type = *str_type;
-    symbol->size = hex2uint32(str_size);
+    symbol->size = hex_to_u32(str_size, str_size_len - 1);
     symbol->next = NULL;
-    strcpy(symbol->name, namebuf);
+    memcpy(symbol->name, name, name_len - 1);
+    symbol->name[name_len - 1] = 0;
 
     *buf += len;
 
@@ -133,7 +164,6 @@ static int ksym_read(char** symbols, char** buf_start, char** buf, ksym_t** prev
     return 0;
 }
 
-struct memrange;
 typedef struct memrange memrange_t;
 
 struct memrange
@@ -160,14 +190,15 @@ UNMAP_AFTER_INIT int ksyms_load(void* start, void* end)
     char* buf;
     size_t count = ksyms_count_get(start, end);
     memrange_t range = MEMRANGE_INIT(start, end);
+    ksym_t* symbols;
 
-    if (!(kernel_symbols = ptr(buf = buf_start = single_page())))
+    if (!(symbols = ptr(buf = buf_start = single_page())))
     {
         log_error("no mem for syms");
         goto finish;
     }
 
-    char* data = start;
+    const char* data = start;
     ksym_t* prev_symbol = NULL;
     for (size_t i = 0; i < count; i++)
     {
@@ -186,6 +217,7 @@ finish:
     {
         page_free(addr);
     }
+    kernel_symbols = symbols;
 
     return errno;
 }

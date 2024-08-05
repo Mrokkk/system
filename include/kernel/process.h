@@ -42,94 +42,99 @@ typedef enum
 
 #define SPAWN_KERNEL        0
 #define SPAWN_USER          (1 << 1)
-#define SPAWN_VM86          (1 << 2)
 
 #define USER_STACK_SIZE             (2 * PAGE_SIZE)
 #define USER_STACK_VIRT_ADDRESS     (KERNEL_PAGE_OFFSET - USER_STACK_SIZE)
 
 struct mm
 {
-    mutex_t lock;
-    uint32_t code_start, code_end;
-    uint32_t stack_start, stack_end;
-    uint32_t args_start, args_end;
-    uint32_t env_start, env_end;
-    uint32_t brk;
-    void* kernel_stack;
-    pgd_t* pgd;
+    mutex_t    lock;
+    uint32_t   code_start, code_end;
+    uint32_t   stack_start, stack_end;
+    uint32_t   args_start, args_end;
+    uint32_t   env_start, env_end;
+    uint32_t   brk;
+    void*      kernel_stack;
+    pgd_t*     pgd;
     vm_area_t* vm_areas;
     vm_area_t* brk_vma;
 #define MM_INIT(mm) \
-    { MUTEX_INIT(mm.lock), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    { \
+        .lock = MUTEX_INIT(mm.lock), \
+    }
 };
 
 struct signals
 {
-    int count;
-    uint32_t ongoing;
-    uint32_t trapped;
-    uint32_t pending;
-    sighandler_t sighandler[NSIGNALS];
-    sigrestorer_t sigrestorer;
+    int              count;
+    uint32_t         ongoing;
+    uint32_t         trapped;
+    uint32_t         pending;
+    sighandler_t     sighandler[NSIGNALS];
+    sigrestorer_t    sigrestorer;
     signal_context_t context;
 #define SIGNALS_INIT \
-    { 1, 0, 0, 0, { 0, }, 0, { }, }
+    { \
+        .count = 1, \
+    }
 };
 
 struct fs
 {
-    int count;
+    int       count;
     dentry_t* cwd;
     dentry_t* root;
 #define FS_INIT \
-    { 1, NULL, NULL }
+    { \
+        .count = 1, \
+    }
 };
 
 struct files
 {
-    int count;
+    int     count;
     file_t* files[PROCESS_FILES];
 #define FILES_INIT \
-    { 1, { 0, } }
+    { \
+        .count = 1, \
+    }
 };
 
 struct process
 {
     // Cacheline 0
-    context_t context;
-    unsigned _need_resched[0];
-    unsigned need_resched:1;
-    unsigned need_signal:1;
+    context_t   context;
+    unsigned    _need_resched[0];
+    unsigned    need_resched:1;
+    unsigned    need_signal:1;
     task_type_t type:1;
-    stat_t stat:2;
-    int trace:2;
+    stat_t      stat:2;
+    int         trace:2;
     list_head_t running;
-    unsigned context_switches;
-    unsigned forks;
-    pid_t pid;
-    pid_t ppid;
-    int pgid;
-    int sid;
-    int exit_code;
-    uid_t uid;
-    gid_t gid;
-    int alarm;
+    unsigned    context_switches;
+    unsigned    forks;
+    pid_t       pid;
+    pid_t       ppid;
+    int         pgid;
+    int         sid;
+    int         exit_code;
+    uid_t       uid;
+    gid_t       gid;
+    int         alarm;
 
     // Cacheline 1
-    char name[PROCESS_NAME_LEN];
-    struct mm* mm;
-    struct fs* fs;
-    struct files* files;
-    struct signals* signals;
-    process_t* parent;
-    list_head_t timers;
+    char              name[PROCESS_NAME_LEN];
+    struct mm*        mm;
+    struct fs*        fs;
+    struct files*     files;
+    struct signals*   signals;
+    process_t*        parent;
+    list_head_t       timers;
     wait_queue_head_t wait_child;
-    unsigned padding;
+    unsigned          padding;
 
     // Cacheline 2
     list_head_t children;
-
-    // Don't iterate over those lists
     list_head_t siblings;
     list_head_t processes;
 };
@@ -151,19 +156,19 @@ struct process
 
 #define PROCESS_INIT(proc) \
     { \
-        .stat = PROCESS_RUNNING, \
-        .context = INIT_PROCESS_CONTEXT(proc), \
-        .mm = &proc##_mm, \
-        .name = #proc, \
-        .fs = &proc##_fs, \
-        .files = &proc##_files, \
-        .signals = &proc##_signals, \
+        .stat       = PROCESS_RUNNING, \
+        .context    = INIT_PROCESS_CONTEXT(proc), \
+        .mm         = &proc##_mm, \
+        .name       = #proc, \
+        .fs         = &proc##_fs, \
+        .files      = &proc##_files, \
+        .signals    = &proc##_signals, \
         .wait_child = WAIT_QUEUE_HEAD_INIT(proc.wait_child), \
-        .processes = LIST_INIT(proc.processes), \
-        .running = LIST_INIT(proc.running), \
-        .children = LIST_INIT(proc.children), \
-        .siblings = LIST_INIT(proc.siblings), \
-        .type = KERNEL_PROCESS, \
+        .processes  = LIST_INIT(proc.processes), \
+        .running    = LIST_INIT(proc.running), \
+        .children   = LIST_INIT(proc.children), \
+        .siblings   = LIST_INIT(proc.siblings), \
+        .type       = KERNEL_PROCESS, \
     }
 
 #define PROCESS_DECLARE(name) \
@@ -172,11 +177,11 @@ struct process
     PROCESS_FS_DECLARE(name); \
     PROCESS_FILES_DECLARE(name); \
     PROCESS_SIGNALS_DECLARE(name); \
-    struct process name = PROCESS_INIT(name)
+    process_t name = PROCESS_INIT(name)
 
 extern unsigned* need_resched;
-extern struct process init_process;
-extern struct process* process_current;
+extern process_t init_process;
+extern process_t* process_current;
 
 extern list_head_t running;
 
@@ -187,22 +192,21 @@ extern unsigned int context_switches;
 typedef void (*process_entry_t)();
 
 int processes_init();
-int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags);
-void process_exit(struct process* p);
+int process_clone(process_t* parent, struct pt_regs* regs, int clone_flags);
+void process_exit(process_t* p);
 process_t* process_spawn(const char* name, process_entry_t entry, void* args, int flags);
-int process_find(int pid, struct process** p);
-void process_wake_waiting(struct process* p);
-int process_find_free_fd(struct process* p, int* fd);
+int process_find(int pid, process_t** p);
+void process_wake_waiting(process_t* p);
+int process_find_free_fd(process_t* p, int* fd);
 void scheduler();
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[]);
-char* process_print(const struct process* p, char* str);
 
 // Arch-dependent functions
 int arch_process_init(void);
-int arch_process_copy(struct process* dest, struct process* src, struct pt_regs* old_regs);
-int arch_process_spawn(struct process* child, process_entry_t entry, void* args, int flags);
-void arch_process_free(struct process* p);
+int arch_process_copy(process_t* dest, process_t* src, struct pt_regs* old_regs);
+int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int flags);
+void arch_process_free(process_t* p);
 int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
 
 static inline void process_name_set(process_t* p, const char* name)
@@ -215,22 +219,22 @@ static inline char process_state_char(int s)
     return PROCESS_STATE_STRING[s];
 }
 
-static inline int process_is_running(struct process* p)
+static inline int process_is_running(process_t* p)
 {
     return p->stat == PROCESS_RUNNING;
 }
 
-static inline int process_is_stopped(struct process* p)
+static inline int process_is_stopped(process_t* p)
 {
     return p->stat == PROCESS_STOPPED;
 }
 
-static inline int process_is_zombie(struct process* p)
+static inline int process_is_zombie(process_t* p)
 {
     return p->stat == PROCESS_ZOMBIE;
 }
 
-static inline void process_stop(struct process* p)
+static inline void process_stop(process_t* p)
 {
     flags_t flags;
     irq_save(flags);
@@ -244,7 +248,7 @@ static inline void process_stop(struct process* p)
     }
 }
 
-static inline void process_wake(struct process* p)
+static inline void process_wake(process_t* p)
 {
     flags_t flags;
     if (p->stat == PROCESS_ZOMBIE)
@@ -329,12 +333,12 @@ static inline void process_wait2(flags_t flags)
     scheduler();
 }
 
-static inline void process_fd_set(struct process* p, int fd, struct file* file)
+static inline void process_fd_set(process_t* p, int fd, struct file* file)
 {
     p->files->files[fd] = file;
 }
 
-static inline int process_fd_get(struct process* p, int fd, struct file** file)
+static inline int process_fd_get(process_t* p, int fd, struct file** file)
 {
     return !(*file = p->files->files[fd]);
 }
@@ -344,22 +348,22 @@ static inline int fd_check_bounds(int fd)
     return (fd >= PROCESS_FILES) || (fd < 0);
 }
 
-static inline int process_is_kernel(struct process* p)
+static inline int process_is_kernel(process_t* p)
 {
     return p->type == KERNEL_PROCESS;
 }
 
-static inline int process_is_user(struct process* p)
+static inline int process_is_user(process_t* p)
 {
     return p->type == USER_PROCESS;
 }
 
-static inline void process_signals_exit(struct process* p)
+static inline void process_signals_exit(process_t* p)
 {
     if (!--p->signals->count) delete(p->signals);
 }
 
-static inline void process_files_exit(struct process* p)
+static inline void process_files_exit(process_t* p)
 {
     for (int i = 0; i < PROCESS_FILES; ++i)
     {
@@ -374,17 +378,17 @@ static inline void process_files_exit(struct process* p)
     }
 }
 
-static inline void process_fs_exit(struct process* p)
+static inline void process_fs_exit(process_t* p)
 {
     if (!--p->fs->count) delete(p->fs);
 }
 
-static inline int current_can_kill(struct process* p)
+static inline int current_can_kill(process_t* p)
 {
     return p->pid != 0;
 }
 
-static inline vm_area_t* process_code_vm_area(struct process* p)
+static inline vm_area_t* process_code_vm_area(process_t* p)
 {
     uint32_t code_start = p->mm->code_start;
     for (vm_area_t* temp = p->mm->vm_areas; temp; temp = temp->next)
@@ -397,7 +401,7 @@ static inline vm_area_t* process_code_vm_area(struct process* p)
     return NULL;
 }
 
-static inline vm_area_t* process_stack_vm_area(struct process* p)
+static inline vm_area_t* process_stack_vm_area(process_t* p)
 {
     uint32_t stack_start = p->mm->stack_start;
     for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)
@@ -410,7 +414,7 @@ static inline vm_area_t* process_stack_vm_area(struct process* p)
     return NULL;
 }
 
-static inline vm_area_t* process_brk_vm_area(struct process* p)
+static inline vm_area_t* process_brk_vm_area(process_t* p)
 {
     uint32_t brk = p->mm->brk;
     for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)

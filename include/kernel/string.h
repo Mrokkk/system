@@ -73,19 +73,6 @@ void* memsetw(unsigned short*, unsigned short, size_t);
 #define copy_array(dest, src, count) \
     memcpy(dest, src, sizeof(typeof(*src)) * (count))
 
-static inline char* word_read(char* string, char* output)
-{
-    while (*string != '\n' && *string != '\0' && *string != ' ')
-    {
-        *output++ = *string++;
-    }
-
-    string++;
-    *output = 0;
-
-    return string;
-}
-
 static inline int memcmp(const void* cs, const void* ct, size_t count)
 {
     const unsigned char* su1;

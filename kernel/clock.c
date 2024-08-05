@@ -210,7 +210,7 @@ UNMAP_AFTER_INIT int clock_sources_setup(void)
         monotonic_clock->mult_ns,
         monotonic_clock->shift_ns);
 
-    log_notice("rtc source: %-10s freq %u KHz", rtc_clock->name, rtc_clock->freq_khz);
+    log_notice("rtc source:       %-10s freq: %u KHz", rtc_clock->name, rtc_clock->freq_khz);
 
     return 0;
 }

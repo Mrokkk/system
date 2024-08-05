@@ -8,38 +8,59 @@ int path_validate(const char* path)
     return current_vm_verify_string(VERIFY_READ, path);
 }
 
-void dirname(const char* path, char* output)
+int dirname_get(const char* path, char* output, size_t size)
 {
-    const char* last_slash = find_last_slash(path);
+    const char* last_slash = strrchr(path, '/');
 
-    if (last_slash - path == 0)
+    if (!last_slash)
     {
-        strcpy(output, "/");
-        return;
+        if (unlikely(size < 1))
+        {
+            return -1;
+        }
+
+        *output = '\0';
+        return 0;
+    }
+
+    if (unlikely(size <= (size_t)(last_slash - path)))
+    {
+        return -1;
     }
 
     memcpy(output, path, last_slash - path);
     output[last_slash - path] = 0;
+
+    return 0;
 }
+
+typedef struct path_list path_list_t;
 
 struct path_list
 {
-    const char* name;
-    struct path_list* next;
+    const char*  name;
+    path_list_t* next;
 };
 
-int path_construct(dentry_t* dentry, char* output, size_t size)
+int path_construct(const dentry_t* dentry, char* output, size_t size)
 {
-    struct path_list* null = NULL;
-    struct path_list* path;
-    struct path_list** it = &null;
-    struct path_list* next;
+    path_list_t* null = NULL;
+    path_list_t* path;
+    path_list_t** it = &null;
+    path_list_t* next;
     char* temp = output;
     int i = 0;
+    const char* end = output + size;
 
     while (dentry)
     {
-        path = fmalloc(sizeof(struct path_list));
+        path = fmalloc(sizeof(*path));
+
+        if (unlikely(!path))
+        {
+            goto no_memory;
+        }
+
         path->name = dentry->name;
         path->next = *it;
         *it = path;
@@ -60,21 +81,30 @@ int path_construct(dentry_t* dentry, char* output, size_t size)
         if (temp - output + strlen(path->name) + 1 + (i > 1 ? 1 : 0) > size)
         {
             *output = 0;
-            return -ERANGE;
+            return -ENAMETOOLONG;
         }
         if (i > 1)
         {
-            temp += sprintf(temp, "/%s", path->name);
+            temp = csnprintf(temp, end, "/%s", path->name);
         }
         else
         {
-            temp += sprintf(temp, "%s", path->name);
+            temp = csnprintf(temp, end, "%s", path->name);
         }
         next = path->next;
-        ffree(path, sizeof(struct path_list));
+        ffree(path, sizeof(*path));
         path = next;
         ++i;
     }
 
     return 0;
+
+no_memory:
+    while (path)
+    {
+        next = path->next;
+        ffree(path, sizeof(*path));
+        path = next;
+    }
+    return -ENOMEM;
 }

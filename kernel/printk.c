@@ -117,7 +117,7 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
     switch (entry->log_level)
     {
         case KERN_DEBUG:
-            len = snprintf(buffer, PRINTK_LINE_LEN, "%u,%u,%u.%06u;%s:%u:%s: ",
+            len = snprintf(buffer, PRINTK_LINE_LEN, "%u,%lu,%u.%06u;%s:%u:%s: ",
                 KERN_DEBUG,
                 state.sequence++,
                 ts.tv_sec,
@@ -130,7 +130,7 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
             len = snprintf(buffer, PRINTK_LINE_LEN, " ");
             break;
         default:
-            len = snprintf(buffer, PRINTK_LINE_LEN, "%u,%u,%u.%06u;",
+            len = snprintf(buffer, PRINTK_LINE_LEN, "%u,%lu,%u.%06u;",
                 entry->log_level,
                 state.sequence++,
                 ts.tv_sec,

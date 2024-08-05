@@ -6,8 +6,6 @@
 #include <kernel/string.h>
 #include <kernel/kernel.h>
 
-int sprintf(char* buf, const char* fmt, ...);
-
 static inline int skip_atoi(const char** s)
 {
     int i = 0;
@@ -314,7 +312,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                 if (field_width == -1)
                 {
                     field_width = 2 * sizeof(void*);
-                    flags |= ZEROPAD;
+                    flags |= ZEROPAD | SMALL | SPECIAL;
                 }
                 str = number(
                     str,
@@ -442,20 +440,16 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
 next:
     }
 
-    *str = '\0';
+    if (unlikely(str == end))
+    {
+        *(str - 1) = '\0';
+    }
+    else
+    {
+        *str = '\0';
+    }
+
     return str - buf;
-}
-
-int sprintf(char* buf, const char* fmt, ...)
-{
-    va_list args;
-    int i;
-
-    va_start(args, fmt);
-    i = vsnprintf_impl(buf, (const char*)-1, fmt, args);
-    va_end(args);
-
-    return i;
 }
 
 int snprintf(char* buf, size_t size, const char* fmt, ...)
@@ -470,9 +464,32 @@ int snprintf(char* buf, size_t size, const char* fmt, ...)
     return i;
 }
 
-int vsprintf(char* buf, const char* fmt, va_list args)
+char* csnprintf(char* buf, const char* end, const char* fmt, ...)
 {
-    return vsnprintf_impl(buf, (const char*)-1, fmt, args);
+    va_list args;
+    int i;
+
+    if (unlikely(buf == end))
+    {
+        return buf;
+    }
+
+    va_start(args, fmt);
+    i = vsnprintf_impl(buf, end, fmt, args);
+    va_end(args);
+
+    return buf + i;
+}
+
+char* ssnprintf(char* buf, size_t size, const char* fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    vsnprintf_impl(buf, buf + size, fmt, args);
+    va_end(args);
+
+    return buf;
 }
 
 int vsnprintf(char* buf, size_t size, const char* fmt, va_list args)

@@ -495,7 +495,7 @@ void page_stats_print()
         if (page_map[i].caller && page_map[i].refcount)
         {
             void* caller = page_map[i].caller;
-            ksym_string(symbol, addr(caller));
+            ksym_string(addr(caller), symbol, sizeof(symbol));
             log_info("%- 5u %08x %s",
                 page_map[i].refcount,
                 page_phys(&page_map[i]),
@@ -505,30 +505,32 @@ void page_stats_print()
 #endif
 }
 
-void pde_print(const uint32_t pde, char* output)
+void pde_print(const uint32_t pde, char* output, size_t size)
 {
-    output += sprintf(output, "pgt{phys_addr=%x, flags=(", pde & ~PAGE_MASK);
-    output += sprintf(output, (pde & PDE_PRESENT)
+    const char* end = output + size;
+    output = csnprintf(output, end, "pgt{phys_addr=%x, flags=(", pde & ~PAGE_MASK);
+    output = csnprintf(output, end, (pde & PDE_PRESENT)
         ? "present "
         : "non-present ");
-    output += sprintf(output, (pde & PDE_WRITEABLE)
+    output = csnprintf(output, end, (pde & PDE_WRITEABLE)
         ? "writable "
         : "non-writable ");
-    output += sprintf(output, (pde & PDE_USER)
+    output = csnprintf(output, end, (pde & PDE_USER)
         ? "user)}"
         : "kernel)}");
 }
 
-void pte_print(const uint32_t pte, char* output)
+void pte_print(const uint32_t pte, char* output, size_t size)
 {
-    output += sprintf(output, "pg{phys_addr=%x, flags=(", pte & ~PAGE_MASK);
-    output += sprintf(output, (pte & PTE_PRESENT)
+    const char* end = output + size;
+    output = csnprintf(output, end, "pg{phys_addr=%x, flags=(", pte & ~PAGE_MASK);
+    output = csnprintf(output, end, (pte & PTE_PRESENT)
         ? "present "
         : "non-present ");
-    output += sprintf(output, (pte & PTE_WRITEABLE)
+    output = csnprintf(output, end, (pte & PTE_WRITEABLE)
         ? "writable "
         : "non-writable ");
-    output += sprintf(output, (pte & PTE_USER)
+    output = csnprintf(output, end, (pte & PTE_USER)
         ? "user)}"
         : "kernel)}");
 }

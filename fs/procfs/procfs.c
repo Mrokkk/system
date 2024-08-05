@@ -157,7 +157,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
     int errno, pid = 0, pid_ino;
     inode_t* new_inode;
     procfs_entry_t* entry = NULL;
-    struct process* p;
+    process_t* p;
 
     if (!strcmp(name, "self"))
     {
@@ -239,7 +239,7 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     char type;
     size_t len;
     procfs_entry_t* entry;
-    struct process* p;
+    process_t* p;
     char namebuf[12];
 
     log_debug(DEBUG_PROCFS, "inode=%O", file->inode);
@@ -260,7 +260,7 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 
     for_each_process(p)
     {
-        len = sprintf(namebuf, "%u", p->pid);
+        len = snprintf(namebuf, sizeof(namebuf), "%u", p->pid);
         log_debug(DEBUG_PROCFS, "adding %s", namebuf);
         ++i;
         if (dirent_add(buf, namebuf, len, 0, DT_DIR))
@@ -358,7 +358,7 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 
 static int comm_show(seq_file_t* s)
 {
-    struct process* p = procfs_process_from_seqfile(s);
+    process_t* p = procfs_process_from_seqfile(s);
     seq_puts(s, p->name);
     return 0;
 }

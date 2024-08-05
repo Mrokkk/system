@@ -142,7 +142,7 @@ static int mouse_poll(file_t*, short events, short* revents, wait_queue_head_t**
 static void mouse_irs()
 {
     uint8_t data;
-    struct process* p;
+    process_t* p;
 
     data = i8042_receive();
 

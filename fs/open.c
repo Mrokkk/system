@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <kernel/fs.h>
 #include <kernel/path.h>
+#include <kernel/errno.h>
 #include <kernel/dentry.h>
 #include <kernel/process.h>
 #include <kernel/api/stat.h>
@@ -27,30 +28,36 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     }
     else if (!dentry && !(flags & O_CREAT))
     {
-        log_debug(DEBUG_OPEN, "invalid mode");
+        log_debug(DEBUG_OPEN, "no dentry found and no O_CREAT flag specified");
         return -ENOENT;
     }
     else
     {
         if (path_is_absolute(filename))
         {
-            dirname(filename, parent);
+            if (unlikely(dirname_get(filename, parent, sizeof(parent))))
+            {
+                return -ENAMETOOLONG;
+            }
 
             log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
             parent_dentry = lookup(parent);
 
-            if (!parent_dentry)
+            if (unlikely(!parent_dentry))
             {
                 log_debug(DEBUG_OPEN, "no dentry for parent", filename);
                 return -ENOENT;
             }
-            basename = find_last_slash(filename) + 1;
+            basename = basename_get(filename);
         }
         else
         {
-            dirname(filename, parent);
+            if (unlikely(dirname_get(filename, parent, sizeof(parent))))
+            {
+                return -ENAMETOOLONG;
+            }
 
-            if (*parent == '/')
+            if (*parent == '\0')
             {
                 parent_dentry = process_current->fs->cwd;
                 basename = filename;
@@ -58,7 +65,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
             else
             {
                 parent_dentry = lookup(parent);
-                basename = find_last_slash(filename) + 1;
+                basename = basename_get(filename);
             }
 
             if (unlikely(!parent_dentry))
@@ -221,7 +228,7 @@ int sys_close(int fd)
     if (fd_check_bounds(fd)) return -EBADF;
     if (process_fd_get(process_current, fd, &file)) return -EBADF;
 
-    if ((errno = do_close(file)))
+    if (unlikely(errno = do_close(file)))
     {
         return errno;
     }
@@ -237,13 +244,17 @@ int do_mkdir(const char* path, int mode)
     inode_t* inode;
     dentry_t* new_dentry;
     dentry_t* parent_dentry;
-    char dir_name[64];
+    char dir_name[PATH_MAX];
     const char* basename;
 
     if (path_is_absolute(path))
     {
-        dirname(path, dir_name);
-        basename = find_last_slash(path) + 1;
+        if (unlikely(dirname_get(path, dir_name, sizeof(dir_name))))
+        {
+            return -ENAMETOOLONG;
+        }
+
+        basename = basename_get(path);
         parent_dentry = lookup(dir_name);
     }
     else
@@ -252,12 +263,12 @@ int do_mkdir(const char* path, int mode)
         parent_dentry = process_current->fs->cwd;
     }
 
-    if (!parent_dentry)
+    if (unlikely(!parent_dentry))
     {
         return -ENOENT;
     }
 
-    if (!parent_dentry->inode->ops || !parent_dentry->inode->ops->mkdir)
+    if (unlikely(!parent_dentry->inode->ops || !parent_dentry->inode->ops->mkdir))
     {
         return -ENOSYS;
     }
@@ -269,7 +280,7 @@ int do_mkdir(const char* path, int mode)
         0,
         &inode);
 
-    if (errno)
+    if (unlikely(errno))
     {
         return errno;
     }
@@ -278,7 +289,7 @@ int do_mkdir(const char* path, int mode)
 
     new_dentry = dentry_create(inode, parent_dentry, basename);
 
-    if (!new_dentry)
+    if (unlikely(!new_dentry))
     {
         return -ENOMEM;
     }

@@ -51,8 +51,8 @@ typedef uint32_t pgt_t;
 #define pde_index(vaddr)        (addr(vaddr) >> 22)
 #define pte_index(vaddr)        ((addr(vaddr) >> 12) & 0x3ff)
 
-void pde_print(const uint32_t entry, char* output);
-void pte_print(const uint32_t entry, char* output);
+void pde_print(const uint32_t entry, char* output, size_t size);
+void pte_print(const uint32_t entry, char* output, size_t size);
 
 static inline void pgd_load(pgd_t* pgd)
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernel/string.h>
+#include <kernel/compiler.h>
 
 extern char _unpaged_transient_start[], _unpaged_transient_end[];
 extern char _unpaged_eternal_start[], _unpaged_eternal_end[];
@@ -46,27 +47,30 @@ int section_add(const char* name, void* start, void* end, int flags);
 void section_free(section_t* section);
 void sections_print(void);
 
-#define section_flags_string(buf, flags) \
+#define section_flags_string(flags, buf, size) \
     ({ \
-        int i; \
-        i = sprintf(buf, flags & SECTION_READ ? "R" : "-"); \
-        i += sprintf(buf + i, flags & SECTION_WRITE ? "W" : "-"); \
-        i += sprintf(buf + i, flags & SECTION_EXEC ? "X" : "-"); \
-        i += sprintf(buf + i, flags & SECTION_UNPAGED ? "U" : "-"); \
-        i += sprintf(buf + i, flags & SECTION_UNMAP_AFTER_INIT ? "T" : "-"); \
+        char* it = buf; \
+        it = csnprintf(it, end, flags & SECTION_READ ? "R" : "-"); \
+        it = csnprintf(it, end, flags & SECTION_WRITE ? "W" : "-"); \
+        it = csnprintf(it, end, flags & SECTION_EXEC ? "X" : "-"); \
+        it = csnprintf(it, end, flags & SECTION_UNPAGED ? "U" : "-"); \
+        it = csnprintf(it, end, flags & SECTION_UNMAP_AFTER_INIT ? "T" : "-"); \
         buf; \
     })
 
 #define sections_print() \
     { \
         char buf[6]; \
+        const char* end = buf + sizeof(buf); \
         section_t* section = sections; \
         for (; section->name; ++section) \
         { \
             log_notice("[sec %08x - %08x %s] %s", \
                 section->start, \
                 section->end, \
-                section_flags_string(buf, section->flags), \
+                section_flags_string(section->flags, buf, end), \
                 section->name); \
         } \
     }
+
+#define UNMAP_AFTER_INIT SECTION(.text.init) NOINLINE

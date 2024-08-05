@@ -63,16 +63,17 @@ void NORETURN(__stack_chk_fail(void))
     panic("Stack smashing detected!");
 }
 
-static void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output)
+static void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output, size_t size)
 {
-    output += sprintf(output, (error_code & PF_WRITE)
+    const char* end = output + size;
+    output = csnprintf(output, end, (error_code & PF_WRITE)
         ? "Write access "
         : "Read access ");
-    output += sprintf(output, (error_code & PF_PRESENT)
+    output = csnprintf(output, end, (error_code & PF_PRESENT)
             ? "to protected page at virtual address %x "
             : "to non-present page at virtual address %x ",
         cr2);
-    output += sprintf(output, (error_code & PF_USER)
+    output = csnprintf(output, end, (error_code & PF_USER)
         ? "in user space"
         : "in kernel space");
 }
@@ -84,12 +85,12 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
     const uint32_t pde_index = pde_index(cr2);
     const uint32_t pte_index = pte_index(cr2);
 
-    pf_reason_print(regs->error_code, cr2, buffer);
+    pf_reason_print(regs->error_code, cr2, buffer, sizeof(buffer));
     log(severity, "%s: %s", header, buffer);
     log(severity, "%s: pgd: cr3 = %08x", header, cr3);
 
     const uint32_t pgt = pgd[pde_index];
-    pde_print(pgt, buffer);
+    pde_print(pgt, buffer, sizeof(buffer));
 
     log(severity, "%s: pgd[%u]: %s", header, pde_index, buffer);
 
@@ -102,7 +103,7 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
     else
     {
         const uint32_t pg = pgt_ptr[pte_index];
-        pte_print(pg, buffer);
+        pte_print(pg, buffer, sizeof(buffer));
         log(severity, "%s: pgt[%u]: %s", header, pte_index, buffer);
     }
 }
@@ -215,7 +216,7 @@ handle_fault:
             kernel_fault(exception, &regs, printer);
         }
 
-        sprintf(header, "%s[%u]", p->name, p->pid);
+        snprintf(header, sizeof(header), "%s[%u]", p->name, p->pid);
         log_info("%s: %s #%x at %x",
             header,
             exception->name,
@@ -285,9 +286,9 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
     }
 
     regs_print(KERN_CRIT, regs, header);
-    log_critical("%s: cr0: %08x: (%s)", header, cr0, cr0_bits_string_get(cr0, string));
+    log_critical("%s: cr0: %08x: (%s)", header, cr0, cr0_bits_string_get(cr0, string, sizeof(string)));
     log_critical("%s: cr2: %08x cr3: %08x", header, cr2, cr3);
-    log_critical("%s: cr4: %08x: (%s)", header, cr4, cr4_bits_string_get(cr4, string));
+    log_critical("%s: cr4: %08x: (%s)", header, cr4, cr4_bits_string_get(cr4, string, sizeof(string)));
 
     backtrace_exception(regs);
 

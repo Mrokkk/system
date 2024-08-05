@@ -107,60 +107,6 @@ int sys_setsid(void)
     return 0;
 }
 
-char* mm_print(const struct mm* mm, char* str)
-{
-    str += sprintf(str,
-        "mm{\n"
-        "\t\taddr = %x,\n"
-        "\t\tstack_start =  %08x,\n"
-        "\t\tstack_end =    %08x,\n"
-        "\t\targs_start =   %08x,\n"
-        "\t\targs_end =     %08x,\n"
-        "\t\tenv_start =    %08x,\n"
-        "\t\tenv_end =      %08x,\n"
-        "\t\tbrk =          %08x,\n"
-        "\t\tkernel_stack = %08x,\n"
-        "\t\tpgd =          %08x,\n"
-        "\t}", mm, mm->stack_start, mm->stack_end, mm->args_start, mm->args_end, mm->env_start, mm->env_end,
-        mm->brk, mm->kernel_stack, mm->pgd);
-    return str;
-}
-
-char* fs_print(const void* data, char* str)
-{
-    const struct fs* fs = data;
-    str += sprintf(str,
-        "fs{\n"
-        "\t\taddr = %x,\n"
-        "\t\tcount = %x,\n"
-        "\t\tcwd = %O\n"
-        "\t}", fs, fs->count, fs->cwd);
-    return str;
-}
-
-char* process_print(const process_t* p, char* str)
-{
-    str += sprintf(str,
-        "process{\n"
-        "\taddr = %x,\n"
-        "\tname = %S\n"
-        "\tpid = %u\n"
-        "\tppid = %u\n"
-        "\tstat = %c,\n"
-        "\ttype = %u,\n"
-        "\tcontext_switches = %u,\n"
-        "\tforks = %u,\n"
-        "\tmm = ",
-        p, p->name, p->pid, p->ppid, process_state_char(p->stat), p->type, p->context_switches, p->forks);
-
-    str = mm_print(p->mm, str);
-    str += sprintf(str, ",\n\tfs = ");
-    str = fs_print(p->fs, str);
-    str += sprintf(str, "\n}");
-
-    return str;
-}
-
 int processes_init()
 {
     init_process.mm->pgd = init_pgd_get();

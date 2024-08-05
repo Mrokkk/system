@@ -94,7 +94,7 @@ int tty_ldisc_poll(tty_t* tty, file_t*, short events, short* revents, wait_queue
 void tty_ldisc_putch(tty_t* tty, int c)
 {
     int signal = 0;
-    struct process* p;
+    process_t* p;
     int special_mode = tty->special_mode;
 
     if (c == '\r' && I_ICRNL(tty))

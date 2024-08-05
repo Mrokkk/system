@@ -73,9 +73,9 @@ static int address_fill(uint32_t eip, vm_area_t* vm_areas, user_address_t* addr)
     return 0;
 }
 
-static void backtrace_user_format(user_address_t* addr, char* buffer)
+static void backtrace_user_format(user_address_t* addr, char* buffer, size_t size)
 {
-    sprintf(buffer, "USER:%08x %08x %s:", addr->vaddr, addr->file_offset, addr->path);
+    snprintf(buffer, size, "USER:%08x %08x %s:", addr->vaddr, addr->file_offset, addr->path);
 }
 
 static void* backtrace_user_next(void** data_ptr, user_address_t* addr)
@@ -123,7 +123,7 @@ void backtrace_user(loglevel_t severity, const pt_regs_t* regs, const char* pref
         unsigned depth = 0;
         while ((backtrace_user_next(&data, &addr)) && depth < BACKTRACE_MAX_RECURSION)
         {
-            backtrace_user_format(&addr, buffer);
+            backtrace_user_format(&addr, buffer, sizeof(buffer));
             log(severity, "%s%s", prefix, buffer);
             ++depth;
         }

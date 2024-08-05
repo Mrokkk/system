@@ -14,7 +14,7 @@ void __down_failed(semaphore_t* sem)
 
 void __up(semaphore_t* sem)
 {
-    struct process* proc;
+    process_t* proc;
 
     proc = wait_queue_front(&sem->queue);
     if (!proc)

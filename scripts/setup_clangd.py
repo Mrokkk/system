@@ -9,11 +9,12 @@ JSON: TypeAlias = dict[str, 'JSON'] | list['JSON'] | str | int | float | bool | 
 
 default_clang_flags = [
     '-Wno-error',
+    '-Wno-format',
     '-Wno-address-of-packed-member',
     '-Wno-unused-command-line-argument',
     '-Wno-c2x-extensions',
     '-Wno-strict-prototypes',
-    '-D_GCC_MAX_ALIGN_T'
+    '-D_GCC_MAX_ALIGN_T',
 ]
 
 

@@ -53,7 +53,7 @@ UNMAP_AFTER_INIT static void extended_functions_read()
     cpuid_regs_t cpuid_regs = {};
     uint32_t max_function;
 
-    sprintf(cpu_info.producer, "Intel");
+    snprintf(cpu_info.producer, sizeof(cpu_info.producer), "Intel");
 
     // Check how many extended functions we have
     cpuid_read(0x80000000, &cpuid_regs);
@@ -89,7 +89,7 @@ UNMAP_AFTER_INIT static void extended_functions_read()
     }
     else
     {
-        strcpy(cpu_info.name, "unknown");
+        strlcpy(cpu_info.name, "unknown", sizeof(cpu_info.name));
     }
 
     if (max_function >= 0x80000006)

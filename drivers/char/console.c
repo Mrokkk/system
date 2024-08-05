@@ -225,7 +225,7 @@ static inline void line_nr_print(console_t* console, size_t nr)
 {
     char buf[32];
     size_t pos;
-    sprintf(buf, "[%d/%d]", nr, console->current_index);
+    snprintf(buf, sizeof(buf), "[%lu/%lu]", nr, console->current_index);
     pos = console->resx - strlen(buf);
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {

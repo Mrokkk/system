@@ -27,6 +27,79 @@ static char* printf_buf;
 
 static int initialize(void);
 
+static char* mm_print(const struct mm* mm, char* str, const char* end)
+{
+    str += snprintf(
+        str,
+        end - str,
+        "mm{\n"
+        "\t\taddr = %p,\n"
+        "\t\tstack_start =  %08x,\n"
+        "\t\tstack_end =    %08x,\n"
+        "\t\targs_start =   %08x,\n"
+        "\t\targs_end =     %08x,\n"
+        "\t\tenv_start =    %08x,\n"
+        "\t\tenv_end =      %08x,\n"
+        "\t\tbrk =          %08x,\n"
+        "\t\tkernel_stack = %08x,\n"
+        "\t\tpgd =          %08x,\n"
+        "\t}",
+        mm,
+        mm->stack_start, mm->stack_end,
+        mm->args_start, mm->args_end,
+        mm->env_start, mm->env_end,
+        mm->brk,
+        addr(mm->kernel_stack),
+        addr(mm->pgd));
+    return str;
+}
+
+static char* fs_print(const void* data, char* str, const char* end)
+{
+    const struct fs* fs = data;
+    str += snprintf(
+        str,
+        end - str,
+        "fs{\n"
+        "\t\taddr = %p,\n"
+        "\t\tcount = %x,\n"
+        "\t\tcwd = %p\n"
+        "\t}", fs, fs->count, fs->cwd);
+    return str;
+}
+
+static char* process_print(const process_t* p, char* str, const char* end)
+{
+    str += snprintf(
+        str,
+        end - str,
+        "process{\n"
+        "\taddr = %p,\n"
+        "\tname = \"%s\"\n"
+        "\tpid = %u\n"
+        "\tppid = %u\n"
+        "\tstat = %c,\n"
+        "\ttype = %u,\n"
+        "\tcontext_switches = %u,\n"
+        "\tforks = %u,\n"
+        "\tmm = ",
+        p,
+        p->name,
+        p->pid,
+        p->ppid,
+        process_state_char(p->stat),
+        p->type,
+        p->context_switches,
+        p->forks);
+
+    str = mm_print(p->mm, str, end);
+    str += snprintf(str, end - str, ",\n\tfs = ");
+    str = fs_print(p->fs, str, end);
+    str += snprintf(str, end - str, "\n}");
+
+    return str;
+}
+
 static inline void read_line(char* line)
 {
     do_read(file, 0, line, 32);
@@ -40,7 +113,7 @@ static int printf(const char* fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    printed = vsprintf(printf_buf, fmt, args);
+    printed = vsnprintf(printf_buf, PAGE_SIZE, fmt, args);
     va_end(args);
 
     do_write(file, 0, printf_buf, strlen(printf_buf));
@@ -56,7 +129,7 @@ static int c_fs()
 
 static int c_ps()
 {
-    struct process* proc;
+    process_t* proc;
     for_each_process(proc)
     {
         printf("pid=%d name=%s stat=%c\n",
@@ -127,7 +200,7 @@ static int c_kstat()
 
 static int c_running()
 {
-    struct process* proc;
+    process_t* proc;
     list_for_each_entry(proc, &running, running)
     {
         printf("pid=%d name=%s stat=%d\n",
@@ -172,9 +245,9 @@ static inline int address_is_mapped(uint32_t addr)
     return pgt[pte_index];
 }
 
-struct process* process_get(int pid)
+process_t* process_get(int pid)
 {
-    struct process* p;
+    process_t* p;
     for_each_process(p)
     {
         if (p->pid == pid)
@@ -224,7 +297,7 @@ static void line_handle(const char* line)
 {
     int i, pid, flags = 0;
     ksym_t* sym;
-    struct process* p;
+    process_t* p;
     const char* line_it = line;
     char* str;
     uint32_t* ptr;
@@ -250,7 +323,7 @@ static void line_handle(const char* line)
             return;
         }
 
-        str = process_print(p, printf_buf);
+        str = process_print(p, printf_buf, printf_buf + PAGE_SIZE);
         do_write(file, 0, printf_buf, str - printf_buf);
         printf("\n");
         return;

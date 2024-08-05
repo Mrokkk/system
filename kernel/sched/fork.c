@@ -12,13 +12,13 @@ static inline pid_t find_free_pid()
     return ++last_pid;
 }
 
-static inline void process_forked(struct process* proc)
+static inline void process_forked(process_t* proc)
 {
     ++proc->forks;
     ++total_forks;
 }
 
-static int process_space_copy(struct process* dest, struct process* src, int clone_flags)
+static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
 {
     int errno = -ENOMEM;
     void* pgd;
@@ -126,7 +126,7 @@ error:
     return errno;
 }
 
-static inline void process_init(struct process* child, struct process* parent)
+static inline void process_init(process_t* child, process_t* parent)
 {
     list_init(&child->running);
     child->pid = find_free_pid();
@@ -147,7 +147,7 @@ static inline void process_init(struct process* child, struct process* parent)
     list_init(&child->timers);
 }
 
-static inline void process_parent_child_link(struct process* parent, struct process* child)
+static inline void process_parent_child_link(process_t* parent, process_t* child)
 {
     child->parent = parent;
     child->ppid = parent->pid;
@@ -160,7 +160,7 @@ static inline void fs_init(struct fs* dest, struct fs* src)
     dest->count = 1;
 }
 
-static inline int process_fs_copy(struct process* child, struct process* parent, int clone_flags)
+static inline int process_fs_copy(process_t* child, process_t* parent, int clone_flags)
 {
     if (clone_flags & CLONE_FS)
     {
@@ -190,7 +190,7 @@ static inline void files_init(struct files* dest, struct files* src)
     dest->count = 1;
 }
 
-static inline int process_files_copy(struct process* child, struct process* parent, int clone_flags)
+static inline int process_files_copy(process_t* child, process_t* parent, int clone_flags)
 {
     if (clone_flags & CLONE_FILES)
     {
@@ -213,7 +213,7 @@ static inline void signals_init(struct signals* dest, struct signals* src)
     dest->count = 1;
 }
 
-static inline int process_signals_copy(struct process* child, struct process* parent, int clone_flags)
+static inline int process_signals_copy(process_t* child, process_t* parent, int clone_flags)
 {
     if (clone_flags & CLONE_SIGHAND)
     {
@@ -230,15 +230,15 @@ static inline int process_signals_copy(struct process* child, struct process* pa
     return 0;
 }
 
-int process_clone(struct process* parent, struct pt_regs* regs, int clone_flags)
+int process_clone(process_t* parent, struct pt_regs* regs, int clone_flags)
 {
     int errno = -ENOMEM;
-    struct process* child;
+    process_t* child;
     scoped_irq_lock();
 
     log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
 
-    if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
+    if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, clone_flags)) goto cannot_allocate;
     if (process_fs_copy(child, parent, clone_flags)) goto fs_error;
     if (process_files_copy(child, parent, clone_flags)) goto files_error;
@@ -276,14 +276,14 @@ process_t* process_spawn(const char* name, process_entry_t entry, void* args, in
 {
     int errno = -ENOMEM;
 
-    struct process* child;
-    struct process* parent = flags == SPAWN_KERNEL
+    process_t* child;
+    process_t* parent = flags == SPAWN_KERNEL
         ? &init_process
         : process_current;
 
     cli();
 
-    if (!(child = alloc(struct process, process_init(this, parent)))) goto cannot_create_process;
+    if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
     child->type = KERNEL_PROCESS;
     if (process_space_copy(child, parent, 0)) goto cannot_allocate;
     if (process_fs_copy(child, parent, 0)) goto fs_error;
@@ -334,7 +334,7 @@ int sys_dtrace(int flag)
 
 void processes_stats_print(void)
 {
-    struct process* proc;
+    process_t* proc;
 
     log_info("processes stats:");
 

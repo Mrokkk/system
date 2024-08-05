@@ -242,7 +242,7 @@ void dmi_read(void)
         return;
     }
 
-    smbios_offset = offset_get(mapped, paddr);
+    smbios_offset = addr(mapped) - paddr;
 
     header = ptr(smbios_entry->table_address + smbios_offset);
     end = ptr(addr(header) + len);

@@ -94,17 +94,17 @@ static mode_info_t standard_modes[] = {
 
 #define default_text_mode (&standard_modes[DEFAULT_TEXT_MODE])
 
-static char* video_mode_print(char* buf, mode_info_t* m)
+static char* video_mode_string(mode_info_t* m, char* buf, size_t size)
 {
     int i;
-    i = sprintf(buf, "%x: %ux%ux%u ", m->mode, m->resx, m->resy, m->bits);
-    i += sprintf(buf + i, "%s %s",
+    i = snprintf(buf, size, "%x: %ux%ux%u ", m->mode, m->resx, m->resy, m->bits);
+    i += snprintf(buf + i, size - i, "%s %s",
         m->type == VBE_MODE_GRAPHICS ? "graphics" : "text",
         m->color_support ? "color" : "mono");
 
     if (m->framebuffer)
     {
-        sprintf(buf + i, " fb=%x", m->framebuffer);
+        snprintf(buf + i, size - i, " fb=%x", m->framebuffer);
     }
 
     return buf;
@@ -115,7 +115,7 @@ static inline int video_mode_set(mode_info_t* mode)
     char buf[48];
     regs_t regs;
 
-    log_notice("setting mode %s", video_mode_print(buf, mode));
+    log_notice("setting mode %s", video_mode_string(mode, buf, sizeof(buf)));
 
     regs.ax = VBE_SET_MODE;
     regs.bx = mode->mode | (mode->framebuffer ? VBE_MODE_USE_LINEAR_FB : 0);
@@ -155,7 +155,7 @@ static int video_modes_print(void)
 
     for (v = modes; v->is_valid; ++v)
     {
-        log_notice("%s", video_mode_print(buf, v));
+        log_notice("%s", video_mode_string(v, buf, sizeof(buf)));
     }
     return 0;
 }
@@ -303,7 +303,7 @@ int vbe_initialize(void)
     if (current_mode)
     {
         char buf[48];
-        log_notice("current: %s", video_mode_print(buf, current_mode));
+        log_notice("current: %s", video_mode_string(current_mode, buf, sizeof(buf)));
     }
 
 setup_fb:

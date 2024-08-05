@@ -92,3 +92,5 @@ static inline int ts_gt(timeval_t* lhs, timeval_t* rhs)
         uint64_t __e = monotonic_clock->read(); \
         cycles2##unit(((__e - __s) & monotonic_clock->mask) - monotonic_clock->read_overhead); \
     })
+
+extern volatile unsigned int jiffies;

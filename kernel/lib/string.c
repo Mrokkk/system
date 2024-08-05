@@ -312,11 +312,17 @@ size_t strlcpy(char* dst, const char* src, size_t size)
 {
     size_t len = strlen(src);
 
-    if (size)
+    if (unlikely(len >= size))
     {
-        len = (len >= size) ? size - 1 : len;
-        memcpy(dst, src, len);
-        dst[len] = 0;
+        if (size)
+        {
+            memcpy(dst, src, size);
+            dst[size - 1] = '\0';
+        }
+    }
+    else
+    {
+        memcpy(dst, src, len + 1);
     }
 
     return len;

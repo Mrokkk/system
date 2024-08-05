@@ -48,7 +48,7 @@ int diskimg_init(void)
         }
 
         devfs_blk_register(
-            fmtstr(buf, "img%u", j),
+            ssnprintf(buf, sizeof(buf), "img%u", j),
             MAJOR_BLK_DISKIMG,
             BLK_MINOR(0, j),
             &ops);

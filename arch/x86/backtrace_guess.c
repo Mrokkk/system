@@ -28,7 +28,7 @@ void* backtrace_next(void** stack_ptr)
     return ret;
 }
 
-size_t do_backtrace_process(struct process* p, void** buffer, size_t)
+size_t do_backtrace_process(process_t* p, void** buffer, size_t)
 {
     void* eip = ptr(p->context.eip);
 

@@ -1,7 +1,7 @@
 #include <kernel/kernel.h>
 #include <kernel/bitflag.h>
 
-int bitflags_string_impl(char* buffer, const char* strings[], uint32_t bitflags, size_t n)
+int bitflags_string_impl(char* buffer, size_t size, const char* strings[], uint32_t bitflags, size_t n)
 {
     int len = 0;
 
@@ -15,7 +15,7 @@ int bitflags_string_impl(char* buffer, const char* strings[], uint32_t bitflags,
             {
                 buffer[len++] = ' ';
             }
-            len += sprintf(buffer + len, "%s", strings[i]);
+            len += snprintf(buffer + len, size - len, "%s", strings[i]);
         }
     }
 

@@ -63,6 +63,7 @@ int seq_read(file_t* file, char* buffer, size_t count)
         }
 
         s->buffer = page_virt_ptr(pages);
+        s->size = 4 * PAGE_SIZE;
 
         if ((errno = s->show(s)))
         {
@@ -92,7 +93,7 @@ int seq_printf(seq_file_t* s, const char* fmt, ...)
     int i;
 
     va_start(args, fmt);
-    i = vsprintf(s->buffer + s->count, fmt, args);
+    i = vsnprintf(s->buffer + s->count, s->size - s->count, fmt, args);
     va_end(args);
 
     s->count += i;

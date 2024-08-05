@@ -146,272 +146,277 @@ skip_pci_bios:
     param_call_if_set(KERNEL_PARAM("pciprint"), &pci_devices_list);
 }
 
-static inline char* pci_device_description(char* buf, pci_device_t* device)
+static inline char* pci_device_description(pci_device_t* device, char* buf, size_t size)
 {
-    int i = 0;
+    char* it = buf;
+    const char* end = buf + size;
+
     switch (device->class)
     {
         case PCI_UNCLASSIFIED:
-            i = sprintf(buf, "Unclassified");
+            it = csnprintf(it, end, "Unclassified");
             break;
         case PCI_STORAGE:
-            i = sprintf(buf, storage_subclass_string(device->subclass));
+            it = csnprintf(it, end, storage_subclass_string(device->subclass));
             break;
         case PCI_NETWORK:
-            i = sprintf(buf, "Network controller");
+            it = csnprintf(it, end, "Network controller");
             break;
         case PCI_DISPLAY:
-            i = sprintf(buf, display_subclass_string(device->subclass));
+            it = csnprintf(it, end, display_subclass_string(device->subclass));
             break;
         case PCI_MULTIMEDIA:
-            i = sprintf(buf, multimedia_subclass_string(device->subclass));
+            it = csnprintf(it, end, multimedia_subclass_string(device->subclass));
             break;
         case PCI_BRIDGE:
-            i = sprintf(buf, bridge_subclass_string(device->subclass));
+            it = csnprintf(it, end, bridge_subclass_string(device->subclass));
             break;
         case PCI_COMCONTROLLER:
-            i = sprintf(buf, "Communication controller");
+            it = csnprintf(it, end, "Communication controller");
             break;
         case PCI_SERIAL_BUS:
-            i = sprintf(buf, serial_bus_subclass_string(device->subclass));
+            it = csnprintf(it, end, serial_bus_subclass_string(device->subclass));
             break;
     }
-    i += sprintf(buf + i, " [%02X%02X]: ", device->class, device->subclass);
+    it = csnprintf(it, end, " [%02X%02X]: ", device->class, device->subclass);
     switch (device->vendor_id)
     {
         case PCI_AMD:
-            i += sprintf(buf + i, "Advanced Micro Devices, Inc. [AMD/ATI] ");
+            it = csnprintf(it, end, "Advanced Micro Devices, Inc. [AMD/ATI] ");
             switch (device->device_id)
             {
                 case 0x4e50:
-                    i += sprintf(buf + i, "RV350/M10 / RV360/M11 [Mobility Radeon 9600 (PRO) / 9700]");
+                    it = csnprintf(it, end, "RV350/M10 / RV360/M11 [Mobility Radeon 9600 (PRO) / 9700]");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         case PCI_TI:
-            i += sprintf(buf + i, "Texas Instruments ");
+            it = csnprintf(it, end, "Texas Instruments ");
             switch (device->device_id)
             {
                 case 0xac46:
-                    i += sprintf(buf + i, "PCI4520 PC card Cardbus Controller");
+                    it = csnprintf(it, end, "PCI4520 PC card Cardbus Controller");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         case PCI_VIRTIO:
-            i += sprintf(buf + i, "Red Hat, Inc. ");
+            it = csnprintf(it, end, "Red Hat, Inc. ");
             switch (device->device_id)
             {
                 case 0x1001:
-                    i += sprintf(buf + i, "VirtIO block device");
+                    it = csnprintf(it, end, "VirtIO block device");
                     break;
                 case 0x1003:
-                    i += sprintf(buf + i, "VirtIO console");
+                    it = csnprintf(it, end, "VirtIO console");
                     break;
                 case 0x1050:
-                    i += sprintf(buf + i, "Virtio 1.0 GPU");
+                    it = csnprintf(it, end, "Virtio 1.0 GPU");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         case PCI_INTEL:
-            i += sprintf(buf + i, "Intel ");
+            it = csnprintf(it, end, "Intel ");
             switch (device->device_id)
             {
                 case 0x0154:
-                    i += sprintf(buf + i, "3rd Gen Core processor DRAM Controller");
+                    it = csnprintf(it, end, "3rd Gen Core processor DRAM Controller");
                     break;
                 case 0x0166:
-                    i += sprintf(buf + i, "3rd Gen Core processor Graphics Controller");
+                    it = csnprintf(it, end, "3rd Gen Core processor Graphics Controller");
                     break;
                 case 0x100e:
-                    i += sprintf(buf + i, "82540EM Gigabit Ethernet Controller");
+                    it = csnprintf(it, end, "82540EM Gigabit Ethernet Controller");
                     break;
                 case 0x101e:
-                    i += sprintf(buf + i, "82540EP Gigabit Ethernet Controller (Mobile)");
+                    it = csnprintf(it, end, "82540EP Gigabit Ethernet Controller (Mobile)");
                     break;
                 case 0x1503:
-                    i += sprintf(buf + i, "82579V Gigabit Network Connection");
+                    it = csnprintf(it, end, "82579V Gigabit Network Connection");
                     break;
                 case 0x1e03:
-                    i += sprintf(buf + i, "7 Series Chipset Family 6-port SATA Controller [AHCI mode]");
+                    it = csnprintf(it, end, "7 Series Chipset Family 6-port SATA Controller [AHCI mode]");
                     break;
                 case 0x1e10:
-                    i += sprintf(buf + i, "7 Series/C216 Chipset Family PCI Express Root Port 1");
+                    it = csnprintf(it, end, "7 Series/C216 Chipset Family PCI Express Root Port 1");
                     break;
                 case 0x1e12:
-                    i += sprintf(buf + i, "7 Series/C210 Series Chipset Family PCI Express Root Port 2");
+                    it = csnprintf(it, end, "7 Series/C210 Series Chipset Family PCI Express Root Port 2");
                     break;
                 case 0x1e14:
-                    i += sprintf(buf + i, "7 Series/C210 Series Chipset Family PCI Express Root Port 3");
+                    it = csnprintf(it, end, "7 Series/C210 Series Chipset Family PCI Express Root Port 3");
                     break;
                 case 0x1e16:
-                    i += sprintf(buf + i, "7 Series/C216 Chipset Family PCI Express Root Port 4");
+                    it = csnprintf(it, end, "7 Series/C216 Chipset Family PCI Express Root Port 4");
                     break;
                 case 0x1e20:
-                    i += sprintf(buf + i, "7 Series/C216 Chipset Family High Definition Audio Controller");
+                    it = csnprintf(it, end, "7 Series/C216 Chipset Family High Definition Audio Controller");
                     break;
                 case 0x1e26:
-                    i += sprintf(buf + i, "7 Series/C216 Chipset Family USB Enhanced Host Controller #1");
+                    it = csnprintf(it, end, "7 Series/C216 Chipset Family USB Enhanced Host Controller #1");
                     break;
                 case 0x1e2d:
-                    i += sprintf(buf + i, "7 Series/C216 Chipset Family USB Enhanced Host Controller #2");
+                    it = csnprintf(it, end, "7 Series/C216 Chipset Family USB Enhanced Host Controller #2");
                     break;
                 case 0x1e31:
-                    i += sprintf(buf + i, "7 Series/C210 Series Chipset Family USB xHCI Host Controller");
+                    it = csnprintf(it, end, "7 Series/C210 Series Chipset Family USB xHCI Host Controller");
                     break;
                 case 0x1e3a:
-                    i += sprintf(buf + i, "7 Series/C216 Chipset Family MEI Controller #1");
+                    it = csnprintf(it, end, "7 Series/C216 Chipset Family MEI Controller #1");
                     break;
                 case 0x1e59:
-                    i += sprintf(buf + i, "HM76 Express Chipset LPC Controller");
+                    it = csnprintf(it, end, "HM76 Express Chipset LPC Controller");
                     break;
                 case 0x1237:
-                    i += sprintf(buf + i, "440FX - 82441FX PMC [Natoma]");
+                    it = csnprintf(it, end, "440FX - 82441FX PMC [Natoma]");
                     break;
                 case 0x2448:
-                    i += sprintf(buf + i, "82801 Mobile PCI Bridge");
+                    it = csnprintf(it, end, "82801 Mobile PCI Bridge");
                     break;
                 case 0x24c2:
-                    i += sprintf(buf + i, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
+                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
                     break;
                 case 0x24c3:
-                    i += sprintf(buf + i, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
+                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
                     break;
                 case 0x24c4:
-                    i += sprintf(buf + i, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2");
+                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2");
                     break;
                 case 0x24c5:
-                    i += sprintf(buf + i, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Audio Controller");
+                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Audio Controller");
                     break;
                 case 0x24c6:
-                    i += sprintf(buf + i, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Modem Controller");
+                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Modem Controller");
                     break;
                 case 0x24c7:
-                    i += sprintf(buf + i, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #3");
+                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #3");
                     break;
                 case 0x24ca:
-                    i += sprintf(buf + i, "82801DBM (ICH4-M) IDE Controller");
+                    it = csnprintf(it, end, "82801DBM (ICH4-M) IDE Controller");
                     break;
                 case 0x24cc:
-                    i += sprintf(buf + i, "82801DBM (ICH4-M) LPC Interface Bridge");
+                    it = csnprintf(it, end, "82801DBM (ICH4-M) LPC Interface Bridge");
                     break;
                 case 0x24cd:
-                    i += sprintf(buf + i, "82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller");
+                    it = csnprintf(it, end, "82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller");
                     break;
                 case 0x2922:
-                    i += sprintf(buf + i, "82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]");
+                    it = csnprintf(it, end, "82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]");
                     break;
                 case 0x3340:
-                    i += sprintf(buf + i, "82855PM Processor to I/O Controller");
+                    it = csnprintf(it, end, "82855PM Processor to I/O Controller");
                     break;
                 case 0x3341:
-                    i += sprintf(buf + i, "82855PM Processor to AGP Controller");
+                    it = csnprintf(it, end, "82855PM Processor to AGP Controller");
                     break;
                 case 0x7000:
-                    i += sprintf(buf + i, "82371SB PIIX3 ISA [Natoma/Triton II]");
+                    it = csnprintf(it, end, "82371SB PIIX3 ISA [Natoma/Triton II]");
                     break;
                 case 0x7010:
-                    i += sprintf(buf + i, "82371SB PIIX3 IDE [Natoma/Triton II]");
+                    it = csnprintf(it, end, "82371SB PIIX3 IDE [Natoma/Triton II]");
                     break;
                 case 0x7113:
-                    i += sprintf(buf + i, "82371AB/EB/MB PIIX4 ACPI");
+                    it = csnprintf(it, end, "82371AB/EB/MB PIIX4 ACPI");
                     break;
                 case 0x7020:
-                    i += sprintf(buf + i, "82371SB PIIX3 USB [Natoma/Triton II]");
+                    it = csnprintf(it, end, "82371SB PIIX3 USB [Natoma/Triton II]");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         case PCI_QEMU:
-            i += sprintf(buf + i, "QEMU ");
+            it = csnprintf(it, end, "QEMU ");
             switch (device->device_id)
             {
                 case 0x1111:
-                    i += sprintf(buf + i, "Virtual Video Controller");
+                    it = csnprintf(it, end, "Virtual Video Controller");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         case PCI_QUALCOMM:
-            i += sprintf(buf + i, "Qualcomm Atheros ");
+            it = csnprintf(it, end, "Qualcomm Atheros ");
             switch (device->device_id)
             {
                 case 0x0013:
-                    i += sprintf(buf + i, "AR5212/5213/2414 Wireless Network Adapter");
+                    it = csnprintf(it, end, "AR5212/5213/2414 Wireless Network Adapter");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         case PCI_VMWARE:
-            i += sprintf(buf + i, "VMware ");
+            it = csnprintf(it, end, "VMware ");
             switch (device->device_id)
             {
                 case 0x0405:
-                    i += sprintf(buf + i, "SVGA II Adapter");
+                    it = csnprintf(it, end, "SVGA II Adapter");
                     break;
                 default:
-                    i += sprintf(buf + i, "<unknown>");
+                    it = csnprintf(it, end, "<unknown>");
                     break;
             }
             break;
         default:
-            i += sprintf(buf + i, "Device");
+            it = csnprintf(it, end, "Device");
     }
-    i += sprintf(buf + i, " [%04X:%04X]", device->vendor_id, device->device_id);
+    it = csnprintf(it, end, " [%04X:%04X]", device->vendor_id, device->device_id);
 
     return buf;
 }
 
-static inline char* pci_device_subsystem_description(char* buf, pci_device_t* device)
+static inline char* pci_device_subsystem_description(pci_device_t* device, char* buf, size_t size)
 {
-    int i = 0;
+    char* it = buf;
+    const char* end = buf + size;
+
     switch (device->subsystem_vendor_id)
     {
         case 0x1014:
-            i = sprintf(buf, "IBM");
+            it = csnprintf(it, end, "IBM");
             break;
         case 0x103c:
-            i = sprintf(buf, "Hewlett-Packard Company");
+            it = csnprintf(it, end, "Hewlett-Packard Company");
             break;
         case 0x1af4:
-            i = sprintf(buf, "QEMU Virtual Machine");
+            it = csnprintf(it, end, "QEMU Virtual Machine");
             break;
         default:
-            i = sprintf(buf, "Unknown");
+            it = csnprintf(it, end, "Unknown");
             break;
     }
-    i += sprintf(buf + i, " [%04X:%04X]", device->subsystem_vendor_id, device->subsystem_id);
+    it = csnprintf(it, end, " [%04X:%04X]", device->subsystem_vendor_id, device->subsystem_id);
     return buf;
 }
 
-static inline char* pci_bar_description(char* buf, bar_t* bar)
+static inline char* pci_bar_description(bar_t* bar, char* buf, size_t size)
 {
     const char* unit = "B";
-    uint32_t size = bar->size;
+    uint32_t bar_size = bar->size;
 
     if (bar->region == PCI_MEMORY)
     {
-        human_size(size, unit);
-        sprintf(buf, "memory %x [size=%u %s]", bar->addr, size, unit);
+        human_size(bar_size, unit);
+        snprintf(buf, size, "memory %x [size=%u %s]", bar->addr, bar_size, unit);
     }
     else
     {
-        sprintf(buf, "io %x [size=%u]", bar->addr, size);
+        snprintf(buf, size, "io %x [size=%u]", bar->addr, bar_size);
     }
+
     return buf;
 }
 
@@ -481,16 +486,14 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
 
 void pci_device_print(pci_device_t* device)
 {
-    // FIXME: this can still overflow, some bound checking
-    // is needed in below functions
     char description[256] = {0, };
 
     log_notice("%X:%X.%X %s",
         device->bus, device->slot, device->func,
-        pci_device_description(description, device));
+        pci_device_description(device, description, sizeof(description)));
 
     description[0] = 0;
-    log_notice("\tSubsystem: %s", pci_device_subsystem_description(description, device));
+    log_notice("\tSubsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
     log_notice("\tStatus: %04x", device->status);
     log_notice("\tCommand: %04x", device->command);
     log_notice("\tProg IF: %02x", device->prog_if);
@@ -508,7 +511,7 @@ void pci_device_print(pci_device_t* device)
             {
                 continue;
             }
-            log_notice("\tBAR%u: %s", i, pci_bar_description(description, bar));
+            log_notice("\tBAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
         }
     }
 }

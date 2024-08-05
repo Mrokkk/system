@@ -82,7 +82,7 @@ static int pipe_write(file_t* file, const char* buffer, size_t count)
 
     irq_restore(flags);
 
-    struct process* proc = wait_queue_pop(&pipe->wq);
+    process_t* proc = wait_queue_pop(&pipe->wq);
 
     log_debug(DEBUG_PIPE, "%u: pipe %x: written %u B", process_current->pid, pipe, count);
 
@@ -114,7 +114,7 @@ static int pipe_w_close(file_t* file)
     log_debug(DEBUG_PIPE, "%u: pipe %x: closing", process_current->pid, pipe);
     if (!--pipe->writers)
     {
-        struct process* proc = wait_queue_pop(&pipe->wq);
+        process_t* proc = wait_queue_pop(&pipe->wq);
 
         if (proc)
         {
