@@ -67,6 +67,8 @@ int fileno(FILE* stream);
 int fseek(FILE* stream, long offset, int whence);
 long ftell(FILE* stream);
 
+void rewind(FILE* stream);
+
 int scanf(const char* restrict format, ...);
 int fscanf(FILE* restrict stream, const char* restrict format, ...);
 
