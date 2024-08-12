@@ -1,6 +1,8 @@
-#include <string.h>
+#define FUNCNAME memcmp
+#include <common/defs.h>
 
-int LIBC(memcmp)(const void* s1, const void* s2, size_t n)
+#if !IS_ARCH_DEFINED
+int NAME(memcmp)(const void* s1, const void* s2, size_t n)
 {
     int res = 0;
 
@@ -15,4 +17,5 @@ int LIBC(memcmp)(const void* s1, const void* s2, size_t n)
     return res;
 }
 
-LIBC_ALIAS(memcmp);
+POST(memcmp);
+#endif

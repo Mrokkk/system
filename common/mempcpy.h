@@ -1,6 +1,8 @@
-#include <string.h>
+#pragma once
 
-void* LIBC(memcpy)(void* dest, const void* src, size_t size)
+#include <common/defs.h>
+
+static inline void* mempcpy_impl(void* dest, const void* src, size_t size)
 {
     size_t size4;
     uint32_t* d4;
@@ -8,7 +10,7 @@ void* LIBC(memcpy)(void* dest, const void* src, size_t size)
     uint8_t* d1;
     uint8_t* s1;
 
-    for (size4 = size >> 2, d4 = (uint32_t*)dest, s4 = (uint32_t*)src;
+    for (size4 = size / 4, d4 = (uint32_t*)dest, s4 = (uint32_t*)src;
          size4>0;
          size4--, *d4++ = *s4++);
 
@@ -16,7 +18,5 @@ void* LIBC(memcpy)(void* dest, const void* src, size_t size)
          size>0;
          size--, *d1++ = *s1++);
 
-    return dest;
+    return d1;
 }
-
-LIBC_ALIAS(memcpy);

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <arch/string.h>
 #include <kernel/api/types.h>
 
 struct string
@@ -34,79 +33,79 @@ static inline void __string_free(string_t** string)
 
 #define scoped_string_t CLEANUP(__string_free) string_t
 
-#ifndef __HAVE_ARCH_STRLEN
+void bzero(void* s, size_t n);
+void* memset(void* s, int c, size_t n);
+void* memsetw(unsigned short*, unsigned short, size_t);
+void* memcpy(void* dest, const void* src, size_t n);
+int memcmp(const void* s1, const void* s2, size_t n);
+
 size_t strlen(const char* s);
-#endif
-
-#ifndef __HAVE_ARCH_STRNLEN
 size_t strnlen(const char* s, size_t count);
-#endif
 
-#ifndef __HAVE_ARCH_STRCPY
-char* strcpy(char* __restrict, const char* __restrict);
-#endif
-
-#ifndef __HAVE_ARCH_STRNCPY
-char* strncpy(char* __restrict, const char* __restrict, size_t count);
-#endif
-
+char* strcpy(char* restrict dst, const char* restrict src);
 size_t strlcpy(char* dst, const char* src, size_t size);
 
-size_t strspn(const char* str, const char* accept);
-size_t strcspn(const char* str, const char* reject);
+int strcmp(const char* s1, const char* s2);
+int strncmp(const char* s1, const char* s2, size_t n);
+
+char* strchr(const char* s , int c);
+char* strrchr(const char* s, int c);
+
+char* strstr(const char* haystack, const char* needle);
+size_t strspn(const char* s, const char* accept);
+size_t strcspn(const char* s, const char* reject);
 char* strtok_r(char* str, const char* delim, char** saveptr);
 
-int strcmp(const char*, const char*);
-int strncmp(const char*, const char*, size_t);
+#if __has_builtin(__builtin_bzero)
+#define bzero(s, n) __builtin_bzero(s, n)
+#endif
 
-char* strchr(const char*, int);
-char* strrchr(const char*, int);
+#if __has_builtin(__builtin_memset)
+#define memset(dst, val, n) __builtin_memset(dst, val, n)
+#endif
 
-void* memcpy(void* dest, const void* src, size_t n);
-void* memcpyw(unsigned short*, const unsigned short*, size_t);
-void* memset(void*, int, size_t);
-void* memsetw(unsigned short*, unsigned short, size_t);
+#if __has_builtin(__builtin_memcpy)
+#define memcpy(dst, src, n) __builtin_memcpy(dst, src, n)
+#endif
+
+#if __has_builtin(__builtin_memcmp)
+#define memcmp(s1, s2, n)   __builtin_memcmp(s1, s2, n)
+#endif
+
+#if __has_builtin(__builtin_strlen)
+#define strlen(s)           __builtin_strlen(s)
+#endif
+
+#if __has_builtin(__builtin_strnlen)
+#define strnlen(s, n)       __builtin_strnlen(s, n)
+#endif
+
+#if __has_builtin(__builtin_strcpy)
+#define strcpy(dst, src)    __builtin_strcpy(dst, src)
+#endif
+
+#if __has_builtin(__builtin_strlcpy)
+#define strlcpy(dst, src, n) __builtin_strlcpy(dst, src, n)
+#endif
+
+#if __has_builtin(__builtin_strcmp)
+#define strcmp(s1, s2)      __builtin_strcmp(s1, s2)
+#endif
+
+#if __has_builtin(__builtin_strncmp)
+#define strncmp(s1, s2, n)  __builtin_strncmp(s1, s2, n)
+#endif
+
+#if __has_builtin(__builtin_strchr)
+#define strchr(s, c)        __builtin_strchr(s, c)
+#endif
+
+#if __has_builtin(__builtin_strrchr)
+#define strrchr(s, c)       __builtin_strrchr(s, c)
+#endif
 
 #define copy_struct(dest, src) \
     memcpy(dest, src, sizeof(typeof(*src)))
 
 #define copy_array(dest, src, count) \
     memcpy(dest, src, sizeof(typeof(*src)) * (count))
-
-static inline int memcmp(const void* cs, const void* ct, size_t count)
-{
-    const unsigned char* su1;
-    const unsigned char* su2;
-    int res = 0;
-
-    for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
-    {
-        if ((res = *su1 - *su2) != 0)
-        {
-            break;
-        }
-    }
-    return res;
-}
-
-static inline char* strstr(const char* s1, const char* s2)
-{
-    size_t l1, l2;
-
-    l2 = strlen(s2);
-    if (!l2)
-    {
-        return (char*)s1;
-    }
-    l1 = strlen(s1);
-    while (l1 >= l2)
-    {
-        l1--;
-        if (!memcmp(s1, s2, l2))
-        {
-            return (char*)s1;
-        }
-        s1++;
-    }
-    return 0;
-}

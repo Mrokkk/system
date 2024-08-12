@@ -7,9 +7,36 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio_ext.h>
 
 TEST_SUITE(libc);
+
+TEST(memset_zero)
+{
+    char buf[32];
+    __builtin_memset(buf, 0xfe, sizeof(buf));
+    memset(buf, 0, 7);
+    EXPECT_EQ(buf[0], 0);
+    EXPECT_EQ(buf[1], 0);
+    EXPECT_EQ(buf[5], 0);
+    EXPECT_EQ(buf[6], 0);
+    EXPECT_EQ(buf[7], 0xfe);
+    EXPECT_EQ(buf[31], 0xfe);
+}
+
+TEST(bzero)
+{
+    char buf[32];
+    __builtin_memset(buf, 0xfe, sizeof(buf));
+    bzero(buf, 7);
+    EXPECT_EQ(buf[0], 0);
+    EXPECT_EQ(buf[1], 0);
+    EXPECT_EQ(buf[5], 0);
+    EXPECT_EQ(buf[6], 0);
+    EXPECT_EQ(buf[7], 0xfe);
+    EXPECT_EQ(buf[31], 0xfe);
+}
 
 TEST(strlen)
 {
@@ -41,6 +68,8 @@ TEST(strncmp)
     static const char* string = "test";
 
     EXPECT_EQ(strncmp(string, "test", 4), 0);
+    EXPECT_EQ(strncmp(string, "tes", 3), 0);
+    EXPECT_EQ(strncmp(string, "aaa", 0), 0);
     EXPECT_EQ(strncmp(string, "test", SIZE_MAX), 0);
     EXPECT_EQ(strncmp(string, "tes", SIZE_MAX), 't');
     EXPECT_EQ(strncmp(string, "est", 4), 't' - 'e');
@@ -75,6 +104,19 @@ TEST(strcspn)
     EXPECT_EQ(strcspn(string, "abc"), 16);
 }
 
+TEST(stpcpy)
+{
+    char buf[16] = {0, };
+    static const char* string = "test";
+    buf[4] = 0xff;
+    EXPECT_EQ(stpcpy(buf, string), buf + 4);
+    EXPECT_EQ(buf[0], 't');
+    EXPECT_EQ(buf[1], 'e');
+    EXPECT_EQ(buf[2], 's');
+    EXPECT_EQ(buf[3], 't');
+    EXPECT_EQ(buf[4], 0);
+}
+
 TEST(strcpy)
 {
     char buf[16] = {0, };
@@ -86,6 +128,33 @@ TEST(strcpy)
     EXPECT_EQ(buf[2], 's');
     EXPECT_EQ(buf[3], 't');
     EXPECT_EQ(buf[4], 0);
+}
+
+TEST(stpncpy)
+{
+    {
+        char buf[16] = {0, };
+        static const char* string = "test";
+        buf[4] = 0xff;
+        EXPECT_EQ(stpncpy(buf, string, 16), buf + 4);
+        EXPECT_EQ(buf[0], 't');
+        EXPECT_EQ(buf[1], 'e');
+        EXPECT_EQ(buf[2], 's');
+        EXPECT_EQ(buf[3], 't');
+        EXPECT_EQ(buf[4], 0);
+    }
+    {
+        char buf[16] = {0, };
+        static const char* string = "test";
+        buf[3] = 0xff;
+        buf[4] = 0xff;
+        EXPECT_EQ(stpncpy(buf, string, 3), buf + 3);
+        EXPECT_EQ(buf[0], 't');
+        EXPECT_EQ(buf[1], 'e');
+        EXPECT_EQ(buf[2], 's');
+        EXPECT_EQ(buf[3], 0xff);
+        EXPECT_EQ(buf[4], 0xff);
+    }
 }
 
 TEST(strncpy)
@@ -104,14 +173,39 @@ TEST(strncpy)
     {
         char buf[16] = {0, };
         static const char* string = "test";
+        buf[3] = 0xff;
         buf[4] = 0xff;
         EXPECT_EQ(strncpy(buf, string, 3), buf);
         EXPECT_EQ(buf[0], 't');
         EXPECT_EQ(buf[1], 'e');
         EXPECT_EQ(buf[2], 's');
-        EXPECT_EQ(buf[3], 0);
+        EXPECT_EQ(buf[3], 0xff);
         EXPECT_EQ(buf[4], 0xff);
     }
+}
+
+TEST(strchr)
+{
+    static const char* string = "this_is_test_string";
+    EXPECT_EQ(strchr(string, 'x'), NULL);
+    EXPECT_EQ(strchr(string, '\0'), string + 19);
+    EXPECT_EQ(strchr(string, 'g'), string + 18);
+    EXPECT_EQ(strchr(string, 'i'), string + 2);
+    EXPECT_EQ(strchr(string, 's'), string + 3);
+    EXPECT_EQ(strchr(string, 'h'), string + 1);
+}
+
+TEST(strrchr)
+{
+    static const char* string = "{this_is_test_string}";
+    EXPECT_EQ(strrchr(string, 'x'), NULL);
+    EXPECT_EQ(strrchr(string + 1, '{'), NULL);
+    EXPECT_EQ(strrchr(string, '{'), string);
+    EXPECT_EQ(strrchr(string, '\0'), string + 21);
+    EXPECT_EQ(strrchr(string, 'g'), string + 19);
+    EXPECT_EQ(strrchr(string, 'i'), string + 17);
+    EXPECT_EQ(strrchr(string, 's'), string + 14);
+    EXPECT_EQ(strrchr(string, 'h'), string + 2);
 }
 
 TEST(strtok)
@@ -153,6 +247,13 @@ TEST(strcat)
     strcpy(buf, "test");
     EXPECT_EQ(strcat(buf, "_test"), buf);
     EXPECT_STR_EQ(buf, "test_test");
+}
+
+TEST(strncat)
+{
+    char buf[32] = "this";
+    strncat(buf, "_is_test", 3);
+    EXPECT_STR_EQ(buf, "this_is");
 }
 
 TEST(strpbrk)

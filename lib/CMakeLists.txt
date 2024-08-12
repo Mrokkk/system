@@ -5,11 +5,12 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_WARNINGS} \
     ${C_FLAGS_DEBUG} \
     ${C_FLAGS_FRAME_POINTER} \
+    ${C_FLAGS_ADDITIONAL} \
     -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx \
     -nostdlib \
     -nostartfiles \
     -fno-builtin \
-    -fno-asynchronous-unwind-tables -fno-stack-protector \
+    -fno-asynchronous-unwind-tables \
     -include ${PROJECT_SOURCE_DIR}/lib/libc.h \
     -fdata-sections \
     -ffunction-sections")
@@ -17,6 +18,8 @@ set(CMAKE_C_FLAGS
 include_directories(
    ${PROJECT_SOURCE_DIR}/lib/include
 )
+
+add_common_library(libc_common "__libc_" ON)
 
 set(LIBC_SRC
     abort.c
@@ -50,6 +53,7 @@ set(LIBC_SRC
     setjmp.c
     signal.c
     sleep.c
+    ssp.c
     strtod.c
     strtol.c
     syscall.c
@@ -80,25 +84,20 @@ set(LIBC_SRC
     stdio/stdio_ext.c
     stdio/vsprintf.c
 
+    string/bzero.c
     string/memchr.c
-    string/memcmp.c
-    string/memcpy.c
     string/memmove.c
-    string/memset.c
     string/strcat.c
-    string/strchr.c
-    string/strcmp.c
-    string/strcpy.c
+    string/strcoll.c
     string/strdup.c
-    string/strlen.c
     string/strpbrk.c
     string/strsignal.c
-    string/strspn.c
-    string/strstr.c
     string/strtok.c
     string/strxfrm.c
 
     ../kernel/lib/bitset.c
+
+    $<TARGET_OBJECTS:libc_common>
 )
 
 add_library(c SHARED ${LIBC_SRC})

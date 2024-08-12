@@ -57,13 +57,17 @@ include_directories(
    ${PROJECT_SOURCE_DIR}/arch/${ARCH}/include
 )
 
+add_subdirectory(common)
 add_subdirectory(arch/${ARCH})
 add_subdirectory(drivers)
 add_subdirectory(fs)
 add_subdirectory(kernel)
 
+add_common_library(kernel_common "" OFF)
+
 add_executable(
     system
+    $<TARGET_OBJECTS:kernel_common>
     $<TARGET_OBJECTS:kernel>
     $<TARGET_OBJECTS:drivers>
     $<TARGET_OBJECTS:arch>

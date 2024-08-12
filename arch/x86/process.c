@@ -1,5 +1,4 @@
 #include <arch/asm.h>
-#include <arch/string.h>
 #include <arch/segment.h>
 #include <arch/register.h>
 #include <arch/processor.h>
