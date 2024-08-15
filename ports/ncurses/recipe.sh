@@ -22,3 +22,8 @@ function build()
 
     make -O -j${NPROC} || die "compilation failed"
 }
+
+function install()
+{
+    make -O -j${NPROC} install || die "installation failed"
+}

@@ -16,6 +16,8 @@ int unsetenv(const char* name);
 char* getenv(const char* name);
 char* secure_getenv(const char* name);
 
+int system(const char* command);
+
 int atexit(void (*function)(void));
 
 int atoi(const char* nptr);

@@ -13,7 +13,14 @@ int LIBC(execlp)(const char* file, const char* arg, ...)
         argv[i++] = arg;
         arg = va_arg(args, const char*);
     }
-    while (arg);
+    while (arg && i < 32);
+
+    if (UNLIKELY(i == 32))
+    {
+        return -1;
+    }
+
+    argv[i] = NULL;
 
     return execvp(file, (char* const*)argv);
 }

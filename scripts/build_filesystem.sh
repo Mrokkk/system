@@ -106,7 +106,7 @@ create_dir "${boot_dir}/grub"
 
 for binary in $(find bin -type f -executable)
 do
-    if [[ ${binary} == *".so" ]]
+    if [[ ${binary} == *".so"* ]]
     then
         continue
     fi
@@ -118,7 +118,7 @@ do
     if [[ ${binary} == *"ld.so" ]]
     then
         copy ${binary} ${mountpoint}/lib
-    elif [[ ${binary} == *".so" ]]
+    elif [[ ${binary} == *".so"* ]]
     then
         copy ${binary} ${mountpoint}/usr/lib
     else

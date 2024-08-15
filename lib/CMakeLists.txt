@@ -59,6 +59,7 @@ set(LIBC_SRC
     syscall.c
     sysconf.c
     syslog.c
+    system.c
     termios.c
     time.c
     ttyname.c
@@ -78,10 +79,12 @@ set(LIBC_SRC
     stdio/fseek.c
     stdio/fwrite.c
     stdio/gnulib.c
+    stdio/scanf.c
     stdio/setvbuf.c
     stdio/sprintf.c
     stdio/stdio.c
     stdio/stdio_ext.c
+    stdio/tmpnam.c
     stdio/vsprintf.c
 
     string/bzero.c

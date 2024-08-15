@@ -1,7 +1,7 @@
 REPO="https://github.com/coreutils/coreutils.git"
 VERSION=
 BRANCH=
-APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep" "stty" "kill" "stat" "dircolors" "du" "uniq" "sort" "date")
+APPS=("ls" "tty" "dirname" "basename" "env" "fold" "sleep" "stty" "kill" "stat" "dircolors" "du" "uniq" "sort" "date" "readlink")
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

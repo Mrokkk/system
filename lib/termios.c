@@ -12,6 +12,11 @@ int LIBC(tcsetattr)(int fd, int optional_actions, const struct termios* termios_
     return ioctl(fd, TCSETA, termios_p);
 }
 
+int LIBC(tcflush)(int fd, int queue_selector)
+{
+    NOT_IMPLEMENTED(-1, "%u, %u", fd, queue_selector);
+}
+
 int LIBC(tcflow)(int fd, int action)
 {
     NOT_IMPLEMENTED(-1, "%d, %d", fd, action);
@@ -39,6 +44,7 @@ int LIBC(cfsetospeed)(struct termios* termios_p, speed_t speed)
 
 LIBC_ALIAS(tcgetattr);
 LIBC_ALIAS(tcsetattr);
+LIBC_ALIAS(tcflush);
 LIBC_ALIAS(tcflow);
 LIBC_ALIAS(cfgetispeed);
 LIBC_ALIAS(cfgetospeed);

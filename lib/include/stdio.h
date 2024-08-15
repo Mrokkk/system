@@ -75,6 +75,8 @@ int fscanf(FILE* restrict stream, const char* restrict format, ...);
 int vscanf(const char* restrict format, va_list ap);
 int vfscanf(FILE* restrict stream, const char* restrict format, va_list ap);
 
+int sscanf(const char* restrict str, const char* restrict format, ...);
+
 int vsprintf(char* buf, const char* fmt, va_list args);
 int vsnprintf(char* buf, size_t size, const char* fmt, va_list args);
 int vfprintf(FILE* restrict stream, const char* restrict format, va_list ap);
@@ -90,3 +92,9 @@ int feof(FILE* stream);
 int ferror(FILE* stream);
 int fflush(FILE* stream);
 int fpurge(FILE *stream);
+
+#define P_tmpdir    "/tmp"
+#define L_tmpnam    20
+#define TMP_MAX     238328
+
+char* tmpnam(char* s);
