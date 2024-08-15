@@ -463,5 +463,8 @@ static inline vm_area_t* process_brk_vm_area(process_t* p)
 #define current_vm_verify_string(flag, data_ptr) \
     vm_verify_string(flag, data_ptr, process_current->mm->vm_areas)
 
+#define current_vm_verify_string_limit(flag, data_ptr, limit) \
+    vm_verify_string_limit(flag, data_ptr, limit, process_current->mm->vm_areas)
+
 #define for_each_process(p) \
     list_for_each_entry(p, &init_process.processes, processes)

@@ -154,6 +154,13 @@ static const char* errors[] = {
 static int string_print(const char* string, int limit, char* buffer, const char* end)
 {
     char* it = buffer;
+
+    if (unlikely(current_vm_verify_string_limit(VM_READ, string, 64)))
+    {
+        it = csnprintf(it, end, "%x", addr(string));
+        return it - buffer;
+    }
+
     size_t len = limit != -1 ? (size_t)limit : strlen(string);
     size_t to_print = min(len, 64);
 

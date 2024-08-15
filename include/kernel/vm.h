@@ -77,6 +77,14 @@ static inline int vm_verify_wrapper(vm_verify_flag_t flag, const void* ptr, size
 // @vma - vm_areas against which access is checked
 int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 
+// vm_verify_string - check access to the max limit bytes from string pointed by string
+//
+// @flag - vm_verify_flag_t as defined above
+// @string - pointer to a string
+// @limit - max number of bytes checked
+// @vma - vm_areas against which access is checked
+int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t limit, vm_area_t* vma);
+
 // vm_verify - check access to the object pointed by data_ptr
 //
 // @flag - vm_verify_flag_t as defined above

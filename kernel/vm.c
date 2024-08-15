@@ -212,7 +212,7 @@ int vm_verify_impl(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area
     return -EFAULT;
 }
 
-int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
+static int vm_verify_string_impl(vm_verify_flag_t flag, const char* string, size_t limit, vm_area_t* vma)
 {
     for (; vma; vma = vma->next)
     {
@@ -226,6 +226,11 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
 
             size_t i;
             size_t max_len = vma->end - addr(string);
+
+            if (limit < max_len)
+            {
+                return 0;
+            }
 
             for (i = 1, string++;; ++i, ++string)
             {
@@ -242,4 +247,15 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
     }
 
     return -EFAULT;
+
+}
+
+int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma)
+{
+    return vm_verify_string_impl(flag, string, -1, vma);
+}
+
+int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t limit, vm_area_t* vma)
+{
+    return vm_verify_string_impl(flag, string, limit, vma);
 }
