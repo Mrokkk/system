@@ -916,7 +916,7 @@ static void ide_irq(int nr)
 
     bm_writeb(channel, BM_REG_CMD, 0);
 
-    process_t* proc = wait_queue_front(&channels[channel].queue);
+    process_t* proc = wait_queue_pop(&channels[channel].queue);
 
     if (unlikely(!proc))
     {

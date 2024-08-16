@@ -236,39 +236,40 @@ static inline int process_is_zombie(process_t* p)
 
 static inline void process_stop(process_t* p)
 {
-    flags_t flags;
-    irq_save(flags);
-    list_del(&p->running);
-    p->stat = PROCESS_STOPPED;
-    process_wake_waiting(p);
-    irq_restore(flags);
+    {
+        scoped_irq_lock();
+        list_del(&p->running);
+        p->stat = PROCESS_STOPPED;
+        process_wake_waiting(p);
+    }
+
     if (p == process_current)
     {
         p->need_resched = true;
     }
 }
 
-static inline void process_wake(process_t* p)
+static inline void NONNULL() process_wake(process_t* p)
 {
-    flags_t flags;
     if (p->stat == PROCESS_ZOMBIE)
     {
         log_warning("process %u:%x is zombie", p->pid, p);
         return;
     }
-    irq_save(flags);
-    if (p->stat != PROCESS_RUNNING)
+
     {
-        list_add_tail(&p->running, &running);
+        scoped_irq_lock();
+
+        if (p->stat != PROCESS_RUNNING)
+        {
+            list_add_tail(&p->running, &running);
+        }
+        p->stat = PROCESS_RUNNING;
     }
-    p->stat = PROCESS_RUNNING;
-    irq_restore(flags);
 }
 
 static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
 {
-    flags_t flags;
-
     if (process_current->stat == PROCESS_ZOMBIE)
     {
         log_warning("process %u:%x is zombie", process_current->pid, process_current);
@@ -276,24 +277,24 @@ static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
         return 0;
     }
 
-    irq_save(flags);
+    {
+        scoped_irq_lock();
 
-    log_debug(DEBUG_EXIT, "%u waiting", process_current->pid);
+        log_debug(DEBUG_EXIT, "%u waiting", process_current->pid);
 
-    wait_queue_push(q, wq);
-    list_del(&process_current->running);
-    process_current->stat = PROCESS_WAITING;
-
-    irq_restore(flags);
+        wait_queue_push(q, wq);
+        list_del(&process_current->running);
+        process_current->stat = PROCESS_WAITING;
+    }
 
     scheduler();
 
-    irq_save(flags);
+    {
+        scoped_irq_lock();
 
-    log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
-    wait_queue_remove(q, wq);
-
-    irq_restore(flags);
+        log_debug(DEBUG_PROCESS, "woken %u", process_current->pid);
+        wait_queue_remove(q, wq);
+    }
 
     if (signal_run(process_current))
     {

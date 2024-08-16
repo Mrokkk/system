@@ -166,9 +166,8 @@ void tty_ldisc_putch(tty_t* tty, int c)
 
         tty->ldisc_current = tty->ldisc_buf;
 
-        if (!wait_queue_empty(&tty->wq))
+        if ((p = wait_queue_pop(&tty->wq)))
         {
-            p = wait_queue_front(&tty->wq);
             process_wake(p);
             if (p != process_current)
             {

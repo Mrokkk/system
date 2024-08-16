@@ -148,9 +148,8 @@ static void mouse_irs()
 
     fifo_put(&mouse_fifo, data);
 
-    if (!wait_queue_empty(&mouse_wq))
+    if ((p = wait_queue_pop(&mouse_wq)))
     {
-        p = wait_queue_front(&mouse_wq);
         process_wake(p);
     }
 }

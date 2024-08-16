@@ -285,6 +285,7 @@ static int iso9660_readdir_visitor(
     buffer_t* b,
     void* visitor_data)
 {
+    size_t name_len;
     ino_t ino = ino_get(b, dirent);
     readdir_data_t* data = visitor_data;
     direntadd_t dirent_add = data->dirent_add;
@@ -301,7 +302,12 @@ static int iso9660_readdir_visitor(
     }
     else
     {
-        size_t name_len = NM_NAME_LEN(nm);
+        if (unlikely(!nm))
+        {
+            return READDIR_CONTINUE;
+        }
+
+        name_len = NM_NAME_LEN(nm);
         over = dirent_add(buf, nm->nm.name, name_len, ino, S_ISDIR((mode_t)px->px.mode) ? DT_DIR : DT_REG);
     }
 

@@ -149,7 +149,7 @@ int arch_vm_map_single(pgd_t* pgd, uint32_t pde_index, uint32_t pte_index, page_
 int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
 {
     pgt_t* dest_pgt;
-    pgt_t* src_pgt;
+    pgt_t* src_pgt = NULL;
     uint32_t pde_index, pte_index, pgd_flags;
     int prev_pde_index = -1;
 
@@ -184,7 +184,9 @@ int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
             }
         }
 
-        if (src_pgt[pte_index])
+        // FIXME: static analyzer from gcc isn't clever enough to
+        // figure out that src_pgt is never accessed uninitialized
+        if (src_pgt && src_pgt[pte_index])
         {
             uintptr_t paddr = src_pgt[pte_index] & PAGE_ADDRESS;
 

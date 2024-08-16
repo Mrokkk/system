@@ -6,8 +6,7 @@
     if (raise(SIGABRT))
     {
         // If raise failed for some reason, just crash
-        int* v = (int*)0;
-        *v = 20;
+        __builtin_trap();
     }
 
     __builtin_unreachable();

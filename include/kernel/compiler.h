@@ -15,20 +15,20 @@
 #define COMPILE_ERROR(msg)      __attribute__((__error__(msg)))
 #define CLEANUP(fn)             __attribute__((cleanup(fn)))
 #define MUST_CHECK(ret)         __attribute__((warn_unused_result)) ret
+#define NONNULL(...)            __attribute__((nonnull(__VA_ARGS__)))
 #define RETURNS_NONNULL(fn)     __attribute__((returns_nonnull)) fn
 #define NORETURN(fn)            __attribute__((noreturn)) fn
 #define FASTCALL(fn)            __attribute__((regparm(3))) fn
 #define ALIGN(x)                __attribute__((aligned(x)))
 #define WEAK                    __attribute__((weak))
 #define FORMAT(...)             __attribute__((format(__VA_ARGS__)))
-#define UNUSED(x)               (void)x
+#define UNUSED(x)               (void)(x)
 #define ACCESS_ONCE(x)          (*(volatile typeof(x)*)&(x))
 
 #define __STRINGIFY(x)          #x
 #define STRINGIFY(x)            __STRINGIFY(x)
 #define EXPAND(x)               x
 #define PASTE(a, b)             a##b
-#define NOT_USED(x)             (void)(x)
 
 #ifndef __clang__
 

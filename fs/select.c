@@ -169,11 +169,11 @@ int sys_poll(struct pollfd* fds, unsigned long nfds, int timeout)
 
 int sys_select(int nfds, fd_set_t* readfds, fd_set_t* writefds, fd_set_t* exceptfds, timeval_t* timeout)
 {
-    NOT_USED(nfds);
-    NOT_USED(readfds);
-    NOT_USED(writefds);
-    NOT_USED(exceptfds);
-    NOT_USED(timeout);
+    UNUSED(nfds);
+    UNUSED(readfds);
+    UNUSED(writefds);
+    UNUSED(exceptfds);
+    UNUSED(timeout);
     return -ENOSYS;
 }
 
