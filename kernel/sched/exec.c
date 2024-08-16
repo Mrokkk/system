@@ -403,7 +403,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         return -ENOMEM;
     }
 
-    strcpy(copied_path, pathname);
+    strlcpy(copied_path, pathname, sizeof(copied_path));
     args_get(argv, true, &argvec[ARGV]);
     args_get(envp, false, &argvec[ENVP]);
 

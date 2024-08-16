@@ -45,3 +45,7 @@
 #define ULLONG_WIDTH    64
 
 #define SSIZE_MAX       LONG_MAX
+#define INT_MAX         __INT_MAX__
+
+#define NAME_MAX        255
+#define PATH_MAX        255

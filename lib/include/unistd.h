@@ -16,13 +16,11 @@
 int syscall(int nr, ...);
 int isatty(int fd);
 
-static inline int execvp(const char* path, char* const argv[])
-{
-    extern char** environ;
-    return execve(path, argv, environ);
-}
+int execlp(const char* file, const char* arg, ...) __attribute__((sentinel));
 
-int execlp(const char* file, const char* arg, ...);
+int execv(const char* pathname, char* const argv[]);
+int execvp(const char* file, char* const argv[]);
+int execvpe(const char* file, char* const argv[], char* const envp[]);
 
 unsigned int sleep(unsigned int seconds);
 
