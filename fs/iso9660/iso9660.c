@@ -331,7 +331,7 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
         return errno;
     }
 
-    if (unlikely((errno = inode_get(result))))
+    if (unlikely((errno = inode_alloc(result))))
     {
         log_debug(DEBUG_ISO9660, "cannot get free inode for \"%s\"", name);
         return errno;

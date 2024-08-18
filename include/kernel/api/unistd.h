@@ -62,6 +62,8 @@ int fchown(int fd, uid_t owner, gid_t group);
 int fsync(int fildes);
 int rmdir(const char* pathname);
 
+ssize_t readlink(const char* pathname, char* buf, size_t bufsiz);
+
 // FIXME: replace later with ptrace
 #define DTRACE_FOLLOW_FORK 2
 int dtrace(int flag);

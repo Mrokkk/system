@@ -4,7 +4,7 @@
 static LIST_DECLARE(free_inodes);
 inode_t* root;
 
-int inode_get(inode_t** inode)
+int inode_alloc(inode_t** inode)
 {
     if (list_empty(&free_inodes))
     {
@@ -22,18 +22,24 @@ int inode_get(inode_t** inode)
     }
 
     memset(*inode, 0, sizeof(**inode));
+    (*inode)->refcount = 1;
 
     list_init(&(*inode)->list);
 
-#ifdef USE_MAGIC
-    (*inode)->magic = INODE_MAGIC;
-#endif
     return 0;
 }
 
-int inode_put(inode_t* inode)
+int inode_get(inode_t* inode)
 {
-    list_del(&inode->list);
-    list_add_tail(&inode->list, &free_inodes);
+    ++inode->refcount;
     return 0;
+}
+
+void inode_put(inode_t* inode)
+{
+    if (!--inode->refcount)
+    {
+        list_del(&inode->list);
+        list_add_tail(&inode->list, &free_inodes);
+    }
 }

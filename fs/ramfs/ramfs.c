@@ -343,7 +343,7 @@ static int ramfs_create_node(
         return errno;
     }
 
-    if (unlikely(errno = inode_get(result_inode)))
+    if (unlikely(errno = inode_alloc(result_inode)))
     {
         return errno;
     }

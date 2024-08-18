@@ -134,6 +134,11 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
             goto free_vma;
         }
 
+        if (unlikely(inode_get(file->inode)))
+        {
+            return ptr(-ENOENT);
+        }
+
         vma->inode = file->inode;
         vma->offset = offset;
     }
@@ -149,6 +154,10 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     return ptr(vaddr);
 
 free_vma:
+    if (vma->inode)
+    {
+        inode_put(vma->inode);
+    }
     delete(vma);
     return ptr(errno);
 }

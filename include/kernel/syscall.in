@@ -74,3 +74,5 @@ clock_gettime: int, clockid_t, struct timespec*
 clock_settime: int, clockid_t, const struct timespec*
 getpgrp: pid_t
 setpgrp: pid_t
+readlink: int, const char*, char*, size_t
+fchdir: int, int

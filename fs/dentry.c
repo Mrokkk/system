@@ -11,9 +11,6 @@ void dentry_init(dentry_t* dentry)
     list_add(&dentry->cache, &dentry_cache);
     dentry->parent = NULL;
     dentry->inode = NULL;
-#ifdef USE_MAGIC
-    dentry->magic = DENTRY_MAGIC;
-#endif
 }
 
 dentry_t* dentry_create(inode_t* inode, dentry_t* parent_dentry, const char* name)

@@ -522,4 +522,18 @@ syscall_t trace_syscalls[] = {
         .nargs  = 0,
         .args   = {  },
     },
+
+    {
+        .name   = "readlink",
+        .ret    = TYPE_LONG,
+        .nargs  = 3,
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_CHAR_PTR, TYPE_UNSIGNED_LONG },
+    },
+
+    {
+        .name   = "fchdir",
+        .ret    = TYPE_LONG,
+        .nargs  = 1,
+        .args   = { TYPE_LONG },
+    },
 };

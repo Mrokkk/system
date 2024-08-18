@@ -1,4 +1,4 @@
-commit bc894f323dbfafcf442a5c667b1bf59bf3d4c549
+commit 4e31b40845aca6a237f2eb3afdec8682a847626c
 Author: Mrokkk <mrokk@protonmail.com>
 Date:   Mon Jun 3 23:09:42 2024 +0200
 
@@ -36,6 +36,22 @@ index b607786..6457101 100644
 +#endif
  
  #endif /* _POSIXSTAT_H_ */
+diff --git a/lib/malloc/malloc.c b/lib/malloc/malloc.c
+index f61f027..48b5854 100644
+--- a/lib/malloc/malloc.c
++++ b/lib/malloc/malloc.c
+@@ -1012,8 +1012,9 @@ internal_free (mem, file, line, flags)
+   ap += p->mh_nbytes;
+   z = mg.s;
+   *z++ = *ap++, *z++ = *ap++, *z++ = *ap++, *z++ = *ap++;  
+-  if (mg.i != p->mh_nbytes)
+-    xbotch (mem, ERR_ASSERT_FAILED, _("free: start and end chunk sizes differ"), file, line);
++  /* FIXME: what is this magic? mg is a variable on stack */
++  /*if (mg.i != p->mh_nbytes)*/
++    /*xbotch (mem, ERR_ASSERT_FAILED, _("free: start and end chunk sizes differ"), file, line);*/
+ 
+ #if defined (USE_MMAP)
+   if (nunits > malloc_mmap_threshold)
 diff --git a/lib/readline/terminal.c b/lib/readline/terminal.c
 index 9997161..9f2f76e 100644
 --- a/lib/readline/terminal.c

@@ -76,7 +76,6 @@ then
     mkdir -p mnt
     execute_cmd "mounting filesystem... "       sudo mount -t ext2 -o rw "${dev}${partition_number}" ${mountpoint}
 
-    sudo chmod -R a+w ${mountpoint}
     sudo chown -R ${USER} ${mountpoint}
     sudo chgrp -R ${USER} ${mountpoint}
 fi
@@ -92,7 +91,8 @@ bashrc_content='export PS1="\u \e[34m\w\e[0m # "
 alias ktest=/bin/test
 alias ..="cd .."
 alias l="ls -lah"
-alias dmesg="cat /proc/syslog"'
+alias dmesg="cat /proc/syslog"
+alias f="find . -name"'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"

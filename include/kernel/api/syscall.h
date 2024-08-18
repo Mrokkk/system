@@ -75,8 +75,10 @@
 #define __NR_clock_settime  72
 #define __NR_getpgrp        73
 #define __NR_setpgrp        74
+#define __NR_readlink       75
+#define __NR_fchdir         76
 
-#define __NR_syscalls       75
+#define __NR_syscalls       77
 
 #ifndef __ASSEMBLER__
 
@@ -195,3 +197,5 @@ __syscall2(clock_gettime, int, clockid_t, struct timespec*)
 __syscall2(clock_settime, int, clockid_t, const struct timespec*)
 __syscall0(getpgrp, pid_t)
 __syscall0(setpgrp, pid_t)
+__syscall3(readlink, int, const char*, char*, size_t)
+__syscall1(fchdir, int, int)

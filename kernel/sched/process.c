@@ -22,17 +22,22 @@ int process_find(int pid, process_t** p)
     return 1;
 }
 
-int process_find_free_fd(process_t* proc, int* fd)
+int process_find_free_fd_at(process_t* p, int at, int* fd)
 {
-    struct file* dummy;
     int i;
+    file_t* dummy = NULL;
 
     *fd = 0;
 
-    // Find first free file descriptor
-    for (i = 0; i < PROCESS_FILES; i++)
+    if (unlikely(at < 0))
     {
-        if (process_fd_get(proc, i, &dummy)) break;
+        return 1;
+    }
+
+    // Find first free file descriptor
+    for (i = at; i < PROCESS_FILES; i++)
+    {
+        if (process_fd_get(p, i, &dummy)) break;
     }
 
     if (dummy)
@@ -42,9 +47,14 @@ int process_find_free_fd(process_t* proc, int* fd)
 
     *fd = i;
 
-    log_debug(DEBUG_PROCESS, "found %d, %x", *fd, proc->files);
+    log_debug(DEBUG_PROCESS, "found %d, %x", *fd, p->files + i);
 
     return 0;
+}
+
+int process_find_free_fd(process_t* p, int* fd)
+{
+    return process_find_free_fd_at(p, 0, fd);
 }
 
 int sys_getpid(void)

@@ -63,6 +63,7 @@ set(LIBC_SRC
     termios.c
     time.c
     ttyname.c
+    uname.c
     wchar.c
 
     stdio/fclose.c

@@ -31,21 +31,23 @@ typedef struct statfs statfs_t;
 
 struct inode
 {
-    MAGIC_NUMBER;
-    dev_t dev;
-    dev_t rdev;
-    ino_t ino;
-    mode_t mode;
-    uid_t uid;
-    gid_t gid;
-    time_t ctime;
-    time_t mtime;
-    size_t size;
-    super_block_t* sb;
-    list_head_t list;
-    file_operations_t* file_ops;
+    dev_t               dev;
+    dev_t               rdev;
+    ino_t               ino;
+    int                 flags;
+    mode_t              mode;
+    uint16_t            refcount;
+    uid_t               uid;
+    gid_t               gid;
+    time_t              ctime;
+    time_t              mtime;
+    nlink_t             nlink;
+    size_t              size;
+    list_head_t         list;
+    file_operations_t*  file_ops;
     inode_operations_t* ops;
-    void* fs_data;
+    void*               fs_data;
+    super_block_t*      sb;
 };
 
 struct inode_operations
@@ -53,6 +55,7 @@ struct inode_operations
     int (*lookup)(inode_t* parent, const char* name, inode_t** result);
     int (*create)(inode_t* parent, const char* name, int, int, inode_t** result);
     int (*mkdir)(inode_t* parent, const char* name, int, int, inode_t** result);
+    int (*readlink)(inode_t* inode, char* buffer, size_t size);
 };
 
 struct file
@@ -139,7 +142,11 @@ extern list_head_t mounted_inodes;
 extern inode_t* root;
 
 int file_system_register(file_system_t* fs);
-dentry_t* lookup(const char* filename);
+
+#define LOOKUP_NOFOLLOW 0
+#define LOOKUP_FOLLOW   1
+
+int lookup(const char* filename, int flag, dentry_t** result);
 
 int do_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags);
 int do_chroot(const char* path);
@@ -162,8 +169,9 @@ int file_fd_allocate(file_t* file);
 // @output - result
 int string_read(file_t* file, size_t offset, size_t count, string_t** output);
 
-int inode_get(inode_t** inode);
-int inode_put(inode_t* inode);
+int inode_alloc(inode_t** inode);
+int inode_get(inode_t* inode);
+void inode_put(inode_t* inode);
 
 void file_systems_print(void);
 

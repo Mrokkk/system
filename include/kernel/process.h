@@ -198,6 +198,7 @@ process_t* process_spawn(const char* name, process_entry_t entry, void* args, in
 int process_find(int pid, process_t** p);
 void process_wake_waiting(process_t* p);
 int process_find_free_fd(process_t* p, int* fd);
+int process_find_free_fd_at(process_t* p, int at, int* fd);
 void scheduler();
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[]);

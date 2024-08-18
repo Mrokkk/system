@@ -301,6 +301,11 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
             return errno;
         }
 
+        if (unlikely(!(file->inode->mode & S_IXUGO)))
+        {
+            return -EACCES;
+        }
+
         if (unlikely(!file->ops || !file->ops->mmap || !file->ops->read))
         {
             return -ENOSYS;

@@ -2,12 +2,14 @@
 #include "procfs.h"
 #include <kernel/fs.h>
 #include <kernel/init.h>
+#include <kernel/path.h>
 #include <kernel/time.h>
 #include <kernel/memory.h>
 #include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/seq_file.h>
 #include <kernel/vm_print.h>
+#include <kernel/api/dirent.h>
 
 #define DEBUG_PROCFS 0
 
@@ -20,6 +22,10 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 
 static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result);
 static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add);
+
+static int procfs_fd_lookup(inode_t* dir, const char* name, inode_t** result);
+static int procfs_fd_readdir(file_t* file, void* buf, direntadd_t dirent_add);
+static int procfs_fd_readlink(inode_t* inode, char* buffer, size_t size);
 
 static int comm_show(seq_file_t* s);
 static int status_show(seq_file_t* s);
@@ -51,7 +57,7 @@ int maps_show(seq_file_t* s);
     NODE(#name, S_IFLNK | mode, NULL, NULL)
 
 #define DOT(name) \
-    DIR(name, S_IFDIR | S_IRUGO | S_IWUSR, NULL, NULL)
+    DIR(name, S_IFDIR | S_IRUGO, NULL, NULL)
 
 #define PROCFS_ENTRY(name) \
     static int name##_open(file_t* file) { return seq_open(file, &name##_show); } \
@@ -89,6 +95,17 @@ static file_operations_t procfs_pid_fops = {
     .readdir = &procfs_pid_readdir,
 };
 
+static file_operations_t procfs_fd_fops = {
+    .open = &procfs_open,
+    .close = &procfs_close,
+    .readdir = &procfs_fd_readdir,
+};
+
+static inode_operations_t procfs_fd_iops = {
+    .lookup = &procfs_fd_lookup,
+    .readlink = &procfs_fd_readlink,
+};
+
 PROCFS_ENTRY(meminfo);
 PROCFS_ENTRY(cmdline);
 PROCFS_ENTRY(uptime);
@@ -116,6 +133,7 @@ static procfs_entry_t pid_entries[] = {
     REG(maps, S_IRUGO),
     REG(environ, S_IRUGO),
     REG(cmdline, S_IRUGO),
+    DIR("fd", S_IRUGO | S_IWUSR | S_IXUGO, &procfs_fd_iops, &procfs_fd_fops)
 };
 
 static inline procfs_entry_t* procfs_find(const char* name, procfs_entry_t* dir, size_t count)
@@ -177,7 +195,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
             return -ENOENT;
         }
 
-        if (unlikely(errno = inode_get(&new_inode)))
+        if (unlikely(errno = inode_alloc(&new_inode)))
         {
             log_error("cannot get inode, errno %d", errno);
             return errno;
@@ -203,7 +221,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
         return -ENOENT;
     }
 
-    if (unlikely(errno = inode_get(&new_inode)))
+    if (unlikely(errno = inode_alloc(&new_inode)))
     {
         log_error("cannot get inode, errno %d", errno);
         return errno;
@@ -263,14 +281,14 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
         len = snprintf(namebuf, sizeof(namebuf), "%u", p->pid);
         log_debug(DEBUG_PROCFS, "adding %s", namebuf);
         ++i;
-        if (dirent_add(buf, namebuf, len, 0, DT_DIR))
+        if (dirent_add(buf, namebuf, len, PID_TO_INO(p->pid), DT_DIR))
         {
             goto finish;
         }
     }
 
     ++i;
-    if (dirent_add(buf, "self", 4, 0, DT_DIR))
+    if (dirent_add(buf, "self", 4, SELF_INO, DT_DIR))
     {
         log_debug(DEBUG_PROCFS, "adding self");
         goto finish;
@@ -309,7 +327,7 @@ static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result)
         return -ENOENT;
     }
 
-    if (unlikely(errno = inode_get(&new_inode)))
+    if (unlikely(errno = inode_alloc(&new_inode)))
     {
         log_error("cannot get inode, errno %d", errno);
         return errno;
@@ -361,6 +379,115 @@ static int comm_show(seq_file_t* s)
     process_t* p = procfs_process_from_seqfile(s);
     seq_puts(s, p->name);
     return 0;
+}
+
+static int procfs_fd_lookup(inode_t* dir, const char* name, inode_t** result)
+{
+    int errno;
+    process_t* p;
+    inode_t* new_inode;
+    int fd = strtoi(name);
+
+    if (unlikely(!(p = procfs_process_from_inode(dir))))
+    {
+        return -ESRCH;
+    }
+
+    if (unlikely(fd < 0 || fd >= PROCESS_FILES))
+    {
+        return -ESRCH;
+    }
+
+    file_t* file = p->files->files[fd];
+
+    if (unlikely(!file))
+    {
+        return -ESRCH;
+    }
+
+    if (unlikely(errno = inode_alloc(&new_inode)))
+    {
+        log_error("cannot get inode, errno %d", errno);
+        return errno;
+    }
+
+    new_inode->ops = &procfs_fd_iops;
+    new_inode->file_ops = &procfs_fd_fops;
+    new_inode->ino = PID_TO_INO(p->pid) | fd << 24;
+    new_inode->sb = dir->sb;
+    new_inode->mode = 0644 | S_IFLNK;
+
+    *result = new_inode;
+
+    return 0;
+}
+
+static int procfs_fd_readdir(file_t* file, void* buf, direntadd_t dirent_add)
+{
+    int count = 0;
+    process_t* p;
+    char namebuf[12];
+
+    if (unlikely(!(p = procfs_process_from_inode(file->inode))))
+    {
+        return -ESRCH;
+    }
+
+    for (int i = 0; i < PROCESS_FILES; ++i)
+    {
+        if (!p->files->files[i])
+        {
+            continue;
+        }
+
+        snprintf(namebuf, sizeof(namebuf), "%u", i);
+        count++;
+
+        if (dirent_add(buf, namebuf, strlen(namebuf), PID_TO_INO(p->pid) | FD_TO_INO(i), DT_LNK))
+        {
+            return count;
+        }
+    }
+
+    return count;
+}
+
+static int procfs_fd_readlink(inode_t* inode, char* buffer, size_t size)
+{
+    int errno;
+    process_t* p;
+    int fd = INO_TO_FD(inode->ino);
+
+    if (unlikely(!(p = procfs_process_from_inode(inode))))
+    {
+        return -ESRCH;
+    }
+
+    if (unlikely(fd < 0 || fd >= PROCESS_FILES))
+    {
+        return -ESRCH;
+    }
+
+    file_t* file = p->files->files[fd];
+
+    if (unlikely(!file))
+    {
+        return -ESRCH;
+    }
+
+    dentry_t* dentry = dentry_get(file->inode);
+
+    if (unlikely(!dentry))
+    {
+        return -ENOENT;
+    }
+
+    if (unlikely(errno = path_construct(dentry, buffer, size)))
+    {
+        return errno;
+    }
+
+    return strlen(buffer);
 }
 
 static int status_show(seq_file_t* s)

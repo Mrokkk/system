@@ -1,13 +1,11 @@
 #pragma once
 
 #include <kernel/list.h>
-#include <kernel/magic.h>
 
 struct inode;
 
 struct dentry
 {
-    MAGIC_NUMBER;
     struct inode* inode;
     char* name;
     list_head_t cache;

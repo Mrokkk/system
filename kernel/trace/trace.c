@@ -300,6 +300,8 @@ static int special_parameter(int nr, size_t id, int value, char** it, const char
                 BITFLAG(O_TRUNC);
                 BITFLAG(O_APPEND);
                 BITFLAG(O_NONBLOCK);
+                BITFLAG(O_NOFOLLOW);
+                BITFLAG(O_CLOEXEC);
                 BITFLAG(O_DIRECTORY);
                 BITFLAG_LEFT();
                 return 1);

@@ -255,7 +255,7 @@ static int devfs_lookup(inode_t* dir, const char* name, inode_t** result)
         return -ENOENT;
     }
 
-    if (unlikely(errno = inode_get(&new_inode)))
+    if (unlikely(errno = inode_alloc(&new_inode)))
     {
         log_error("cannot get inode, errno %d", errno);
         return errno;

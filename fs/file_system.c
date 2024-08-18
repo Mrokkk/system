@@ -81,7 +81,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
     sb->device_file = file;
     sb->dev = dev;
 
-    dentry = lookup(mount_point);
+    lookup(mount_point, LOOKUP_NOFOLLOW, &dentry);
 
     if (dentry)
     {
@@ -98,7 +98,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
     }
     else if (unlikely(!root))
     {
-        if (unlikely(errno = inode_get(&inode)))
+        if (unlikely(errno = inode_alloc(&inode)))
         {
             log_error("failed to get root inode");
             return errno;
@@ -209,6 +209,7 @@ int sys_umount2(const char*, int)
 
 int do_chroot(const char* path)
 {
+    int errno;
     dentry_t* dentry;
 
     if (unlikely(!process_current->fs->root && !path))
@@ -217,9 +218,9 @@ int do_chroot(const char* path)
         return 0;
     }
 
-    if ((dentry = lookup(path)) == NULL)
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
     {
-        return -ENOENT;
+        return errno;
     }
 
     if (!S_ISDIR(dentry->inode->mode))

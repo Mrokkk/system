@@ -15,15 +15,17 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     int errno;
     inode_t* inode = NULL;
     inode_t* parent_inode = NULL;
+    dentry_t* dentry = NULL;
     dentry_t* parent_dentry = NULL;
     const char* basename;
     char parent[PATH_MAX];
 
-    dentry_t* dentry = lookup(filename);
+    lookup(filename, LOOKUP_FOLLOW, &dentry);
 
     if (likely(dentry))
     {
         inode = dentry->inode;
+
         goto set_file;
     }
     else if (!dentry && !(flags & O_CREAT))
@@ -41,12 +43,11 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
             }
 
             log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
-            parent_dentry = lookup(parent);
 
-            if (unlikely(!parent_dentry))
+            if (unlikely(errno = lookup(parent, LOOKUP_NOFOLLOW, &parent_dentry)))
             {
                 log_debug(DEBUG_OPEN, "no dentry for parent", filename);
-                return -ENOENT;
+                return errno;
             }
             basename = basename_get(filename);
         }
@@ -64,7 +65,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
             }
             else
             {
-                parent_dentry = lookup(parent);
+                lookup(parent, LOOKUP_NOFOLLOW, &parent_dentry);
                 basename = basename_get(filename);
             }
 
@@ -100,9 +101,14 @@ set_file:
         return -ENOSYS;
     }
 
-    if (unlikely(S_ISDIR(inode->mode) && !(flags & O_DIRECTORY)))
+    if (unlikely(!S_ISDIR(inode->mode) && (flags & O_DIRECTORY)))
     {
-        return -EISDIR;
+        return -ENOTDIR;
+    }
+
+    if (unlikely(S_ISLNK(inode->mode)))
+    {
+        return -ELOOP;
     }
 
     // TODO: check permissions
@@ -255,7 +261,7 @@ int do_mkdir(const char* path, int mode)
         }
 
         basename = basename_get(path);
-        parent_dentry = lookup(dir_name);
+        lookup(dir_name, LOOKUP_NOFOLLOW, &parent_dentry);
     }
     else
     {
@@ -325,12 +331,13 @@ int sys_creat(const char* pathname, int mode)
 
 int do_chdir(const char* path)
 {
-    dentry_t* dentry;
+    int errno;
     mode_t mode;
+    dentry_t* dentry;
 
-    if ((dentry = lookup(path)) == NULL)
+    if (unlikely(errno = lookup(path, LOOKUP_FOLLOW, &dentry)))
     {
-        return -ENOENT;
+        return errno;
     }
 
     mode = dentry->inode->mode;
@@ -362,6 +369,38 @@ int sys_chdir(const char* __user path)
     return do_chdir(path);
 }
 
+int sys_fchdir(int fd)
+{
+    int mode;
+    file_t* file;
+    dentry_t* dentry;
+
+    if (fd_check_bounds(fd)) return -EBADF;
+    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+
+    if (!(dentry = dentry_get(file->inode)))
+    {
+        log_error("VFS issue: inode %x has no dentry", file->inode);
+        return -ENOENT;
+    }
+
+    mode = dentry->inode->mode;
+
+    if (!S_ISDIR(mode))
+    {
+        return -ENOTDIR;
+    }
+
+    if (!(mode & S_IXUSR) && !(mode & S_IXGRP) && !(mode & S_IXOTH))
+    {
+        return -EACCES;
+    }
+
+    process_current->fs->cwd = dentry;
+
+    return 0;
+}
+
 int sys_getcwd(char* __user buf, size_t size)
 {
     int errno;
@@ -373,7 +412,8 @@ int sys_getcwd(char* __user buf, size_t size)
 
     if (!process_current->fs->cwd)
     {
-        return -EACCES; // FIXME: find better errno
+        current_log_error("no cwd");
+        return -EPERM;
     }
 
     return path_construct(process_current->fs->cwd, buf, size);
@@ -390,16 +430,18 @@ static void stat_fill(struct stat* statbuf, const dentry_t* dentry)
     statbuf->st_ctime = dentry->inode->ctime;
     statbuf->st_mtime = dentry->inode->mtime;
     statbuf->st_atime = 0;
+    statbuf->st_nlink = dentry->inode->nlink;
     statbuf->st_rdev = dentry->inode->rdev;
 }
 
 int sys_stat(const char* __user pathname, struct stat* __user statbuf)
 {
+    int errno;
     dentry_t* dentry;
 
-    if (!(dentry = lookup(pathname)))
+    if (unlikely(errno = lookup(pathname, LOOKUP_NOFOLLOW, &dentry)))
     {
-        return -ENOENT;
+        return errno;
     }
 
     stat_fill(statbuf, dentry);
@@ -437,9 +479,9 @@ int sys_statvfs(const char* path, struct statvfs* buf)
         return errno;
     }
 
-    if ((dentry = lookup(path)) == NULL)
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
     {
-        return -ENOENT;
+        return errno;
     }
 
     // FIXME: add proper implementation
@@ -463,13 +505,13 @@ int sys_fstatvfs(int fd, struct statvfs* buf)
 
 int sys_unlink(const char* path)
 {
-    (void)path;
+    UNUSED(path);
     return -ENOSYS;
 }
 
 mode_t sys_umask(mode_t cmask)
 {
-    (void)cmask;
+    UNUSED(cmask);
     return -ENOSYS;
 }
 
@@ -488,16 +530,16 @@ int sys_access(const char* path, int amode)
     int errno;
     dentry_t* dentry;
 
-    (void)amode;
+    UNUSED(amode);
 
     if ((errno = path_validate(path)))
     {
         return errno;
     }
 
-    if ((dentry = lookup(path)) == NULL)
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
     {
-        return -ENOENT;
+        return errno;
     }
 
     return 0;
@@ -505,13 +547,13 @@ int sys_access(const char* path, int amode)
 
 int sys_rename(const char* oldpath, const char* newpath)
 {
-    (void)oldpath; (void)newpath;
+    UNUSED(oldpath); UNUSED(newpath);
     return -ENOSYS;
 }
 
 int sys_mknod(const char* pathname, mode_t mode, dev_t dev)
 {
-    (void)pathname, (void)mode; (void)dev;
+    UNUSED(pathname), UNUSED(mode), UNUSED(dev);
     return -ENOSYS;
 }
 
@@ -530,7 +572,15 @@ int sys_fcntl(int fd, int cmd, ...)
     {
         case F_DUPFD:
         {
-            ret = sys_dup2(fd, va_arg(args, int));
+            int new_fd;
+            if (process_find_free_fd_at(process_current, va_arg(args, int), &new_fd))
+            {
+                ret = -ENOMEM;
+            }
+            else
+            {
+                ret = sys_dup2(fd, new_fd);
+            }
             break;
         }
         case F_GETFD:
@@ -557,18 +607,31 @@ int sys_fcntl(int fd, int cmd, ...)
 
 int sys_lchown(const char* pathname, uid_t owner, gid_t group)
 {
-    (void)pathname; (void)owner; (void)group;
+    UNUSED(pathname); UNUSED(owner); UNUSED(group);
     return -ENOSYS;
 }
 
 int sys_fchown(int fd, uid_t owner, gid_t group)
 {
-    (void)fd; (void)owner; (void)group;
+    UNUSED(fd); UNUSED(owner); UNUSED(group);
     return -ENOSYS;
 }
 
 int sys_rmdir(const char* pathname)
 {
-    (void)pathname;
+    UNUSED(pathname);
     return -ENOSYS;
-};
+}
+
+ssize_t sys_readlink(const char* pathname, char* buf, size_t bufsiz)
+{
+    int errno;
+    dentry_t* dentry;
+
+    if (unlikely(errno = path_validate(pathname))) return errno;
+    if (unlikely(errno = lookup(pathname, LOOKUP_NOFOLLOW, &dentry))) return errno;
+    if (unlikely(!S_ISLNK(dentry->inode->mode))) return -EINVAL;
+    if (unlikely(!dentry->inode->ops || !dentry->inode->ops->readlink)) return -ENOSYS;
+
+    return dentry->inode->ops->readlink(dentry->inode, buf, bufsiz);
+}

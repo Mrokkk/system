@@ -2,8 +2,9 @@
 #include <kernel/path.h>
 #include <kernel/dentry.h>
 #include <kernel/process.h>
+#include <kernel/api/stat.h>
 
-static inline void get_next_dir(char** path, char* output)
+static inline void get_next_dir(const char** path, char* output)
 {
     char* next_slash = strchr(*path, '/');
 
@@ -21,10 +22,46 @@ static inline void get_next_dir(char** path, char* output)
     }
 }
 
-dentry_t* lookup(const char* filename)
+static int link_follow(dentry_t* dentry, dentry_t** result)
 {
+    int res, errno;
+    char buffer[PATH_MAX];
+    inode_t* inode;
+
+    while (S_ISLNK(dentry->inode->mode))
+    {
+        inode = dentry->inode;
+
+        if (unlikely(!inode->ops || !inode->ops->readlink))
+        {
+            return -ENOSYS;
+        }
+
+        res = inode->ops->readlink(inode, buffer, sizeof(buffer));
+
+        if (unlikely(errno = errno_get(res)))
+        {
+            return errno;
+        }
+
+        buffer[res] = 0;
+
+        if (unlikely(errno = lookup(buffer, LOOKUP_NOFOLLOW, &dentry)))
+        {
+            return errno;
+        }
+    }
+
+    *result = dentry;
+
+    return 0;
+}
+
+int lookup(const char* filename, int flag, dentry_t** result)
+{
+    int errno;
     char name[PATH_MAX];
-    char* path = (char*)filename;
+    const char* path = filename;
     inode_t* parent_inode = NULL;
     dentry_t* parent_dentry = NULL;
     dentry_t* dentry = NULL;
@@ -62,6 +99,12 @@ dentry_t* lookup(const char* filename)
         }
         else if (!strcmp(name, ".."))
         {
+            if (unlikely(!S_ISDIR(dentry->inode->mode)))
+            {
+                *result = NULL;
+                return -ENOTDIR;
+            }
+
             if (dentry != process_current->fs->root)
             {
                 dentry = dentry->parent
@@ -69,9 +112,10 @@ dentry_t* lookup(const char* filename)
                     : dentry;
             }
         }
-        else if (!strlen(name) && parent_dentry)
+        else if (!*name && parent_dentry)
         {
-            return parent_dentry;
+            *result = parent_dentry;
+            return 0;
         }
         else
         {
@@ -79,14 +123,16 @@ dentry_t* lookup(const char* filename)
 
             if (unlikely(!dentry && !parent_inode))
             {
-                return NULL;
+                *result = NULL;
+                return -ENOENT;
             }
             else if (!dentry)
             {
                 log_debug(DEBUG_LOOKUP, "calling ops->lookup with %O, %S", parent_inode, name);
-                if (parent_inode->ops->lookup(parent_inode, name, &parent_inode))
+                if (unlikely(errno = parent_inode->ops->lookup(parent_inode, name, &parent_inode)))
                 {
-                    return NULL;
+                    *result = NULL;
+                    return errno;
                 }
 
                 if (!parent_inode->dev)
@@ -106,17 +152,38 @@ dentry_t* lookup(const char* filename)
 
         if (!path || strlen(path) == 0)
         {
-            if (dentry)
+            break;
+        }
+        else if (S_ISLNK(dentry->inode->mode))
+        {
+            if (unlikely(errno = link_follow(dentry, &dentry)))
             {
-                log_debug(DEBUG_LOOKUP, "returning %O for dentry: %O", dentry->inode, dentry);
+                *result = NULL;
+                return errno;
             }
-            else
-            {
-                log_debug(DEBUG_LOOKUP, "returning %O", dentry);
-            }
-            return dentry;
+
+            parent_inode = dentry->inode;
         }
     }
 
-    return dentry;
+    if (unlikely(!dentry))
+    {
+        log_debug(DEBUG_LOOKUP, "returning %O", dentry);
+        *result = NULL;
+        return -ENOENT;
+    }
+
+    if (S_ISLNK(dentry->inode->mode) && (flag & LOOKUP_FOLLOW))
+    {
+        if (unlikely(errno = link_follow(dentry, &dentry)))
+        {
+            *result = NULL;
+            return errno;
+        }
+    }
+
+    log_debug(DEBUG_LOOKUP, "returning %O for dentry: %O", dentry->inode, dentry);
+
+    *result = dentry;
+    return 0;
 }

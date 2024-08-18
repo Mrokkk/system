@@ -9,6 +9,7 @@
 #include <kernel/minmax.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/api/dirent.h>
 
 KERNEL_MODULE(ext2);
 module_init(ext2_init);
@@ -21,6 +22,7 @@ static int ext2_mmap(file_t* file, vm_area_t* vma);
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int ext2_read(file_t* file, char* buffer, size_t count);
 static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page);
+static int ext2_readlink(inode_t* inode, char* buffer, size_t size);
 
 enum traverse_command
 {
@@ -73,6 +75,7 @@ static file_operations_t ext2_fops = {
 
 static inode_operations_t ext2_inode_ops = {
     .lookup = &ext2_lookup,
+    .readlink = &ext2_readlink,
 };
 
 static vm_operations_t ext2_vmops = {
@@ -219,7 +222,7 @@ static int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
         return errno;
     }
 
-    if (unlikely(errno = inode_get(result)))
+    if (unlikely(errno = inode_alloc(result)))
     {
         return errno;
     }
@@ -235,6 +238,7 @@ static int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
     (*result)->gid = child_inode->gid;
     (*result)->ctime = child_inode->ctime;
     (*result)->mtime = child_inode->mtime;
+    (*result)->nlink = child_inode->links_count;
 
     return 0;
 }
@@ -581,6 +585,7 @@ static inline char ext2_file_type_convert(uint16_t type)
     {
         case 1: return DT_REG;
         case 2: return DT_DIR;
+        case 7: return DT_LNK;
         default: return DT_UNKNOWN;
     }
 }
@@ -659,6 +664,29 @@ static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     }
 
     return ctx.i;
+}
+
+static int ext2_readlink(inode_t* inode, char* buffer, size_t size)
+{
+    ext2_inode_t* raw_inode = inode->fs_data;
+
+    if (unlikely(!S_ISLNK(inode->mode)))
+    {
+        return -EINVAL;
+    }
+
+    if (size < inode->size)
+    {
+        return -ENAMETOOLONG;
+    }
+
+    if (inode->size <= 60)
+    {
+        memcpy(buffer, raw_inode->block, inode->size);
+        return inode->size;
+    }
+
+    return -ENAMETOOLONG;
 }
 
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
@@ -746,6 +774,7 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
     inode->mode = root->mode;
     inode->ctime = root->ctime;
     inode->mtime = root->mtime;
+    inode->nlink = root->links_count;
 
     return 0;
 }

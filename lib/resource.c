@@ -1,3 +1,4 @@
+#include <string.h>
 #include <sys/resource.h>
 
 int LIBC(getpriority)(int which, id_t who)
@@ -12,6 +13,8 @@ int LIBC(getrlimit)(int resource, struct rlimit* rlp)
 
 int LIBC(getrusage)(int who, struct rusage* r_usage)
 {
+    memset(&r_usage->ru_stime, 0, sizeof(r_usage->ru_stime));
+    memset(&r_usage->ru_utime, 0, sizeof(r_usage->ru_utime));
     NOT_IMPLEMENTED(-1, "%d, %p", who, r_usage);
 }
 
