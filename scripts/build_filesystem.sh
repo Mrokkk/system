@@ -88,11 +88,18 @@ then
 fi
 
 bashrc_content='export PS1="\u \e[34m\w\e[0m # "
+
+function path()
+{
+    stat -L "${1}" >/dev/null && readlink -f "${1}"
+}
+
 alias ktest=/bin/test
 alias ..="cd .."
 alias l="ls -lah"
 alias dmesg="cat /proc/syslog"
-alias f="find . -name"'
+alias f="find . -name"
+alias p="path"'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
@@ -102,6 +109,7 @@ create_dir "${mountpoint}/lib/modules"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/proc"
 create_dir "${mountpoint}/root"
+create_dir "${mountpoint}/sys"
 create_dir "${boot_dir}/grub"
 
 for binary in $(find bin -type f -executable)

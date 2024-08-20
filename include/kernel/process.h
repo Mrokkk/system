@@ -109,7 +109,7 @@ struct process
     unsigned    need_signal:1;
     task_type_t type:1;
     stat_t      stat:2;
-    int         trace:2;
+    int         trace:3;
     list_head_t running;
     unsigned    context_switches;
     unsigned    forks;

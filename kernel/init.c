@@ -6,6 +6,7 @@
 #include <kernel/time.h>
 #include <kernel/devfs.h>
 #include <kernel/ksyms.h>
+#include <kernel/sysfs.h>
 #include <kernel/timer.h>
 #include <kernel/kernel.h>
 #include <kernel/memory.h>
@@ -170,6 +171,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     slab_allocator_init();
     devfs_init();
     procfs_init();
+    sysfs_init();
     processes_init();
 
     arch_late_setup();
@@ -254,6 +256,7 @@ UNMAP_AFTER_INIT static void rootfs_prepare(void)
     MUST_SUCCEED("chdir to real root",  do_chdir, "/");
     MUST_SUCCEED("mounting /dev",       do_mount, "none", "/dev", "devfs", 0);
     MUST_SUCCEED("mounting /proc",      do_mount, "none", "/proc", "proc", 0);
+    MUST_SUCCEED("mounting /sys",       do_mount, "none", "/sys", "sys", 0);
     MAY_FAIL("mounting /tmp",           do_mount, "none", "/tmp", "ramfs", 0);
 }
 

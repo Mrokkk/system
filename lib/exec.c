@@ -98,6 +98,11 @@ int LIBC(execvpe)(const char* file, char* const argv[], char* const envp[])
             default:
                 return -1;
         }
+
+        if (*delim == '\0')
+        {
+            break;
+        }
     }
 
     if (got_eaccess)

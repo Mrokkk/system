@@ -328,6 +328,10 @@ int sys_fork(struct pt_regs regs)
 // dtrace for dummy trace
 int sys_dtrace(int flag)
 {
+    if (flag & ~(DTRACE_FOLLOW_FORK | DTRACE_BACKTRACE))
+    {
+        return -EINVAL;
+    }
     process_current->trace = 1 | flag;
     return 0;
 }

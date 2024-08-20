@@ -1,15 +1,16 @@
 #define log_fmt(fmt) "procfs: " fmt
-#include "procfs.h"
 #include <kernel/fs.h>
 #include <kernel/init.h>
 #include <kernel/path.h>
 #include <kernel/time.h>
 #include <kernel/memory.h>
 #include <kernel/minmax.h>
+#include <kernel/procfs.h>
 #include <kernel/process.h>
 #include <kernel/seq_file.h>
 #include <kernel/vm_print.h>
 #include <kernel/api/dirent.h>
+#include <kernel/generic_vfs.h>
 
 #define DEBUG_PROCFS 0
 
@@ -37,28 +38,6 @@ static int environ_show(seq_file_t* s);
 int syslog_show(seq_file_t* s);
 int maps_show(seq_file_t* s);
 
-#define NODE(NAME, MODE, IOPS, FOPS) \
-    { \
-        .name = NAME, \
-        .len = sizeof(NAME), \
-        .mode = MODE, \
-        .ino = 2 + __COUNTER__, \
-        .iops = IOPS, \
-        .fops = FOPS, \
-    }
-
-#define DIR(name, mode, iops, fops) \
-    NODE(name, S_IFDIR | mode, iops, fops)
-
-#define REG(name, mode) \
-    NODE(#name, S_IFREG | mode, &name##_iops, &name##_fops)
-
-#define LNK(name, mode) \
-    NODE(#name, S_IFLNK | mode, NULL, NULL)
-
-#define DOT(name) \
-    DIR(name, S_IFDIR | S_IRUGO, NULL, NULL)
-
 #define PROCFS_ENTRY(name) \
     static int name##_open(file_t* file) { return seq_open(file, &name##_show); } \
     static inode_operations_t name##_iops; \
@@ -72,8 +51,6 @@ static file_system_t procfs = {
     .name = "proc",
     .mount = &procfs_mount,
 };
-
-static super_operations_t procfs_sb_ops;
 
 static file_operations_t procfs_root_fops = {
     .open = &procfs_open,
@@ -111,7 +88,7 @@ PROCFS_ENTRY(cmdline);
 PROCFS_ENTRY(uptime);
 PROCFS_ENTRY(syslog);
 
-static procfs_entry_t root_entries[] = {
+static generic_vfs_entry_t root_entries[] = {
     REG(meminfo, S_IFREG | S_IRUGO),
     REG(cmdline, S_IFREG | S_IRUGO),
     REG(uptime, S_IFREG | S_IRUGO),
@@ -124,31 +101,17 @@ PROCFS_ENTRY(stack);
 PROCFS_ENTRY(maps);
 PROCFS_ENTRY(environ);
 
-static procfs_entry_t pid_entries[] = {
-    DOT("."),
-    DOT(".."),
+static generic_vfs_entry_t pid_entries[] = {
+    DOT(.),
+    DOT(..),
     REG(comm, S_IRUGO),
     REG(status, S_IRUGO),
     REG(stack, S_IRUGO),
     REG(maps, S_IRUGO),
     REG(environ, S_IRUGO),
     REG(cmdline, S_IRUGO),
-    DIR("fd", S_IRUGO | S_IWUSR | S_IXUGO, &procfs_fd_iops, &procfs_fd_fops)
+    DIR(fd, S_IRUGO | S_IWUSR | S_IXUGO, &procfs_fd_iops, &procfs_fd_fops)
 };
-
-static inline procfs_entry_t* procfs_find(const char* name, procfs_entry_t* dir, size_t count)
-{
-    for (size_t i = 0; i < count; ++i)
-    {
-        if (!strcmp(name, dir[i].name))
-        {
-            log_debug(DEBUG_PROCFS, "found node: %S", name);
-            return &dir[i];
-        }
-    }
-
-    return NULL;
-}
 
 int procfs_init(void)
 {
@@ -157,10 +120,12 @@ int procfs_init(void)
 
 static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int)
 {
+    static super_operations_t procfs_sb_ops;
+
     sb->ops = &procfs_sb_ops;
     sb->module = 0;
 
-    inode->ino = DEVFS_ROOT_INO;
+    inode->ino = GENERIC_VFS_ROOT_INO;
     inode->ops = &procfs_root_iops;
     inode->fs_data = NULL;
     inode->file_ops = &procfs_root_fops;
@@ -174,7 +139,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
 {
     int errno, pid = 0, pid_ino;
     inode_t* new_inode;
-    procfs_entry_t* entry = NULL;
+    generic_vfs_entry_t* entry = NULL;
     process_t* p;
 
     if (!strcmp(name, "self"))
@@ -213,7 +178,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
         return 0;
     }
 
-    entry = procfs_find(name, root_entries, array_size(root_entries));
+    entry = generic_vfs_find(name, root_entries, array_size(root_entries));
 
     if (!entry)
     {
@@ -256,7 +221,7 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     int i = 0;
     char type;
     size_t len;
-    procfs_entry_t* entry;
+    generic_vfs_entry_t* entry;
     process_t* p;
     char namebuf[12];
 
@@ -317,9 +282,9 @@ static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result)
 {
     int errno;
     inode_t* new_inode;
-    procfs_entry_t* entry = NULL;
+    generic_vfs_entry_t* entry = NULL;
 
-    entry = procfs_find(name, pid_entries, array_size(pid_entries));
+    entry = generic_vfs_find(name, pid_entries, array_size(pid_entries));
 
     if (!entry)
     {
@@ -352,7 +317,7 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     int i;
     char type;
     size_t len;
-    procfs_entry_t* entry;
+    generic_vfs_entry_t* entry;
 
     log_debug(DEBUG_PROCFS, "inode=%O", file->inode);
 

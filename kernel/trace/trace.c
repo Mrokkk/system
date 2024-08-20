@@ -9,9 +9,8 @@
 #include <kernel/api/mman.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/api/types.h>
+#include <kernel/api/unistd.h>
 #include <kernel/api/syscall.h>
-
-#define DEBUG_TRACE_BACKTRACE 0
 
 extern syscall_t trace_syscalls[];
 
@@ -421,7 +420,7 @@ int trace_syscall(unsigned long nr, ...)
 
     log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
 
-    if (DEBUG_TRACE_BACKTRACE)
+    if (process_current->trace & DTRACE_BACKTRACE)
     {
         const pt_regs_t* regs = ptr_get(addr(&nr));
         backtrace_user(KERN_INFO, regs, "\t");
@@ -444,7 +443,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 
     scoped_irq_lock();
 
-    if (DEBUG_TRACE_BACKTRACE)
+    if (process_current->trace & DTRACE_BACKTRACE)
     {
         it = csnprintf(it, end, "%s returned ", trace_syscalls[nr].name);
     }
@@ -462,7 +461,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
         it = csnprintf(it, end, format_get(trace_syscalls[nr].ret, retval), retval);
     }
 
-    if (DEBUG_TRACE_BACKTRACE)
+    if (process_current->trace & DTRACE_BACKTRACE)
     {
         log_info("%s[%u]:   %s", process_current->name, process_current->pid, buf);
     }

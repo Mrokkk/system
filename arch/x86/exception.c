@@ -2,6 +2,7 @@
 #include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/ksyms.h>
+#include <kernel/sysfs.h>
 #include <kernel/reboot.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
@@ -13,7 +14,6 @@
 #include <arch/register.h>
 #include <arch/descriptor.h>
 
-#define DEBUG_USER_EXCEPTION    0
 #define DEBUG_PAGE_FAULT        0
 #define DEBUG_PAGE_FAULT_TRACE  0
 
@@ -223,7 +223,7 @@ handle_fault:
             exception->has_error_code ? regs.error_code : 0,
             regs.eip);
 
-        if (DEBUG_USER_EXCEPTION)
+        if (sys_config.user_backtrace)
         {
             if (printer)
             {
