@@ -8,8 +8,12 @@
 
 #define _POSIX_VERSION 200809L
 
+// Flags for sysconf
 #define _SC_ARG_MAX         1
 #define _SC_OPEN_MAX        2
+
+// Flags for confstr
+#define _CS_PATH            1
 
 #ifndef __ASSEMBLER__
 
@@ -32,6 +36,8 @@ int getpagesize(void);
 long sysconf(int name);
 
 int ftruncate(int fildes, off_t length);
+
+size_t confstr(int name, char* buf, size_t size);
 
 extern char** environ;
 

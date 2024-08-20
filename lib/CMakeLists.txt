@@ -26,6 +26,7 @@ set(LIBC_SRC
     assert.c
     atexit.c
     bsearch.c
+    confstr.c
     ctype.c
     dirent.c
     env.c

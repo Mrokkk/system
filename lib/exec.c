@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#define DEFAULT_PATH "/bin:/usr/bin"
+#include "confstr.h"
 
 int LIBC(execv)(const char* pathname, char* const argv[])
 {

@@ -834,4 +834,16 @@ TEST(getopt_long_only)
     }
 }
 
+TEST(confstr)
+{
+    char buf[32];
+    EXPECT_EQ(confstr(_CS_PATH, NULL, 0), 14);
+    EXPECT_EQ(errno, 0);
+    EXPECT_EQ(confstr(33, NULL, 0), 0);
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(confstr(_CS_PATH, buf, 32), 14);
+    EXPECT_STR_EQ(buf, "/bin:/usr/bin");
+    EXPECT_EQ(errno, 0);
+}
+
 TEST_SUITE_END(libc);
