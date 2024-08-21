@@ -8,6 +8,7 @@ void* realloc(void* ptr, size_t size);
 void free(void* ptr);
 
 [[noreturn]] void exit(int retcode);
+[[noreturn]] void _exit(int retcode);
 [[noreturn]] void _Exit(int retcode);
 [[noreturn]] void abort(void);
 
@@ -67,3 +68,5 @@ void srand(unsigned int seed);
 #define EXIT_FAILURE    -1
 
 #define MB_CUR_MAX      1
+
+#define ATEXIT_MAX      32
