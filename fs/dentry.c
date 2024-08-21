@@ -33,6 +33,7 @@ dentry_t* dentry_create(inode_t* inode, dentry_t* parent_dentry, const char* nam
     new_dentry->name = slab_alloc(len);
     new_dentry->inode = inode;
     new_dentry->parent = parent_dentry;
+    new_dentry->refcount = 1;
     strcpy(new_dentry->name, name);
 
     log_debug(DEBUG_DENTRY, "added %O for parent %O", new_dentry, parent_dentry);

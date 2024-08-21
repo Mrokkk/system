@@ -77,8 +77,9 @@
 #define __NR_setpgrp        74
 #define __NR_readlink       75
 #define __NR_fchdir         76
+#define __NR_lstat          77
 
-#define __NR_syscalls       77
+#define __NR_syscalls       78
 
 #ifndef __ASSEMBLER__
 
@@ -199,3 +200,4 @@ __syscall0(getpgrp, pid_t)
 __syscall0(setpgrp, pid_t)
 __syscall3(readlink, int, const char*, char*, size_t)
 __syscall1(fchdir, int, int)
+__syscall2(lstat, int, const char*, struct stat*)

@@ -45,6 +45,8 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
         return -ENOMEM;
     }
 
+    memset(data, 0, sizeof(*data) * nfds);
+
     for (size_t i = 0; i < nfds; ++i)
     {
         fds[i].revents = 0;

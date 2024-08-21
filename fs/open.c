@@ -334,15 +334,26 @@ int do_chdir(const char* path)
     int errno;
     mode_t mode;
     dentry_t* dentry;
+    dentry_t* tmp;
 
-    if (unlikely(errno = lookup(path, LOOKUP_FOLLOW, &dentry)))
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
     {
         return errno;
     }
 
     mode = dentry->inode->mode;
 
-    if (!S_ISDIR(mode))
+    if (S_ISLNK(mode))
+    {
+        if (unlikely(errno = lookup(path, LOOKUP_FOLLOW, &tmp)))
+        {
+            return errno;
+        }
+
+        mode = tmp->inode->mode;
+    }
+
+    if (unlikely(!S_ISDIR(mode)))
     {
         return -ENOTDIR;
     }
@@ -434,12 +445,12 @@ static void stat_fill(struct stat* statbuf, const dentry_t* dentry)
     statbuf->st_rdev = dentry->inode->rdev;
 }
 
-int sys_stat(const char* __user pathname, struct stat* __user statbuf)
+static int stat_impl(const char* pathname, struct stat* statbuf, int lookup_flag)
 {
     int errno;
     dentry_t* dentry;
 
-    if (unlikely(errno = lookup(pathname, LOOKUP_NOFOLLOW, &dentry)))
+    if (unlikely(errno = lookup(pathname, lookup_flag, &dentry)))
     {
         return errno;
     }
@@ -447,6 +458,16 @@ int sys_stat(const char* __user pathname, struct stat* __user statbuf)
     stat_fill(statbuf, dentry);
 
     return 0;
+}
+
+int sys_stat(const char* pathname, struct stat* statbuf)
+{
+    return stat_impl(pathname, statbuf, LOOKUP_FOLLOW);
+}
+
+int sys_lstat(const char* pathname, struct stat* statbuf)
+{
+    return stat_impl(pathname, statbuf, LOOKUP_NOFOLLOW);
 }
 
 int sys_fstat(int fd, struct stat* statbuf)

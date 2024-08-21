@@ -26,12 +26,18 @@ int main(int argc, char** argv)
                 break;
 
             case 1:
-                if (app_argc == sizeof(app_argv) / sizeof(*app_argv))
+                optind--;
+                for (; optind < argc;)
                 {
-                    fprintf(stderr, "Too many arguments\n");
-                    exit(EXIT_FAILURE);
+                    if (app_argc == sizeof(app_argv) / sizeof(*app_argv))
+                    {
+                        fprintf(stderr, "Too many arguments\n");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    app_argv[app_argc++] = argv[optind++];
                 }
-                app_argv[app_argc++] = optarg;
+                goto next;
                 break;
 
             default:
@@ -39,6 +45,7 @@ int main(int argc, char** argv)
         }
     }
 
+next:
     if (!app_argv[0])
     {
         fprintf(stderr, "Application path/name is needed\n");

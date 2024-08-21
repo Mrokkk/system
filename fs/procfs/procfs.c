@@ -22,6 +22,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result);
 static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 
 static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result);
+static int procfs_pid_readlink(inode_t* inode, char* buffer, size_t size);
 static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 
 static int procfs_fd_lookup(inode_t* dir, const char* name, inode_t** result);
@@ -64,6 +65,7 @@ static inode_operations_t procfs_root_iops = {
 
 static inode_operations_t procfs_pid_iops = {
     .lookup = &procfs_pid_lookup,
+    .readlink = &procfs_pid_readlink,
 };
 
 static file_operations_t procfs_pid_fops = {
@@ -146,6 +148,23 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
     {
         pid = -1;
         pid_ino = SELF_INO;
+
+        if (unlikely(errno = inode_alloc(&new_inode)))
+        {
+            log_error("cannot get inode, errno %d", errno);
+            return errno;
+        }
+
+        new_inode->ops = &procfs_pid_iops;
+        new_inode->file_ops = &procfs_pid_fops;
+        new_inode->ino = SELF_INO;
+        new_inode->sb = dir->sb;
+        new_inode->mode = S_IFLNK | S_IRUGO | S_IXUGO;
+        new_inode->fs_data = NULL;
+
+        *result = new_inode;
+
+        return 0;
     }
     else
     {
@@ -204,6 +223,16 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
     log_debug(DEBUG_PROCFS, "finished succesfully %O", *result);
 
     return 0;
+}
+
+static int procfs_pid_readlink(inode_t* inode, char* buffer, size_t size)
+{
+    if (unlikely(inode->ino != (ino_t)SELF_INO))
+    {
+        return -EINVAL;
+    }
+
+    return snprintf(buffer, size, "/proc/%u", process_current->pid) + 1;
 }
 
 static int procfs_open(file_t*)

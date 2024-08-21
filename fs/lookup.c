@@ -94,8 +94,24 @@ int lookup(const char* filename, int flag, dentry_t** result)
 
         log_debug(DEBUG_LOOKUP, "dirname=%S", name);
 
+        if (*name && dentry && S_ISLNK(dentry->inode->mode))
+        {
+            if (unlikely(errno = link_follow(dentry, &dentry)))
+            {
+                *result = NULL;
+                return errno;
+            }
+
+            parent_inode = dentry->inode;
+        }
+
         if (!strcmp(name, "."))
         {
+            if (unlikely(!S_ISDIR(dentry->inode->mode)))
+            {
+                *result = NULL;
+                return -ENOTDIR;
+            }
         }
         else if (!strcmp(name, ".."))
         {
@@ -119,6 +135,7 @@ int lookup(const char* filename, int flag, dentry_t** result)
         }
         else
         {
+            parent_dentry = dentry;
             dentry = dentry_lookup(dentry, name);
 
             if (unlikely(!dentry && !parent_inode))
@@ -153,16 +170,6 @@ int lookup(const char* filename, int flag, dentry_t** result)
         if (!path || strlen(path) == 0)
         {
             break;
-        }
-        else if (S_ISLNK(dentry->inode->mode))
-        {
-            if (unlikely(errno = link_follow(dentry, &dentry)))
-            {
-                *result = NULL;
-                return errno;
-            }
-
-            parent_inode = dentry->inode;
         }
     }
 

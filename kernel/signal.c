@@ -164,6 +164,11 @@ int do_kill(process_t* proc, int signum)
         return -EPERM;
     }
 
+    if (unlikely(proc->stat == PROCESS_ZOMBIE))
+    {
+        return 0;
+    }
+
     if (proc->stat == PROCESS_WAITING)
     {
         process_wake(proc);
