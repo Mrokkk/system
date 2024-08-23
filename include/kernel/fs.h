@@ -47,6 +47,7 @@ struct inode
     file_operations_t*  file_ops;
     inode_operations_t* ops;
     void*               fs_data;
+    dentry_t*           dentry;
     super_block_t*      sb;
 };
 
@@ -60,14 +61,13 @@ struct inode_operations
 
 struct file
 {
-    MAGIC_NUMBER;
-    unsigned short mode;
-    unsigned short count;
-    inode_t* inode;
-    size_t offset;
-    list_head_t files;
+    unsigned short     mode;
+    unsigned short     count;
+    dentry_t*          dentry;
+    size_t             offset;
+    list_head_t        files;
     file_operations_t* ops;
-    void* private;
+    void*              private;
 };
 
 typedef int (*direntadd_t)(void* buf, const char* name, size_t name_len, ino_t ino, char type);
@@ -139,8 +139,8 @@ struct buffer
 
 extern list_head_t files;
 extern list_head_t mounted_inodes;
-extern inode_t* root;
 
+int pipefs_init(void);
 int file_system_register(file_system_t* fs);
 
 #define LOOKUP_NOFOLLOW 0

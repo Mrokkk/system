@@ -374,8 +374,8 @@ static int iso9660_mmap(file_t*, vm_area_t* vma)
 // read
 static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
 {
-    iso9660_dirent_t* dirent = vma->inode->fs_data;
-    iso9660_data_t* data = vma->inode->sb->fs_data;
+    iso9660_dirent_t* dirent = vma->dentry->inode->fs_data;
+    iso9660_data_t* data = vma->dentry->inode->sb->fs_data;
 
     if (unlikely(!dirent || !data))
     {
@@ -429,8 +429,8 @@ error:
 
 static int iso9660_read(file_t* file, char* buffer, size_t count)
 {
-    iso9660_dirent_t* dirent = file->inode->fs_data;
-    iso9660_data_t* data = file->inode->sb->fs_data;
+    iso9660_dirent_t* dirent = file->dentry->inode->fs_data;
+    iso9660_data_t* data = file->dentry->inode->sb->fs_data;
 
     if (unlikely(!dirent || !data))
     {
@@ -490,8 +490,8 @@ static int iso9660_open(file_t*)
 
 static int iso9660_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
-    iso9660_data_t* data = file->inode->sb->fs_data;
-    iso9660_dirent_t* parent_dirent = file->inode->fs_data;
+    iso9660_data_t* data = file->dentry->inode->sb->fs_data;
+    iso9660_dirent_t* parent_dirent = file->dentry->inode->fs_data;
 
     int errno;
     iso9660_dirent_t* dirent;

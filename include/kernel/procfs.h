@@ -41,7 +41,8 @@ static inline process_t* procfs_process_from_inode(inode_t* inode)
 
 static inline process_t* procfs_process_from_seqfile(seq_file_t* s)
 {
-    return procfs_process_from_inode(s->file->inode);
+    return procfs_process_from_inode(s->file->dentry->inode);
 }
 
 int procfs_init(void);
+void procfs_cleanup(process_t* p);

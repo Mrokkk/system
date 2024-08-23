@@ -40,7 +40,7 @@ static int mem_deinit()
 
 static int mem_open(file_t* file)
 {
-    switch (MINOR(file->inode->rdev))
+    switch (MINOR(file->dentry->inode->rdev))
     {
         case MINOR_NULL:
             file->ops->read = &null_read;

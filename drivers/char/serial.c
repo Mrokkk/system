@@ -83,7 +83,7 @@ static int serial_open(tty_t* tty, file_t* file)
     uint16_t port;
     int minor;
 
-    minor = MINOR(file->inode->rdev);
+    minor = MINOR(file->dentry->inode->rdev);
 
     log_debug(DEBUG_SERIAL, "minor = %u", minor);
 

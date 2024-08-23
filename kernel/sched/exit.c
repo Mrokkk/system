@@ -1,5 +1,6 @@
 #include <kernel/vm.h>
 #include <kernel/timer.h>
+#include <kernel/procfs.h>
 #include <kernel/process.h>
 #include <kernel/api/unistd.h>
 
@@ -28,6 +29,7 @@ static inline void process_space_free(process_t* proc)
 static void process_delete(process_t* proc)
 {
     log_debug(DEBUG_EXIT, "");
+
     list_del(&proc->siblings);
     list_del(&proc->children);
     list_del(&proc->processes);
@@ -39,6 +41,8 @@ static void process_delete(process_t* proc)
         process_fs_exit(proc);
         process_signals_exit(proc);
     }
+
+    procfs_cleanup(proc);
 
     delete(proc);
 }

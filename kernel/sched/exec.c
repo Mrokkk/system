@@ -301,7 +301,7 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
             return errno;
         }
 
-        if (unlikely(!(file->inode->mode & S_IXUGO)))
+        if (unlikely(!(file->dentry->inode->mode & S_IXUGO)))
         {
             return -EACCES;
         }

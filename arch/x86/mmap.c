@@ -109,7 +109,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 
     if (flags & MAP_ANONYMOUS)
     {
-        vma->inode = NULL;
+        vma->dentry = NULL;
         vma->offset = 0;
     }
     else
@@ -134,12 +134,12 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
             goto free_vma;
         }
 
-        if (unlikely(inode_get(file->inode)))
+        if (unlikely(inode_get(file->dentry->inode)))
         {
             return ptr(-ENOENT);
         }
 
-        vma->inode = file->inode;
+        vma->dentry = file->dentry;
         vma->offset = offset;
     }
 
@@ -154,9 +154,9 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     return ptr(vaddr);
 
 free_vma:
-    if (vma->inode)
+    if (vma->dentry)
     {
-        inode_put(vma->inode);
+        inode_put(vma->dentry->inode);
     }
     delete(vma);
     return ptr(errno);

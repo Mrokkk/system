@@ -39,6 +39,13 @@ static int environ_show(seq_file_t* s);
 int syslog_show(seq_file_t* s);
 int maps_show(seq_file_t* s);
 
+typedef struct procfs_pid_data procfs_pid_data_t;
+
+struct procfs_pid_data
+{
+    list_head_t entries;
+};
+
 #define PROCFS_ENTRY(name) \
     static int name##_open(file_t* file) { return seq_open(file, &name##_show); } \
     static inode_operations_t name##_iops; \
@@ -174,6 +181,7 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
 
     if (pid)
     {
+        procfs_pid_data_t* data;
         if (process_find(pid, &p) && pid != -1)
         {
             return -ENOENT;
@@ -181,16 +189,25 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
 
         if (unlikely(errno = inode_alloc(&new_inode)))
         {
-            log_error("cannot get inode, errno %d", errno);
             return errno;
         }
+
+        if (unlikely(!(data = alloc(typeof(*data)))))
+        {
+            inode_put(new_inode);
+            return -ENOMEM;
+        }
+
+        list_init(&data->entries);
 
         new_inode->ops = &procfs_pid_iops;
         new_inode->file_ops = &procfs_pid_fops;
         new_inode->ino = pid_ino;
         new_inode->sb = dir->sb;
         new_inode->mode = S_IFDIR | S_IRUGO | S_IXUGO;
-        new_inode->fs_data = NULL;
+        new_inode->fs_data = data;
+
+        p->procfs_inode = new_inode;
 
         *result = new_inode;
         log_debug(DEBUG_PROCFS, "finished succesfully for %s %O", name, *result);
@@ -254,7 +271,7 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     process_t* p;
     char namebuf[12];
 
-    log_debug(DEBUG_PROCFS, "inode=%O", file->inode);
+    log_debug(DEBUG_PROCFS, "inode=%O", file->dentry->inode);
 
     ++i;
     if (dirent_add(buf, ".", 4, 0, DT_DIR))
@@ -282,7 +299,7 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     }
 
     ++i;
-    if (dirent_add(buf, "self", 4, SELF_INO, DT_DIR))
+    if (dirent_add(buf, "self", 4, SELF_INO, DT_LNK))
     {
         log_debug(DEBUG_PROCFS, "adding self");
         goto finish;
@@ -310,8 +327,15 @@ finish:
 static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result)
 {
     int errno;
+    process_t* p;
     inode_t* new_inode;
     generic_vfs_entry_t* entry = NULL;
+    procfs_pid_data_t* data;
+
+    if (unlikely(!(p = procfs_process_from_inode(dir))))
+    {
+        return -ESRCH;
+    }
 
     entry = generic_vfs_find(name, pid_entries, array_size(pid_entries));
 
@@ -327,12 +351,16 @@ static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result)
         return errno;
     }
 
+    data = p->procfs_inode->fs_data;
+
     new_inode->ops = entry->iops;
     new_inode->file_ops = entry->fops;
     new_inode->ino = dir->ino | entry->ino;
     new_inode->sb = dir->sb;
     new_inode->mode = entry->mode;
     new_inode->fs_data = entry;
+
+    list_add(&new_inode->list, &data->entries);
 
     *result = new_inode;
 
@@ -348,7 +376,7 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     size_t len;
     generic_vfs_entry_t* entry;
 
-    log_debug(DEBUG_PROCFS, "inode=%O", file->inode);
+    log_debug(DEBUG_PROCFS, "inode=%O", file->dentry->inode);
 
     for (i = 0; i < (int)array_size(pid_entries); ++i)
     {
@@ -381,6 +409,7 @@ static int procfs_fd_lookup(inode_t* dir, const char* name, inode_t** result)
     process_t* p;
     inode_t* new_inode;
     int fd = strtoi(name);
+    procfs_pid_data_t* data;
 
     if (unlikely(!(p = procfs_process_from_inode(dir))))
     {
@@ -405,11 +434,15 @@ static int procfs_fd_lookup(inode_t* dir, const char* name, inode_t** result)
         return errno;
     }
 
+    data = p->procfs_inode->fs_data;
+
     new_inode->ops = &procfs_fd_iops;
     new_inode->file_ops = &procfs_fd_fops;
     new_inode->ino = PID_TO_INO(p->pid) | fd << 24;
     new_inode->sb = dir->sb;
     new_inode->mode = 0644 | S_IFLNK;
+
+    list_add(&new_inode->list, &data->entries);
 
     *result = new_inode;
 
@@ -422,7 +455,7 @@ static int procfs_fd_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     process_t* p;
     char namebuf[12];
 
-    if (unlikely(!(p = procfs_process_from_inode(file->inode))))
+    if (unlikely(!(p = procfs_process_from_inode(file->dentry->inode))))
     {
         return -ESRCH;
     }
@@ -469,7 +502,7 @@ static int procfs_fd_readlink(inode_t* inode, char* buffer, size_t size)
         return -ESRCH;
     }
 
-    dentry_t* dentry = dentry_get(file->inode);
+    dentry_t* dentry = file->dentry;
 
     if (unlikely(!dentry))
     {
@@ -482,6 +515,40 @@ static int procfs_fd_readlink(inode_t* inode, char* buffer, size_t size)
     }
 
     return strlen(buffer);
+}
+
+void procfs_unlink(inode_t* inode)
+{
+    if (inode->dentry)
+    {
+        dentry_delete(inode->dentry);
+    }
+    inode_put(inode);
+}
+
+// FIXME: some locking is needed to handle parallel
+// removal and reading from different process
+void procfs_cleanup(process_t* p)
+{
+    inode_t* inode;
+    procfs_pid_data_t* data;
+
+    if (!p->procfs_inode)
+    {
+        return;
+    }
+
+    data = p->procfs_inode->fs_data;
+
+    // FIXME:  it should do backwards iteration
+    list_for_each_entry_safe(inode, &data->entries, list)
+    {
+        procfs_unlink(inode);
+    }
+
+    procfs_unlink(p->procfs_inode);
+
+    delete(data);
 }
 
 static int status_show(seq_file_t* s)

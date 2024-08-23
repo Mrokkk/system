@@ -17,7 +17,7 @@ vm_area_t* vm_create(uint32_t vaddr, size_t size, int vm_flags)
     vma->start = vma->end = vaddr;
     vma->end += size;
     vma->vm_flags = vm_flags;
-    vma->inode = NULL;
+    vma->dentry = NULL;
     vma->next = NULL;
     vma->prev = NULL;
     vma->offset = 0;
@@ -106,7 +106,7 @@ int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
 
     page_t* page = vm_page(pgd, address, &pde_index, &pte_index);
 
-    if (vma->inode && !page)
+    if (vma->dentry && !page)
     {
         if (unlikely(!vma->ops))
         {

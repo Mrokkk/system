@@ -25,7 +25,6 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     if (likely(dentry))
     {
         inode = dentry->inode;
-
         goto set_file;
     }
     else if (!dentry && !(flags & O_CREAT))
@@ -95,7 +94,21 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
         return -ENOENT;
     }
 
+    dentry = dentry_create(inode, parent_dentry, basename);
+
+    if (unlikely(!dentry))
+    {
+        log_error("cannot create dentry");
+        return -ENOMEM;
+    }
+
 set_file:
+    if (unlikely(!inode))
+    {
+        log_error("VFS issue: null inode in dentry %x", dentry);
+        return -ENOENT;
+    }
+
     if (unlikely(!inode->file_ops || !inode->file_ops->open))
     {
         return -ENOSYS;
@@ -120,11 +133,11 @@ set_file:
 
     log_debug(DEBUG_OPEN, "file=%O, inode=%O", *new_file, inode);
 
-    (*new_file)->inode = inode;
-    (*new_file)->ops = inode->file_ops;
-    (*new_file)->mode = flags;
-    (*new_file)->offset = 0;
-    (*new_file)->count = 1;
+    (*new_file)->ops     = inode->file_ops;
+    (*new_file)->mode    = flags;
+    (*new_file)->offset  = 0;
+    (*new_file)->count   = 1;
+    (*new_file)->dentry  = dentry;
     (*new_file)->private = NULL;
 
     if (unlikely(errno = (*new_file)->ops->open(*new_file)))
@@ -153,7 +166,7 @@ int file_fd_allocate(file_t* file)
     return fd;
 }
 
-int sys_open(const char* __user filename, int flags, int mode)
+int sys_open(const char* filename, int flags, int mode)
 {
     int fd, errno;
     struct file *file;
@@ -231,8 +244,8 @@ int sys_close(int fd)
     int errno;
     file_t* file;
 
-    if (fd_check_bounds(fd)) return -EBADF;
-    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+    if (unlikely(process_fd_get(process_current, fd, &file))) return -EBADF;
 
     if (unlikely(errno = do_close(file)))
     {
@@ -303,11 +316,11 @@ int do_mkdir(const char* path, int mode)
     return 0;
 }
 
-int sys_mkdir(const char* __user path, int mode)
+int sys_mkdir(const char* path, int mode)
 {
     int errno;
 
-    if ((errno = path_validate(path)))
+    if (unlikely(errno = path_validate(path)))
     {
         return errno;
     }
@@ -319,7 +332,7 @@ int sys_creat(const char* pathname, int mode)
 {
     int errno;
 
-    if ((errno = path_validate(pathname)))
+    if (unlikely(errno = path_validate(pathname)))
     {
         return errno;
     }
@@ -368,7 +381,7 @@ int do_chdir(const char* path)
     return 0;
 }
 
-int sys_chdir(const char* __user path)
+int sys_chdir(const char* path)
 {
     int errno;
 
@@ -386,12 +399,14 @@ int sys_fchdir(int fd)
     file_t* file;
     dentry_t* dentry;
 
-    if (fd_check_bounds(fd)) return -EBADF;
-    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+    if (unlikely(process_fd_get(process_current, fd, &file))) return -EBADF;
 
-    if (!(dentry = dentry_get(file->inode)))
+    dentry = file->dentry;
+
+    if (unlikely(!dentry))
     {
-        log_error("VFS issue: inode %x has no dentry", file->inode);
+        log_error("VFS issue: missing dentry in file %x", file);
         return -ENOENT;
     }
 
@@ -412,16 +427,16 @@ int sys_fchdir(int fd)
     return 0;
 }
 
-int sys_getcwd(char* __user buf, size_t size)
+int sys_getcwd(char* buf, size_t size)
 {
     int errno;
 
-    if ((errno = current_vm_verify_buf(VERIFY_READ, buf, size)))
+    if (unlikely(errno = current_vm_verify_buf(VERIFY_READ, buf, size)))
     {
         return errno;
     }
 
-    if (!process_current->fs->cwd)
+    if (unlikely(!process_current->fs->cwd))
     {
         current_log_error("no cwd");
         return -EPERM;
@@ -432,17 +447,17 @@ int sys_getcwd(char* __user buf, size_t size)
 
 static void stat_fill(struct stat* statbuf, const dentry_t* dentry)
 {
-    statbuf->st_ino = dentry->inode->ino;
-    statbuf->st_dev = dentry->inode->dev;
-    statbuf->st_size = dentry->inode->size;
-    statbuf->st_mode = dentry->inode->mode;
-    statbuf->st_uid = dentry->inode->uid;
-    statbuf->st_gid = dentry->inode->gid;
+    statbuf->st_ino   = dentry->inode->ino;
+    statbuf->st_dev   = dentry->inode->dev;
+    statbuf->st_size  = dentry->inode->size;
+    statbuf->st_mode  = dentry->inode->mode;
+    statbuf->st_uid   = dentry->inode->uid;
+    statbuf->st_gid   = dentry->inode->gid;
     statbuf->st_ctime = dentry->inode->ctime;
     statbuf->st_mtime = dentry->inode->mtime;
     statbuf->st_atime = 0;
     statbuf->st_nlink = dentry->inode->nlink;
-    statbuf->st_rdev = dentry->inode->rdev;
+    statbuf->st_rdev  = dentry->inode->rdev;
 }
 
 static int stat_impl(const char* pathname, struct stat* statbuf, int lookup_flag)
@@ -476,12 +491,14 @@ int sys_fstat(int fd, struct stat* statbuf)
 
     file_t* file;
 
-    if (fd_check_bounds(fd)) return -EBADF;
-    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+    if (unlikely(process_fd_get(process_current, fd, &file))) return -EBADF;
 
-    if (!(dentry = dentry_get(file->inode)))
+    dentry = file->dentry;
+
+    if (unlikely(!dentry))
     {
-        log_error("VFS issue: inode %x has no dentry", file->inode);
+        log_error("VFS issue: missing dentry in file %x", file);
         return -ENOENT;
     }
 
@@ -495,7 +512,7 @@ int sys_statvfs(const char* path, struct statvfs* buf)
     int errno;
     dentry_t* dentry;
 
-    if ((errno = path_validate(path)))
+    if (unlikely(errno = path_validate(path)))
     {
         return errno;
     }
@@ -515,8 +532,8 @@ int sys_fstatvfs(int fd, struct statvfs* buf)
 {
     file_t* file;
 
-    if (fd_check_bounds(fd)) return -EBADF;
-    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+    if (unlikely(process_fd_get(process_current, fd, &file))) return -EBADF;
 
     // FIXME: add proper implementation
     memset(buf, 0, sizeof(*buf));
@@ -540,8 +557,8 @@ int sys_fchmod(int fd, mode_t)
 {
     file_t* file;
 
-    if (fd_check_bounds(fd)) return -EBADF;
-    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+    if (unlikely(process_fd_get(process_current, fd, &file))) return -EBADF;
 
     return -ENOSYS;
 }
@@ -553,7 +570,7 @@ int sys_access(const char* path, int amode)
 
     UNUSED(amode);
 
-    if ((errno = path_validate(path)))
+    if (unlikely(errno = path_validate(path)))
     {
         return errno;
     }
@@ -584,8 +601,8 @@ int sys_fcntl(int fd, int cmd, ...)
     va_list args;
     file_t* file;
 
-    if (fd_check_bounds(fd)) return -EBADF;
-    if (process_fd_get(process_current, fd, &file)) return -EBADF;
+    if (unlikely(fd_check_bounds(fd))) return -EBADF;
+    if (unlikely(process_fd_get(process_current, fd, &file))) return -EBADF;
 
     va_start(args, cmd);
 
@@ -594,7 +611,7 @@ int sys_fcntl(int fd, int cmd, ...)
         case F_DUPFD:
         {
             int new_fd;
-            if (process_find_free_fd_at(process_current, va_arg(args, int), &new_fd))
+            if (unlikely(process_find_free_fd_at(process_current, va_arg(args, int), &new_fd)))
             {
                 ret = -ENOMEM;
             }

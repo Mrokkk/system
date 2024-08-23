@@ -173,7 +173,7 @@ static int ramfs_read(file_t* file, char* buffer, size_t count)
 {
     int res, errno;
     size_t offset = file->offset;
-    ram_node_t* node = file->inode->fs_data;
+    ram_node_t* node = file->dentry->inode->fs_data;
 
     log_debug(DEBUG_RAMFS, "reading %u B at offset %u from %s", count, offset, node->name);
 
@@ -204,7 +204,7 @@ static int ramfs_write(file_t* file, const char* buffer, size_t count)
     page_t* pages;
     size_t offset = file->offset;
     size_t page_count;
-    ram_node_t* node = file->inode->fs_data;
+    ram_node_t* node = file->dentry->inode->fs_data;
 
     log_debug(DEBUG_RAMFS, "writing %u B at offset %u to %s", count, offset, node->name);
 
@@ -242,7 +242,7 @@ static int ramfs_write(file_t* file, const char* buffer, size_t count)
     }
 
     file->offset += res;
-    file->inode->size = node->size;
+    file->dentry->inode->size = node->size;
 
     return res;
 }
@@ -442,7 +442,7 @@ static cmd_t ramfs_readdir_block(void* data, size_t count, void* cb_data)
 static int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
     int res, errno;
-    ram_node_t* parent = file->inode->fs_data;
+    ram_node_t* parent = file->dentry->inode->fs_data;
 
     readdir_context_t ctx = {.dirent_add = dirent_add, .buf = buf, .count = 0};
 

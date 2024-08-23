@@ -145,19 +145,11 @@ static void table_print(table_t* t, int flag, void* data)
 
 void vm_file_path_read(vm_area_t* vma, char* buffer, size_t max_len)
 {
-    dentry_t* dentry;
     int type = VM_TYPE_GET(vma->vm_flags);
 
-    if (vma->inode)
+    if (vma->dentry)
     {
-        if ((dentry = dentry_get(vma->inode)))
-        {
-            path_construct(dentry, buffer, max_len);
-        }
-        else
-        {
-            strlcpy(buffer, "missing dentry", max_len);
-        }
+        path_construct(vma->dentry, buffer, max_len);
     }
     else
     {
@@ -321,7 +313,7 @@ static int maps_row_fill(table_context_t* ctx, void* data)
     table_column_write(ctx, vma->end);
     table_column_write(ctx, vm_maps_flags_string(buf, vma));
     table_column_write(ctx, vma->offset);
-    table_column_write(ctx, vma->inode ? vma->inode->ino : 0);
+    table_column_write(ctx, vma->dentry ? vma->dentry->inode->ino : 0);
     vm_file_path_read(vma, buf, PATH_MAX);
     table_column_write(ctx, buf);
     d->vma = vma->next;

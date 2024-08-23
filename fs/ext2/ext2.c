@@ -497,8 +497,8 @@ static cmd_t ext2_read_block(void* block, size_t to_copy, void* data)
 static int ext2_read(file_t* file, char* buffer, size_t count)
 {
     int res, errno;
-    ext2_data_t* data = file->inode->sb->fs_data;
-    ext2_inode_t* raw_inode = file->inode->fs_data;
+    ext2_data_t* data = file->dentry->inode->sb->fs_data;
+    ext2_inode_t* raw_inode = file->dentry->inode->fs_data;
 
     res = ext2_traverse_blocks(
         data,
@@ -545,8 +545,8 @@ static cmd_t ext2_nopage_block(void* block, size_t to_copy, void* data)
 static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
 {
     int res, errno;
-    ext2_inode_t* inode = vma->inode->fs_data;
-    ext2_data_t* data = vma->inode->sb->fs_data;
+    ext2_inode_t* inode = vma->dentry->inode->fs_data;
+    ext2_data_t* data = vma->dentry->inode->sb->fs_data;
 
     *page = page_alloc1();
 
@@ -637,13 +637,13 @@ static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
 static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
     int res, errno;
-    ext2_data_t* data = file->inode->sb->fs_data;
-    ext2_inode_t* raw_inode = file->inode->fs_data;
+    ext2_data_t* data = file->dentry->inode->sb->fs_data;
+    ext2_inode_t* raw_inode = file->dentry->inode->fs_data;
     readdir_context_t ctx = {
         .buf = buf,
         .dirent_add = dirent_add,
         .i = 0,
-        .parent_ino = file->inode->ino
+        .parent_ino = file->dentry->inode->ino
     };
 
     if (unlikely(!S_ISDIR(raw_inode->mode)))

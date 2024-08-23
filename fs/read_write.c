@@ -174,7 +174,7 @@ int sys_lseek(int fd, off_t offset, int whence)
             file->offset += offset;
             break;
         case SEEK_END:
-            file->offset = file->inode->size + offset;
+            file->offset = file->dentry->inode->size + offset;
             break;
     }
 

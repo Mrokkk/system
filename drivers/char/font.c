@@ -49,7 +49,7 @@ int font_load(void)
         return -ENOSYS;
     }
 
-    pages_needed = page_align(file->inode->size) / PAGE_SIZE;
+    pages_needed = page_align(file->dentry->inode->size) / PAGE_SIZE;
 
     log_info("allocating %u pages for font", pages_needed);
 
@@ -65,7 +65,7 @@ int font_load(void)
         return -ENOMEM;
     }
 
-    file->ops->read(file, page_virt_ptr(pages), file->inode->size);
+    file->ops->read(file, page_virt_ptr(pages), file->dentry->inode->size);
 
     uint32_t* magic = page_virt_ptr(pages);
 

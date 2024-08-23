@@ -2,7 +2,6 @@
 #include <kernel/kernel.h>
 
 static LIST_DECLARE(free_inodes);
-inode_t* root;
 
 int inode_alloc(inode_t** inode)
 {

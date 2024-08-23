@@ -41,6 +41,8 @@ int seq_close(file_t* file)
         page_free(ptr(addr(s->buffer) + 3 * PAGE_SIZE));
     }
 
+    delete(s);
+
     return 0;
 }
 

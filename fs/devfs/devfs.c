@@ -292,13 +292,13 @@ static int devfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     dir_node_t* dir;
     dev_data_t* data;
 
-    log_debug(DEBUG_DEVFS, "inode=%O fs_data=%O", file->inode, file->inode->fs_data);
+    log_debug(DEBUG_DEVFS, "inode=%O fs_data=%O", file->dentry->inode, file->dentry->inode->fs_data);
 
-    node = file->inode->fs_data;
+    node = file->dentry->inode->fs_data;
 
     if (node != dev_root)
     {
-        log_debug(DEBUG_DEVFS, "not a root: %O", file->inode);
+        log_debug(DEBUG_DEVFS, "not a root: %O", file->dentry->inode);
         return -ENOTDIR;
     }
 

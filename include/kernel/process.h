@@ -131,6 +131,7 @@ struct process
     process_t*        parent;
     list_head_t       timers;
     wait_queue_head_t wait_child;
+    inode_t*          procfs_inode;
     unsigned          padding;
 
     // Cacheline 2

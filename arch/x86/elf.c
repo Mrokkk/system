@@ -382,7 +382,7 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
     const char* shstr = NULL;
     elf32_sym_t* symbols = NULL;
     uint32_t* got = NULL;
-    size_t size = file->inode->size;
+    size_t size = file->dentry->inode->size;
     page_t* module_pages = page_alloc(page_align(size) / PAGE_SIZE, PAGE_ALLOC_CONT);
     ctor_t* ctors = NULL;
     size_t ctors_count = 0;

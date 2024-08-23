@@ -140,6 +140,7 @@ static inline void process_init(process_t* child, process_t* parent)
     child->need_resched = false;
     child->need_signal = false;
     child->alarm = 0;
+    child->procfs_inode = NULL;
     process_name_set(child, parent->name);
     wait_queue_head_init(&child->wait_child);
     list_init(&child->children);

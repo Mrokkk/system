@@ -7,6 +7,7 @@
 static LIST_DECLARE(file_systems);
 static LIST_DECLARE(mounted_systems);
 static dentry_t* root_dentry;
+static inode_t* root;
 
 int file_system_register(file_system_t* fs)
 {
@@ -160,7 +161,7 @@ int do_mount(const char* source, const char* target, const char* filesystemtype,
             goto error;
         }
 
-        dev = file->inode->rdev;
+        dev = file->dentry->inode->rdev;
     }
     else
     {

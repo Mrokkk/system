@@ -177,6 +177,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     arch_late_setup();
 
     modules_init();
+    pipefs_init();
 
     ASSERT(init_in_progress == INIT_IN_PROGRESS);
     init_in_progress = 0;

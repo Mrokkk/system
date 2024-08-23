@@ -5,7 +5,7 @@
 #include <kernel/page.h>
 #include <kernel/kernel.h>
 
-struct inode;
+struct dentry;
 
 typedef struct pages pages_t;
 typedef struct vm_area vm_area_t;
@@ -33,7 +33,7 @@ struct vm_area
 {
     uint32_t         start, end;
     int              vm_flags;
-    struct inode*    inode;
+    struct dentry*   dentry;
     off_t            offset; // offset within inode
     vm_operations_t* ops;
     vm_area_t*       next;

@@ -148,8 +148,8 @@ static tty_t* tty_find(dev_t major, dev_t minor)
 
 static int tty_open(file_t* file)
 {
-    int major = MAJOR(file->inode->rdev);
-    int minor = MINOR(file->inode->rdev);
+    int major = MAJOR(file->dentry->inode->rdev);
+    int minor = MINOR(file->dentry->inode->rdev);
     tty_t* tty = NULL;
 
     if (unlikely(major == MAJOR_CHR_TTYAUX))
@@ -265,8 +265,8 @@ void tty_write_to_all(const char* buffer, size_t len, tty_t* excluded)
 tty_t* tty_from_file(file_t* file)
 {
     tty_t* tty;
-    const dev_t major = MAJOR(file->inode->rdev);
-    const dev_t minor = MINOR(file->inode->rdev);
+    const dev_t major = MAJOR(file->dentry->inode->rdev);
+    const dev_t minor = MINOR(file->dentry->inode->rdev);
 
     list_for_each_entry(tty, &ttys, list_entry)
     {

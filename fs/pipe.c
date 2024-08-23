@@ -1,7 +1,10 @@
 #include <kernel/fs.h>
+#include <kernel/dev.h>
 #include <kernel/fifo.h>
+#include <kernel/dentry.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>
+#include <kernel/api/stat.h>
 
 #define DEBUG_PIPE 0
 
@@ -15,9 +18,9 @@ typedef struct pipe pipe_t;
 struct pipe
 {
     wait_queue_head_t wq;
-    int writers;
-    int readers;
-    int count;
+    int               writers;
+    int               readers;
+    int               count;
     BUFFER_MEMBER_DECLARE(buffer, 256);
 };
 
@@ -29,6 +32,18 @@ static file_operations_t pipe_r_fops = {
 static file_operations_t pipe_w_fops = {
     .write = &pipe_write,
     .close = &pipe_w_close,
+};
+
+static inode_operations_t pipe_iops = {
+};
+
+static file_operations_t pipe_fops = {
+};
+
+static super_operations_t sb_ops;
+
+static super_block_t sb = {
+    .ops = &sb_ops
 };
 
 static int pipe_read(file_t* file, char* buffer, size_t count)
@@ -98,20 +113,21 @@ static int pipe_write(file_t* file, const char* buffer, size_t count)
 static int pipe_r_close(file_t* file)
 {
     pipe_t* pipe = file->private;
-    log_debug(DEBUG_PIPE, "%u: pipe %x: closing", process_current->pid, pipe);
+    log_debug(DEBUG_PIPE, "%u: pipe %x: closing; refcount %u", process_current->pid, pipe, pipe->count);
     --pipe->readers;
     if (!--pipe->count)
     {
         log_debug(DEBUG_PIPE, "%u: pipe %x: removing", process_current->pid, pipe);
         delete(pipe);
     }
+    dentry_delete(file->dentry);
     return 0;
 }
 
 static int pipe_w_close(file_t* file)
 {
     pipe_t* pipe = file->private;
-    log_debug(DEBUG_PIPE, "%u: pipe %x: closing", process_current->pid, pipe);
+    log_debug(DEBUG_PIPE, "%u: pipe %x: closing; refcount %u", process_current->pid, pipe, pipe->count);
     if (!--pipe->writers)
     {
         process_t* proc = wait_queue_pop(&pipe->wq);
@@ -127,10 +143,11 @@ static int pipe_w_close(file_t* file)
         log_debug(DEBUG_PIPE, "%u: pipe %x: removing", process_current->pid, pipe);
         delete(pipe);
     }
+    dentry_delete(file->dentry);
     return 0;
 }
 
-static void file_init(file_t* file, pipe_t* pipe, file_operations_t* fops, int mode)
+static void file_init(file_t* file, pipe_t* pipe, dentry_t* dentry, file_operations_t* fops, int mode)
 {
     memset(file, 0, sizeof(*file));
 
@@ -138,6 +155,7 @@ static void file_init(file_t* file, pipe_t* pipe, file_operations_t* fops, int m
     file->count = 1;
     file->ops = fops;
     file->mode = mode;
+    file->dentry = dentry;
     pipe->count++;
 
     list_add_tail(&file->files, &files);
@@ -147,8 +165,20 @@ static void pipe_init(pipe_t* pipe)
 {
     fifo_init(&pipe->buffer);
     wait_queue_head_init(&pipe->wq);
+    pipe->count = 0;
     pipe->readers = 1;
     pipe->writers = 1;
+}
+
+static void inode_init(inode_t* inode)
+{
+    inode->ops = &pipe_iops;
+    inode->file_ops = &pipe_fops;
+    inode->dev = MKDEV(0, 255);
+    inode->ino = 1;
+    inode->sb = &sb;
+    inode->mode = S_IFIFO | 666;
+    inode->fs_data = NULL;
 }
 
 int sys_pipe(int* pipefd)
@@ -158,6 +188,12 @@ int sys_pipe(int* pipefd)
     file_t* output = NULL;
     pipe_t* pipe = NULL;
     int inputfd = -1, outputfd = -1;
+    inode_t* inode_r;
+    inode_t* inode_w;
+    dentry_t* dentry_r;
+    dentry_t* dentry_w;
+
+    static unsigned id;
 
     if (process_find_free_fd(process_current, &inputfd))
     {
@@ -167,6 +203,29 @@ int sys_pipe(int* pipefd)
     // FIXME: make fds a bitset and allocate it in process_find_free_fd
     process_fd_set(process_current, inputfd, (file_t*)1);
 
+    if (unlikely(
+        (errno = inode_alloc(&inode_r)) ||
+        (errno = inode_alloc(&inode_w))))
+    {
+        goto error;
+    }
+
+    inode_init(inode_r);
+    inode_init(inode_w);
+
+    char namebuf_r[16];
+    char namebuf_w[16];
+
+    snprintf(namebuf_r, sizeof(namebuf_r), "pipe:%u", id++);
+    snprintf(namebuf_w, sizeof(namebuf_w), "pipe:%u", id++);
+
+    if (!(dentry_r = dentry_create(inode_r, NULL, namebuf_r)) ||
+        !(dentry_w = dentry_create(inode_w, NULL, namebuf_w)))
+    {
+        errno = -EINVAL;
+        goto error;
+    }
+
     if (process_find_free_fd(process_current, &outputfd))
     {
         errno = -EMFILE;
@@ -174,8 +233,8 @@ int sys_pipe(int* pipefd)
     }
 
     if (!(pipe = alloc(pipe_t, pipe_init(this))) ||
-        !(input = alloc(file_t, file_init(this, pipe, &pipe_r_fops, O_RDONLY))) ||
-        !(output = alloc(file_t, file_init(this, pipe, &pipe_w_fops, O_WRONLY))))
+        !(input = alloc(file_t, file_init(this, pipe, dentry_r, &pipe_r_fops, O_RDONLY))) ||
+        !(output = alloc(file_t, file_init(this, pipe, dentry_w, &pipe_w_fops, O_WRONLY))))
     {
         errno = -ENOMEM;
         goto error;
@@ -201,5 +260,20 @@ error:
         delete(pipe);
     }
 
+    if (inode_r)
+    {
+        inode_put(inode_r);
+    }
+
+    if (inode_w)
+    {
+        inode_put(inode_w);
+    }
+
     return errno;
+}
+
+int pipefs_init(void)
+{
+    return 0;
 }
