@@ -7,23 +7,13 @@
 #include <error.h>
 #include <errno.h>
 #include <stdint.h>
+#include <common/compiler.h>
+
 #include "magic.h"
 
 extern int libc_debug;
 
-#define UNUSED(x)   (void)x
-#define LIKELY(x)   __builtin_expect(!!(x), 1)
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#define FALLTHROUGH __attribute__((__fallthrough__))
-
 #define LIBC(name)              __libc_##name
-#define __STRINGIFY(x)          #x
-#define STRINGIFY(x)            __STRINGIFY(x)
-#define ADDR(a)                 ((uintptr_t)(a))
-#define PTR(a)                  ((void*)(a))
-#define SHIFT(ptr, off)         ((typeof(ptr))(ADDR(ptr) + (off)))
-#define SHIFT_AS(t, ptr, off)   ((t)(ADDR(ptr) + (off)))
-#define ARRAY_SIZE(a)           (sizeof(a) / sizeof(*a))
 
 #define STRONG_ALIAS(name, aliasname) \
     extern __typeof(name) aliasname __attribute__((alias(STRINGIFY(name))))
@@ -36,9 +26,6 @@ extern int libc_debug;
 
 #define ERRNO_SET(e, v) \
     ({ errno = e; v; })
-
-#define ALIGN_TO(address, size) \
-    (((address) + (size) - 1) & (~((size) - 1)))
 
 #define DIR_CHECK(dir) \
     ({ (dir) && (dir)->magic == DIR_MAGIC; })
@@ -83,9 +70,5 @@ extern int libc_debug;
 
 #define SAFE_SYSCALL(val, ret) \
     ({ typeof(val) __x = (val); VALIDATE_SYSCALL_RETCODE(__x, ret); __x; })
-
-typedef uint8_t     u8;
-typedef uint16_t    u16;
-typedef uint32_t    u32;
 
 #endif // __ASSEMBLER__

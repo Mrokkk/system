@@ -1,4 +1,4 @@
-#include <kernel/bitset.h>
+#include <common/bitset.h>
 
 int __bitset_find_clear_range(uint32_t* bitset, int count, size_t bitset_size)
 {

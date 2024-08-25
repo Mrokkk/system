@@ -7,10 +7,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <common/list.h>
 #include <kernel/api/elf.h>
 
 #include "elf.h"
-#include "list.h"
 
 // References:
 // https://docs.oracle.com/cd/E18752_01/html/817-1984/chapter6-14428.html

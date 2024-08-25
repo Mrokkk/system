@@ -54,6 +54,7 @@ set(CMAKE_C_FLAGS
 
 include_directories(
    ${PROJECT_SOURCE_DIR}/include
+   ${PROJECT_SOURCE_DIR}/common/include
    ${PROJECT_SOURCE_DIR}/arch/${ARCH}/include
 )
 
@@ -82,6 +83,7 @@ target_link_libraries(
 add_custom_target(
     kernel_headers_install
     COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/include" sysroot/usr/include
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/common/include/common/" sysroot/usr/include
     COMMENT "Installing kernel headers"
 )
 

@@ -52,6 +52,12 @@ static int link_follow(dentry_t* dentry, dentry_t** result)
         }
     }
 
+    if (unlikely(!dentry))
+    {
+        log_error("%s:%u: VFS lookup bug: NULL dentry", __func__, __LINE__);
+        return -ENOENT;
+    }
+
     *result = dentry;
 
     return 0;
@@ -107,6 +113,10 @@ int lookup(const char* filename, int flag, dentry_t** result)
 
         if (!strcmp(name, "."))
         {
+            if (unlikely(!dentry))
+            {
+                return -ENOENT;
+            }
             if (unlikely(!S_ISDIR(dentry->inode->mode)))
             {
                 *result = NULL;
@@ -115,6 +125,10 @@ int lookup(const char* filename, int flag, dentry_t** result)
         }
         else if (!strcmp(name, ".."))
         {
+            if (unlikely(!dentry))
+            {
+                return -ENOENT;
+            }
             if (unlikely(!S_ISDIR(dentry->inode->mode)))
             {
                 *result = NULL;
@@ -158,6 +172,12 @@ int lookup(const char* filename, int flag, dentry_t** result)
                 }
 
                 dentry = dentry_create(parent_inode, parent_dentry, name);
+
+                if (unlikely(!dentry))
+                {
+                    return -ENOMEM;
+                }
+
                 parent_dentry = dentry;
             }
             else

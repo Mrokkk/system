@@ -100,8 +100,6 @@ set(LIBC_SRC
     string/strtok.c
     string/strxfrm.c
 
-    ../kernel/lib/bitset.c
-
     $<TARGET_OBJECTS:libc_common>
 )
 

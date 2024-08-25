@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <common/list.h>
 #include <kernel/api/elf.h>
 
-#include "list.h"
 #include "loader.h"
 
 typedef struct lib lib_t;

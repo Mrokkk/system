@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
+#include <common/compiler.h>
 
 struct list_head
 {
@@ -54,12 +56,18 @@ static inline void list_del(list_head_t* entry)
     entry->prev = (void*)entry;
 }
 
-static inline void list_move(list_head_t* list, list_head_t* head)
+static inline void list_move_tail(list_head_t* list, list_head_t* head)
 {
     __list_del(list->prev, list->next);
     list_add_tail(list, head);
 }
 
+// list_merge - join 2 lists
+//
+// Inserts list2 at the end of list1. It can be used also to insert
+// new element at the start/end of list:
+// - end: list1 is head, list2 is a new element
+// - start: list1 is a new element, list2 is head
 static inline void list_merge(list_head_t* list1, list_head_t* list2)
 {
     list_head_t* list1_last = list1->prev;
@@ -73,16 +81,19 @@ static inline void list_merge(list_head_t* list1, list_head_t* list2)
 
 #define list_entry(ptr, type, member) \
     ({ \
+       typecheck(list_head_t*, ptr); \
        ((type*)(ADDR(ptr) - ADDR(offsetof(type, member)))); \
     })
 
 #define list_next_entry(ptr, type, member) \
     ({ \
+       typecheck(list_head_t*, ptr); \
        ((type*)(ADDR((ptr)->next) - ADDR(offsetof(type, member)))); \
     })
 
 #define list_prev_entry(ptr, type, member) \
     ({ \
+       typecheck(list_head_t*, ptr); \
        ((type*)(ADDR((ptr)->prev) - ADDR(offsetof(type, member)))); \
     })
 

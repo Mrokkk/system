@@ -475,6 +475,7 @@ TEST(isatty)
     int fd = open("/proc/uptime", O_RDONLY);
     EXPECT_GT(fd, 0);
     EXPECT_EQ(isatty(fd), 0);
+    close(fd);
 }
 
 TEST(strtol)

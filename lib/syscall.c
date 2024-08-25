@@ -9,11 +9,11 @@ int syscall(int nr, ...)
     va_list args;
 
     va_start(args, nr);
-    u32 a1 = va_arg(args, u32);
-    u32 a2 = va_arg(args, u32);
-    u32 a3 = va_arg(args, u32);
-    u32 a4 = va_arg(args, u32);
-    u32 a5 = va_arg(args, u32);
+    uintptr_t a1 = va_arg(args, uintptr_t);
+    uintptr_t a2 = va_arg(args, uintptr_t);
+    uintptr_t a3 = va_arg(args, uintptr_t);
+    uintptr_t a4 = va_arg(args, uintptr_t);
+    uintptr_t a5 = va_arg(args, uintptr_t);
     va_end(args);
 
     asm volatile(

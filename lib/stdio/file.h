@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <common/list.h>
 
-#include "../list.h"
 #include "printf_buffer.h"
 
 #define LAST_READ   1

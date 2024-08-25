@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <kernel/bitset.h>
+#include <common/bitset.h>
 
 #define MALLOC_AREA         (0x14000 * 2)
 #define MALLOC_BLOCK_SIZE   8

@@ -296,6 +296,8 @@ TEST(modify_data)
     EXPECT_EQ(data2, 99);
 }
 
+DIAG_IGNORE("-Wanalyzer-null-dereference");
+
 TEST_CRASH_READ_ADDRESS(crash_read_nullptr, 0)
 TEST_CRASH_READ_ADDRESS(crash_read_kernel_space_1, 0xc0000000)
 TEST_CRASH_READ_ADDRESS(crash_read_kernel_space_2, 0xc0010000)
@@ -309,6 +311,8 @@ TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_1, 0xc0000000)
 TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_2, 0xc0010000)
 TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_3, 0xc0020000)
 TEST_CRASH_WRITE_ADDRESS(crash_write_kernel_space_4, 0xc011759c)
+
+DIAG_RESTORE()
 
 TEST(bad_syscall)
 {

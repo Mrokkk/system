@@ -3,16 +3,12 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <kernel/list.h>
+#include <common/list.h>
+#include <common/compiler.h>
 
 #ifndef TEST_SUITES_COUNT
 #define TEST_SUITES_COUNT       16
 #endif
-#define LIKELY(x)               __builtin_expect(!!(x), 1)
-#define UNLIKELY(x)             __builtin_expect(!!(x), 0)
-#define __STRINGIFY(x)          #x
-#define STRINGIFY(x)            __STRINGIFY(x)
-#define ARRAY_SIZE(a)           ((sizeof(a) / sizeof(*a)))
 
 typedef enum comp comp_t;
 typedef enum type type_t;

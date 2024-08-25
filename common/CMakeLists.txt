@@ -9,6 +9,7 @@ function(add_common_library name name_prefix make_alias)
     target_include_directories(${name}
         PRIVATE
             ${PROJECT_SOURCE_DIR}
+            ${PROJECT_SOURCE_DIR}/include
     )
 
     target_compile_definitions(${name}
