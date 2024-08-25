@@ -2,30 +2,18 @@
 
 #include "file.h"
 
-FILE* stdin;
-FILE* stdout;
-FILE* stderr;
+static FILE _stdin, _stdout, _stderr;
+static char stdin_buffer[BUFSIZ], stdout_buffer[BUFSIZ], stderr_buffer[BUFSIZ];
 
-#define INIT_MUST_SUCCEED(x, data) \
-    do \
-    { \
-        int __ret = x; \
-        if (UNLIKELY(__ret)) \
-        { \
-            asm volatile( \
-                "movl $0, 0" \
-                :: "a" (__ret), \
-                   "b" (__LINE__), \
-                   "c" (data)); \
-        } \
-    } \
-    while (0)
+FILE* stdin = &_stdin;
+FILE* stdout = &_stdout;
+FILE* stderr = &_stderr;
 
 void stdio_init(void)
 {
-    INIT_MUST_SUCCEED(file_allocate(STDIN_FILENO, O_RDONLY, &stdin), stdin);
-    INIT_MUST_SUCCEED(file_allocate(STDOUT_FILENO, O_WRONLY, &stdout), stdout);
-    INIT_MUST_SUCCEED(file_allocate(STDERR_FILENO, O_WRONLY, &stderr), stderr);
+    file_init(STDIN_FILENO, O_RDONLY, stdin, stdin_buffer, sizeof(stdin_buffer));
+    file_init(STDOUT_FILENO, O_WRONLY, stdout, stdout_buffer, sizeof(stdout_buffer));
+    file_init(STDERR_FILENO, O_WRONLY, stderr, stderr_buffer, sizeof(stderr_buffer));
 }
 
 // Temporary

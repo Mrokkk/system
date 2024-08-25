@@ -29,6 +29,7 @@ struct file
 #define FILE_FROM_BUFFER(buf) \
     ({ (FILE*)(ADDR(buf) - offsetof(FILE, buffer)); })
 
+int file_init(int fd, int mode, FILE* file, char* buffer, size_t buffer_size);
 int file_allocate(int fd, int mode, FILE** file);
 int file_flush(FILE* file);
 int file_flush_all(void);

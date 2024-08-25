@@ -12,15 +12,9 @@ static list_head_t files = LIST_INIT(files);
 static_assert(sizeof(FILE) == 64);
 static_assert(sizeof(FILE) + BUFSIZ == 1024);
 
-int file_allocate(int fd, int mode, FILE** output)
+int file_init(int fd, int mode, FILE* file, char* buffer, size_t buffer_size)
 {
-    FILE* file;
-    char* buffer;
     int flag = isatty(fd) ? _IOLBF : _IOFBF;
-
-    file = SAFE_ALLOC(malloc(sizeof(*file) + BUFSIZ), -1);
-
-    buffer = PTR(ADDR(file) + sizeof(*file));
 
     file->fd = fd;
     file->mode = mode;
@@ -28,9 +22,22 @@ int file_allocate(int fd, int mode, FILE** output)
     file->last = 0;
     list_init(&file->files);
 
-    file_setbuf(file, flag, buffer, BUFSIZ);
+    file_setbuf(file, flag, buffer, buffer_size);
 
     list_add_tail(&file->files, &files);
+
+    return 0;
+}
+
+int file_allocate(int fd, int mode, FILE** output)
+{
+    FILE* file;
+    char* buffer;
+
+    file = SAFE_ALLOC(malloc(sizeof(*file) + BUFSIZ), -1);
+    buffer = SHIFT_AS(char*, file, sizeof(*file));
+
+    file_init(fd, mode, file, buffer, BUFSIZ);
 
     *output = file;
 
@@ -78,7 +85,7 @@ int file_setbuf(FILE* file, int flag, char* buf, size_t bufsiz)
     {
         file->buffer.current = file->buffer.start = buf;
         file->buffer.end = buf + bufsiz;
-        // TODO: free previos buffer
+        // TODO: free previous buffer
     }
 
     return 0;
@@ -90,7 +97,11 @@ int file_close(FILE* file)
 
     fflush(file);
     list_del(&file->files);
-    free(file);
+
+    if (file != stdin && file != stdout && file != stderr)
+    {
+        free(file);
+    }
 
     return close(fd);
 }
