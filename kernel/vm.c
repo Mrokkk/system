@@ -92,6 +92,11 @@ int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
     int errno;
     uint32_t pde_index, pte_index;
 
+    if (unlikely(!(vma->vm_flags & VM_READ)))
+    {
+        return -EFAULT;
+    }
+
     if (unlikely(write && !(vma->vm_flags & VM_WRITE)))
     {
         return -EFAULT;
