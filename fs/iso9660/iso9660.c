@@ -388,7 +388,8 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
     off_t offset = vma->offset + address - vma->start;
     uint32_t pos = offset, data_size;
     uint32_t block_nr = offset / BLOCK_SIZE + block_nr_convert(GET(dirent->lba));
-    size_t blocks_count = PAGE_SIZE / BLOCK_SIZE;
+    const size_t blocks_count = PAGE_SIZE / BLOCK_SIZE;
+    size_t count = 0;
     buffer_t* b;
 
     if (unlikely(!(*page = page_alloc1())))
@@ -416,10 +417,11 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
 
         ++block_nr;
         pos += data_size;
+        count += data_size;
         data_ptr = shift(data_ptr, data_size);
     }
 
-    return 0;
+    return count;
 
 error:
     pages_free(*page);

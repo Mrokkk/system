@@ -18,5 +18,7 @@
 #define MAP_EXECUTABLE  0x1000  /* mark it as a executable */
 #define MAP_LOCKED      0x2000  /* pages are locked */
 
+#define MAP_FAILED      ((void *)-1)
+
 void* mmap(void* addr, size_t len, int prot, int flags, int fd, size_t off);
 int mprotect(void* addr, size_t len, int prot);

@@ -71,34 +71,34 @@ enum type
 
 struct value
 {
-    void* value;
+    void*       value;
     const char* name;
-    type_t type;
+    type_t      type;
 };
 
 struct config
 {
     const char* test_to_run;
-    bool run_until_failure;
-    bool verbose;
+    bool        run_until_failure;
+    bool        verbose;
 };
 
 struct test_case
 {
-    const char* name;
+    const char*     name;
+    list_head_t     failed_tests;
+    test_suite_t*   suite;
+
     void (*test)(void);
-    list_head_t failed_tests;
-    test_suite_t* suite;
 };
 
 struct test_suite
 {
-    const char* name;
+    const char*  name;
     test_case_t* test_cases;
-    size_t test_cases_count;
-    int failed;
-    int** assert_failed;
-    config_t** config;
+    size_t       test_cases_count;
+    int          failed;
+    config_t**   config;
 };
 
 void __test_suite_register(test_suite_t* suite);
@@ -111,8 +111,7 @@ void string_check(
     value_t* actual,
     value_t* expected,
     const char* file,
-    size_t line,
-    int* assert_failed);
+    size_t line);
 
 void failure_print(
     value_t* actual,
@@ -120,6 +119,10 @@ void failure_print(
     comp_t comp,
     const char* file,
     size_t line);
+
+void user_failure_print(const char* file, size_t line, const char* fmt, ...);
+
+extern int __assert_failed;
 
 #define TYPE_GET(val) \
     _Generic((val), \
@@ -164,7 +167,7 @@ void failure_print(
         uint64_t*:          TYPE_UINT64_T_PTR, \
         default:            TYPE_UNRECOGNIZED))
 
-#define EXPECT_FAILED(expected, expected_s, actual, actual_s, sign) \
+#define EXPECT_FAILED(expected, expected_s, actual, actual_s, sign, file, line) \
     do \
     { \
         int type = TYPE_GET(actual); \
@@ -178,75 +181,98 @@ void failure_print(
             .name = actual_s, \
             .type = type, \
         }; \
-        failure_print(&actual_value, &expected_value, sign, __FILE__, __LINE__); \
-        ++(*__assert_failed); \
+        failure_print(&actual_value, &expected_value, sign, file, line); \
+        ++__assert_failed; \
     } \
     while(0)
 
-#define EXPECT_GENERIC(C, SIGN, var, value) \
+#define EXPECT_GENERIC(C, SIGN, l, r, file, line) \
     do \
     { \
-        typeof(var) actual = var; \
-        typeof(var) expected = (typeof(var))(value); \
+        typeof(l) actual = l; \
+        typeof(l) expected = (typeof(l))(r); \
         if (UNLIKELY(!(actual SIGN expected))) \
         { \
-            EXPECT_FAILED(expected, #value, actual, #var, COMP_##C); \
+            EXPECT_FAILED(expected, #r, actual, #l, COMP_##C, file, line); \
         } \
     } \
     while (0)
 
-#define EXPECT_STR_EQ(A, E) \
+#define EXPECT_STR_EQ(l, r) \
     do \
     { \
-        const char* actual = (const char*)(A); \
-        const char* expected = (const char*)(E); \
+        const char* actual = (const char*)(l); \
+        const char* expected = (const char*)(r); \
         value_t expected_value = { \
             .value = (void*)&expected, \
-            .name = #E, \
+            .name = #r, \
             .type = TYPE_CHAR_PTR, \
         }; \
         value_t actual_value = { \
             .value = (void*)&actual, \
-            .name = #A, \
+            .name = #l, \
             .type = TYPE_CHAR_PTR, \
         }; \
-        string_check(&actual_value, &expected_value, __FILE__, __LINE__, __assert_failed); \
+        string_check(&actual_value, &expected_value, __FILE__, __LINE__); \
     } \
     while (0)
 
-#define EXPECT_EQ(var, value) EXPECT_GENERIC(EQ, ==, var, value)
-#define EXPECT_NE(var, value) EXPECT_GENERIC(NE, !=, var, value)
-#define EXPECT_GT(var, value) EXPECT_GENERIC(GT, >, var, value)
-#define EXPECT_GE(var, value) EXPECT_GENERIC(GE, >=, var, value)
-#define EXPECT_LT(var, value) EXPECT_GENERIC(LT, <, var, value)
-#define EXPECT_LE(var, value) EXPECT_GENERIC(LE, <=, var, value)
+#define EXPECT_EQ_L(l, r, file, line) EXPECT_GENERIC(EQ, ==, l, r, file, line)
+#define EXPECT_NE_L(l, r, file, line) EXPECT_GENERIC(NE, !=, l, r, file, line)
+#define EXPECT_GT_L(l, r, file, line) EXPECT_GENERIC(GT, >,  l, r, file, line)
+#define EXPECT_GE_L(l, r, file, line) EXPECT_GENERIC(GE, >=, l, r, file, line)
+#define EXPECT_LT_L(l, r, file, line) EXPECT_GENERIC(LT, <,  l, r, file, line)
+#define EXPECT_LE_L(l, r, file, line) EXPECT_GENERIC(LE, <=, l, r, file, line)
 
-#define EXPECT_EXIT_WITH(expected_error_code) \
+#define EXPECT_EQ(l, r) EXPECT_EQ_L(l, r, __FILE__, __LINE__)
+#define EXPECT_NE(l, r) EXPECT_NE_L(l, r, __FILE__, __LINE__)
+#define EXPECT_GT(l, r) EXPECT_GT_L(l, r, __FILE__, __LINE__)
+#define EXPECT_GE(l, r) EXPECT_GE_L(l, r, __FILE__, __LINE__)
+#define EXPECT_LT(l, r) EXPECT_LT_L(l, r, __FILE__, __LINE__)
+#define EXPECT_LE(l, r) EXPECT_LE_L(l, r, __FILE__, __LINE__)
+
+#define EXPECT_EXIT_WITH_L(expected_error_code, file, line) \
     int pid = fork(); \
+    if (pid == 0) \
+    { \
+        __assert_failed = 0; \
+    } \
     if (pid > 0) \
     { \
-        *__assert_failed += expect_exit_with(pid, expected_error_code, __FILE__, __LINE__); \
+        __assert_failed += expect_exit_with(pid, expected_error_code, file, line); \
     } \
     else
 
-#define EXPECT_KILLED_BY(signal) \
+#define EXPECT_EXIT_WITH(expected_error_code) EXPECT_EXIT_WITH_L(expected_error_code, __FILE__, __LINE__)
+
+#define EXPECT_KILLED_BY_L(signal, file, line) \
     int pid = fork(); \
+    if (pid == 0) \
+    { \
+        __assert_failed = 0; \
+    } \
     if (pid > 0) \
     { \
-        *__assert_failed += expect_killed_by(pid, signal, __FILE__, __LINE__); \
+        __assert_failed += expect_killed_by(pid, signal, file, line); \
     } \
     else
+
+#define EXPECT_KILLED_BY(signal) EXPECT_KILLED_BY_L(signal, __FILE__, __LINE__)
+
+#define FAIL_L(file, line, fmt, ...) \
+    ({ __assert_failed++; user_failure_print(file, line, fmt, ##__VA_ARGS__); 0; })
+
+#define FAIL(fmt, ...) \
+    FAIL_L(__FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #define TEST_SUITE(n) \
     extern test_case_t __##n##_test_cases[]; \
     static test_case_t* test_cases = __##n##_test_cases; \
-    static int* __assert_failed; \
     static config_t* __config; \
     static test_suite_t suite = { \
         .name = #n, \
         .test_cases = __##n##_test_cases, \
         .failed = 0, \
-        .assert_failed = &__assert_failed, \
         .config = &__config, \
     }
 
@@ -271,7 +297,7 @@ void failure_print(
     void CASE_##tc_name(void)
 
 #define FAILED_EXPECTATIONS() \
-    ({ *__assert_failed; })
+    ({ __assert_failed; })
 
 #define TESTS_RUN(argc, argv) \
     __test_suites_run(argc, argv)

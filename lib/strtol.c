@@ -50,7 +50,7 @@ static void base_determine(const char** nptr, int* base)
     }
 }
 
-static int digit_read(char c)
+static unsigned digit_read(char c)
 {
     return isdigit(c)
         ? c - '0'
@@ -81,11 +81,11 @@ static int digit_read(char c)
             } \
             \
             value *= base; \
-            value -= digit; \
+            value += digit; \
             \
             if (validate_overflow) \
             { \
-                if (UNLIKELY(old < value)) \
+                if (UNLIKELY(old > value)) \
                 { \
                     errno = ERANGE; \
                     return negative ? min : max; \
@@ -98,7 +98,7 @@ static int digit_read(char c)
             *endptr = (char*)nptr; \
         } \
         \
-        return negative ? value : -value; \
+        return negative ? -value : value; \
     }
 
 int LIBC(atoi)(const char* nptr)
@@ -129,7 +129,7 @@ unsigned long LIBC(strtoul)(
     char** endptr,
     int base)
 {
-    STRTOL(long, 1, ULONG_MAX, ULONG_MAX, nptr, endptr, base);
+    STRTOL(unsigned long, 1, ULONG_MAX, ULONG_MAX, nptr, endptr, base);
 }
 
 double LIBC(atof)(const char* nptr)

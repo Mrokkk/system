@@ -203,6 +203,47 @@ cannot_allocate:
     return -ENOMEM;
 }
 
+int vm_apply(vm_area_t* vmas, pgd_t* pgd, uintptr_t vaddr_start, uintptr_t vaddr_end)
+{
+    pgt_t* pgt;
+    vm_area_t* vma = vmas;
+    uintptr_t vaddr, pde_index, pte_index, pte_flags = pte_flags_get(vmas->vm_flags);
+
+    for (vaddr = vaddr_start; vaddr < vaddr_end; vaddr += PAGE_SIZE)
+    {
+        while (vaddr >= vma->end)
+        {
+            vma = vma->next;
+
+            if (unlikely(!vma))
+            {
+                log_error("%s:%u:%s: cannot apply vm; vma->next is null", __FILE__, __LINE__, __func__);
+                vm_area_log(KERN_ERR, vmas);
+                return -1;
+            }
+
+            pte_flags = pte_flags_get(vma->vm_flags);
+        }
+
+        pde_index = pde_index(vaddr);
+        pte_index = pte_index(vaddr);
+
+        if (!(pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS)))
+        {
+            continue;
+        }
+
+        if (!pgt[pte_index])
+        {
+            continue;
+        }
+
+        pgt[pte_index] = (pgt[pte_index] & PAGE_ADDRESS) | pte_flags;
+    }
+
+    return 0;
+}
+
 int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uint32_t paddr)
 {
     pgt_t* pgt;

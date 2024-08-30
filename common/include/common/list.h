@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stddef.h>
-#include <stdint.h>
 #include <common/compiler.h>
 
 struct list_head

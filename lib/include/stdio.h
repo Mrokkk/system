@@ -84,6 +84,7 @@ int sprintf(char* buf, const char* fmt, ...);
 int snprintf(char* str, size_t size, const char* restrict format, ...);
 int fprintf(FILE* file, const char* fmt, ...);
 int printf(const char* fmt, ...);
+int vprintf(const char* restrict format, va_list ap);
 
 void perror(const char* s);
 

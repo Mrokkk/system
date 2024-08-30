@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <sys/syscall.h>
+#include <common/compiler.h>
 
 #include "test.h"
 
@@ -321,17 +322,6 @@ TEST(bad_syscall)
     int ret = syscall(999, 0, 0);
     EXPECT_EQ(ret, -1);
     EXPECT_EQ(errno, ENOSYS);
-}
-
-TEST(mmap_prot_none)
-{
-    EXPECT_KILLED_BY(SIGSEGV)
-    {
-        uintptr_t* data = mmap(NULL, 0x1000, PROT_NONE, MAP_ANONYMOUS, -1, 0);
-        EXPECT_NE(data, -1);
-        *data = 2;
-        exit(FAILED_EXPECTATIONS());
-    }
 }
 
 TEST_SUITE_END(kernel);

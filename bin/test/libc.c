@@ -513,12 +513,21 @@ TEST(strtol)
     EXPECT_EQ(*end, 'b');
 
     errno = 0;
+    EXPECT_EQ(strtol("0xbff04000", NULL, 16), LONG_MAX);
+    EXPECT_EQ(errno, ERANGE);
+
+    errno = 0;
     EXPECT_EQ(strtol("0xabd1045bdfe", NULL, 0), LONG_MAX);
     EXPECT_EQ(errno, ERANGE);
 
     errno = 0;
     EXPECT_EQ(strtol("-0x9482bf92dda![", NULL, 0), LONG_MIN);
     EXPECT_EQ(errno, ERANGE);
+}
+
+TEST(strtoul)
+{
+    EXPECT_EQ(strtoul("0xbff04000", NULL, 16), 0xbff04000);
 }
 
 extern int __fmode(FILE* stream);

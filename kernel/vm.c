@@ -1,5 +1,7 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
+#include <kernel/signal.h>
+#include <kernel/process.h>
 #include <kernel/vm_print.h>
 
 #define DEBUG_NOPAGE 0
@@ -69,11 +71,73 @@ int vm_add(vm_area_t** head, vm_area_t* new_vma)
     return 0;
 }
 
+void vm_add_tail(vm_area_t* new_vma, vm_area_t* old_vma)
+{
+    new_vma->prev = old_vma;
+    new_vma->next = old_vma->next;
+    if (old_vma->next)
+    {
+        old_vma->next->prev = new_vma;
+    }
+    old_vma->next = new_vma;
+}
+
+void vm_add_front(vm_area_t* new_vma, vm_area_t* old_vma)
+{
+    new_vma->next = old_vma;
+    new_vma->prev = old_vma->prev;
+    if (old_vma->prev)
+    {
+        old_vma->prev->next = new_vma;
+    }
+    old_vma->prev = new_vma;
+}
+
 void vm_del(vm_area_t* vma)
 {
     vma->next->prev = vma->prev;
     vma->prev->next = vma->next;
     delete(vma);
+}
+
+void vm_areas_del(vm_area_t* vmas)
+{
+    vm_area_t* temp;
+    for (vm_area_t* v = vmas; v;)
+    {
+        temp = v->next;
+        delete(v);
+        v = temp;
+    }
+}
+
+void vm_replace(
+    vm_area_t** vm_areas,
+    vm_area_t* new_vmas,
+    vm_area_t* new_vmas_end,
+    vm_area_t* replace_start,
+    vm_area_t* replace_end)
+{
+    if (replace_start == *vm_areas)
+    {
+        *vm_areas = new_vmas;
+    }
+    else
+    {
+        replace_start->prev->next = new_vmas;
+        new_vmas->prev = replace_start->prev;
+    }
+
+    new_vmas_end->next = replace_end->next;
+
+    if (likely(replace_end->prev))
+    {
+        replace_end->next->prev = new_vmas_end;
+    }
+
+    replace_end->next = NULL;
+
+    vm_areas_del(replace_start);
 }
 
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd)
@@ -89,7 +153,7 @@ int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_
 
 int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
 {
-    int errno;
+    int errno, res;
     uint32_t pde_index, pte_index;
 
     if (unlikely(!(vma->vm_flags & VM_READ)))
@@ -119,12 +183,17 @@ int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
             return -ENOSYS;
         }
 
-        errno = vma->ops->nopage(vma, address, &page);
+        res = vma->ops->nopage(vma, address, &page);
 
-        if (unlikely(errno))
+        if (unlikely(errno = errno_get(res)))
         {
             log_warning("ops->nopage failed: %d", errno);
             return errno;
+        }
+
+        if (res != PAGE_SIZE)
+        {
+            memset(page_virt_ptr(page) + res, 0, PAGE_SIZE - res);
         }
 
         goto map_page;
@@ -136,8 +205,9 @@ int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
 
         if (unlikely(!page))
         {
-            log_error("no memory available!");
-            return -ENOMEM;
+            current_log_info("OOM on %x", address);
+            do_kill(process_current, SIGKILL);
+            return 0;
         }
 
         memset(page_virt_ptr(page), 0, PAGE_SIZE);
@@ -176,11 +246,6 @@ map_page:
     pgd_reload();
 
     return 0;
-}
-
-static inline bool address_within(uint32_t vaddr, vm_area_t* vma)
-{
-    return vaddr >= vma->start && vaddr < vma->end;
 }
 
 vm_area_t* vm_find(uint32_t vaddr, vm_area_t* vmas)

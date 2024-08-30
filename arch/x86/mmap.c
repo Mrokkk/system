@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <arch/mmap.h>
 #include <kernel/fs.h>
 #include <kernel/vm.h>
@@ -68,12 +69,15 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 
     log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", addr, size, prot, flags, file);
 
-    if (unlikely(!size || (offset & PAGE_MASK) || (addr(addr) & PAGE_MASK)))
+    if (unlikely(!size
+        || (offset & PAGE_MASK)
+        || (addr(addr) & PAGE_MASK))
+        || ((prot & (PROT_EXEC | PROT_WRITE)) == (PROT_EXEC | PROT_WRITE)))
     {
         return ptr(-EINVAL);
     }
 
-    if (flags & MAP_ANONYMOUS && file != NULL)
+    if (unlikely(flags & MAP_ANONYMOUS && file != NULL))
     {
         return ptr(-EINVAL);
     }
@@ -183,28 +187,188 @@ void* sys_mmap(struct mmap_params* params)
     return do_mmap(params->addr, params->len, params->prot, params->flags, file, params->off);
 }
 
+static int vma_mprotect_find(uintptr_t addr, size_t len, int prot, vm_area_t** vma)
+{
+    vm_area_t* next;
+    UNUSED(prot);
+
+    for (vm_area_t* temp = process_current->mm->vm_areas; temp; temp = temp->next)
+    {
+        if (address_within(addr, temp))
+        {
+            *vma = temp;
+
+            // If we found vma with given vaddr, then check if
+            // requested range is valid
+            while (addr + len > temp->end)
+            {
+                // If len extends beyond vma, then check if next
+                // exists and adheres to vma
+                if (unlikely(!(next = temp->next)))
+                {
+                    return -ENOMEM;
+                }
+
+                if (next->start != temp->end)
+                {
+                    return -ENOMEM;
+                }
+
+                temp = next;
+            }
+
+            return 0;
+        }
+    }
+
+    return -ENOMEM;
+}
+
+static bool vmas_can_be_merged(const vm_area_t* vma1, const vm_area_t* vma2)
+{
+    return vma1->vm_flags == vma2->vm_flags
+        && !vma1->dentry && !vma2->dentry
+        && (vma1->start == vma2->end || vma1->end == vma2->start);
+}
+
+static void vm_copy_details(vm_area_t* to, const vm_area_t* from)
+{
+    to->offset = from->offset;
+    to->dentry = from->dentry;
+    to->ops = from->ops;
+}
+
 int sys_mprotect(void* addr, size_t len, int prot)
 {
+    int errno;
     vm_area_t* vma;
+    vm_area_t* new_vma = NULL;
+    vm_area_t* new_vmas = NULL;
+    vm_area_t* new_vmas_end = NULL;
+    vm_area_t* replace_start = NULL;
+    vm_area_t* replace_end = NULL;
+    uintptr_t start, end;
+
+    if (unlikely((addr(addr) & PAGE_MASK) | (len & PAGE_MASK))
+        || (prot & (PROT_EXEC | PROT_WRITE)) == (PROT_EXEC | PROT_WRITE))
+    {
+        return -EINVAL;
+    }
 
     scoped_mutex_lock(&process_current->mm->lock);
 
-    vma = vm_find(addr(addr), process_current->mm->vm_areas);
+    if (unlikely(errno = vma_mprotect_find(addr(addr), len, prot, &vma)))
+    {
+        return errno;
+    }
 
     if (unlikely(!vma))
     {
         return -ENOMEM;
     }
 
-    if (vma->end - vma->start != len)
+    start = addr(addr);
+    end = start + len;
+
+    replace_start = vma;
+
+    do
     {
-        // TODO: divide vma
-        return -EINVAL;
+        replace_end = vma;
+        vm_area_t* prev_vma = vma->prev;
+        vm_area_t* next_vma = vma->next;
+
+        if (new_vma && !new_vma->dentry && !vma->dentry)
+        {
+            if (vma->vm_flags == new_vma->vm_flags)
+            {
+                start = new_vma->end = vma->end;
+            }
+            else
+            {
+                start = new_vma->end = min(vma->end, end);
+            }
+        }
+
+        #define safe_vm_create(...) \
+            ({ \
+                vm_area_t* v = vm_create(__VA_ARGS__); \
+                if (unlikely(!v)) \
+                { \
+                    errno = -ENOMEM; \
+                    goto error; \
+                } \
+                v; \
+            })
+
+        if (start < vma->end)
+        {
+            if (start > vma->start)
+            {
+                new_vma = safe_vm_create(vma->start, start - vma->start, vma->vm_flags);
+                vm_copy_details(new_vma, vma);
+                vm_add(&new_vmas, new_vma);
+            }
+
+            new_vma = safe_vm_create(start, min(vma->end - start, end - start), prot);
+            vm_copy_details(new_vma, vma);
+
+            if (prev_vma && vmas_can_be_merged(prev_vma, new_vma))
+            {
+                new_vma->start = prev_vma->start;
+            }
+            if (next_vma && vmas_can_be_merged(next_vma, new_vma))
+            {
+                new_vma->end = next_vma->end;
+                replace_end = next_vma;
+            }
+
+            vm_add(&new_vmas, new_vma);
+
+            if (end < vma->end)
+            {
+                new_vma = vm_create(end, vma->end - end, vma->vm_flags);
+                vm_copy_details(new_vma, vma);
+                vm_add(&new_vmas, new_vma);
+            }
+        }
+
+        new_vmas_end = new_vma;
+        start = new_vma->end;
+        vma = vma->next;
+
+        if (!vma)
+        {
+            break;
+        }
+    }
+    while (start < end);
+
+    if (unlikely(start < end))
+    {
+        errno = -ENOMEM;
+        goto error;
     }
 
-    vma->vm_flags = vm_flags_get(prot);
+    vm_replace(&process_current->mm->vm_areas, new_vmas, new_vmas_end, replace_start, replace_end);
+
+    if (unlikely(vm_apply(new_vmas, process_current->mm->pgd, addr(addr), addr(addr) + len)))
+    {
+        do_kill(process_current, SIGBUS);
+        return -ENOMEM;
+    }
+
+    pgd_reload();
 
     return 0;
+
+error:
+    if (new_vmas)
+    {
+        vm_areas_del(new_vmas);
+    }
+
+    return errno;
 }
 
 int sys_brk(void* addr)
@@ -279,9 +443,32 @@ void* sys_sbrk(int incr)
 
     if (unlikely(!brk_vma))
     {
-        current_log_error("brk vm_area missing; brk address: %x", process_current->mm->brk);
+        current_log_error("brk vm_area missing; brk address: %x", previous_brk);
         process_vm_areas_log(KERN_ERR, process_current);
         return ptr(-ENOMEM);
+    }
+
+    if (incr > 0)
+    {
+        if (unlikely(next_page < previous_page))
+        {
+            return ptr(-ENOMEM);
+        }
+        if (unlikely(brk_vma->next && brk_vma->next->start <= next_page))
+        {
+            return ptr(-ENOMEM);
+        }
+    }
+    else
+    {
+        if (unlikely(next_page > previous_page))
+        {
+            return ptr(-ENOMEM);
+        }
+        if (unlikely(brk_vma->prev && brk_vma->prev->end > next_page))
+        {
+            return ptr(-ENOMEM);
+        }
     }
 
     if (previous_page > next_page)

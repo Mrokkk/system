@@ -44,13 +44,37 @@ vm_area_t* vm_create(uint32_t virt_address, size_t size, int vm_flags);
 vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
+void vm_add_tail(vm_area_t* new_vma, vm_area_t* old_vma);
+void vm_add_front(vm_area_t* new_vma, vm_area_t* old_vma);
 void vm_del(vm_area_t* vma);
+void vm_areas_del(vm_area_t* vmas);
 int vm_unmap(vm_area_t* vma, pgd_t* pgd);
 int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd);
 int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uint32_t start);
 int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write);
+
+// vm_replace - replace vm areas <replace_start, replace_end> with <new_vmas, new_vmas_end>
+void vm_replace(
+    vm_area_t** vm_areas,
+    vm_area_t* new_vmas,
+    vm_area_t* new_vmas_end,
+    vm_area_t* replace_start,
+    vm_area_t* replace_end);
+
+// vm_apply - apply protection flags to pages in range <vaddr_start, vaddr_end)
+//
+// @vmas - list of vmas from which protection flags are taken
+// @pgd - pgd to which change is applied
+// @vaddr_start - beginning of virtual address space
+// @vaddr_end - end of virtual address space
+int vm_apply(vm_area_t* vmas, pgd_t* pgd, uintptr_t vaddr_start, uintptr_t vaddr_end);
+
+static inline bool address_within(uint32_t vaddr, vm_area_t* vma)
+{
+    return vaddr >= vma->start && vaddr < vma->end;
+}
 
 typedef enum
 {

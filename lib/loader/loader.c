@@ -147,6 +147,8 @@ static void dynamic_read(elf32_phdr_t* p, dynamic_t* dynamic, list_head_t* libs,
     }
 }
 
+DIAG_IGNORE("-Wanalyzer-malloc-leak");
+
 static void missing_symbol_add(const char* name, elf32_sym_t* symbol, elf32_rel_t* rel, int type, uintptr_t base_address, list_head_t* missing_symbols)
 {
     symbol_t* missing = ALLOC(malloc(sizeof(*missing)));
@@ -162,15 +164,25 @@ static void missing_symbol_add(const char* name, elf32_sym_t* symbol, elf32_rel_
     list_add_tail(&missing->missing, missing_symbols);
 }
 
+DIAG_RESTORE();
+
+#define ENSURE(x, ...) \
+    if (UNLIKELY(!(x))) \
+    { \
+        fprintf(stderr, __VA_ARGS__); \
+        die("Cannot load executable"); \
+    }
+
 static void symbol_relocate(
     const elf32_sym_t* symbol,
     const elf32_rel_t* rel,
     uintptr_t base_address, // base address of the binary where symbol is needed
     uintptr_t lib_base_address)
 {
+    int type;
     uintptr_t* memory = PTR(base_address + rel->r_offset);
 
-    switch (ELF32_R_TYPE(rel->r_info))
+    switch (type = ELF32_R_TYPE(rel->r_info))
     {
         // A - The addend used to compute the value of the relocatable field.
         // B - The base address at which a shared object is loaded into memory during
@@ -190,6 +202,7 @@ static void symbol_relocate(
         case R_386_GLOB_DAT:
         case R_386_JMP_SLOT: // S
         {
+            ENSURE(symbol, "missing symbol for %#x relocation at %p\n", type, memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             *memory = S;
             break;
@@ -197,6 +210,7 @@ static void symbol_relocate(
 
         case R_386_32: // S + A
         {
+            ENSURE(symbol, "missing symbol for %#x relocation at %p\n", type, memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             uintptr_t A = *memory;
 
@@ -206,6 +220,7 @@ static void symbol_relocate(
 
         case R_386_PC32: // S + A - P
         {
+            ENSURE(symbol, "missing symbol for R_386_PC32 relocation at %p\n", memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             uintptr_t A = *memory;
             uintptr_t P = ADDR(memory);
@@ -216,7 +231,7 @@ static void symbol_relocate(
 
         default:
         {
-            printf("warning: unsupported rel type: %#x\n", ELF32_R_TYPE(rel->r_info));
+            fprintf(stderr, "warning: unsupported rel type: %#x\n", type);
         }
     }
 }
@@ -265,10 +280,10 @@ static void missing_symbols_verify(list_head_t* missing_symbols)
     if (!list_empty(missing_symbols))
     {
         symbol_t* s;
-        printf("%s: cannot load executable\n", AUX_GET(AT_EXECFN));
+        fprintf(stderr, "%s: cannot load executable\n", AUX_GET(AT_EXECFN));
         list_for_each_entry(s, missing_symbols, missing)
         {
-            printf("  missing symbol %s\n", s->name);
+            fprintf(stderr, "  missing symbol %s\n", s->name);
         }
         exit(EXIT_FAILURE);
     }

@@ -466,7 +466,7 @@ static int ext2_traverse_blocks(
         return -EINVAL;
     }
 
-    for (left = count = min(count, raw_inode->size - offset);
+    for (left = count = min(count, raw_inode->size - offset), count = 0;
         left;
         left -= to_copy, block_offset = 0, errno = ext2_next_block(data, &cur_lvl, &cur_block))
     {
@@ -475,7 +475,7 @@ static int ext2_traverse_blocks(
             return errno;
         }
 
-        to_copy = min(EXT2_BLOCK_SIZE - block_offset, left);
+        count += to_copy = min(EXT2_BLOCK_SIZE - block_offset, left);
 
         if (cb(shift(cur_block->data, block_offset), to_copy, cb_data) == TRAVERSE_STOP)
         {
@@ -570,7 +570,7 @@ static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
         return errno;
     }
 
-    return 0;
+    return res;
 }
 
 static int ext2_mmap(file_t*, vm_area_t* vma)

@@ -18,6 +18,13 @@ int LIBC(printf)(const char* fmt, ...)
     return printed;
 }
 
+int LIBC(vprintf)(const char* format, va_list ap)
+{
+    VALIDATE_INPUT(format, -1);
+    stdout->last = LAST_WRITE;
+    return vsprintf_internal(&stdout->buffer, format, ap);
+}
+
 int LIBC(fprintf)(FILE* file, const char* fmt, ...)
 {
     VALIDATE_INPUT(file && fmt, -1);
@@ -43,5 +50,6 @@ int LIBC(vfprintf)(FILE* restrict stream, const char* restrict format, va_list a
 }
 
 LIBC_ALIAS(printf);
+LIBC_ALIAS(vprintf);
 LIBC_ALIAS(fprintf);
 LIBC_ALIAS(vfprintf);

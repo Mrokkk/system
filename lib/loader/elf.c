@@ -18,7 +18,7 @@ static void* mmap_wrapper(void* addr, size_t len, int prot, int flags, int fd, s
 {
     void* mapped = mmap(addr, len, prot, flags, fd, off);
 
-    if (UNLIKELY((int)mapped == -1))
+    if (UNLIKELY(mapped == MAP_FAILED))
     {
         char buffer[128];
         sprintf(buffer, "mmap(%p, %#x, %#x, %#x, %u, %#x)", addr, len, prot, flags, fd, off);
@@ -36,10 +36,17 @@ void* mmap_phdr(int exec_fd, size_t page_size, elf32_phdr_t* phdr, int add_prot,
     uintptr_t vaddr_file_end = vaddr_start + phdr->p_filesz;
     uintptr_t vaddr_page_end = ALIGN_TO(vaddr_start + phdr->p_memsz, page_size);
 
+    int flags = mmap_flags_get(phdr->p_flags | add_prot);
+
+    if (add_prot & PF_W)
+    {
+        flags &= ~PROT_EXEC;
+    }
+
     void* mapped = mmap_wrapper(
         PTR(vaddr_page_start),
         vaddr_page_end - vaddr_page_start,
-        mmap_flags_get(phdr->p_flags | add_prot),
+        flags,
         MAP_PRIVATE | MAP_FIXED,
         exec_fd,
         phdr->p_offset & ~page_mask);
@@ -54,10 +61,17 @@ void* mmap_phdr(int exec_fd, size_t page_size, elf32_phdr_t* phdr, int add_prot,
 
 void mprotect_phdr(uintptr_t base_address, size_t page_size, int additional, elf32_phdr_t* phdr)
 {
+    int flags = mmap_flags_get(phdr->p_flags | additional);
+
+    if (additional & PF_W)
+    {
+        flags &= ~PROT_EXEC;
+    }
+
     SYSCALL(mprotect(
         PTR(phdr->p_vaddr + base_address),
         ALIGN_TO(phdr->p_memsz, page_size),
-        mmap_flags_get(phdr->p_flags | additional)));
+        flags));
 }
 
 const char* strtab_read(strtab_t* this, uintptr_t addr)

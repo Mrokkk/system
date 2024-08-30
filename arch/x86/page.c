@@ -41,7 +41,7 @@ static inline page_t* free_page_find()
 {
     if (unlikely(list_empty(&free_pages)))
     {
-        log_exception("no free page!");
+        log_debug(DEBUG_PAGE, "no free pages!");
         return NULL;
     }
 

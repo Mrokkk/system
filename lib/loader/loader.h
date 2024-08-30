@@ -6,7 +6,7 @@
 typedef int (*entry_t)();
 
 #define DEBUG(...) \
-    do { if (UNLIKELY(debug)) { printf(__VA_ARGS__); } } while (0)
+    do { if (UNLIKELY(debug)) { fprintf(stderr, __VA_ARGS__); } } while (0)
 
 #define SYSCALL(call) \
     ({ typeof(call) __v = call; if (UNLIKELY((int)__v == -1)) { die_errno(#call); }; __v; })
