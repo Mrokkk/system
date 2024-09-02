@@ -1,6 +1,7 @@
 #include <stdarg.h>
 
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/dev.h>
 #include <kernel/tty.h>
 #include <kernel/time.h>
@@ -8,6 +9,7 @@
 #include <kernel/minmax.h>
 #include <kernel/printk.h>
 #include <kernel/reboot.h>
+#include <kernel/process.h>
 #include <kernel/seq_file.h>
 #include <kernel/backtrace.h>
 #include <kernel/api/syslog.h>
@@ -244,6 +246,11 @@ int syslog_show(seq_file_t* s)
 int sys__syslog(int priority, int option, const char* message)
 {
     UNUSED(option);
+
+    if (unlikely(current_vm_verify_string(VERIFY_READ, message)))
+    {
+        return -EFAULT;
+    }
 
     PRINTK_ENTRY(e, priority & 0xf);
     printk(&e, "%s", message);

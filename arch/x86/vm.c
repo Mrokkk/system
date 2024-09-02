@@ -1,5 +1,6 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
+#include <kernel/segmexec.h>
 #include <kernel/vm_print.h>
 
 typedef enum
@@ -21,12 +22,11 @@ typedef enum
         vaddr < end; \
         vaddr = vaddr_init(vaddr + PAGE_SIZE))
 
-static pgt_t* vm_remove_range_impl(
+static void vm_remove_range_impl(
     vm_area_t* vma,
     uintptr_t start,
     uintptr_t end,
     pgd_t* pgd,
-    pgt_t* prev_pgt,
     operation_t operation)
 {
     pgt_t* pgt;
@@ -60,50 +60,41 @@ static pgt_t* vm_remove_range_impl(
             case UNMAP:
                 pgt[pte_index] = 0;
                 break;
-            case DELETE:
-                if (prev_pgt != pgt)
-                {
-                    if (prev_pgt)
-                    {
-                        log_debug(DEBUG_EXIT, "freeing PGT %x", prev_pgt);
-                        page_free(prev_pgt);
-                    }
-                    prev_pgt = pgt;
-                }
+            case DELETE: // We don't need to clear the pte
         }
     }
-
-    return prev_pgt;
 }
 
 int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd)
 {
-    vm_remove_range_impl(vma, start, end, pgd, NULL, UNMAP);
+    vm_remove_range_impl(vma, start, end, pgd, UNMAP);
     return 0;
 }
 
 int vm_unmap(vm_area_t* vma, pgd_t* pgd)
 {
-    vm_remove_range_impl(vma, vma->start, vma->end, pgd, NULL, UNMAP);
+    vm_remove_range_impl(vma, vma->start, vma->end, pgd, UNMAP);
     return 0;
 }
 
 int vm_free(vm_area_t* vma_list, pgd_t* pgd)
 {
     vm_area_t* temp;
-    pgt_t* prev_pgt = NULL;
 
     for (vm_area_t* vma = vma_list; vma;)
     {
-        prev_pgt = vm_remove_range_impl(vma, vma->start, vma->end, pgd, prev_pgt, DELETE);
+        vm_remove_range_impl(vma, vma->start, vma->end, pgd, DELETE);
         temp = vma;
         vma = vma->next;
         delete(temp);
     }
 
-    if (prev_pgt)
+    for (uintptr_t pde_index = 0; pde_index < KERNEL_PDE_OFFSET; ++pde_index)
     {
-        page_free(prev_pgt);
+        if (pgd[pde_index])
+        {
+            page_free(virt_ptr(pgd[pde_index] & PAGE_ADDRESS));
+        }
     }
 
     return 0;
@@ -146,12 +137,13 @@ int arch_vm_map_single(pgd_t* pgd, uint32_t pde_index, uint32_t pte_index, page_
     return 0;
 }
 
-int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
+static int arch_vm_copy_impl(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
 {
     pgt_t* dest_pgt;
     pgt_t* src_pgt = NULL;
     uint32_t pde_index, pte_index, pgd_flags;
     int prev_pde_index = -1;
+    uint32_t src_pgt_paddr;
 
     for (uint32_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE)
     {
@@ -161,7 +153,14 @@ int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
         if ((int)pde_index > prev_pde_index)
         {
             prev_pde_index = pde_index;
-            src_pgt = virt_ptr(src_pgd[pde_index] & PAGE_ADDRESS);
+            src_pgt_paddr = src_pgd[pde_index] & PAGE_ADDRESS;
+
+            if (!src_pgt_paddr)
+            {
+                continue;
+            }
+
+            src_pgt = virt_ptr(src_pgt_paddr);
 
             log_debug(DEBUG_VM_COPY, "pgd=%x pgd[%u]=%x", src_pgd, pde_index, src_pgd[pde_index]);
 
@@ -186,7 +185,11 @@ int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
 
         // FIXME: static analyzer from gcc isn't clever enough to
         // figure out that src_pgt is never accessed uninitialized
-        if (src_pgt && src_pgt[pte_index])
+        if (src_pgt && src_pgt[pte_index]
+#if CONFIG_SEGMEXEC
+                && start < CODE_START
+#endif
+            )
         {
             uintptr_t paddr = src_pgt[pte_index] & PAGE_ADDRESS;
 
@@ -201,6 +204,26 @@ int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
 
 cannot_allocate:
     return -ENOMEM;
+}
+
+int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
+{
+    int errno = arch_vm_copy_impl(dest_pgd, src_pgd, start, end);
+    UNUSED(dest_vma);
+
+#if CONFIG_SEGMEXEC
+    if (unlikely(errno))
+    {
+        return errno;
+    }
+
+    if (dest_vma->vm_flags & VM_EXEC)
+    {
+        errno = arch_vm_copy_impl(dest_pgd, src_pgd, start + CODE_START, end + CODE_START);
+    }
+#endif
+
+    return errno;
 }
 
 int vm_apply(vm_area_t* vmas, pgd_t* pgd, uintptr_t vaddr_start, uintptr_t vaddr_end)

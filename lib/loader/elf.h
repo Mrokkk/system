@@ -19,76 +19,74 @@ typedef struct dynamic dynamic_t;
 
 struct auxv
 {
-    int _AT_EXECFD;
-    uintptr_t _AT_PHDR;
-    uintptr_t _AT_ENTRY;
-    uintptr_t _AT_PHNUM;
-    uintptr_t _AT_PAGESZ;
-    uintptr_t _AT_BASE;
+    int         _AT_EXECFD;
+    uintptr_t   _AT_PHDR;
+    uintptr_t   _AT_ENTRY;
+    uintptr_t   _AT_PHNUM;
+    uintptr_t   _AT_PAGESZ;
+    uintptr_t   _AT_BASE;
     const char* _AT_EXECFN;
 };
 
 struct strtab
 {
-    const char* (*read)(strtab_t* this, uint32_t addr);
-
-    uint32_t offset;
+    uint32_t    offset;
     const char* strings;
-    size_t size;
+    size_t      size;
 };
 
 struct symtab
 {
-    size_t entsize;
-    uintptr_t offset;
+    size_t       entsize;
+    uintptr_t    offset;
     elf32_sym_t* entries;
-    size_t count;
+    size_t       count;
 };
 
 struct rel
 {
-    size_t count;
-    uintptr_t offset;
-    size_t size;
-    size_t entsize;
+    size_t       count;
+    uintptr_t    offset;
+    size_t       size;
+    size_t       entsize;
     elf32_rel_t* entries;
 };
 
 struct hash
 {
-    size_t offset;
-    size_t size;
+    size_t     offset;
+    size_t     size;
     uintptr_t* data;
 };
 
 struct dynamic
 {
-    size_t count;
-    size_t size;
+    size_t       count;
+    size_t       size;
     elf32_dyn_t* entries;
 
-    hash_t hash;
-    rel_t rel;
-    rel_t jmprel;
-    symtab_t symtab;
-    strtab_t dynstr;
-    list_head_t libraries;
+    hash_t       hash;
+    rel_t        rel;
+    rel_t        jmprel;
+    symtab_t     symtab;
+    strtab_t     dynstr;
+    list_head_t  libraries;
 };
 
 struct symbol
 {
-    const char* name;
-    int type;
+    const char*  name;
+    int          type;
     elf32_sym_t* symbol;
     elf32_rel_t* rel;
-    uintptr_t base_address;
-    list_head_t missing;
+    uintptr_t    base_address;
+    list_head_t  missing;
 };
 
 struct lib
 {
     const char* name;
-    uintptr_t string_ndx;
+    uintptr_t   string_ndx;
     list_head_t list_entry;
 };
 
@@ -104,7 +102,7 @@ struct lib
     while (0)
 
 #define DYNSTR(dynamic, str) \
-    ({ (dynamic)->dynstr.read(&(dynamic)->dynstr, str); })
+    ({ (dynamic)->dynstr.strings + str; })
 
 #define SYMBOL(dynamic, entry) \
     ({ &(dynamic)->symtab.entries[ELF32_R_SYM((entry)->r_info)]; })
@@ -120,7 +118,6 @@ struct lib
 
 #define DYNAMIC_DECLARE(name) \
     dynamic_t name = { \
-        .dynstr = {.read = &strtab_read}, \
     }
 
 #define SYMTAB_DECLARE(name) \
@@ -190,5 +187,9 @@ static inline uint32_t elf_hash(const char* name)
 
 const char* strtab_read(strtab_t* this, uint32_t addr);
 
-void* mmap_phdr(int exec_fd, size_t page_mask, elf32_phdr_t* phdr, int add_prot, uintptr_t base);
+void mmap_phdr(int exec_fd, size_t page_mask, elf32_phdr_t* phdr, uintptr_t base);
 void mprotect_phdr(uintptr_t base_address, size_t page_size, int additional, elf32_phdr_t* phdr);
+void mimmutable_phdr(uintptr_t base_address, size_t page_size, elf32_phdr_t* phdr);
+
+#define PHDR_FOR_EACH(name, phdr, phnum) \
+    for (elf32_phdr_t* name = phdr; name != (phdr) + (phnum); ++name)

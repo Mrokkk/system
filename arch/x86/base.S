@@ -38,15 +38,19 @@ ENTRY(eip_get)
 ENDPROC(eip_get)
 
 ENTRY(vsyscall_handler)
+    pushl %ds
     push %edx
     push %ecx
     push %ebx
     push %eax
+    movl $KERNEL_DS, %eax
+    mov %ax, %ds
     call SYMBOL_NAME(do_vsyscall)
     add $4, %esp
     pop %ebx
     pop %ecx
     pop %edx
+    popl %ds
     sysexit
 ENDPROC(vsyscall_handler)
 
@@ -83,8 +87,8 @@ ENDPROC(syscall_handler)
 
 ENTRY(timer_handler)
     cli
-    incl jiffies
     SAVE_ALL(0)
+    incl jiffies
     call SYMBOL_NAME(timestamp_update)
     call SYMBOL_NAME(ktimers_update)
     push $0

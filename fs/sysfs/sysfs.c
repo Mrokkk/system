@@ -1,6 +1,7 @@
 #include <kernel/fs.h>
 #include <kernel/sysfs.h>
 #include <kernel/string.h>
+#include <kernel/segmexec.h>
 #include <kernel/generic_vfs.h>
 
 static int sysfs_mount(super_block_t* sb, inode_t* inode, void*, int);
@@ -8,7 +9,7 @@ static int sysfs_open(file_t* file);
 static int sysfs_root_lookup(inode_t* dir, const char* name, inode_t** result);
 static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 
-#define SYSFS_ENTRY(name) \
+#define SYSFS_ENTRY_READ(name) \
     static int name##_read(file_t*, char* buffer, size_t count) \
     { \
         if (unlikely(count < 3)) \
@@ -16,7 +17,9 @@ static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
             return -EINVAL; \
         } \
         return snprintf(buffer, count, "%u\n", sys_config.name); \
-    } \
+    }
+
+#define SYSFS_ENTRY_WRITE(name) \
     static int name##_write(file_t*, const char* buffer, size_t count) \
     { \
         char tmp[count + 1]; \
@@ -26,7 +29,11 @@ static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
         if (value & ~1) return -EINVAL; \
         sys_config.name = value; \
         return count; \
-    } \
+    }
+
+#define SYSFS_ENTRY_RDWR(name) \
+    SYSFS_ENTRY_READ(name) \
+    SYSFS_ENTRY_WRITE(name) \
     static inode_operations_t name##_iops; \
     static file_operations_t name##_fops = { \
         .open = &sysfs_open, \
@@ -34,7 +41,18 @@ static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
         .write = &name##_write, \
     }
 
-sys_config_t sys_config;
+#define SYSFS_ENTRY_RDONLY(name) \
+    SYSFS_ENTRY_READ(name) \
+    static inode_operations_t name##_iops; \
+    static file_operations_t name##_fops = { \
+        .open = &sysfs_open, \
+        .read = &name##_read, \
+    }
+
+sys_config_t sys_config = {
+    .user_backtrace = 0,
+    .segmexec = CONFIG_SEGMEXEC
+};
 
 static file_system_t sysfs = {
     .name = "sys",
@@ -50,12 +68,14 @@ static inode_operations_t sysfs_root_iops = {
     .lookup = &sysfs_root_lookup,
 };
 
-SYSFS_ENTRY(user_backtrace);
+SYSFS_ENTRY_RDWR(user_backtrace);
+SYSFS_ENTRY_RDONLY(segmexec);
 
 static generic_vfs_entry_t root_entries[] = {
     DOT(.),
     DOT(..),
     REG(user_backtrace, S_IFREG | S_IRUGO | S_IWUGO),
+    REG(segmexec, S_IFREG | S_IRUGO),
 };
 
 static int sysfs_open(file_t*)

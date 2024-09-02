@@ -77,3 +77,4 @@ setpgrp: pid_t
 readlink: int, const char*, char*, size_t
 fchdir: int, int
 lstat: int, const char*, struct stat*
+mimmutable: int, void*, size_t

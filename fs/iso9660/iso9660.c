@@ -20,7 +20,7 @@ static int iso9660_read(file_t* file, char* buffer, size_t count);
 static int iso9660_open(file_t* file);
 static int iso9660_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 static int iso9660_mount(super_block_t* sb, inode_t* inode, void*, int);
-static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page);
+static int iso9660_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page);
 
 static_assert(offsetof(iso9660_pvd_t, root) == 156 - 8);
 static_assert(offsetof(iso9660_dirent_t, name) == 33);
@@ -372,7 +372,8 @@ static int iso9660_mmap(file_t*, vm_area_t* vma)
 // [       5.534779] /bin/test[3]: page fault #0x4 at 0x4800 caused by 0x0
 // Under the eip is 0 (so it's "add %al, (%eax)"), so page was not properly
 // read
-static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
+// FIXME: read only size bytes
+static int iso9660_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page)
 {
     iso9660_dirent_t* dirent = vma->dentry->inode->fs_data;
     iso9660_data_t* data = vma->dentry->inode->sb->fs_data;
@@ -388,7 +389,7 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
     off_t offset = vma->offset + address - vma->start;
     uint32_t pos = offset, data_size;
     uint32_t block_nr = offset / BLOCK_SIZE + block_nr_convert(GET(dirent->lba));
-    const size_t blocks_count = PAGE_SIZE / BLOCK_SIZE;
+    const size_t blocks_count = align(size, BLOCK_SIZE) / BLOCK_SIZE;
     size_t count = 0;
     buffer_t* b;
 

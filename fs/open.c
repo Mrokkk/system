@@ -25,6 +25,12 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     if (likely(dentry))
     {
         inode = dentry->inode;
+
+        if (unlikely((flags & (O_RDWR | O_WRONLY)) && !(inode->mode & S_IWUGO)))
+        {
+            return -EPERM;
+        }
+
         goto set_file;
     }
     else if (!dentry && !(flags & O_CREAT))

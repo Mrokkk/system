@@ -5,6 +5,8 @@
 #include <arch/multiboot.h>
 #include <arch/descriptor.h>
 
+#include <kernel/segmexec.h>
+
 #define FLAGS       MULTIBOOT_HEADER_FLAGS_ALIGNED
 #define MAGIC       MULTIBOOT_HEADER_MAGIC
 #define CHECKSUM    -(MAGIC + FLAGS)
@@ -94,11 +96,19 @@ ENTRY(unpaged_gdt_entries)
     // Kernel data segment
     descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
+#if CONFIG_SEGMEXEC
+    // User code segment
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, CODE_START, 0xffffffff)
+
+    // User data segment
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, CODE_START / 0x1000)
+#else
     // User code segment
     descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_CODE | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
 
     // User data segment
     descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x0, 0xffffffff)
+#endif
 
     // TSS
     descriptor_entry(GDT_FLAGS_TYPE_32TSS, 0, 0)

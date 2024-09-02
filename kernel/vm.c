@@ -1,7 +1,9 @@
 #include <kernel/vm.h>
 #include <kernel/page.h>
+#include <kernel/minmax.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
+#include <kernel/segmexec.h>
 #include <kernel/vm_print.h>
 
 #define DEBUG_NOPAGE 0
@@ -17,7 +19,7 @@ vm_area_t* vm_create(uint32_t vaddr, size_t size, int vm_flags)
     }
 
     vma->start = vma->end = vaddr;
-    vma->end += size;
+    vma->actual_end = vma->end += size;
     vma->vm_flags = vm_flags;
     vma->dentry = NULL;
     vma->next = NULL;
@@ -148,13 +150,14 @@ int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_
     dest_vma->next = NULL;
     dest_vma->prev = NULL;
 
-    return arch_vm_copy(dest_pgd, src_pgd, src_vma->start, src_vma->end);
+    return arch_vm_copy(dest_vma, dest_pgd, src_pgd, src_vma->start, src_vma->end);
 }
 
 int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
 {
     int errno, res;
     uint32_t pde_index, pte_index;
+    size_t size;
 
     if (unlikely(!(vma->vm_flags & VM_READ)))
     {
@@ -183,7 +186,10 @@ int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
             return -ENOSYS;
         }
 
-        res = vma->ops->nopage(vma, address, &page);
+        size = vma->actual_end - page_beginning(address);
+        size = min(size, PAGE_SIZE);
+
+        res = vma->ops->nopage(vma, address, size, &page);
 
         if (unlikely(errno = errno_get(res)))
         {
@@ -242,6 +248,18 @@ map_page:
         log_warning("arch_vm_map_single failed with %d", errno);
         return errno;
     }
+
+#if CONFIG_SEGMEXEC
+    if (vma->vm_flags & VM_EXEC)
+    {
+        pde_index += CODE_START / (PAGE_SIZE * PAGES_IN_PTE);
+        if (unlikely(errno = arch_vm_map_single(pgd, pde_index, pte_index, page, vma->vm_flags)))
+        {
+            log_warning("arch_vm_map_single failed with %d", errno);
+            return errno;
+        }
+    }
+#endif
 
     pgd_reload();
 

@@ -10,18 +10,20 @@ target_include_directories(loader
 
 target_compile_options(loader
     PRIVATE
-        -fno-PIC
-        -fno-pie
+        -fPIC
+        -fpie
+        -pie
         -ggdb3
         -ffunction-sections
         -fdata-sections
 )
 
 target_link_libraries(loader c_static
-    -Wl,-T${CMAKE_CURRENT_SOURCE_DIR}/loader.ld
     -Wl,--gc-sections
     -Wl,-nostdlib
-    -Wl,-no-pie
+    -nostartfiles
+    -Wl,-pie
+    -Wl,-no-dynamic-linker
 )
 
 add_custom_target(

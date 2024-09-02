@@ -6,6 +6,7 @@
 #include <kernel/reboot.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
+#include <kernel/segmexec.h>
 #include <kernel/vm_print.h>
 
 #include <arch/io.h>
@@ -189,6 +190,13 @@ void do_exception(uint32_t nr, pt_regs_t regs)
 
     prev_cr2 = cr2;
     prev_cr2_valid = true;
+
+#if CONFIG_SEGMEXEC
+    if (unlikely(cr2 >= CODE_START && cr2 < KERNEL_PAGE_OFFSET))
+    {
+        cr2 -= CODE_START;
+    }
+#endif
 
     vma = vm_find(cr2, p->mm->vm_areas);
 

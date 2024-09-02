@@ -234,15 +234,17 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
             continue;
         }
 
-        uint32_t vaddr_start = phdr[i].p_vaddr + base;
-        uint32_t vaddr_file_end = vaddr_start + phdr[i].p_filesz;
-        uint32_t vaddr_page_start = vaddr_start & ~PAGE_MASK;
-        uint32_t vaddr_page_end = page_align(vaddr_start + phdr[i].p_memsz);
+        int flags = mmap_flags_get(&phdr[i]);
+        uintptr_t vaddr_start = phdr[i].p_vaddr + base;
+        uintptr_t vaddr_page_start = vaddr_start & ~PAGE_MASK;
+        uintptr_t vaddr_file_end = vaddr_start + phdr[i].p_filesz;
+        uintptr_t vaddr_file_aligned_end = page_align(vaddr_file_end);
+        uintptr_t vaddr_page_end = page_align(vaddr_start + phdr[i].p_memsz);
 
         void* ptr = do_mmap(
             ptr(vaddr_page_start),
-            page_align(phdr[i].p_memsz),
-            mmap_flags_get(&phdr[i]),
+            vaddr_file_end - vaddr_page_start,
+            flags,
             MAP_PRIVATE | MAP_FIXED,
             file,
             phdr[i].p_offset & ~PAGE_MASK);
@@ -253,9 +255,21 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
             return errno;
         }
 
-        if (phdr[i].p_flags & PF_W)
+        if (vaddr_file_aligned_end != vaddr_page_end)
         {
-            memset(ptr(vaddr_file_end), 0, vaddr_page_end - vaddr_file_end);
+            void* ptr = do_mmap(
+                ptr(vaddr_file_aligned_end),
+                vaddr_page_end - vaddr_file_aligned_end,
+                flags,
+                MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS,
+                NULL,
+                0);
+
+            if ((errno = errno_get(ptr)))
+            {
+                log_debug(DEBUG_ELF, "failed mmap: %d", ptr);
+                return errno;
+            }
         }
 
         bin->brk = page_align(phdr[i].p_vaddr + phdr[i].p_memsz + base);
@@ -296,7 +310,6 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
     if (!aux_insert(AT_ENTRY, addr(bin->entry), argvecs) ||
         !aux_insert(AT_PHDR, base + header->e_phoff, argvecs) ||
         !aux_insert(AT_PHENT, header->e_phentsize, argvecs) ||
-        !aux_insert(AT_BASE, base, argvecs) ||
         !aux_insert(AT_PHNUM, header->e_phnum, argvecs))
     {
         return -ENOMEM;
@@ -305,19 +318,28 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
     return errno;
 }
 
-static int elf_interp_load(file_t* file, binary_t* bin, void* data, argvecs_t)
+static int elf_interp_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
 {
     int errno;
     elf_data_t* elf_data = data;
     elf32_header_t* header = &elf_data->header;
     elf32_phdr_t* phdr = page_virt_ptr(elf_data->header_page);
 
-    if ((errno = elf_program_headers_load(file, phdr, header->e_phnum, bin, 0)))
+    uintptr_t base = CONFIG_SEGMEXEC
+        ? 0x5ff80000
+        : 0xbff00000;
+
+    if ((errno = elf_program_headers_load(file, phdr, header->e_phnum, bin, base)))
     {
         return errno;
     }
 
-    bin->entry = ptr(header->e_entry);
+    bin->entry = ptr(header->e_entry + base);
+
+    if (unlikely(!aux_insert(AT_BASE, base, argvecs)))
+    {
+        return -ENOMEM;
+    }
 
     return 0;
 }

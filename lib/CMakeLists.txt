@@ -19,6 +19,8 @@ include_directories(
    ${PROJECT_SOURCE_DIR}/lib/include
 )
 
+set_property(SOURCE vsyscall.S PROPERTY LANGUAGE C)
+
 add_common_library(libc_common "__libc_" ON)
 
 set(LIBC_SRC
@@ -65,6 +67,7 @@ set(LIBC_SRC
     time.c
     ttyname.c
     uname.c
+    vsyscall.S
     wchar.c
 
     stdio/fclose.c
@@ -111,6 +114,12 @@ target_compile_options(c
         -fpie
         -pie
         -fPIC
+)
+
+target_compile_options(c_static
+    PRIVATE
+        -fPIC
+        -pie
 )
 
 add_library(crt0 OBJECT crt0.c)

@@ -32,15 +32,20 @@ __attribute__((naked)) int LIBC(setjmp)(jmp_buf)
 }
 
 // FIXME: implement those properly
-__attribute__((naked)) void LIBC(siglongjmp)(sigjmp_buf, int)
+void LIBC(siglongjmp)(sigjmp_buf buf, int val)
 {
-    asm volatile("jmp longjmp;");
+    return LIBC(longjmp)(buf, val);
 }
 
-__attribute__((naked)) int LIBC(sigsetjmp)(sigjmp_buf, int)
+DIAG_IGNORE("-Wanalyzer-use-of-uninitialized-value");
+
+int LIBC(sigsetjmp)(sigjmp_buf buf, int savesig)
 {
-    asm volatile("jmp setjmp;");
+    UNUSED(savesig);
+    return LIBC(setjmp)(buf);
 }
+
+DIAG_RESTORE();
 
 LIBC_ALIAS(longjmp);
 LIBC_ALIAS(setjmp);

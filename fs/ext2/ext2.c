@@ -21,7 +21,7 @@ static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 static int ext2_mmap(file_t* file, vm_area_t* vma);
 static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int);
 static int ext2_read(file_t* file, char* buffer, size_t count);
-static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page);
+static int ext2_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page);
 static int ext2_readlink(inode_t* inode, char* buffer, size_t size);
 
 enum traverse_command
@@ -542,7 +542,7 @@ static cmd_t ext2_nopage_block(void* block, size_t to_copy, void* data)
     return TRAVERSE_CONTINUE;
 }
 
-static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
+static int ext2_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page)
 {
     int res, errno;
     ext2_inode_t* inode = vma->dentry->inode->fs_data;
@@ -562,7 +562,7 @@ static int ext2_nopage(vm_area_t* vma, uintptr_t address, page_t** page)
 
     off_t vma_off = address - vma->start;
 
-    res = ext2_traverse_blocks(data, inode, vma->offset + vma_off, PAGE_SIZE, &ctx, &ext2_nopage_block);
+    res = ext2_traverse_blocks(data, inode, vma->offset + vma_off, size, &ctx, &ext2_nopage_block);
 
     if (unlikely(errno = errno_get(res)))
     {

@@ -16,7 +16,7 @@ typedef int (*entry_t)();
 
 extern int debug;
 
-[[noreturn]] void die(const char* string);
+[[noreturn]] void die(const char* fmt, ...);
 [[noreturn]] void die_errno(const char* string);
 
 void read_from(int fd, void* buffer, size_t size, size_t offset);

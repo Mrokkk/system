@@ -45,30 +45,6 @@ TEST_SUITE(kernel);
         } \
     }
 
-int vsyscall(int nr, ...)
-{
-    int ret;
-    asm volatile(
-        "push %%edi;"
-        "push %%esi;"
-        "push %%edx;"
-        "push %%ecx;"
-        "push %%ebx;"
-        "push %%ebp;"
-        "mov $1f, %%edx;"
-        "mov %%esp, %%ecx;"
-        "sysenter;"
-        "1:"
-        "pop %%ebp;"
-        "pop %%ebx;"
-        "pop %%ecx;"
-        "pop %%edx;"
-        "pop %%esi;"
-        "pop %%edi;"
-        : "=a" (ret) : "a" (nr) : "memory");
-    return ret;
-}
-
 TEST(bss_is_zeroed)
 {
     EXPECT_EQ(data, 0);

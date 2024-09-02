@@ -427,12 +427,15 @@ def line_process(line : str, context : Context) -> None:
     if match := re.search(r'USER:([x0-9a-f]*) ([x0-9a-f]*) (.*):', content):
         # FIXME: how to properly detect non-dynamic executable
         # and print both addresses as the same in kernel?
-        if 'ld.so' in line:
-            addr = match.group(1)
-        else:
-            addr = match.group(2)
+        addr = match.group(2)
 
         binary = f'mnt{match.group(3)}'
+
+        if '[' in binary:
+            content = gdb_stacktrace_line(context.bt_number, addr, '??', '??', '??')
+            line = f'{Color.green}[{timestamp:>14}] {Color.clear}{content}'
+            line_print(line)
+            return
 
         for content in backtrace_get(addr, binary, context):
             line = f'{Color.green}[{timestamp:>14}] {Color.clear}{content}'

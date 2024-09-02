@@ -169,8 +169,7 @@ DIAG_RESTORE();
 #define ENSURE(x, ...) \
     if (UNLIKELY(!(x))) \
     { \
-        fprintf(stderr, __VA_ARGS__); \
-        die("Cannot load executable"); \
+        die(__VA_ARGS__); \
     }
 
 static void symbol_relocate(
@@ -202,7 +201,7 @@ static void symbol_relocate(
         case R_386_GLOB_DAT:
         case R_386_JMP_SLOT: // S
         {
-            ENSURE(symbol, "missing symbol for %#x relocation at %p\n", type, memory);
+            ENSURE(symbol, "missing symbol for %#x relocation at %p", type, memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             *memory = S;
             break;
@@ -210,7 +209,7 @@ static void symbol_relocate(
 
         case R_386_32: // S + A
         {
-            ENSURE(symbol, "missing symbol for %#x relocation at %p\n", type, memory);
+            ENSURE(symbol, "missing symbol for %#x relocation at %p", type, memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             uintptr_t A = *memory;
 
@@ -220,7 +219,7 @@ static void symbol_relocate(
 
         case R_386_PC32: // S + A - P
         {
-            ENSURE(symbol, "missing symbol for R_386_PC32 relocation at %p\n", memory);
+            ENSURE(symbol, "missing symbol for %#x relocation at %p", type, memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             uintptr_t A = *memory;
             uintptr_t P = ADDR(memory);
@@ -291,6 +290,7 @@ static void missing_symbols_verify(list_head_t* missing_symbols)
 
 static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_base, uintptr_t* brk_address)
 {
+    uintptr_t page_size = AUX_GET(AT_PAGESZ);
     LIST_DECLARE(missing_symbols);
 
     relocate(&dynamic->rel, dynamic, base_address, &missing_symbols);
@@ -303,6 +303,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
         char path[128];
         elf32_phdr_t* phdr;
         elf32_header_t* header;
+        uintptr_t next_lib_base = 0;
         DYNAMIC_DECLARE(lib_dynamic);
         LIST_DECLARE(lib_libs);
 
@@ -323,16 +324,15 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
 
         phdr_print(phdr, header->e_phnum);
 
-        for (size_t i = 0; i < header->e_phnum; ++i)
+        PHDR_FOR_EACH(p, phdr, header->e_phnum)
         {
-            elf32_phdr_t* p = &phdr[i];
-
             switch (p->p_type)
             {
                 case PT_LOAD:
                 {
-                    *brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, AUX_GET(AT_PAGESZ));
-                    mmap_phdr(lib_fd, AUX_GET(AT_PAGESZ), p, p->p_flags & PF_X ? PF_W : 0, lib_base);
+                    *brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, page_size);
+                    next_lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, page_size);
+                    mmap_phdr(lib_fd, page_size, p, lib_base);
                     break;
                 }
 
@@ -359,21 +359,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
             }
         }
 
-        for (size_t i = 0; i < header->e_phnum; ++i)
-        {
-            elf32_phdr_t* p = &phdr[i];
-
-            switch (p->p_type)
-            {
-                case PT_LOAD:
-                    if (p->p_flags & PF_X)
-                    {
-                        mprotect_phdr(lib_base, AUX_GET(AT_PAGESZ), 0, p);
-                    }
-                    lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, AUX_GET(AT_PAGESZ));
-                    break;
-            }
-        }
+        lib_base = next_lib_base;
 
         close(lib_fd);
     }
@@ -381,14 +367,107 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
     missing_symbols_verify(&missing_symbols);
 }
 
-static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* stack_ptr)
+extern void __libc_start_main(int, char* const argv[], char* const envp[]);
+
+#define EARLY_ENSURE(x) \
+    if (UNLIKELY(!(x))) \
+    { \
+        __builtin_trap(); \
+    }
+
+void relocate_itself(elf32_auxv_t** auxv)
+{
+    elf32_auxv_t* aux = *auxv;
+    uintptr_t base = 0;
+    uintptr_t page_size = 0;
+
+    for (size_t i = 0; aux[i].a_type; ++i)
+    {
+        if (aux[i].a_type == AT_BASE)
+        {
+            base = aux[i].a_un.a_val;
+        }
+        else if (aux[i].a_type == AT_PAGESZ)
+        {
+            page_size = aux[i].a_un.a_val;
+        }
+    }
+
+    EARLY_ENSURE(base && page_size);
+
+    elf32_header_t* header = PTR(base);
+    elf32_phdr_t* phdr = SHIFT_AS(elf32_phdr_t*, header, header->e_phoff);
+    elf32_dyn_t* dyn = NULL;
+
+    PHDR_FOR_EACH(p, phdr, header->e_phnum)
+    {
+        if (p->p_type == PT_DYNAMIC)
+        {
+            dyn = SHIFT_AS(elf32_dyn_t*, header, p->p_offset);
+            break;
+        }
+        else if (p->p_type == PT_LOAD)
+        {
+            mimmutable_phdr(base, page_size, p);
+        }
+    }
+
+    EARLY_ENSURE(dyn);
+
+    uintptr_t rel_off = 0;
+    size_t rel_size = 0;
+
+    for (; dyn->d_tag != DT_NULL; ++dyn)
+    {
+        switch (dyn->d_tag)
+        {
+            case DT_REL:
+                rel_off = dyn->d_un.d_off;
+                break;
+            case DT_RELSZ:
+                rel_size = dyn->d_un.d_val;
+                break;
+        }
+    }
+
+    EARLY_ENSURE(rel_off && rel_size);
+
+    elf32_rel_t* rel = SHIFT_AS(elf32_rel_t*, header, rel_off);
+    elf32_rel_t* rel_end = SHIFT(rel, rel_size);
+
+    for (; rel != rel_end; ++rel)
+    {
+        int type;
+        uintptr_t* memory = PTR(base + rel->r_offset);
+        switch (type = ELF32_R_TYPE(rel->r_info))
+        {
+            case R_386_RELATIVE: // B + A
+            {
+                uintptr_t B = base;
+                uintptr_t A = *memory;
+                *memory = B + A;
+                break;
+            }
+
+            default:
+                __builtin_trap();
+        }
+    }
+}
+
+static __attribute__((noreturn)) void loader_main(int argc, char* argv[], char* envp[], elf32_auxv_t** auxv, void* stack_ptr)
 {
     int exec_fd = 0;
     elf32_phdr_t* phdr = NULL;
     uintptr_t brk_address = 0;
     uintptr_t base_address = 0;
     uintptr_t lib_base = 0;
+    uintptr_t page_size = 0;
     DYNAMIC_DECLARE(dynamic);
+
+    relocate_itself(auxv);
+
+    __libc_start_main(argc, argv, envp);
 
     debug = !!getenv("L");
 
@@ -396,16 +475,15 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
 
     exec_fd = AUX_GET(AT_EXECFD);
     phdr = PTR(AUX_GET(AT_PHDR));
-    base_address = AUX_GET(AT_BASE);
+    page_size = AUX_GET(AT_PAGESZ);
+    base_address = AUX_GET(AT_PHDR) & ~(page_size - 1);
 
     phdr_print(phdr, AUX_GET(AT_PHNUM));
 
     loader_breakpoint(AUX_GET(AT_EXECFN), base_address);
 
-    for (size_t i = 0; i < AUX_GET(AT_PHNUM); ++i)
+    PHDR_FOR_EACH(p, phdr, AUX_GET(AT_PHNUM))
     {
-        elf32_phdr_t* p = &phdr[i];
-
         switch (p->p_type)
         {
             case PT_DYNAMIC:
@@ -416,29 +494,15 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
 
             case PT_LOAD:
             {
-                brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + base_address, AUX_GET(AT_PAGESZ));
-
-                // Allow writing over segment to perform relocations
-                if (phdr[i].p_flags & PF_X)
-                {
-                    mprotect_phdr(base_address, AUX_GET(AT_PAGESZ), PF_W, p);
-                }
-                lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + base_address, AUX_GET(AT_PAGESZ));
+                mimmutable_phdr(base_address, page_size, p);
+                brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + base_address, page_size);
+                lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + base_address, page_size);
                 break;
             }
         }
     }
 
-    link(&dynamic, exec_fd, AUX_GET(AT_BASE), lib_base, &brk_address);
-
-    for (size_t i = 0; i < AUX_GET(AT_PHNUM); ++i)
-    {
-        // Restore original protection flags
-        if (phdr[i].p_type == PT_LOAD && phdr[i].p_flags & PF_X)
-        {
-            mprotect_phdr(base_address, AUX_GET(AT_PAGESZ), 0, &phdr[i]);
-        }
-    }
+    link(&dynamic, exec_fd, base_address, lib_base, &brk_address);
 
     close(exec_fd);
     brk((void*)brk_address);
@@ -456,14 +520,17 @@ static __attribute__((noreturn)) void loader_main(elf32_auxv_t** auxv, void* sta
     while (1);
 }
 
-__attribute__((noreturn)) int main(int argc, char*[], char* envp[])
+__attribute__((noreturn)) int main(int argc, char* argv[], char* envp[])
 {
-    loader_main(SHIFT_AS(elf32_auxv_t**, &envp, 4), &argc);
+    loader_main(
+        argc,
+        argv,
+        envp,
+        SHIFT_AS(elf32_auxv_t**, &envp, 4),
+        &argc);
 }
 
 __attribute__((naked,noreturn,used)) int _start()
 {
-    asm volatile(
-        "call __libc_start_main;"
-        "call main;");
+    asm volatile("call main@plt;");
 }

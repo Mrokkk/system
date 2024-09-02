@@ -9,8 +9,6 @@
 static mapping_t mappings[32];
 static unsigned last;
 
-static void mappings_read(location_t* location);
-
 void maps_dump(void)
 {
     const char* path = "/proc/self/maps";
@@ -80,14 +78,14 @@ finish:
 void* mmap_wrapped(void* addr, size_t len, int prot, int flags, int fd, size_t off, location_t location)
 {
     void* ret = mmap(addr, len, prot, flags, fd, off);
-    mappings_read(&location);
+    mappings_read(location);
     return ret;
 }
 
 int mprotect_wrapped(void* addr, size_t len, int prot, location_t location)
 {
     int ret = mprotect(addr, len, prot);
-    mappings_read(&location);
+    mappings_read(location);
     return ret;
 }
 
@@ -117,13 +115,21 @@ static char* prot_flags_get(int value, char* buffer, size_t size)
     return buffer;
 }
 
-static void mapping_add(uintptr_t start, uintptr_t end, const char* prot)
+static void mapping_add(uintptr_t start, uintptr_t end, const char* prot, off_t offset, const char* path)
 {
     int flags = 0;
-    mapping_t* mapping = &mappings[last++];
+
+    mapping_t* mapping = &mappings[last];
+
+    if (last)
+    {
+        mappings[last - 1].next = mapping;
+    }
 
     mapping->start = start;
     mapping->size = end - start;
+    mapping->offset = offset;
+    mapping->path = path;
     mapping->ptr = PTR(start);
 
     flags |= *prot++ == 'r' ? PROT_READ : 0;
@@ -131,32 +137,47 @@ static void mapping_add(uintptr_t start, uintptr_t end, const char* prot)
     flags |= *prot++ == 'x' ? PROT_EXEC : 0;
 
     mapping->flags = flags;
+    mapping->next = NULL;
+    last++;
 }
 
 static void mapping_read(char* it, location_t* location)
 {
-    char* endptr;
+    char* path = strrchr(it, ' ');
     char* start_str = strtok(it, " -");
     char* end_str = strtok(NULL, " ");
     char* prot = strtok(NULL, " ");
+    char* offset_str = strtok(NULL, " ");
+    /*char* ino_str = */strtok(NULL, " ");
+
+    off_t offset;
     uintptr_t start, end;
+
+    if (path)
+    {
+        path = *(path + 1) == '\0'
+            ? NULL
+            : path + 1;
+    }
 
     if (UNLIKELY(!start_str)) die(location, "cannot read start of mapping");
     if (UNLIKELY(!end_str)) die(location, "cannot read end of mapping");
     if (UNLIKELY(!prot)) die(location, "cannot read prot of mapping");
+    if (UNLIKELY(!offset_str)) die(location, "cannot read offset of mapping");
 
-    start = strtoul(start_str, &endptr, 16);
-    end = strtoul(end_str, &endptr, 16);
+    start = strtoul(start_str, NULL, 16);
+    end = strtoul(end_str, NULL, 16);
+    offset = strtoul(offset_str, NULL, 16);
 
-    mapping_add(start, end, prot);
+    mapping_add(start, end, prot, offset, path);
 }
 
-static void mappings_read(location_t* location)
+mapping_t* mappings_read(location_t location)
 {
+    static char buffer[0x1000];
     const char* path = "/proc/self/maps";
     int fd, bytes;
-    char buffer[0x1000];
-    char* newline = NULL;
+    char* newline;
     char* it;
 
     last = 0;
@@ -173,12 +194,19 @@ static void mappings_read(location_t* location)
         {
             newline = strchr(it, '\n');
 
-            if (newline && *(newline + 1) == '\0')
+            if (UNLIKELY(!newline))
+            {
+                die(&location, "error in mapping format: no newline");
+            }
+
+            if (*(newline + 1) == '\0')
             {
                 break;
             }
 
-            mapping_read(it, location);
+            *newline = '\0';
+
+            mapping_read(it, &location);
 
             it = newline + 1;
         }
@@ -189,9 +217,11 @@ static void mappings_read(location_t* location)
     mappings[last].start = 0;
 
     close(fd);
+
+    return mappings;
 }
 
-mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, location_t location)
+mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, off_t offset, const char* path, location_t location)
 {
     char expected_prot[64];
     char actual_prot[64];
@@ -208,6 +238,17 @@ mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, location
         {
             FAIL_L(location.file, location.line, "incorrect size: expected %#lx, got %#lx", size, it->size);
             return NULL;
+        }
+
+        if (it->path != path)
+        {
+            FAIL_L(location.file, location.line, "incorrect path: expected %s; got \"%s\"", path, it->path);
+            maps_dump();
+        }
+
+        if (it->offset != offset)
+        {
+            FAIL_L(location.file, location.line, "incorrect offset: expected %#x; got %#x", offset, it->offset);
         }
 
         if (it->flags != flags)

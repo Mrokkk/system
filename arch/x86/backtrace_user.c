@@ -66,7 +66,9 @@ static int address_fill(uint32_t eip, vm_area_t* vm_areas, user_address_t* addr)
     }
 
     addr->vaddr = eip;
-    addr->file_offset = eip - vma->start + vma->offset;
+    addr->file_offset = vma->dentry
+        ? eip - vma->start + vma->offset
+        : eip;
 
     vm_file_path_read(vma, addr->path, PATH_MAX);
 

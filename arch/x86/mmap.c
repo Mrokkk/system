@@ -15,7 +15,12 @@
 static inline uint32_t address_space_find(size_t size)
 {
     uint32_t as_start = 0x1000;
-    uint32_t as_end = USER_STACK_VIRT_ADDRESS - USER_STACK_SIZE;
+    uint32_t as_end =
+#if CONFIG_SEGMEXEC
+        CODE_START - USER_STACK_SIZE;
+#else
+        USER_STACK_VIRT_ADDRESS - USER_STACK_SIZE;
+#endif
 
     uint32_t last_start;
     vm_area_t* vma = process_current->mm->vm_areas;
@@ -65,9 +70,10 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     int errno;
     uint32_t vaddr;
     vm_area_t* vma;
+    size_t file_size = len;
     size_t size = page_align(len);
 
-    log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", addr, size, prot, flags, file);
+    current_log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", addr, size, prot, flags, file);
 
     if (unlikely(!size
         || (offset & PAGE_MASK)
@@ -132,9 +138,10 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         }
 
         log_debug(DEBUG_MMAP, "calling ops->mmap");
+
         if (unlikely(errno = file->ops->mmap(file, vma)))
         {
-            log_debug(DEBUG_MMAP, "ops->mmap failed");
+            log_debug(DEBUG_MMAP, "ops->mmap failed with %d", errno);
             goto free_vma;
         }
 
@@ -152,6 +159,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         goto free_vma;
     }
 
+    vma->actual_end = vma->start + file_size;
     log_debug(DEBUG_MMAP, "returning %x; vm area:", vaddr);
     vm_area_log_debug(DEBUG_MMAP, vma);
 
@@ -187,10 +195,9 @@ void* sys_mmap(struct mmap_params* params)
     return do_mmap(params->addr, params->len, params->prot, params->flags, file, params->off);
 }
 
-static int vma_mprotect_find(uintptr_t addr, size_t len, int prot, vm_area_t** vma)
+static int vma_range_find(uintptr_t addr, size_t len, vm_area_t** vma)
 {
     vm_area_t* next;
-    UNUSED(prot);
 
     for (vm_area_t* temp = process_current->mm->vm_areas; temp; temp = temp->next)
     {
@@ -214,7 +221,17 @@ static int vma_mprotect_find(uintptr_t addr, size_t len, int prot, vm_area_t** v
                     return -ENOMEM;
                 }
 
+                if (unlikely(next->vm_flags & VM_IMMUTABLE))
+                {
+                    return -EPERM;
+                }
+
                 temp = next;
+            }
+
+            if (unlikely(temp->vm_flags & VM_IMMUTABLE))
+            {
+                return -EPERM;
             }
 
             return 0;
@@ -235,6 +252,10 @@ static void vm_copy_details(vm_area_t* to, const vm_area_t* from)
 {
     to->offset = from->offset;
     to->dentry = from->dentry;
+    if (to->dentry)
+    {
+        to->offset += to->start - from->start;
+    }
     to->ops = from->ops;
 }
 
@@ -248,6 +269,7 @@ int sys_mprotect(void* addr, size_t len, int prot)
     vm_area_t* replace_start = NULL;
     vm_area_t* replace_end = NULL;
     uintptr_t start, end;
+    int vm_flags = vm_flags_get(prot);
 
     if (unlikely((addr(addr) & PAGE_MASK) | (len & PAGE_MASK))
         || (prot & (PROT_EXEC | PROT_WRITE)) == (PROT_EXEC | PROT_WRITE))
@@ -257,7 +279,7 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
     scoped_mutex_lock(&process_current->mm->lock);
 
-    if (unlikely(errno = vma_mprotect_find(addr(addr), len, prot, &vma)))
+    if (unlikely(errno = vma_range_find(addr(addr), len, &vma)))
     {
         return errno;
     }
@@ -269,6 +291,13 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
     start = addr(addr);
     end = start + len;
+
+    if (vma->start == start && vma->end == end)
+    {
+        new_vmas = vma;
+        vma->vm_flags = vm_flags;
+        goto apply;
+    }
 
     replace_start = vma;
 
@@ -310,7 +339,7 @@ int sys_mprotect(void* addr, size_t len, int prot)
                 vm_add(&new_vmas, new_vma);
             }
 
-            new_vma = safe_vm_create(start, min(vma->end - start, end - start), prot);
+            new_vma = safe_vm_create(start, min(vma->end - start, end - start), vm_flags);
             vm_copy_details(new_vma, vma);
 
             if (prev_vma && vmas_can_be_merged(prev_vma, new_vma))
@@ -352,6 +381,7 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
     vm_replace(&process_current->mm->vm_areas, new_vmas, new_vmas_end, replace_start, replace_end);
 
+apply:
     if (unlikely(vm_apply(new_vmas, process_current->mm->pgd, addr(addr), addr(addr) + len)))
     {
         do_kill(process_current, SIGBUS);
@@ -369,6 +399,49 @@ error:
     }
 
     return errno;
+}
+
+int sys_mimmutable(void* addr, size_t len)
+{
+    vm_area_t* vma;
+    uintptr_t start = addr(addr);
+    const uintptr_t end = start + len;
+
+    // TODO: this require some changes to properly validate requested
+    // range and to be able to divide vmas
+
+    if (unlikely((addr(addr) & PAGE_MASK) | (len & PAGE_MASK)))
+    {
+        return -EINVAL;
+    }
+
+    scoped_mutex_lock(&process_current->mm->lock);
+
+    if (unlikely(!(vma = vm_find(addr(addr), process_current->mm->vm_areas))))
+    {
+        return -EINVAL;
+    }
+
+    while (start < end)
+    {
+        vma->vm_flags |= VM_IMMUTABLE;
+        vma = vma->next;
+        start = vma->end;
+
+        if (!vma)
+        {
+            break;
+        }
+
+        start = vma->start;
+    }
+
+    if (unlikely(start < end))
+    {
+        return -EINVAL;
+    }
+
+    return 0;
 }
 
 int sys_brk(void* addr)

@@ -16,6 +16,7 @@ typedef struct vm_operations vm_operations_t;
 #define VM_EXEC         0x00000004
 #define VM_SHARED       0x00000008
 #define VM_IO           0x00000010
+#define VM_IMMUTABLE    0x00000020
 #define VM_TYPE_MASK    0xff000000
 
 #define VM_TYPE_STACK   1
@@ -26,12 +27,13 @@ typedef struct vm_operations vm_operations_t;
 
 struct vm_operations
 {
-    int (*nopage)(vm_area_t* vma, uintptr_t address, page_t** page);
+    int (*nopage)(vm_area_t* vma, uintptr_t address, size_t size, page_t** page);
 };
 
 struct vm_area
 {
-    uint32_t         start, end;
+    uintptr_t        start, end;
+    uintptr_t        actual_end;
     int              vm_flags;
     struct dentry*   dentry;
     off_t            offset; // offset within inode
@@ -140,5 +142,5 @@ int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t lim
 
 #include <arch/vm.h>
 
-int arch_vm_copy(pgd_t* dest_pgd, pgd_t* src_pgd,  uint32_t start, uint32_t end);
+int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd,  uint32_t start, uint32_t end);
 int arch_vm_map_single(pgd_t* pgd, uint32_t pde_index, uint32_t pte_index, page_t* page, int vm_flags);

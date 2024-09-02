@@ -8,12 +8,18 @@
 
 #include "test.h"
 
+typedef struct mapping mapping_t;
+typedef struct location location_t;
+
 struct mapping
 {
-    uintptr_t start;
-    size_t    size;
-    int       flags;
-    void*     ptr;
+    uintptr_t   start;
+    size_t      size;
+    int         flags;
+    off_t       offset;
+    const char* path;
+    void*       ptr;
+    mapping_t*  next;
 };
 
 struct location
@@ -21,9 +27,6 @@ struct location
     const char* file;
     size_t      line;
 };
-
-typedef struct mapping mapping_t;
-typedef struct location location_t;
 
 #define LOCATION() \
     (location_t){ \
@@ -34,7 +37,8 @@ typedef struct location location_t;
 void* mmap_wrapped(void* addr, size_t len, int prot, int flags, int fd, size_t off, location_t location);
 int mprotect_wrapped(void* addr, size_t len, int prot, location_t location);
 
-mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, location_t location);
+mapping_t* mappings_read(location_t location);
+mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, off_t offset, const char* path, location_t location);
 void verify_access_impl(mapping_t* m, location_t location);
 
 void maps_dump(void);
@@ -61,12 +65,15 @@ void maps_dump(void);
         ret; \
     })
 
-#define EXPECT_MAPPING(start, size, flags) \
-    expect_mapping_impl(start, size, flags, LOCATION())
+#define MAPPINGS_FOR_EACH(name) \
+    for (mapping_t* name = mappings_read(LOCATION()); name; name = name->next)
 
-#define EXPECT_MAPPING_CHECK_ACCESS(start, size, flags) \
+#define EXPECT_MAPPING(start, size, flags, offset, path) \
+    expect_mapping_impl(start, size, flags, offset, path, LOCATION())
+
+#define EXPECT_MAPPING_CHECK_ACCESS(start, size, flags, offset, path) \
     ({ \
-        mapping_t* m = EXPECT_MAPPING(start, size, flags); \
+        mapping_t* m = EXPECT_MAPPING(start, size, flags, offset, path); \
         if (LIKELY(m)) \
         { \
             verify_access_impl(m, LOCATION()); \

@@ -9,6 +9,7 @@
 #include <kernel/kernel.h>
 #include <kernel/signal.h>
 #include <kernel/api/wait.h>
+#include <kernel/segmexec.h>
 
 typedef struct process process_t;
 
@@ -44,7 +45,11 @@ typedef enum
 #define SPAWN_USER          (1 << 1)
 
 #define USER_STACK_SIZE             (2 * PAGE_SIZE)
+#if CONFIG_SEGMEXEC
+#define USER_STACK_VIRT_ADDRESS     (CODE_START - USER_STACK_SIZE)
+#else
 #define USER_STACK_VIRT_ADDRESS     (KERNEL_PAGE_OFFSET - USER_STACK_SIZE)
+#endif
 
 struct mm
 {
