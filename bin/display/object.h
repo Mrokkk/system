@@ -1,8 +1,8 @@
 #pragma once
 
 #include <stdbool.h>
+#include <common/list.h>
 
-#include "list.h"
 #include "vector2.h"
 
 struct object;

@@ -60,6 +60,19 @@ static void signal_handlers_set(void)
     signal(SIGSEGV, sighan);
 }
 
+static void* alloc(size_t size)
+{
+    void* ptr = malloc(size);
+
+    if (UNLIKELY(!ptr))
+    {
+        fprintf(stderr, "display: cannot allocate %lu bytes\n", size);
+        sighan();
+    }
+
+    return ptr;
+}
+
 static void area_refresh(int x, int y, int w, int h)
 {
     for (int i = x; i < x + w; ++i)
@@ -169,7 +182,7 @@ int initialize()
         return EXIT_FAILURE;
     }
 
-    window_t* window = malloc(sizeof(window_t));
+    window_t* window = alloc(sizeof(window_t));
     window->position.x = 0;
     window->position.y = 0;
     window->size.x = vinfo.xres;
@@ -290,7 +303,7 @@ int main(int argc, char* argv[])
 
     if (argc < 2)
     {
-        printf("display: no image path given\n");
+        fprintf(stderr, "display: no image path given\n");
         return EXIT_FAILURE;
     }
 
@@ -306,7 +319,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    object_t* close_button = malloc(sizeof(object_t));
+    object_t* close_button = alloc(sizeof(*close_button));
     close_button->normal_img = close_icon;
     close_button->pressed_img = close_pressed_icon;
     close_button->position.x = vinfo.xres - close_icon->w - 2 * WINDOW_FRAME_WIDTH;
@@ -317,7 +330,7 @@ int main(int argc, char* argv[])
     list_init(&close_button->list);
     list_init(&close_button->dirty);
 
-    object_t* image = malloc(sizeof(object_t));
+    object_t* image = alloc(sizeof(*image));
     image->normal_img = img;
     image->pressed_img = NULL;
     image->position.x = (vinfo.xres - img->w) / 2;

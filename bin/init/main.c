@@ -8,6 +8,7 @@
 #include <termios.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <common/compiler.h>
 #include <kernel/api/reboot.h>
 
 #define MAX_CMDLINE_LEN 128
@@ -22,6 +23,12 @@ static void parse_cmdline(options_t* options, const char* cmdline)
 {
     char* token;
     char* temp = malloc(strlen(cmdline) + 1);
+
+    if (UNLIKELY(!temp))
+    {
+        __builtin_trap();
+    }
+
     strcpy(temp, cmdline);
 
     options->cmdline = cmdline;

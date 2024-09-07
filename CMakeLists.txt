@@ -4,7 +4,7 @@ project(system C)
 set(ARCH x86)
 set(FRAME_POINTER 1)
 set(STACK_PROTECTOR 1)
-set(STATIC_ANALYZER 0)
+set(STATIC_ANALYZER 1)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -23,7 +23,7 @@ set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_FLAGS_DEBUG "-ggdb3")
 
 if(STATIC_ANALYZER)
-    set(C_FLAGS_WARNINGS "${C_FLAGS_WARNINGS} -fanalyzer -Wno-analyzer-va-arg-type-mismatch -Wno-analyzer-va-list-exhausted -Wno-error")
+    set(C_FLAGS_WARNINGS "${C_FLAGS_WARNINGS} -fanalyzer -Wno-analyzer-va-arg-type-mismatch -Wno-analyzer-va-list-exhausted")
 endif()
 
 if(STACK_PROTECTOR)

@@ -12,6 +12,8 @@ static void* data;
 
 // TODO: write proper allocator
 
+DIAG_IGNORE("-Wanalyzer-malloc-leak");
+
 void* malloc(size_t size)
 {
     size_t blocks = ALIGN_TO(size, MALLOC_BLOCK_SIZE) / MALLOC_BLOCK_SIZE;
@@ -57,3 +59,5 @@ void free(void*)
     /*size_t blocks = ALIGN_TO(size, MALLOC_BLOCK_SIZE) / MALLOC_BLOCK_SIZE;*/
     /*bitset_clear_range(bitset, frame, blocks);*/
 }
+
+DIAG_RESTORE();

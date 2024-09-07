@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <common/compiler.h>
 
 #include "input.h"
 #include "macro.h"
@@ -54,6 +55,18 @@ int input_fd;
 static void snake_create(int segments);
 static void graphic_mode_enter();
 static void graphic_mode_exit();
+
+static void* alloc(size_t size)
+{
+    void* ptr = malloc(size);
+
+    if (UNLIKELY(!ptr))
+    {
+        die("Cannot allocate %lu bytes\n", size);
+    }
+
+    return ptr;
+}
 
 void sighan()
 {
@@ -116,7 +129,7 @@ static void map_initialize()
 
     printf("Map: %lu x %lu\n", xgrids, ygrids);
 
-    cells = malloc(sizeof(struct cell) * xgrids * ygrids);
+    cells = alloc(sizeof(struct cell) * xgrids * ygrids);
 
     for (size_t i = 0; i < xgrids; ++i)
     {
@@ -199,7 +212,7 @@ static void snake_create(int segments)
     int x = xgrids / 2 + segments / 2;
     int y = ygrids / 2;
 
-    head = malloc(sizeof(struct snake_block));
+    head = alloc(sizeof(struct snake_block));
     head->cell = CELL(x--, y);
     head->cell->flags = FLAGS_SNAKE;
 
@@ -209,7 +222,7 @@ static void snake_create(int segments)
 
     while (segments--)
     {
-        struct snake_block* new_block = malloc(sizeof(struct snake_block));
+        struct snake_block* new_block = alloc(sizeof(struct snake_block));
         new_block->prev = last;
         new_block->cell = CELL(x--, y);
         new_block->cell->flags = FLAGS_SNAKE;
@@ -280,7 +293,7 @@ static void snake_move()
 
     if (old_tail->flags & FLAGS_FOOD)
     {
-        new_head = malloc(sizeof(struct snake_block));
+        new_head = alloc(sizeof(struct snake_block));
         new_head->cell = next_cell;
         new_head->next = head;
         new_head->prev = tail;
