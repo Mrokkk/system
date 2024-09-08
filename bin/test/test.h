@@ -265,6 +265,14 @@ extern int __assert_failed;
 #define FAIL(fmt, ...) \
     FAIL_L(__FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
+#define __TEST_SKIPPED (1 << 31)
+
+#define SKIP() \
+    ({ __assert_failed = __TEST_SKIPPED; return; 0; })
+
+#define SKIP_WHEN(condition) \
+    ({ bool c = condition; if (UNLIKELY(c)) { SKIP(); } 0; })
+
 #define TEST_SUITE(n) \
     extern test_case_t __##n##_test_cases[]; \
     static test_case_t* test_cases = __##n##_test_cases; \

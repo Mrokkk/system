@@ -13,17 +13,26 @@
 #define BLUE                "\033[34m"
 #define RESET               "\033[0m"
 
-#define VERDICT(p, f)       (((p) << 16) | (f))
+#define VERDICT(p, f, s)    (verdict_t){.passed = p, .failed = f, .skipped = s}
 #define PASSED_GET(v)       ((v) >> 16)
 #define FAILED_GET(v)       ((v) & 0xffff)
 
-typedef uint32_t verdict_t;
+struct verdict
+{
+    unsigned passed;
+    unsigned failed;
+    unsigned skipped;
+};
+
+typedef struct verdict verdict_t;
 
 static const char* const RUN_MSG           = GREEN  "[ RUN  ]" RESET;
 static const char* const FAIL_MSG          = RED    "[ FAIL ]" RESET;
 static const char* const PASS_MSG          = GREEN  "[ PASS ]" RESET;
+static const char* const SKIP_MSG          = YELLOW "[ SKIP ]" RESET;
 static const char* const GEN_GREEN_MSG     = GREEN  "[======]" RESET;
 static const char* const GEN_RED_MSG       = RED    "[======]" RESET;
+static const char* const GEN_YELLOW_MSG    = YELLOW "[======]" RESET;
 
 static test_suite_t* suites[TEST_SUITES_COUNT];
 static size_t suites_count;
@@ -50,24 +59,38 @@ static option_t options[] = {
     {"-t", "--test",    OPT_VALUE, "Select test to run",      &test_set},
 };
 
+enum
+{
+    TEST_PASSED  = 0,
+    TEST_FAILED  = 1,
+    TEST_SKIPPED = __TEST_SKIPPED
+};
+
 static int test_run(test_case_t* test, test_suite_t* suite)
 {
     const char* suite_name = suite->name;
+    const char* const fmt = "%s %s.%s\n";
 
-    fprintf(stdout, "%s %s.%s\n", RUN_MSG, suite_name, test->name);
+    fprintf(stdout, fmt, RUN_MSG, suite_name, test->name);
 
     __assert_failed = 0;
 
     test->test();
 
-    fprintf(stdout, "%s %s.%s\n", __assert_failed ? FAIL_MSG : PASS_MSG, suite_name, test->name);
+    if (UNLIKELY(__assert_failed == __TEST_SKIPPED))
+    {
+        fprintf(stdout, fmt, SKIP_MSG, suite_name, test->name);
+        return TEST_SKIPPED;
+    }
 
-    return __assert_failed;
+    fprintf(stdout, fmt, __assert_failed ? FAIL_MSG : PASS_MSG, suite_name, test->name);
+
+    return __assert_failed ? TEST_FAILED : TEST_PASSED;
 }
 
 static verdict_t suite_run(test_suite_t* suite, list_head_t* failed_tests, config_t* config)
 {
-    int assert_failed = 0, passed = 0, failed = 0;
+    int assert_failed = 0, passed = 0, failed = 0, skipped = 0;
     test_case_t* test;
     test_case_t* tests = suite->test_cases;
     size_t count = suite->test_cases_count;
@@ -94,20 +117,24 @@ static verdict_t suite_run(test_suite_t* suite, list_head_t* failed_tests, confi
             assert_failed = test_run(test, suite);
         }
 
-        if (LIKELY(!assert_failed))
+        switch (assert_failed)
         {
-            ++passed;
-        }
-        else
-        {
-            ++failed;
-            list_add_tail(&test->failed_tests, failed_tests);
+            case TEST_FAILED:
+                ++failed;
+                list_add_tail(&test->failed_tests, failed_tests);
+                break;
+            case TEST_PASSED:
+                ++passed;
+                break;
+            case TEST_SKIPPED:
+                ++skipped;
+                break;
         }
     }
 
     fprintf(stdout, "%s %u tests from %s\n\n", GEN_GREEN_MSG, count, suite->name);
 
-    return VERDICT(passed, failed);
+    return VERDICT(passed, failed, skipped);
 }
 
 void __test_suite_register(test_suite_t* suite)
@@ -255,11 +282,11 @@ void user_failure_print(const char* file, size_t line, const char* fmt, ...)
 
 enum
 {
-    EXPECTED_EXIT_WITH = 1,
-    EXPECTED_KILLED_BY = 2,
-    ACTUAL_EXIT_WITH = 4,
-    ACTUAL_KILLED_BY = 8,
-    ACTUAL_WAITPID_FAILED = 16,
+    EXPECTED_EXIT_WITH    = 1 << 0,
+    EXPECTED_KILLED_BY    = 1 << 1,
+    ACTUAL_EXIT_WITH      = 1 << 2,
+    ACTUAL_KILLED_BY      = 1 << 3,
+    ACTUAL_WAITPID_FAILED = 1 << 4,
 };
 
 static void exit_failure_print(int error, int expected_status, int status, const char* file, size_t line)
@@ -350,11 +377,16 @@ int expect_killed_by(int pid, int signal, const char* file, size_t line)
     return !!error;
 }
 
-static void final_verdict_print(int passed, int failed, list_head_t* failed_tests)
+static void final_verdict_print(int passed, int failed, int skipped, list_head_t* failed_tests)
 {
     test_case_t* test;
 
     fprintf(stdout, "%s Passed %u\n", GEN_GREEN_MSG, passed);
+
+    if (UNLIKELY(skipped))
+    {
+        fprintf(stdout, "%s Skipped %u\n", GEN_YELLOW_MSG, skipped);
+    }
 
     if (LIKELY(!failed))
     {
@@ -370,7 +402,7 @@ static void final_verdict_print(int passed, int failed, list_head_t* failed_test
 
 int __test_suites_run(int argc, char* argv[])
 {
-    int failed = 0, passed = 0;
+    int failed = 0, passed = 0, skipped = 0;
     config_t config = {};
     list_head_t failed_tests = LIST_INIT(failed_tests);
 
@@ -383,11 +415,12 @@ int __test_suites_run(int argc, char* argv[])
 
         verdict = suite_run(suite, &failed_tests, &config);
 
-        passed += PASSED_GET(verdict);
-        failed += FAILED_GET(verdict);
+        passed  += verdict.passed;
+        failed  += verdict.failed;
+        skipped += verdict.skipped;
     }
 
-    final_verdict_print(passed, failed, &failed_tests);
+    final_verdict_print(passed, failed, skipped, &failed_tests);
 
     return failed;
 }

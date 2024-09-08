@@ -103,7 +103,7 @@ __attribute__((naked)) void write_fn(const char*, size_t)
     );
 }
 
-static bool is_segmexec_enabled(void)
+static bool is_segmexec_disabled(void)
 {
     char buffer[16];
     const char* path = "/sys/segmexec";
@@ -130,15 +130,13 @@ static bool is_segmexec_enabled(void)
         return false;
     }
 
-    return *buffer == '1';
+    return *buffer == '0';
 }
 
 TEST(stack_exec)
 {
-    if (!is_segmexec_enabled())
-    {
-        return;
-    }
+    SKIP_WHEN(is_segmexec_disabled());
+
     EXPECT_KILLED_BY(SIGSEGV)
     {
         const char* const message = "Hello there!\n";
