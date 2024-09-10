@@ -403,7 +403,7 @@ void relocate_itself(elf32_auxv_t** auxv)
     {
         if (p->p_type == PT_DYNAMIC)
         {
-            dyn = SHIFT_AS(elf32_dyn_t*, header, p->p_offset);
+            dyn = SHIFT_AS(elf32_dyn_t*, header, p->p_vaddr);
             break;
         }
         else if (p->p_type == PT_LOAD)
@@ -465,7 +465,9 @@ static __attribute__((noreturn)) void loader_main(int argc, char* argv[], char* 
     uintptr_t page_size = 0;
     DYNAMIC_DECLARE(dynamic);
 
+    asm volatile("" ::: "memory");
     relocate_itself(auxv);
+    asm volatile("" ::: "memory");
 
     __libc_start_main(argc, argv, envp);
 
