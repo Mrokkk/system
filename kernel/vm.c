@@ -97,8 +97,14 @@ void vm_add_front(vm_area_t* new_vma, vm_area_t* old_vma)
 
 void vm_del(vm_area_t* vma)
 {
-    vma->next->prev = vma->prev;
-    vma->prev->next = vma->next;
+    if (vma->next)
+    {
+        vma->next->prev = vma->prev;
+    }
+    if (vma->prev)
+    {
+        vma->prev->next = vma->next;
+    }
     delete(vma);
 }
 

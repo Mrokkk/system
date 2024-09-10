@@ -241,6 +241,70 @@ static int vma_range_find(uintptr_t addr, size_t len, vm_area_t** vma)
     return -ENOMEM;
 }
 
+int sys_munmap(void* addr, size_t len)
+{
+    int errno;
+    vm_area_t* vma;
+    vm_area_t* temp;
+    uintptr_t start = addr(addr);
+    uintptr_t end = start + len;
+    uintptr_t old_start;
+
+    if (unlikely(addr(addr) % PAGE_SIZE || len % PAGE_SIZE))
+    {
+        return -EINVAL;
+    }
+
+    if (unlikely(errno = vma_range_find(addr(addr), len, &vma)))
+    {
+        return errno;
+    }
+
+    if (unlikely(!vma))
+    {
+        return -EINVAL;
+    }
+
+    if (vma->start == start && vma->end == end)
+    {
+        vm_unmap(vma, process_current->mm->pgd);
+        vm_del(vma);
+        return 0;
+    }
+
+    do
+    {
+        // TODO: remove this restriction
+        if (UNLIKELY(start > vma->start && end < vma->end))
+        {
+            return -EINVAL;
+        }
+
+        if (start > vma->start)
+        {
+            vma->end = start;
+            vm_unmap_range(vma, start, vma->end, process_current->mm->pgd);
+        }
+        else if (vma->end > end)
+        {
+            old_start = vma->start;
+            start = vma->start = end;
+            vm_unmap_range(vma, old_start, end, process_current->mm->pgd);
+        }
+        else
+        {
+            start = vma->end;
+            temp = vma->next;
+            vm_unmap(vma, process_current->mm->pgd);
+            vm_del(vma);
+            vma = temp;
+        }
+    }
+    while (start < end);
+
+    return 0;
+}
+
 static bool vmas_can_be_merged(const vm_area_t* vma1, const vm_area_t* vma2)
 {
     return vma1->vm_flags == vma2->vm_flags
@@ -345,6 +409,7 @@ int sys_mprotect(void* addr, size_t len, int prot)
             if (prev_vma && vmas_can_be_merged(prev_vma, new_vma))
             {
                 new_vma->start = prev_vma->start;
+                replace_start = prev_vma;
             }
             if (next_vma && vmas_can_be_merged(next_vma, new_vma))
             {

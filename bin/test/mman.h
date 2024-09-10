@@ -39,6 +39,7 @@ int mprotect_wrapped(void* addr, size_t len, int prot, location_t location);
 
 mapping_t* mappings_read(location_t location);
 mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, off_t offset, const char* path, location_t location);
+void expect_no_mapping_impl(uintptr_t start, size_t size, location_t location);
 void verify_access_impl(mapping_t* m, location_t location);
 
 void maps_dump(void);
@@ -70,6 +71,9 @@ void maps_dump(void);
 
 #define EXPECT_MAPPING(start, size, flags, offset, path) \
     expect_mapping_impl(start, size, flags, offset, path, LOCATION())
+
+#define EXPECT_NO_MAPPING(start, size) \
+    expect_no_mapping_impl(start, size, LOCATION())
 
 #define EXPECT_MAPPING_CHECK_ACCESS(start, size, flags, offset, path) \
     ({ \

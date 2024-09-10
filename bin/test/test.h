@@ -231,31 +231,29 @@ extern int __assert_failed;
 #define EXPECT_LT(l, r) EXPECT_LT_L(l, r, __FILE__, __LINE__)
 #define EXPECT_LE(l, r) EXPECT_LE_L(l, r, __FILE__, __LINE__)
 
+#define __GUARD_INIT(pid) \
+    ({ if (pid == 0) __assert_failed = 0; 0; })
+
+#define __FORK_FOR() \
+    for (int pid = fork(), __guard = __GUARD_INIT(pid); !__guard; ++__guard) \
+
 #define EXPECT_EXIT_WITH_L(expected_error_code, file, line) \
-    int pid = fork(); \
-    if (pid == 0) \
-    { \
-        __assert_failed = 0; \
-    } \
-    if (pid > 0) \
-    { \
-        __assert_failed += expect_exit_with(pid, expected_error_code, file, line); \
-    } \
-    else
+    __FORK_FOR() \
+        if (pid > 0) \
+        { \
+            __assert_failed += expect_exit_with(pid, expected_error_code, file, line); \
+        } \
+        else
 
 #define EXPECT_EXIT_WITH(expected_error_code) EXPECT_EXIT_WITH_L(expected_error_code, __FILE__, __LINE__)
 
 #define EXPECT_KILLED_BY_L(signal, file, line) \
-    int pid = fork(); \
-    if (pid == 0) \
-    { \
-        __assert_failed = 0; \
-    } \
-    if (pid > 0) \
-    { \
-        __assert_failed += expect_killed_by(pid, signal, file, line); \
-    } \
-    else
+    __FORK_FOR() \
+        if (pid > 0) \
+        { \
+            __assert_failed += expect_killed_by(pid, signal, file, line); \
+        } \
+        else
 
 #define EXPECT_KILLED_BY(signal) EXPECT_KILLED_BY_L(signal, __FILE__, __LINE__)
 

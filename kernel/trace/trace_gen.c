@@ -550,4 +550,11 @@ syscall_t trace_syscalls[] = {
         .nargs  = 2,
         .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG },
     },
+
+    {
+        .name   = "munmap",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG },
+    },
 };

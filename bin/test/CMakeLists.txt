@@ -2,6 +2,7 @@ set(TESTS
     libc.c
     kernel.c
     mman.c
+    malloc.c
 )
 
 list(LENGTH TESTS TESTS_LEN)

@@ -79,8 +79,9 @@
 #define __NR_fchdir         76
 #define __NR_lstat          77
 #define __NR_mimmutable     78
+#define __NR_munmap         79
 
-#define __NR_syscalls       79
+#define __NR_syscalls       80
 
 #ifndef __ASSEMBLER__
 
@@ -203,3 +204,4 @@ __syscall3(readlink, int, const char*, char*, size_t)
 __syscall1(fchdir, int, int)
 __syscall2(lstat, int, const char*, struct stat*)
 __syscall2(mimmutable, int, void*, size_t)
+__syscall2(munmap, int, void*, size_t)

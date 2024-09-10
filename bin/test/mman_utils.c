@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/param.h>
 
 static mapping_t mappings[32];
 static unsigned last;
@@ -268,6 +269,36 @@ mapping_t* expect_mapping_impl(uintptr_t start, size_t size, int flags, off_t of
         prot_flags_get(flags, expected_prot, sizeof(expected_prot)));
 
     return NULL;
+}
+
+void expect_no_mapping_impl(uintptr_t start, size_t size, location_t location)
+{
+    bool failed = false;
+    mapping_t* it = mappings;
+    uintptr_t end = start + size;
+    uintptr_t m_start, m_end;
+
+    for (; it->start; ++it)
+    {
+        m_start = it->start;
+        m_end = m_start + it->size;
+        if (MAX(m_end, end) - MIN(m_start, start) < size + it->size)
+        {
+            FAIL_L(location.file, location.line, "expected no mapping between %#x and %#x; actual: found {%#x - %#x}",
+                start,
+                end,
+                it->start,
+                it->start + it->size);
+
+            failed = true;
+        }
+    }
+
+    if (failed)
+    {
+        fprintf(stderr, "/proc/self/maps dump");
+        maps_dump();
+    }
 }
 
 void verify_access_impl(mapping_t* m, location_t location)

@@ -3,10 +3,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef uint32_t bitset_data_t;
+
 #define BITSET_BITS 32
 
-#define BITSET_DECLARE(name, size) \
-    uint32_t name[size / BITSET_BITS]
+#define BITSET_SIZE(count) ((count) / BITSET_BITS)
+
+#define BITSET_DECLARE(name, count) \
+    bitset_data_t name[BITSET_SIZE(count)]
 
 #define bitset_initialize(name) \
     __builtin_memset(name, 0, sizeof(name))
@@ -73,6 +77,20 @@ static inline void bitset_clear_range(uint32_t* bitset, size_t pos, int count)
         mask = (uint32_t)~0UL >> (BITSET_BITS - bits_to_clear);
         bitset[array_pos] &= ~(mask << bit_pos);
     }
+}
+
+static inline int bitset_find_zero(uint32_t* bitset, size_t size)
+{
+    size_t index = 0;
+    for (size_t i = 0; i < size;
+        ({ ++i; if ((i % BITSET_BITS) == 0) index++; (void)i; }))
+    {
+        if (!(bitset[index] & (1 << i)))
+        {
+            return i;
+        }
+    }
+    return -1;
 }
 
 int __bitset_find_clear_range(uint32_t* bitset, int count, size_t bitset_size);

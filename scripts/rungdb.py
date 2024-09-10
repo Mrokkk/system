@@ -223,7 +223,7 @@ def gdb_main() -> None:
     gdb.execute('set confirm off')
     gdb.execute('file system')
     gdb.execute('target remote localhost:9000')
-    symbol_file_load('mnt/lib/ld.so', 0x0)
+    symbol_file_load('mnt/lib/ld.so', 0xbff00000)
 
     KernelBreakpoint()
     ModuleBreakpoint()
