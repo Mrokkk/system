@@ -4,21 +4,20 @@
 #include <common/list.h>
 #include <common/bitset.h>
 
+#define CONFIG_WRITE_ZERO_AFTER_FREE 1
 #define CACHELINE_SIZE        64
 #define METADATA_SIZE         0x10000
 #define METADATA_INITIAL_SIZE 0x2000
 #define SLAB_GUARD            0x32fb2002
 #define LARGE_REGION_GUARD    0x3948fde
 #define PAGE_SIZE             0x1000
+#define CANARY                (UINTPTR_MAX & ~0xff)
 
-#define DEFINE_CLASS(size, slab_size) \
+#define CLASS(size, slab_size) \
     CLASS_##size = __COUNTER__, \
     CLASS_##size##_SIZE      = size, \
     CLASS_##size##_SLAB_SIZE = slab_size, \
-    CLASS_##size##_SLOTS     = (slab_size / size)
-
-#define CLASS(size, slab_size) \
-    DEFINE_CLASS(size, slab_size),
+    CLASS_##size##_SLOTS     = (slab_size / size),
 
 #define CLASS_LAST(size) \
     CLASS_LAST_SIZE = size, \

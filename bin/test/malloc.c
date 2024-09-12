@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "mman.h"
 #include "test.h"
@@ -81,6 +82,17 @@ TEST(small_allocation)
         DIAG_RESTORE();
 
         exit(FAILED_EXPECTATIONS());
+    }
+}
+
+TEST(small_allocation_overflow_detection)
+{
+    EXPECT_KILLED_BY(SIGABRT)
+    {
+        uintptr_t* mem = malloc(8);
+        memset(mem, 0, 16);
+        free(mem);
+        exit(0);
     }
 }
 
