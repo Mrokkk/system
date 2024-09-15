@@ -40,7 +40,7 @@ static inline void paranoia(process_t*, process_t* next)
     }
 
     stack = ptr(next->context.esp);
-    stack_end = addr(next->mm->kernel_stack) - PAGE_SIZE;
+    stack_end = addr(next->kernel_stack) - PAGE_SIZE;
 
     if (unlikely(!stack))
     {
@@ -74,18 +74,6 @@ static inline void paranoia(process_t*, process_t* next)
 
     if (next->context.eip == addr(&context_restore))
     {
-        context_switch_frame_t* regs = ptr(stack);
-        if (regs->gs != KERNEL_DS && regs->gs != USER_DS)
-        {
-            cli();
-            memory_dump(KERN_CRIT, stack, 32);
-            panic("process %u:%x gs = %x, expected = %x or %x;",
-                next->pid,
-                next,
-                regs->gs,
-                KERNEL_DS,
-                USER_DS);
-        }
     }
     else if (next->context.eip == addr(&exit_kernel))
     {
@@ -104,7 +92,7 @@ static inline void paranoia(process_t*, process_t* next)
                 CHECK(regs->ds, USER_DS);
                 CHECK(regs->es, USER_DS);
                 CHECK(regs->fs, USER_DS);
-                CHECK(regs->gs, USER_DS);
+                CHECK(regs->gs, USER_TLS);
                 CHECK(regs->ss, USER_DS);
                 break;
             case KERNEL_PROCESS:
@@ -137,14 +125,12 @@ static inline void process_switch(process_t* prev, process_t* next)
         "pushl %%esi;"
         "pushl %%edi;"
         "pushl %%ebp;"
-        "pushl %%gs;"
         "movl %%esp, %0;"
         "movl %2, %%esp;"
         "movl $context_restore, %1;"
         "pushl %3;"
         "jmp __process_switch;"
         ".global context_restore; context_restore:"
-        "popl %%gs;"
         "popl %%ebp;"
         "popl %%edi;"
         "popl %%esi;"

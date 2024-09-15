@@ -48,6 +48,7 @@ struct context
     uint32_t esp;
     uint32_t esp0;
     uint32_t esp2;
+    uint32_t tls_base;
 };
 
 typedef struct context context_t;
@@ -79,7 +80,6 @@ typedef struct pt_regs pt_regs_t;
 
 struct context_switch_frame
 {
-    uint16_t gs, __gs;
     uint32_t ebp;
     uint32_t edi;
     uint32_t esi;
@@ -137,4 +137,4 @@ typedef struct { uint16_t off, seg; } farptr_t;
         .esp = (uint32_t)&name##_stack[INIT_PROCESS_STACK_SIZE], \
     }
 
-#define NEED_RESCHED_SIGNAL_OFFSET  16
+#define NEED_RESCHED_SIGNAL_OFFSET  20

@@ -1,6 +1,7 @@
 #include <errno.h>
-#include <stdint.h>
+#include <sched.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -298,6 +299,53 @@ TEST(bad_syscall)
     int ret = syscall(999, 0, 0);
     EXPECT_EQ(ret, -1);
     EXPECT_EQ(errno, ENOSYS);
+}
+
+static uint8_t stack[0x1000];
+
+static __thread int tls_variable1;
+static __thread int tls_variable2;
+
+static int thread(void* data)
+{
+    printf("Hello from the thread\n");
+    *stack = 45;
+    tls_variable2 = 22;
+    EXPECT_EQ(data, 39284);
+    return 0;
+}
+
+extern int set_thread_area(uintptr_t base);
+
+TEST(clone)
+{
+    static int thread_tls[] = {
+        (int)&thread_tls[3],
+        0,
+        9293,
+        0,
+    };
+
+    static int main_tls[] = {
+        (int)&main_tls[3],
+        0,
+        1245,
+        0,
+    };
+
+    int status;
+
+    set_thread_area(ADDR(main_tls));
+    int pid = clone(thread, stack + sizeof(stack), CLONE_FS | CLONE_FILES | CLONE_VM | CLONE_SIGHAND, PTR(39284), thread_tls);
+
+    EXPECT_GT(pid, 0);
+    EXPECT_EQ(waitpid(pid, &status, 0), pid);
+
+    EXPECT_EQ(*stack, 45);
+    EXPECT_EQ(tls_variable1, 0);
+    EXPECT_EQ(tls_variable2, 1245);
+    EXPECT_GT(WIFEXITED(status), 0);
+    EXPECT_EQ(WEXITSTATUS(status), 0);
 }
 
 TEST_SUITE_END(kernel);

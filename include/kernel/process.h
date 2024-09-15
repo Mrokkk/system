@@ -10,6 +10,7 @@
 #include <kernel/signal.h>
 #include <kernel/api/wait.h>
 #include <kernel/segmexec.h>
+#include <kernel/api/sched.h>
 
 typedef struct process process_t;
 
@@ -36,15 +37,10 @@ typedef enum
     KERNEL_PROCESS      = 1,
 } task_type_t;
 
-#define CLONE_FS            (1 << 0)
-#define CLONE_FILES         (1 << 1)
-#define CLONE_SIGHAND       (1 << 2)
-#define CLONE_MM            (1 << 3)
-
 #define SPAWN_KERNEL        0
 #define SPAWN_USER          (1 << 1)
 
-#define USER_STACK_SIZE             (2 * PAGE_SIZE)
+#define USER_STACK_SIZE             (32 * KiB)
 #if CONFIG_SEGMEXEC
 #define USER_STACK_VIRT_ADDRESS     (CODE_START - USER_STACK_SIZE)
 #else
@@ -54,24 +50,25 @@ typedef enum
 struct mm
 {
     mutex_t    lock;
+    int        refcount;
     uint32_t   code_start, code_end;
     uint32_t   stack_start, stack_end;
     uint32_t   args_start, args_end;
     uint32_t   env_start, env_end;
     uint32_t   brk;
-    void*      kernel_stack;
     pgd_t*     pgd;
     vm_area_t* vm_areas;
     vm_area_t* brk_vma;
 #define MM_INIT(mm) \
     { \
+        .refcount = 1, \
         .lock = MUTEX_INIT(mm.lock), \
     }
 };
 
 struct signals
 {
-    int              count;
+    int              refcount;
     uint32_t         ongoing;
     uint32_t         trapped;
     uint32_t         pending;
@@ -80,28 +77,28 @@ struct signals
     signal_context_t context;
 #define SIGNALS_INIT \
     { \
-        .count = 1, \
+        .refcount = 1, \
     }
 };
 
 struct fs
 {
-    int       count;
+    int       refcount;
     dentry_t* cwd;
     dentry_t* root;
 #define FS_INIT \
     { \
-        .count = 1, \
+        .refcount = 1, \
     }
 };
 
 struct files
 {
-    int     count;
+    int     refcount;
     file_t* files[PROCESS_FILES];
 #define FILES_INIT \
     { \
-        .count = 1, \
+        .refcount = 1, \
     }
 };
 
@@ -125,10 +122,10 @@ struct process
     int         exit_code;
     uid_t       uid;
     gid_t       gid;
-    int         alarm;
 
     // Cacheline 1
     char              name[PROCESS_NAME_LEN];
+    void*             kernel_stack;
     struct mm*        mm;
     struct fs*        fs;
     struct files*     files;
@@ -137,9 +134,9 @@ struct process
     list_head_t       timers;
     wait_queue_head_t wait_child;
     inode_t*          procfs_inode;
-    unsigned          padding;
 
     // Cacheline 2
+    int         alarm;
     list_head_t children;
     list_head_t siblings;
     list_head_t processes;
@@ -211,8 +208,15 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
 // Arch-dependent functions
 int arch_process_init(void);
-int arch_process_copy(process_t* dest, process_t* src, struct pt_regs* old_regs);
+int arch_process_copy(process_t* dest, process_t* src, const pt_regs_t* old_regs);
 int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int flags);
+
+int arch_process_user_spawn(
+    process_t* p,
+    uintptr_t fn,
+    uintptr_t stack,
+    uintptr_t tls);
+
 void arch_process_free(process_t* p);
 int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
 
@@ -243,12 +247,11 @@ static inline int process_is_zombie(process_t* p)
 
 static inline void process_stop(process_t* p)
 {
-    {
-        scoped_irq_lock();
-        list_del(&p->running);
-        p->stat = PROCESS_STOPPED;
-        process_wake_waiting(p);
-    }
+    scoped_irq_lock();
+
+    list_del(&p->running);
+    p->stat = PROCESS_STOPPED;
+    process_wake_waiting(p);
 
     if (p == process_current)
     {
@@ -264,15 +267,14 @@ static inline void NONNULL() process_wake(process_t* p)
         return;
     }
 
-    {
-        scoped_irq_lock();
+    scoped_irq_lock();
 
-        if (p->stat != PROCESS_RUNNING)
-        {
-            list_add_tail(&p->running, &running);
-        }
-        p->stat = PROCESS_RUNNING;
+    if (p->stat != PROCESS_RUNNING)
+    {
+        list_add_tail(&p->running, &running);
     }
+
+    p->stat = PROCESS_RUNNING;
 }
 
 static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
@@ -368,27 +370,33 @@ static inline int process_is_user(process_t* p)
 
 static inline void process_signals_exit(process_t* p)
 {
-    if (!--p->signals->count) delete(p->signals);
+    if (!--p->signals->refcount)
+    {
+        delete(p->signals);
+    }
 }
 
 static inline void process_files_exit(process_t* p)
 {
-    for (int i = 0; i < PROCESS_FILES; ++i)
+    if (!--p->files->refcount)
     {
-        if (p->files->files[i])
+        for (int i = 0; i < PROCESS_FILES; ++i)
         {
-            do_close(p->files->files[i]);
+            if (p->files->files[i])
+            {
+                do_close(p->files->files[i]);
+            }
         }
-    }
-    if (!--p->files->count)
-    {
         delete(p->files);
     }
 }
 
 static inline void process_fs_exit(process_t* p)
 {
-    if (!--p->fs->count) delete(p->fs);
+    if (!--p->fs->refcount)
+    {
+        delete(p->fs);
+    }
 }
 
 static inline int current_can_kill(process_t* p)

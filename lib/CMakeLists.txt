@@ -53,6 +53,7 @@ set(LIBC_SRC
     qsort.c
     rand.c
     resource.c
+    sched.c
     setjmp.c
     signal.c
     sleep.c

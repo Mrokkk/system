@@ -36,8 +36,8 @@ syscall_t trace_syscalls[] = {
     {
         .name   = "clone",
         .ret    = TYPE_LONG,
-        .nargs  = 2,
-        .args   = { TYPE_UNSIGNED_LONG, TYPE_VOID_PTR },
+        .nargs  = 5,
+        .args   = { TYPE_VOID_PTR, TYPE_VOID_PTR, TYPE_LONG, TYPE_VOID_PTR, TYPE_VOID_PTR },
     },
 
     {
@@ -556,5 +556,12 @@ syscall_t trace_syscalls[] = {
         .ret    = TYPE_LONG,
         .nargs  = 2,
         .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG },
+    },
+
+    {
+        .name   = "set_thread_area",
+        .ret    = TYPE_LONG,
+        .nargs  = 1,
+        .args   = { TYPE_UNSIGNED_LONG },
     },
 };

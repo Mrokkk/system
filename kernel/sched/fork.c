@@ -27,10 +27,26 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
     page_t* kernel_stack_page;
     uint32_t* kernel_stack_end;
 
-    if (clone_flags & CLONE_MM)
+    if (clone_flags & CLONE_VM)
     {
-        // TODO: support cloning mm
-        return -EINVAL;
+        scoped_mutex_lock(&src->mm->lock);
+        dest->mm = src->mm;
+        dest->mm->refcount++;
+
+        kernel_stack_page = page_alloc1();
+
+        if (unlikely(!kernel_stack_page))
+        {
+            log_exception("cannot allocate page for kernel stack");
+            goto free_mm;
+        }
+
+        kernel_stack_end = page_virt_ptr(kernel_stack_page);
+        *kernel_stack_end = STACK_MAGIC;
+
+        dest->kernel_stack = ptr(addr(kernel_stack_end) + PAGE_SIZE);
+
+        return 0;
     }
 
     dest->mm = alloc(struct mm);
@@ -62,9 +78,10 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
 
     log_debug(DEBUG_PROCESS, "pgd=%x", pgd);
 
+    dest->kernel_stack = ptr(addr(kernel_stack_end) + PAGE_SIZE);
     mutex_init(&dest->mm->lock);
+    dest->mm->refcount = 1;
     dest->mm->pgd = pgd;
-    dest->mm->kernel_stack = ptr(addr(kernel_stack_end) + PAGE_SIZE);
     dest->mm->code_start = src->mm->code_start;
     dest->mm->code_end = src->mm->code_end;
     dest->mm->brk = src->mm->brk;
@@ -158,15 +175,15 @@ static inline void process_parent_child_link(process_t* parent, process_t* child
 static inline void fs_init(struct fs* dest, struct fs* src)
 {
     copy_struct(dest, src);
-    dest->count = 1;
+    dest->refcount = 1;
 }
 
 static inline int process_fs_copy(process_t* child, process_t* parent, int clone_flags)
 {
     if (clone_flags & CLONE_FS)
     {
+        parent->fs->refcount++;
         child->fs = parent->fs;
-        child->fs->count++;
         return 0;
     }
 
@@ -188,15 +205,15 @@ static inline void files_init(struct files* dest, struct files* src)
             ++src->files[i]->count;
         }
     }
-    dest->count = 1;
+    dest->refcount = 1;
 }
 
 static inline int process_files_copy(process_t* child, process_t* parent, int clone_flags)
 {
     if (clone_flags & CLONE_FILES)
     {
+        parent->files->refcount++;
         child->files = parent->files;
-        child->files->count++;
         return 0;
     }
 
@@ -211,15 +228,15 @@ static inline int process_files_copy(process_t* child, process_t* parent, int cl
 static inline void signals_init(struct signals* dest, struct signals* src)
 {
     copy_struct(dest, src);
-    dest->count = 1;
+    dest->refcount = 1;
 }
 
 static inline int process_signals_copy(process_t* child, process_t* parent, int clone_flags)
 {
     if (clone_flags & CLONE_SIGHAND)
     {
+        parent->signals->refcount++;
         child->signals = parent->signals;
-        child->signals->count++;
         return 0;
     }
 
@@ -231,7 +248,7 @@ static inline int process_signals_copy(process_t* child, process_t* parent, int 
     return 0;
 }
 
-int process_clone(process_t* parent, struct pt_regs* regs, int clone_flags)
+static int process_fork(process_t* parent, struct pt_regs* regs)
 {
     int errno = -ENOMEM;
     process_t* child;
@@ -240,11 +257,55 @@ int process_clone(process_t* parent, struct pt_regs* regs, int clone_flags)
     log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
 
     if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
+    if (process_space_copy(child, parent, 0)) goto cannot_allocate;
+    if (process_fs_copy(child, parent, 0)) goto fs_error;
+    if (process_files_copy(child, parent, 0)) goto files_error;
+    if (process_signals_copy(child, parent, 0)) goto signals_error;
+    if (arch_process_copy(child, parent, regs)) goto arch_error;
+
+    list_add_tail(&child->processes, &init_process.processes);
+    process_parent_child_link(parent, child);
+    process_forked(parent);
+
+    child->trace = parent->trace & DTRACE_FOLLOW_FORK
+        ? parent->trace
+        : 0;
+    child->stat = PROCESS_RUNNING;
+    list_add_tail(&child->running, &running);
+
+    parent->need_resched = true;
+
+    return child->pid;
+
+arch_error:
+    process_signals_exit(child);
+signals_error:
+    process_files_exit(child);
+files_error:
+    process_fs_exit(child);
+fs_error:
+cannot_allocate:
+    delete(child);
+cannot_create_process:
+    return errno;
+}
+
+int sys_clone(int (*fn)(void*), void* stack, int clone_flags, void*, void* tls)
+{
+    int errno = -ENOMEM;
+    process_t* child;
+    scoped_irq_lock();
+
+    process_t* parent = process_current;
+
+    log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
+
+    if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, clone_flags)) goto cannot_allocate;
     if (process_fs_copy(child, parent, clone_flags)) goto fs_error;
     if (process_files_copy(child, parent, clone_flags)) goto files_error;
     if (process_signals_copy(child, parent, clone_flags)) goto signals_error;
-    if (arch_process_copy(child, parent, regs)) goto arch_error;
+    if (arch_process_user_spawn(child, addr(fn), addr(stack), addr(tls))) goto arch_error;
 
     list_add_tail(&child->processes, &init_process.processes);
     process_parent_child_link(parent, child);
@@ -320,10 +381,10 @@ cannot_create_process:
     return ptr(errno);
 }
 
-int sys_fork(struct pt_regs regs)
+int sys_fork(pt_regs_t regs)
 {
     log_debug(DEBUG_PROCESS, "");
-    return process_clone(process_current, &regs, 0);
+    return process_fork(process_current, &regs);
 }
 
 // dtrace for dummy trace

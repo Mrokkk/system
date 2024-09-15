@@ -496,7 +496,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     vm_free(old_vmas, old_pgd);
     page_free(old_pgd);
 
-    arch_exec(bin.entry, p->mm->kernel_stack, user_stack);
+    arch_exec(bin.entry, p->kernel_stack, user_stack);
 
     ASSERT_NOT_REACHED();
 

@@ -122,6 +122,9 @@ ENTRY(unpaged_gdt_entries)
     // APM BIOS data
     descriptor_entry(GDT_FLAGS_RING0 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_1B | GDT_FLAGS_32BIT, 0x0, 0xffff)
 
+    // User TLS segment
+    descriptor_entry(GDT_FLAGS_RING3 | GDT_FLAGS_TYPE_DATA | GDT_FLAGS_4KB | GDT_FLAGS_32BIT, 0x1000, 0xffffffff)
+
 END(unpaged_gdt_entries)
 
 ALIGN(32)

@@ -108,7 +108,7 @@ void idt_write_protect(void);
 #define APM_CODE_ENTRY      6
 #define APM_CODE_16_ENTRY   7
 #define APM_DATA_ENTRY      8
-#define TIMER_IDT_ENTRY     32
+#define TLS_ENTRY           9
 
 #define IDT_OFFSET          2048
 
@@ -116,13 +116,13 @@ void idt_write_protect(void);
 #define TSS_SELECTOR ((TSS_ENTRY) << 3)
 
 #define GDT_LOW_LIMIT(limit) \
-    ((limit) & 0xFFFF)
+    ((limit) & 0xffff)
 
 #define GDT_HI_LIMIT(limit) \
-    (((limit) >> 16) & 0xF)
+    (((limit) >> 16) & 0xf)
 
 #define GDT_LOW_BASE(base) \
-    ((base) & 0xFFFF)
+    ((base) & 0xffff)
 
 #define GDT_MID_BASE(base) \
     (((base) >> 16) & 0xff)
@@ -131,7 +131,7 @@ void idt_write_protect(void);
     (((base) >> 24) & 0xff)
 
 #define GDT_LOW_FLAGS(flags) \
-    (((flags) & 0x7F) & 0xff )
+    (((flags) & 0x7f) & 0xff)
 
 #define GDT_HI_FLAGS(flags) \
     (((flags) >> 1) & 0xf0)
@@ -185,6 +185,9 @@ void idt_write_protect(void);
         .byte GDT_HI_BASE(base);
 
 #endif // !__ASSEMBLER__
+
+// Direction bit
+#define GDT_FLAGS_GROWS_DOWN    (1 << 2)
 
 // DPL in flags
 #define GDT_FLAGS_RING0         (0 << 5)

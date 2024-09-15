@@ -36,7 +36,6 @@ int umount(const char*);
 int umount2(const char* target, int flags);
 int mkdir(const char*, mode_t);
 int creat(const char*, int);
-int clone(unsigned int flags, void* stack);
 int getdents(unsigned int, void*, size_t);
 int reboot(int magic, int magic2, int cmd);
 int chdir(const char* buf);

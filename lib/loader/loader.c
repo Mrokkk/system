@@ -228,6 +228,11 @@ static void symbol_relocate(
             break;
         }
 
+        case R_386_NONE: // none
+        {
+            break;
+        }
+
         default:
         {
             fprintf(stderr, "warning: unsupported rel type: %#x\n", type);

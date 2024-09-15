@@ -80,8 +80,9 @@
 #define __NR_lstat          77
 #define __NR_mimmutable     78
 #define __NR_munmap         79
+#define __NR_set_thread_area 80
 
-#define __NR_syscalls       80
+#define __NR_syscalls       81
 
 #ifndef __ASSEMBLER__
 
@@ -130,7 +131,7 @@ __syscall2(access, int, const char*, int)
 __syscall1(alarm, unsigned int, unsigned int)
 __syscall1(chdir, int, const char*)
 __syscall1(chroot, int, const char*)
-__syscall2(clone, int, unsigned int, void *)
+__syscall5(clone, int, int (*)(void*), void*, int, void*, void*)
 __syscall1(close, int, int)
 __syscall2(creat, int, const char*, int)
 __syscall1(dtrace, int, int)
@@ -205,3 +206,4 @@ __syscall1(fchdir, int, int)
 __syscall2(lstat, int, const char*, struct stat*)
 __syscall2(mimmutable, int, void*, size_t)
 __syscall2(munmap, int, void*, size_t)
+__syscall1(set_thread_area, int, uintptr_t)

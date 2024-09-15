@@ -17,7 +17,7 @@
 
 extern void exit_kernel();
 
-static void fork_kernel_stack_frame(uint32_t** kernel_stack, pt_regs_t* regs)
+static void fork_kernel_stack_frame(uint32_t** kernel_stack, const pt_regs_t* regs)
 {
 #define pushk(v) push((v), *kernel_stack)
     uint32_t eflags = regs->eflags | EFL_IF;
@@ -44,22 +44,50 @@ static void fork_kernel_stack_frame(uint32_t** kernel_stack, pt_regs_t* regs)
 #undef pushk
 }
 
-static uint32_t user_process_setup_stack(process_t* dest, process_t*, pt_regs_t* src_regs)
+static uint32_t user_process_setup_stack(process_t* dest, process_t*, const pt_regs_t* src_regs)
 {
-    uint32_t* kernel_stack = dest->mm->kernel_stack;
+    uint32_t* kernel_stack = dest->kernel_stack;
     fork_kernel_stack_frame(&kernel_stack, src_regs);
     return addr(kernel_stack);
+}
+
+int arch_process_user_spawn(
+    process_t* p,
+    uintptr_t fn,
+    uintptr_t stack,
+    uintptr_t tls)
+{
+    const pt_regs_t regs = {
+        .ss = USER_DS,
+        .esp = stack,
+        .eflags = EFL_IF,
+        .cs = USER_CS,
+        .eip = fn,
+        .gs = USER_TLS,
+        .fs = USER_DS,
+        .es = USER_DS,
+        .ds = USER_DS,
+    };
+
+    p->context.esp = user_process_setup_stack(p, NULL, &regs);
+    p->context.eip = addr(&exit_kernel);
+    p->context.esp0 = addr(p->kernel_stack);
+    p->context.esp2 = regs.esp;
+    p->context.tls_base = tls;
+
+    return 0;
 }
 
 int arch_process_copy(
     process_t* dest,
     process_t* src,
-    pt_regs_t* src_regs)
+    const pt_regs_t* src_regs)
 {
     dest->context.esp = user_process_setup_stack(dest, src, src_regs);
     dest->context.eip = addr(&exit_kernel);
-    dest->context.esp0 = addr(dest->mm->kernel_stack);
+    dest->context.esp0 = addr(dest->kernel_stack);
     dest->context.esp2 = src_regs->esp;
+    dest->context.tls_base = src->context.tls_base;
     return 0;
 }
 
@@ -67,28 +95,7 @@ void arch_process_free(process_t*)
 {
 }
 
-// FIXME: There's a crash happening randomly during ltr instruction
-// [       2.549597] kernel: general protection fault #0x28 from 0xc0118d92 in pid 1
-// [       2.551467] kernel: error code = 0x28
-// [       2.552390] kernel: eax = 0x00000028
-// [       2.553327] kernel: ebx = 0xc01e8fbc
-// [       2.555486] kernel: ecx = 0x000000c0
-// [       2.556776] kernel: edx = 0xc0019400
-// [       2.557856] kernel: esi = 0xc0019400
-// [       2.558783] kernel: edi = 0xc0019560
-// [       2.559689] kernel: esp = 0x0000:0xc011c35c
-// [       2.560746] kernel: ebp = 0xc0127248
-// [       2.561659] kernel: eip = 0x0008:0xc0118d92
-// [       2.562826] kernel: ds = 0x0010; es = 0x0010; fs = 0x0010; gs = 0x0010
-// [       2.564619] kernel: eflags = 0x00010282 = (iopl=0 cf pf af zf SF tf IF df of nt RF vm ac id )
-// [       2.567076] kernel: CR0 = 0x80010013 = (PE MP em ts ET ne WP am nw cd pg )
-// [       2.568991] kernel: CR2 = 0x00000000
-// [       2.570726] kernel: CR3 = 0x001e7000
-// [       2.571717] kernel: CR4 = 0x00000600 = (vme pvi tsd de pse pae mce pge pce OSFXSR OSXMMEXCPT vmxe smxe pcide osxsave smep smap )
-// [       2.574609] backtrace:
-// [       2.575240] [<0xc0118d92>] __process_switch+0x22/0x3e
-// [       2.576500] [<0xc011c358>] timer_handler+0x48/0x4b
-void FASTCALL(__process_switch(process_t*, process_t* next))
+void FASTCALL(__process_switch(process_t* prev, process_t* next))
 {
     scoped_irq_lock();
 
@@ -96,7 +103,12 @@ void FASTCALL(__process_switch(process_t*, process_t* next))
     tss.esp0 = next->context.esp0;
     tss.esp2 = next->context.esp2;
 
-    pgd_load(next->mm->pgd);
+    descriptor_set_base(gdt_entries, TLS_ENTRY, next->context.tls_base);
+
+    if (next->mm != prev->mm)
+    {
+        pgd_load(next->mm->pgd);
+    }
 }
 
 void syscall_regs_check(pt_regs_t regs)
@@ -115,15 +127,10 @@ void syscall_regs_check(pt_regs_t regs)
     {
         ASSERT(regs.cs == USER_CS);
         ASSERT(regs.ds == USER_DS);
-        ASSERT(regs.gs == USER_DS);
-        ASSERT(regs.gs == USER_DS);
-        ASSERT(gs_get() == USER_DS);
+        ASSERT(regs.es == USER_DS);
+        ASSERT(regs.fs == USER_DS);
+        ASSERT(regs.gs == USER_TLS);
     }
-}
-
-int sys_clone(pt_regs_t regs)
-{
-    return process_clone(process_current, &regs, regs.ebx);
 }
 
 static inline void exec_kernel_stack_frame(
@@ -138,7 +145,7 @@ static inline void exec_kernel_stack_frame(
     pushk(USER_CS); // cs
     pushk(eip);     // eip
     pushk(0);       // error_code
-    pushk(USER_DS); // gs
+    pushk(USER_TLS); // gs
     pushk(USER_DS); // fs
     pushk(USER_DS); // es
     pushk(USER_DS); // ds
@@ -176,7 +183,7 @@ int sys_execve(pt_regs_t regs)
 
 int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
 {
-    uint32_t* kernel_stack = child->mm->kernel_stack;
+    uint32_t* kernel_stack = child->kernel_stack;
     uint32_t eflags = EFL_IF;
 
 #define pushk(v) push((v), kernel_stack)
@@ -202,6 +209,7 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     child->context.esp0 = 0;
     child->context.esp = addr(kernel_stack);
     child->context.eip = addr(&exit_kernel);
+    child->context.tls_base = 0;
 
     return 0;
 }
@@ -220,7 +228,7 @@ int NORETURN(arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack)
 {
     cli();
 
-    process_current->context.esp0 = addr(process_current->mm->kernel_stack);
+    process_current->context.esp0 = addr(process_current->kernel_stack);
 
     exec_kernel_stack_frame(&kernel_stack, user_stack, addr(entry));
 
@@ -295,6 +303,7 @@ void do_signals(pt_regs_t regs)
             "mov %%eax, %%ds;"
             "mov %%eax, %%es;"
             "mov %%eax, %%fs;"
+            "mov "ASM_VALUE(USER_TLS)", %%eax;"
             "mov %%eax, %%gs;"
             "sti;"
             "iret;"
@@ -304,6 +313,14 @@ void do_signals(pt_regs_t regs)
     }
 
     ASSERT_NOT_REACHED();
+}
+
+int sys_set_thread_area(uintptr_t base)
+{
+    process_current->context.tls_base = base;
+    descriptor_set_base(gdt_entries, TLS_ENTRY, base);
+
+    return 0;
 }
 
 int arch_process_init(void)

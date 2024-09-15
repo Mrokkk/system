@@ -7,9 +7,9 @@
 static inline void process_space_free(process_t* proc)
 {
     pgd_t* pgd = proc->mm->pgd;
-    uint32_t* kernel_stack_end = ptr(addr(proc->mm->kernel_stack) - PAGE_SIZE);
+    uintptr_t* kernel_stack_end = ptr(addr(proc->kernel_stack) - PAGE_SIZE);
 
-    log_debug(DEBUG_EXIT, "pid %u", proc->pid);
+    current_log_debug(DEBUG_EXIT, "");
 
     if (unlikely(*kernel_stack_end != STACK_MAGIC))
     {
@@ -19,16 +19,21 @@ static inline void process_space_free(process_t* proc)
             *kernel_stack_end);
     }
 
-    vm_free(proc->mm->vm_areas, pgd);
-
-    page_free(proc->mm->pgd);
     page_free(kernel_stack_end);
-    delete(proc->mm);
+
+    scoped_mutex_lock(&proc->mm->lock);
+
+    if (!--proc->mm->refcount)
+    {
+        vm_free(proc->mm->vm_areas, pgd);
+        page_free(proc->mm->pgd);
+        delete(proc->mm);
+    }
 }
 
 static void process_delete(process_t* proc)
 {
-    log_debug(DEBUG_EXIT, "");
+    current_log_debug(DEBUG_EXIT, "");
 
     list_del(&proc->siblings);
     list_del(&proc->children);
@@ -83,7 +88,7 @@ int sys_waitpid(int pid, int* status, int wait_flags)
         }
         return 0;
     }
-    else if (process_find(pid, &proc))
+    else if (UNLIKELY(process_find(pid, &proc)))
     {
         return -ESRCH;
     }
@@ -157,7 +162,7 @@ void process_exit(process_t* p)
 {
     scoped_irq_lock();
 
-    log_debug(DEBUG_EXIT, "%u exiting", p->pid);
+    current_log_debug(DEBUG_EXIT, "");
 
     list_del(&p->running);
     process_files_exit(p);
@@ -169,10 +174,7 @@ void process_exit(process_t* p)
 
 int sys_exit(int return_value)
 {
-    log_debug(DEBUG_EXIT, "process pid=%u, %S exited with %d",
-        process_current->pid,
-        process_current->name,
-        return_value);
+    current_log_debug(DEBUG_EXIT, "exited with %d", return_value);
 
     process_current->exit_code = EXITCODE(return_value, 0);
     process_name_set(process_current, "<defunct>");

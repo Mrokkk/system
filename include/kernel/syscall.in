@@ -4,7 +4,7 @@ access: int, const char*, int
 alarm: unsigned int, unsigned int
 chdir: int, const char*
 chroot: int, const char*
-clone: int, unsigned int, void *
+clone: int, int (*)(void*), void*, int, void*, void*
 close: int, int
 creat: int, const char*, int
 dtrace: int, int
@@ -79,3 +79,4 @@ fchdir: int, int
 lstat: int, const char*, struct stat*
 mimmutable: int, void*, size_t
 munmap: int, void*, size_t
+set_thread_area: int, uintptr_t

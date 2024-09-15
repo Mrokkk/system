@@ -41,7 +41,6 @@ static char* mm_print(const struct mm* mm, char* str, const char* end)
         "\t\tenv_start =    %08x,\n"
         "\t\tenv_end =      %08x,\n"
         "\t\tbrk =          %08x,\n"
-        "\t\tkernel_stack = %08x,\n"
         "\t\tpgd =          %08x,\n"
         "\t}",
         mm,
@@ -49,7 +48,6 @@ static char* mm_print(const struct mm* mm, char* str, const char* end)
         mm->args_start, mm->args_end,
         mm->env_start, mm->env_end,
         mm->brk,
-        addr(mm->kernel_stack),
         addr(mm->pgd));
     return str;
 }
@@ -64,7 +62,7 @@ static char* fs_print(const void* data, char* str, const char* end)
         "\t\taddr = %p,\n"
         "\t\tcount = %x,\n"
         "\t\tcwd = %p\n"
-        "\t}", fs, fs->count, fs->cwd);
+        "\t}", fs, fs->refcount, fs->cwd);
     return str;
 }
 
@@ -82,6 +80,7 @@ static char* process_print(const process_t* p, char* str, const char* end)
         "\ttype = %u,\n"
         "\tcontext_switches = %u,\n"
         "\tforks = %u,\n"
+        "\t\tkernel_stack = %08x,\n"
         "\tmm = ",
         p,
         p->name,
@@ -90,7 +89,8 @@ static char* process_print(const process_t* p, char* str, const char* end)
         process_state_char(p->stat),
         p->type,
         p->context_switches,
-        p->forks);
+        p->forks,
+        addr(p->kernel_stack));
 
     str = mm_print(p->mm, str, end);
     str += snprintf(str, end - str, ",\n\tfs = ");
