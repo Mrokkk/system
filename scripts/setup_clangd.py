@@ -12,6 +12,7 @@ default_clang_flags = [
     '-Wno-format',
     '-Wno-address-of-packed-member',
     '-Wno-unused-command-line-argument',
+    '-Wno-invalid-command-line-argument',
     '-Wno-c2x-extensions',
     '-Wno-strict-prototypes',
     '-D_GCC_MAX_ALIGN_T',
@@ -66,6 +67,7 @@ def main():
 
     for entry in compile_commands:
         flags = entry['command'].split()
+        flags.remove('-fanalyzer')
         flags.extend(default_clang_flags)
         if 'bin' in entry['file']:
             flags.extend([f'-isystem {x}' for x in include_paths])
