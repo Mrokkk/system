@@ -361,7 +361,7 @@ static inline void* page_map_region(uint32_t paddr_start, uint32_t vaddr_start, 
     return ptr(vaddr_start);
 }
 
-void* region_map(uint32_t paddr, uint32_t size, const char* name)
+void* region_map(uintptr_t paddr, uintptr_t size, const char* name)
 {
     memory_area_t* area;
     vm_region_t* region;

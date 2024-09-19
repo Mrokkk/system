@@ -200,9 +200,9 @@ static const char* format_get(type_t t, int value)
     }
 }
 
-static void* ptr_get(uint32_t i)
+static void* ptr_get(uintptr_t i)
 {
-    return ptr(i + sizeof(uint32_t));
+    return ptr(i + sizeof(uintptr_t));
 }
 
 static int* parameters_get(int* buf, va_list args, size_t count)

@@ -20,8 +20,8 @@ typedef struct timespec timespec_t;
 
 void timestamp_get(timeval_t* ts);
 void timestamp_update(void);
-void udelay(uint32_t useconds);
-void mdelay(uint32_t mseconds);
+void udelay(size_t useconds);
+void mdelay(size_t mseconds);
 uint64_t cycles2us(uint64_t cycles);
 uint64_t cycles2ns(uint64_t cycles);
 

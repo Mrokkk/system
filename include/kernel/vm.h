@@ -42,8 +42,8 @@ struct vm_area
     vm_area_t*       prev;
 };
 
-vm_area_t* vm_create(uint32_t virt_address, size_t size, int vm_flags);
-vm_area_t* vm_find(uint32_t virt_address, vm_area_t* areas);
+vm_area_t* vm_create(uintptr_t virt_address, size_t size, int vm_flags);
+vm_area_t* vm_find(uintptr_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
 void vm_add_tail(vm_area_t* new_vma, vm_area_t* old_vma);
@@ -54,7 +54,7 @@ int vm_unmap(vm_area_t* vma, pgd_t* pgd);
 int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd);
-int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uint32_t start);
+int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uintptr_t start);
 int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write);
 
 // vm_replace - replace vm areas <replace_start, replace_end> with <new_vmas, new_vmas_end>
@@ -73,7 +73,7 @@ void vm_replace(
 // @vaddr_end - end of virtual address space
 int vm_apply(vm_area_t* vmas, pgd_t* pgd, uintptr_t vaddr_start, uintptr_t vaddr_end);
 
-static inline bool address_within(uint32_t vaddr, vm_area_t* vma)
+static inline bool address_within(uintptr_t vaddr, vm_area_t* vma)
 {
     return vaddr >= vma->start && vaddr < vma->end;
 }
@@ -142,5 +142,5 @@ int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t lim
 
 #include <arch/vm.h>
 
-int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd,  uint32_t start, uint32_t end);
-int arch_vm_map_single(pgd_t* pgd, uint32_t pde_index, uint32_t pte_index, page_t* page, int vm_flags);
+int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd, uintptr_t start, uintptr_t end);
+int arch_vm_map_single(pgd_t* pgd, uintptr_t pde_index, uintptr_t pte_index, page_t* page, int vm_flags);

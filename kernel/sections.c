@@ -36,7 +36,7 @@ int section_add(const char* name, void* start, void* end, int flags)
 
 void section_free(section_t* section)
 {
-    uint32_t start, end;
+    uintptr_t start, end;
     if (section->flags & SECTION_UNPAGED)
     {
         start = virt_addr(section->start);
@@ -50,7 +50,7 @@ void section_free(section_t* section)
 
     log_notice("freeing [%08x - %08x] %s", section->start, section->end, section->name);
 
-    for (uint32_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE)
+    for (uintptr_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE)
     {
         page_free(ptr(vaddr));
     }

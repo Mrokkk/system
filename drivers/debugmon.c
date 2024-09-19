@@ -228,12 +228,12 @@ static struct command {
     {0, 0}
 };
 
-static inline int address_is_mapped(uint32_t addr)
+static inline int address_is_mapped(uintptr_t addr)
 {
     pgt_t* pgt;
     pgd_t* pgd = process_current->mm->pgd;
-    uint32_t pde_index = pde_index(addr);
-    uint32_t pte_index = pte_index(addr);
+    uintptr_t pde_index = pde_index(addr);
+    uintptr_t pte_index = pte_index(addr);
 
     if (!pgd[pde_index])
     {

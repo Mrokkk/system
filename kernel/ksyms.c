@@ -22,9 +22,9 @@ static const char* next_word_read(const char* string, const char** output, size_
     return string;
 }
 
-static uint32_t hex_to_u32(const char* s, size_t len)
+static uintptr_t hex_to_native(const char* s, size_t len)
 {
-    uint32_t result = 0;
+    uintptr_t result = 0;
     int c;
 
     while (len--)
@@ -53,12 +53,12 @@ ksym_t* ksym_find_by_name(const char* name)
     return NULL;
 }
 
-static inline int ksym_address(uint32_t address, const ksym_t* ksym)
+static inline int ksym_address(uintptr_t address, const ksym_t* ksym)
 {
     return (address <= ksym->address + ksym->size) && address >= ksym->address;
 }
 
-ksym_t* ksym_find(uint32_t address)
+ksym_t* ksym_find(uintptr_t address)
 {
     for (ksym_t* symbol = kernel_symbols; symbol; symbol = symbol->next)
     {
@@ -71,7 +71,7 @@ ksym_t* ksym_find(uint32_t address)
     return NULL;
 }
 
-void ksym_string(uint32_t addr, char* buffer, size_t size)
+void ksym_string(uintptr_t addr, char* buffer, size_t size)
 {
     ksym_t* symbol = ksym_find(addr);
 
@@ -137,7 +137,7 @@ static int ksym_read(const char** symbols, char** buf_start, char** buf, ksym_t*
         return -1;
     }
 
-    len = align(sizeof(ksym_t) + name_len, sizeof(uint32_t));
+    len = align(sizeof(ksym_t) + name_len, sizeof(uintptr_t));
 
     if (*buf - *buf_start + len > PAGE_SIZE)
     {
@@ -149,9 +149,9 @@ static int ksym_read(const char** symbols, char** buf_start, char** buf, ksym_t*
     }
 
     symbol = ptr(*buf);
-    symbol->address = hex_to_u32(str_address, str_address_len - 1);
+    symbol->address = hex_to_native(str_address, str_address_len - 1);
     symbol->type = *str_type;
-    symbol->size = hex_to_u32(str_size, str_size_len - 1);
+    symbol->size = hex_to_native(str_size, str_size_len - 1);
     symbol->next = NULL;
     memcpy(symbol->name, name, name_len - 1);
     symbol->name[name_len - 1] = 0;

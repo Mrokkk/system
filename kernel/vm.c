@@ -8,7 +8,7 @@
 
 #define DEBUG_NOPAGE 0
 
-vm_area_t* vm_create(uint32_t vaddr, size_t size, int vm_flags)
+vm_area_t* vm_create(uintptr_t vaddr, size_t size, int vm_flags)
 {
     vm_area_t* vma = alloc(vm_area_t);
 
@@ -31,8 +31,8 @@ vm_area_t* vm_create(uint32_t vaddr, size_t size, int vm_flags)
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma)
 {
-    uint32_t new_end = new_vma->end;
-    uint32_t new_start = new_vma->start;
+    uintptr_t new_end = new_vma->end;
+    uintptr_t new_start = new_vma->start;
 
     if (!*head)
     {
@@ -162,7 +162,7 @@ int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_
 int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write)
 {
     int errno, res;
-    uint32_t pde_index, pte_index;
+    uintptr_t pde_index, pte_index;
     size_t size;
 
     if (unlikely(!(vma->vm_flags & VM_READ)))
@@ -272,7 +272,7 @@ map_page:
     return 0;
 }
 
-vm_area_t* vm_find(uint32_t vaddr, vm_area_t* vmas)
+vm_area_t* vm_find(uintptr_t vaddr, vm_area_t* vmas)
 {
     for (vm_area_t* temp = vmas; temp; temp = temp->next)
     {
@@ -284,7 +284,7 @@ vm_area_t* vm_find(uint32_t vaddr, vm_area_t* vmas)
     return NULL;
 }
 
-int vm_verify_impl(vm_verify_flag_t verify, uint32_t vaddr, size_t size, vm_area_t* vma)
+int vm_verify_impl(vm_verify_flag_t verify, uintptr_t vaddr, size_t size, vm_area_t* vma)
 {
     for (; vma; vma = vma->next)
     {

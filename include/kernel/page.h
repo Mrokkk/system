@@ -18,22 +18,22 @@ typedef struct vm_region vm_region_t;
 
 struct page
 {
-    uint16_t refcount;
-    size_t pages_count;
-    void* virtual;
+    uint16_t    refcount;
+    size_t      pages_count;
+    void*       virtual;
 #if DEBUG_PAGE_DETAILED
-    void* caller;
+    void*       caller;
 #endif
     list_head_t list_entry;
 };
 
 struct vm_region
 {
-    const char* name;
+    const char*    name;
     memory_area_t* area;
-    uint32_t start;
-    uint32_t end;
-    uint32_t paddr;
+    uintptr_t      start;
+    uintptr_t      end;
+    uintptr_t      paddr;
 };
 
 #define page(phys)              ({ extern page_t* page_map; page_map + ((phys) / PAGE_SIZE); })
@@ -76,7 +76,7 @@ MUST_CHECK(pgd_t*) pgd_alloc(void);
 MUST_CHECK(pgt_t*) pgt_alloc(void);
 MUST_CHECK(pgd_t*) init_pgd_get(void);
 
-void* region_map(uint32_t paddr, uint32_t size, const char* name);
+void* region_map(uintptr_t paddr, uintptr_t size, const char* name);
 
 void page_stats_print(void);
 

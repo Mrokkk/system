@@ -11,7 +11,7 @@ typedef struct ksym ksym_t;
 
 struct ksym
 {
-    uint32_t address;
+    uintptr_t address;
     uint16_t size;
     char type;
     ksym_t* next;
@@ -19,6 +19,6 @@ struct ksym
 };
 
 ksym_t* ksym_find_by_name(const char *name);
-ksym_t* ksym_find(uint32_t address);
+ksym_t* ksym_find(uintptr_t address);
 int ksyms_load(void* start, void* end);
-void ksym_string(uint32_t addr, char* buffer, size_t size);
+void ksym_string(uintptr_t addr, char* buffer, size_t size);

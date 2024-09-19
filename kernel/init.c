@@ -126,9 +126,9 @@ UNMAP_AFTER_INIT static void boot_params_print(void)
 
 UNMAP_AFTER_INIT static void memory_print(void)
 {
-    uint32_t ram_hi = addr(full_ram >> 32);
-    uint32_t ram_low = addr(full_ram);
-    uint32_t mib = 4096 * ram_hi + ram_low / MiB;
+    uintptr_t ram_hi = addr(full_ram >> 32);
+    uintptr_t ram_low = addr(full_ram);
+    uintptr_t mib = 4096 * ram_hi + ram_low / MiB;
 
     log_notice("RAM: %u MiB", mib);
 

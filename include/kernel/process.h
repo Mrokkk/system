@@ -219,7 +219,7 @@ int arch_process_user_spawn(
     uintptr_t tls);
 
 void arch_process_free(process_t* p);
-int arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack);
+int arch_exec(void* entry, uintptr_t* kernel_stack, uint32_t user_stack);
 
 static inline void process_name_set(process_t* p, const char* name)
 {
@@ -407,7 +407,7 @@ static inline int current_can_kill(process_t* p)
 
 static inline vm_area_t* process_code_vm_area(process_t* p)
 {
-    uint32_t code_start = p->mm->code_start;
+    uintptr_t code_start = p->mm->code_start;
     for (vm_area_t* temp = p->mm->vm_areas; temp; temp = temp->next)
     {
         if (temp->start == code_start)
@@ -420,7 +420,7 @@ static inline vm_area_t* process_code_vm_area(process_t* p)
 
 static inline vm_area_t* process_stack_vm_area(process_t* p)
 {
-    uint32_t stack_start = p->mm->stack_start;
+    uintptr_t stack_start = p->mm->stack_start;
     for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)
     {
         if (vma->start == stack_start)
@@ -433,7 +433,7 @@ static inline vm_area_t* process_stack_vm_area(process_t* p)
 
 static inline vm_area_t* process_brk_vm_area(process_t* p)
 {
-    uint32_t brk = p->mm->brk;
+    uintptr_t brk = p->mm->brk;
     for (vm_area_t* vma = p->mm->vm_areas; vma; vma = vma->next)
     {
         if ((brk >= vma->start && brk <= vma->end) || (brk == vma->start && brk == vma->end))

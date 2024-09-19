@@ -49,6 +49,6 @@ static inline const char* memory_area_type_string(int type)
     }
 
 extern memory_area_t memory_areas[];
-extern uint32_t usable_ram;
+extern uintptr_t usable_ram;
 extern uint64_t full_ram;
-extern uint32_t last_phys_address;
+extern uintptr_t last_phys_address;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include <stddef.h>
 
 #define KDSETMODE       0x4b3a  // set text/graphics mode
 #define     KD_TEXT     0x00
@@ -21,10 +21,10 @@ typedef struct fb_var_screeninfo fb_var_screeninfo_t;
 
 struct fb_var_screeninfo
 {
-    uint32_t xres;
-    uint32_t yres;
-    uint32_t bits_per_pixel;
-    uint32_t pitch;
+    size_t xres;
+    size_t yres;
+    size_t bits_per_pixel;
+    size_t pitch;
 };
 
 struct winsize

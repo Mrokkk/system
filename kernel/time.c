@@ -81,14 +81,14 @@ static inline void wait_for(uint64_t time)
     while (elapsed < time);
 }
 
-void udelay(uint32_t useconds)
+void udelay(size_t useconds)
 {
     uint64_t diff = (uint64_t)useconds * (uint64_t)monotonic_clock->freq_khz;
     do_div(diff, 1000);
     wait_for(diff);
 }
 
-void mdelay(uint32_t mseconds)
+void mdelay(size_t mseconds)
 {
     uint64_t diff = (uint64_t)mseconds * (uint64_t)monotonic_clock->freq_khz;
     wait_for(diff);

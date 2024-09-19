@@ -71,7 +71,7 @@ static int diskimg_read(file_t* file, char* buf, size_t count)
 {
     mbr_t* mbr = disk_img;
     int partition = BLK_PARTITION(MINOR(file->dentry->inode->dev));
-    uint32_t offset = file->offset;
+    off_t offset = file->offset;
 
     if (partition != BLK_NO_PARTITION)
     {

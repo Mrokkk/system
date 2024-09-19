@@ -224,7 +224,7 @@ static void argvecs_put(argvecs_t argvecs)
 // +------------+ variable
 // | aux data   |
 // +------------+ <- bottom
-static void argvecs_copy_to_user(uint32_t* dest, argvecs_t argvecs)
+static void argvecs_copy_to_user(uintptr_t* dest, argvecs_t argvecs)
 {
     char* strings;
     arg_t* arg;
@@ -390,7 +390,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 {
     char copied_path[PATH_MAX];
     int errno;
-    uint32_t user_stack;
+    uintptr_t user_stack;
     aux_t* execfn;
     arg_t* argv0;
     process_t* p = process_current;
@@ -419,7 +419,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     argv0 = list_next_entry(&argvec[ARGV].head, arg_t, list_entry);
 
-    argvec[AUXV].size = sizeof(void*) + 2 * sizeof(uint32_t);
+    argvec[AUXV].size = sizeof(void*) + 2 * sizeof(uintptr_t);
 
     execfn = aux_data_insert(AT_EXECFN, copied_path, strlen(copied_path) + 1, argvec);
 

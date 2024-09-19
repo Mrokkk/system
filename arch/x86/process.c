@@ -224,7 +224,7 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
                "r" (ip));       \
     } while (0)
 
-int NORETURN(arch_exec(void* entry, uint32_t* kernel_stack, uint32_t user_stack))
+int NORETURN(arch_exec(void* entry, uintptr_t* kernel_stack, uint32_t user_stack))
 {
     cli();
 

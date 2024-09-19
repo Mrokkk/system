@@ -25,7 +25,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
     vm_area_t* new_vma;
     vm_area_t* src_vma;
     page_t* kernel_stack_page;
-    uint32_t* kernel_stack_end;
+    uintptr_t* kernel_stack_end;
 
     if (clone_flags & CLONE_VM)
     {

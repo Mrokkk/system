@@ -30,12 +30,12 @@ KERNEL_MODULE(framebuffer);
 
 UNMAP_AFTER_INIT static int framebuffer_init()
 {
-    uint8_t* fb = ptr((uint32_t)framebuffer_ptr->addr);
-    uint32_t pitch = framebuffer_ptr->pitch;
-    uint32_t width = framebuffer_ptr->width;
-    uint32_t height = framebuffer_ptr->height;
-    uint32_t bpp = framebuffer_ptr->bpp;
-    uint32_t size = pitch * height;
+    uint8_t* fb = ptr(addr(framebuffer_ptr->addr));
+    size_t pitch = framebuffer_ptr->pitch;
+    size_t width = framebuffer_ptr->width;
+    size_t height = framebuffer_ptr->height;
+    size_t bpp = framebuffer_ptr->bpp;
+    size_t size = pitch * height;
 
     if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
     {

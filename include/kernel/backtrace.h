@@ -24,7 +24,7 @@ void backtrace_exception(const pt_regs_t* regs);
 void backtrace_dump(loglevel_t severity);
 void backtrace_user(loglevel_t severity, const pt_regs_t* regs, const char* prefix);
 
-void memory_dump_impl(int severity, const uint32_t* addr, size_t count);
+void memory_dump_impl(int severity, const uintptr_t* addr, size_t count);
 
 #define memory_dump(severity, addr, count) \
-    memory_dump_impl(severity, (uint32_t*)(addr), count)
+    memory_dump_impl(severity, (uintptr_t*)(addr), count)
