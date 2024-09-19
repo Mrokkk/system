@@ -323,6 +323,27 @@ int sys_set_thread_area(uintptr_t base)
     return 0;
 }
 
+int syscall_permission_check(int, pt_regs_t regs)
+{
+    process_t* p = process_current;
+
+    scoped_mutex_lock(&p->mm->lock);
+
+    if (!p->mm->syscalls_start)
+    {
+        return 0;
+    }
+
+    if (LIKELY(regs.eip >= p->mm->syscalls_start && regs.eip < p->mm->syscalls_end))
+    {
+        return 0;
+    }
+
+    do_kill(p, SIGABRT);
+
+    return -EPERM;
+}
+
 int arch_process_init(void)
 {
     return 0;

@@ -93,6 +93,8 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
     dest->mm->env_end = src->mm->env_end;
     dest->mm->vm_areas = NULL;
     dest->mm->brk_vma = NULL;
+    dest->mm->syscalls_start = src->mm->syscalls_start;
+    dest->mm->syscalls_end = src->mm->syscalls_end;
 
     if (process_is_kernel(dest))
     {

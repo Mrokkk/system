@@ -29,7 +29,7 @@ static void* mmap_wrapper(void* addr, size_t len, int prot, int flags, int fd, s
     return mapped;
 }
 
-void mmap_phdr(int exec_fd, size_t page_size, elf32_phdr_t* phdr, uintptr_t base)
+void* mmap_phdr(int exec_fd, size_t page_size, elf32_phdr_t* phdr, uintptr_t base)
 {
     uintptr_t page_mask = page_size - 1;
     uintptr_t vaddr_start = base + phdr->p_vaddr;
@@ -62,6 +62,8 @@ void mmap_phdr(int exec_fd, size_t page_size, elf32_phdr_t* phdr, uintptr_t base
     SYSCALL(mimmutable(
         PTR(vaddr_page_start),
         vaddr_page_end - vaddr_page_start));
+
+    return PTR(vaddr_page_start);
 }
 
 void mprotect_phdr(uintptr_t base, size_t page_size, int additional, elf32_phdr_t* phdr)

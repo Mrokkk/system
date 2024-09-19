@@ -484,6 +484,9 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     p->mm->stack_start = stack_vma->start;
     p->mm->stack_end = stack_vma->end;
 
+    p->mm->syscalls_start = 0;
+    p->mm->syscalls_end = 0;
+
     argvecs_put(argvec);
 
     ASSERT(*(int*)user_stack == argvec[ARGV].count);

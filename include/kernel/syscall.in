@@ -80,3 +80,4 @@ lstat: int, const char*, struct stat*
 mimmutable: int, void*, size_t
 munmap: int, void*, size_t
 set_thread_area: int, uintptr_t
+pinsyscalls: int, void*, size_t

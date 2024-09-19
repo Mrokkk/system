@@ -89,16 +89,10 @@ TEST(oom)
     }
 }
 
-__attribute__((naked)) void write_fn(const char*, size_t)
+__attribute__((naked)) void dummy_fn(const char*, size_t)
 {
     asm volatile(
-        "push %ebx;"
-        "mov $59, %eax;"
-        "mov $1, %ebx;"
-        "mov 8(%esp), %ecx;"
-        "mov 12(%esp), %edx;"
-        "int $0x80;"
-        "pop %ebx;"
+        "mov $1, %eax;"
         "ret;"
     );
 }
@@ -143,9 +137,21 @@ TEST(stack_exec)
         uint8_t buffer[0x28];
         int (*function_on_stack)() = PTR(buffer);
 
-        memcpy(buffer, &write_fn, sizeof(buffer));
+        memcpy(buffer, &dummy_fn, sizeof(buffer));
         function_on_stack(message, __builtin_strlen(message));
 
+        exit(0);
+    }
+}
+
+TEST(syscall_permissions)
+{
+    EXPECT_KILLED_BY(SIGABRT)
+    {
+        asm volatile(
+            "mov $24, %eax;"
+            "int $0x80"
+        );
         exit(0);
     }
 }

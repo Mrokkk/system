@@ -187,7 +187,7 @@ static inline uint32_t elf_hash(const char* name)
 
 const char* strtab_read(strtab_t* this, uint32_t addr);
 
-void mmap_phdr(int exec_fd, size_t page_mask, elf32_phdr_t* phdr, uintptr_t base);
+void* mmap_phdr(int exec_fd, size_t page_mask, elf32_phdr_t* phdr, uintptr_t base);
 void mprotect_phdr(uintptr_t base_address, size_t page_size, int additional, elf32_phdr_t* phdr);
 void mimmutable_phdr(uintptr_t base_address, size_t page_size, elf32_phdr_t* phdr);
 

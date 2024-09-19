@@ -621,3 +621,28 @@ void* sys_sbrk(int incr)
 
     return ptr(previous_brk);
 }
+
+int sys_pinsyscalls(void* start, size_t size)
+{
+    vm_area_t* vma;
+    process_t* p = process_current;
+
+    scoped_mutex_lock(&p->mm->lock);
+
+    if (unlikely(p->mm->syscalls_start))
+    {
+        return -EPERM;
+    }
+
+    vma = vm_find(addr(start), p->mm->vm_areas);
+
+    if (unlikely(!vma || (vma->end < addr(start) + size) || !(vma->vm_flags & VM_EXEC)))
+    {
+        return -EINVAL;
+    }
+
+    p->mm->syscalls_start = addr(start);
+    p->mm->syscalls_end = addr(start) + size;
+
+    return 0;
+}

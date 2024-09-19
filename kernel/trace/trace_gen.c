@@ -564,4 +564,11 @@ syscall_t trace_syscalls[] = {
         .nargs  = 1,
         .args   = { TYPE_UNSIGNED_LONG },
     },
+
+    {
+        .name   = "pinsyscalls",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG },
+    },
 };

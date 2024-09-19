@@ -22,6 +22,8 @@ static auxv_t saved_auxv = {
     ._AT_EXECFD = -1
 };
 static LIST_DECLARE(libs);
+static void* syscalls_start;
+static size_t syscalls_size;
 
 #define STORE(what, where) \
     case what: where = value; break
@@ -337,7 +339,14 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
                 {
                     *brk_address = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, page_size);
                     next_lib_base = ALIGN_TO(p->p_memsz + p->p_vaddr + lib_base, page_size);
-                    mmap_phdr(lib_fd, page_size, p, lib_base);
+                    void* addr = mmap_phdr(lib_fd, page_size, p, lib_base);
+
+                    if ((p->p_flags & PF_X) && !strcmp("libc.so", DYNSTR(dynamic, lib->string_ndx)))
+                    {
+                        syscalls_start = addr;
+                        syscalls_size = p->p_memsz + p->p_vaddr + lib_base - ADDR(addr);
+                    }
+
                     break;
                 }
 
@@ -513,6 +522,15 @@ static __attribute__((noreturn)) void loader_main(int argc, char* argv[], char* 
 
     close(exec_fd);
     brk((void*)brk_address);
+
+    if (LIKELY(syscalls_start))
+    {
+        extern int pinsyscalls(void* start, size_t size);
+        if (UNLIKELY(pinsyscalls(syscalls_start, syscalls_size)))
+        {
+            die("pinsyscalls(%p, %#lu): %s", syscalls_start, syscalls_size, strerror(errno));
+        }
+    }
 
     // Load original stack ptr so the executable will
     // see argc, argv, envp as was setup by kernel

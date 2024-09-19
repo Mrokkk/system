@@ -51,11 +51,12 @@ struct mm
 {
     mutex_t    lock;
     int        refcount;
-    uint32_t   code_start, code_end;
-    uint32_t   stack_start, stack_end;
-    uint32_t   args_start, args_end;
-    uint32_t   env_start, env_end;
-    uint32_t   brk;
+    uintptr_t  code_start, code_end;
+    uintptr_t  stack_start, stack_end;
+    uintptr_t  args_start, args_end;
+    uintptr_t  env_start, env_end;
+    uintptr_t  syscalls_start, syscalls_end;
+    uintptr_t  brk;
     pgd_t*     pgd;
     vm_area_t* vm_areas;
     vm_area_t* brk_vma;

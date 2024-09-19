@@ -63,11 +63,17 @@ ENTRY(syscall_handler)
     push %eax
     call trace_syscall
     mov %eax, %edi
+
+    call syscall_permission_check
+
+    cmp $0, %eax
     pop %eax
+    jne 1f
 
     mov SYMBOL_NAME(syscalls)(, %eax, 4), %eax
     call *%eax
 
+1:
     // Put value returned by syscall in pt_regs
     mov %eax, REGS_EAX(%esp)
 
