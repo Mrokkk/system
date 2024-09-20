@@ -8,30 +8,26 @@ set(STATIC_ANALYZER 1)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+find_program(CCACHE ccache)
+if(CCACHE)
+    message(STATUS "Using ccache: ${CCACHE}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE}")
 endif()
 
 include(arch/${ARCH}/arch.cmake)
 
 set(C_FLAGS_STANDARD "-std=gnu11")
 set(C_FLAGS_OPTIMIZATION "-O2")
-set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib -Wl,-no-pie -fno-pie -fno-PIC -nostartfiles -fno-asynchronous-unwind-tables") # -fno-strength-reduce
+set(C_FLAGS_FREESTANDING "-ffreestanding -fno-builtin -nostdlib -Wl,-no-pie -fno-pie -fno-PIC -nostartfiles -fno-asynchronous-unwind-tables")
 set(C_FLAGS_WARNINGS "-Wall -Wextra -Werror")
 set(C_FLAGS_DEBUG "-ggdb3")
 
 if(STATIC_ANALYZER)
-    set(C_FLAGS_WARNINGS "${C_FLAGS_WARNINGS} -fanalyzer -Wno-analyzer-va-arg-type-mismatch -Wno-analyzer-va-list-exhausted")
+    set(C_FLAGS_ADDITIONAL "${C_FLAGS_ADDITIONAL} -fanalyzer -Wno-analyzer-va-arg-type-mismatch -Wno-analyzer-va-list-exhausted")
 endif()
 
 if(STACK_PROTECTOR)
     set(C_FLAGS_ADDITIONAL "${C_FLAGS_ADDITIONAL} -fstack-protector-strong")
-endif()
-
-if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    set(C_FLAGS_ADDITIONAL "-Wno-error -Wno-unused-command-line-argument -Wno-c2x-extensions -Wno-strict-prototypes -Wno-address-of-packed-member")
 endif()
 
 if(FRAME_POINTER)
