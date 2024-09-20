@@ -7,6 +7,7 @@ base_dir=$(dirname `readlink -f "$0"`)
 . "${base_dir}/utils.sh"
 
 target="i686-pc-phoenix"
+#target="x86_64-pc-phoenix"
 input_dir="$(readlink -f ${base_dir}/..)"
 output_dir="${PWD}"
 prefix="${PWD}/native-sysroot"

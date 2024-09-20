@@ -83,11 +83,16 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
+qemu_path=$(binary_from_native_sysroot "qemu-system-x86_64")
 
 if [[ -z "${qemu_path}" ]]
 then
-    qemu_path="$(which qemu-system-i386 || which qemu-system-x86_64)"
+    qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
+fi
+
+if [[ -z "${qemu_path}" ]]
+then
+    qemu_path="$(which qemu-system-x86_64 || which qemu-system-i386)"
 fi
 
 if [[ -n "${use_isa_debugcon}" ]]

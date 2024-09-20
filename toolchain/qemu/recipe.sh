@@ -9,7 +9,7 @@ function build()
     then
         "${SRC_DIR}"/configure \
             --prefix="${PREFIX}" \
-            --target-list=i386-softmmu || die "configuration failed"
+            --target-list=i386-softmmu,x86_64-softmmu || die "configuration failed"
     fi
     ninja all || die "compilation failed"
 }
