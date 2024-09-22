@@ -17,9 +17,9 @@
 #define FALLTHROUGH             __attribute__((__fallthrough__))
 #define LIKELY(x)               __builtin_expect(!!(x), 1)
 #define UNLIKELY(x)             __builtin_expect(!!(x), 0)
-#define PTR(x)                  ((void*)(x))
-#define CPTR(x)                 ((const void*)(x))
 #define ADDR(x)                 ((uintptr_t)(x))
+#define PTR(x)                  ((void*)ADDR((x)))
+#define CPTR(x)                 ((const void*)(ADDR(x)))
 
 #define SHIFT(ptr, off)         ((typeof(ptr))(ADDR(ptr) + (off)))
 #define SHIFT_AS(t, ptr, off)   ((t)(ADDR(ptr) + (off)))

@@ -86,7 +86,7 @@ typedef enum
 
 static inline int vm_verify_wrapper(vm_verify_flag_t flag, const void* ptr, size_t size, vm_area_t* vma)
 {
-    extern int vm_verify_impl(vm_verify_flag_t flag, uint32_t vaddr, size_t size, vm_area_t* vma);
+    extern int vm_verify_impl(vm_verify_flag_t flag, uintptr_t vaddr, size_t size, vm_area_t* vma);
 
     if (unlikely(kernel_address(addr(ptr))))
     {

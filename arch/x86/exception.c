@@ -25,18 +25,18 @@
 
 struct exception
 {
-    const char* name;
+    const char*    name;
     const unsigned nr;
-    const int has_error_code;
-    const int signal;
+    const int      has_error_code;
+    const int      signal;
 };
 
 typedef struct exception exception_t;
-typedef void (*printer_t)(loglevel_t severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
+typedef void (*printer_t)(loglevel_t severity, const pt_regs_t* regs, uintptr_t cr2, uintptr_t cr3, const char* header);
 
 static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t* regs, const printer_t printer));
-static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header);
-static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header);
+static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t cr2, uintptr_t cr3, const char* header);
+static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t, uintptr_t, const char* header);
 
 #define __exception(EXC, NR, EC, NAME, SIG) \
     [NR] = { \
@@ -64,33 +64,33 @@ void NORETURN(__stack_chk_fail(void))
     panic("Stack smashing detected!");
 }
 
-static void pf_reason_print(uint32_t error_code, uint32_t cr2, char* output, size_t size)
+static void pf_reason_print(uintptr_t error_code, uintptr_t cr2, char* output, size_t size)
 {
     const char* end = output + size;
     output = csnprintf(output, end, (error_code & PF_WRITE)
         ? "Write access "
         : "Read access ");
     output = csnprintf(output, end, (error_code & PF_PRESENT)
-            ? "to protected page at virtual address %x "
-            : "to non-present page at virtual address %x ",
-        cr2);
+            ? "to protected page at virtual address %p "
+            : "to non-present page at virtual address %p ",
+        ptr(cr2));
     output = csnprintf(output, end, (error_code & PF_USER)
         ? "in user space"
         : "in kernel space");
 }
 
-static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t cr2, uint32_t cr3, const char* header)
+static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t cr2, uintptr_t cr3, const char* header)
 {
     char buffer[256];
     const pgd_t* pgd = virt_cptr(cr3);
-    const uint32_t pde_index = pde_index(cr2);
-    const uint32_t pte_index = pte_index(cr2);
+    const uintptr_t pde_index = pde_index(cr2);
+    const uintptr_t pte_index = pte_index(cr2);
 
     pf_reason_print(regs->error_code, cr2, buffer, sizeof(buffer));
     log(severity, "%s: %s", header, buffer);
-    log(severity, "%s: pgd: cr3 = %08x", header, cr3);
+    log(severity, "%s: pgd: cr3 = %p", header, ptr(cr3));
 
-    const uint32_t pgt = pgd[pde_index];
+    const uintptr_t pgt = pgd[pde_index];
     pde_print(pgt, buffer, sizeof(buffer));
 
     log(severity, "%s: pgd[%u]: %s", header, pde_index, buffer);
@@ -103,13 +103,13 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
     }
     else
     {
-        const uint32_t pg = pgt_ptr[pte_index];
+        const uintptr_t pg = pgt_ptr[pte_index];
         pte_print(pg, buffer, sizeof(buffer));
         log(severity, "%s: pgt[%u]: %s", header, pte_index, buffer);
     }
 }
 
-static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uint32_t, uint32_t, const char* header)
+static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t, uintptr_t, const char* header)
 {
     log(severity, "%s: error code: %x", header, regs->error_code);
 }
@@ -124,7 +124,7 @@ static inline printer_t printer_get(int nr)
     }
 }
 
-void do_exception(uint32_t nr, pt_regs_t regs)
+void do_exception(uintptr_t nr, const pt_regs_t regs)
 {
     char header[48];
     vm_area_t* vma;
@@ -132,8 +132,8 @@ void do_exception(uint32_t nr, pt_regs_t regs)
 
     scoped_irq_lock();
 
-    uint32_t cr2 = cr2_get();
-    uint32_t cr3 = cr3_get();
+    uintptr_t cr2 = cr2_get();
+    uintptr_t cr3 = cr3_get();
 
     if (unlikely(nr != PAGE_FAULT))
     {
@@ -152,7 +152,7 @@ void do_exception(uint32_t nr, pt_regs_t regs)
             0)
         {
             uintptr_t paddr = vm_paddr(cr2, p->mm->pgd);
-            current_log_info("page fault from %x caused by %x (paddr %x)", regs.eip, cr2, paddr);
+            current_log_info("page fault from %x caused by %x (paddr %x)", PT_REGS_IP(&regs), cr2, paddr);
         }
     }
 
@@ -205,7 +205,7 @@ void do_exception(uint32_t nr, pt_regs_t regs)
         goto handle_fault;
     }
 
-    current_log_debug(DEBUG_PAGE_FAULT, "page fault at %x caused by access to %x", regs.eip, cr2);
+    current_log_debug(DEBUG_PAGE_FAULT, "page fault at %x caused by access to %x", PT_REGS_IP(&regs), cr2);
 
     if (unlikely(vm_nopage(vma, p->mm->pgd, cr2, regs.error_code & PF_WRITE)))
     {
@@ -229,7 +229,7 @@ handle_fault:
             header,
             exception->name,
             exception->has_error_code ? regs.error_code : 0,
-            regs.eip);
+            PT_REGS_IP(&regs));
 
         if (sys_config.user_backtrace)
         {
@@ -266,7 +266,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
     if (exception_ongoing > 1)
     {
         log_critical("%s: %s #%x during another exception handling at %x...",
-            header, exception->name, regs->error_code, regs->eip);
+            header, exception->name, regs->error_code, PT_REGS_IP(regs));
         regs_print(KERN_CRIT, regs, "kernel");
         for (;; halt());
     }
@@ -285,7 +285,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
         header,
         exception->name,
         exception->has_error_code ? regs->error_code : 0,
-        regs->eip,
+        PT_REGS_IP(regs),
         p->pid);
 
     if (printer)

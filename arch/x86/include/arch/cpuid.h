@@ -21,12 +21,12 @@ typedef enum
 
 struct cpuid_cache
 {
-    uint8_t layer;
+    uint8_t      layer;
     cache_type_t type;
-    uint32_t ways;
-    uint32_t line_size;
-    uint32_t partitions;
-    uint32_t sets;
+    uint32_t     ways;
+    uint32_t     line_size;
+    uint32_t     partitions;
+    uint32_t     sets;
 };
 
 typedef enum
@@ -37,20 +37,9 @@ typedef enum
 
 typedef struct cpuid_regs cpuid_regs_t;
 
-static inline const char* cache_type_string(cache_type_t t)
-{
-    switch (t)
-    {
-        case DATA: return "data";
-        case INSTRUCTION: return "instruction";
-        case UNIFIED: return "unified";
-        default: return "unknown";
-    }
-}
-
 #define CPUID_1_EDX_INDEX       0
 #define CPUID_1_EDX_OFFSET      0
-#define CPUID_1_EDX_MASK        (~0UL)
+#define CPUID_1_EDX_MASK        0xffffffff
 #define X86_FEATURE_FPU         (CPUID_1_EDX_INDEX * 32 + 0)
 #define X86_FEATURE_VME         (CPUID_1_EDX_INDEX * 32 + 1)
 #define X86_FEATURE_DE          (CPUID_1_EDX_INDEX * 32 + 2)

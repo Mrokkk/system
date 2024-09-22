@@ -16,24 +16,25 @@ static const char* cr4_bits[] = {
     "smxe", 0, 0, "pcide", "osxsave", 0, "smep", "smap"
 };
 
-const char* eflags_bits_string_get(uint32_t eflags, char* buffer, size_t size)
+const char* eflags_bits_string_get(uintptr_t eflags, char* buffer, size_t size)
 {
     bitflags_string(buffer, size, eflags_bits, eflags);
     return buffer;
 }
 
-const char* cr0_bits_string_get(uint32_t cr0, char* buffer, size_t size)
+const char* cr0_bits_string_get(uintptr_t cr0, char* buffer, size_t size)
 {
     bitflags_string(buffer, size, cr0_bits, cr0);
     return buffer;
 }
 
-const char* cr4_bits_string_get(uint32_t cr4, char* buffer, size_t size)
+const char* cr4_bits_string_get(uintptr_t cr4, char* buffer, size_t size)
 {
     bitflags_string(buffer, size, cr4_bits, cr4);
     return buffer;
 }
 
+#ifdef __i386__
 void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
 {
     char buffer[64];
@@ -72,3 +73,8 @@ void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
         (regs->eflags >> 12) & 0x3,
         eflags_bits_string_get(regs->eflags, buffer, sizeof(buffer)));
 }
+#else
+void regs_print(loglevel_t, const pt_regs_t*, const char*)
+{
+}
+#endif

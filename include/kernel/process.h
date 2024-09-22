@@ -144,7 +144,7 @@ struct process
 };
 
 #define PROCESS_STACK_DECLARE(name) \
-    unsigned long name##_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, }
+    uintptr_t name##_stack[INIT_PROCESS_STACK_SIZE] = { STACK_MAGIC, }
 
 #define PROCESS_MM_DECLARE(name) \
     struct mm name##_mm = MM_INIT(name##_mm)

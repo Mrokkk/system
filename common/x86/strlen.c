@@ -1,5 +1,6 @@
 #include <common/defs.h>
 
+#ifdef __i386__
 size_t NAME(strlen)(const char* s)
 {
     int temp1, temp2;
@@ -15,3 +16,4 @@ size_t NAME(strlen)(const char* s)
 }
 
 POST(strlen);
+#endif

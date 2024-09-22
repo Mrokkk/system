@@ -6,6 +6,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_DEBUG} \
     ${C_FLAGS_FRAME_POINTER} \
     ${C_FLAGS_ADDITIONAL} \
+    -m${BITS} \
     -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx \
     -nostdlib \
     -nostartfiles \
@@ -109,6 +110,9 @@ set(LIBC_SRC
 
 add_library(c SHARED ${LIBC_SRC})
 add_library(c_static STATIC ${LIBC_SRC})
+
+target_link_libraries(c PRIVATE "${EMULATION}")
+target_link_libraries(c_static PRIVATE "${EMULATION}")
 
 target_compile_options(c
     PRIVATE

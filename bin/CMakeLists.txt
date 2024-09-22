@@ -8,7 +8,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_OPTIMIZATION} \
     ${C_FLAGS_WARNINGS} \
     ${C_FLAGS_DEBUG} \
-    -m32 -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
+    -m${BITS} -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
 
 set(DISABLED_APPS "env" "date")
 
@@ -18,7 +18,7 @@ function(add_application)
     add_executable(${name} ${ARGN})
 
     target_compile_options(${name} PRIVATE -fdata-sections -ffunction-sections -fPIC)
-    target_link_libraries(${name} -Wl,-gc-sections)
+    target_link_libraries(${name} ${EMULATION} -Wl,-gc-sections)
 
     add_dependencies(rootfs ${name})
     add_dependencies(${name} libc_install)

@@ -116,7 +116,7 @@ static slab_allocator_t* slab_allocator_find(size_t size)
 
     if (UNLIKELY(allocator->guard != SLAB_GUARD || allocator->guard2 != SLAB_GUARD))
     {
-        DIE("memory corruption: guards: %#x, %#x", allocator->guard, allocator->guard2);
+        DIE("memory corruption: guards: %p, %p", PTR(allocator->guard), PTR(allocator->guard2));
     }
 
     return allocator;
@@ -375,7 +375,7 @@ static void small_free(void* ptr, slab_allocator_t* allocator, slab_t* slab)
 
     if (UNLIKELY(offset % allocator->class_size))
     {
-        DIE("%p not aligned for class size %lu", ptr, allocator->class_size);
+        DIE("%p not aligned for class size %zu", ptr, allocator->class_size);
     }
 
     int slot = offset / allocator->class_size;
@@ -449,7 +449,7 @@ static void* small_realloc(void* ptr, size_t size, slab_allocator_t* allocator, 
 
     if (UNLIKELY(offset % class_size))
     {
-        DIE("not aligned ptr %p for class size %lu", ptr, class_size);
+        DIE("not aligned ptr %p for class size %zu", ptr, class_size);
     }
 
     if (diff >= 0 && diff < (int)(class_size / 2))

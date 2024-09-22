@@ -242,7 +242,7 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
 
         // get the conversion qualifier
         qualifier = -1;
-        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'j')
+        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'j' || *fmt == 'z')
         {
             qualifier = *fmt;
             ++fmt;
@@ -365,26 +365,26 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
                 continue;
         }
 
-        if (qualifier == 'l')
+        switch (qualifier)
         {
-            num = va_arg(args, unsigned long);
+            case 'l':
+                num = flags & SIGN
+                    ? (unsigned long)va_arg(args, long)
+                    : va_arg(args, unsigned long);
+                break;
+            case 'z':
+                num = flags & SIGN
+                    ? (unsigned long)va_arg(args, ssize_t)
+                    : (unsigned long)va_arg(args, size_t);
+                break;
+            case 'h':
+            default:
+                num = flags & SIGN
+                    ? (unsigned long)va_arg(args, int)
+                    : (unsigned long)va_arg(args, unsigned int);
+                break;
         }
-        else if (qualifier == 'h')
-        {
-            num = (unsigned short)va_arg(args, int);
-            if (flags & SIGN)
-            {
-                num = (short)num;
-            }
-        }
-        else if (flags & SIGN)
-        {
-            num = va_arg(args, int);
-        }
-        else
-        {
-            num = va_arg(args, unsigned int);
-        }
+
         if (UNLIKELY(number(buffer, num, base, field_width, precision, flags)))
         {
             return -1;

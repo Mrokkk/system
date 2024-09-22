@@ -12,7 +12,7 @@ struct kernel_module
     kmodule_init_t   init;
     kmodule_deinit_t deinit;
     const char*      name;
-    unsigned int     this_module;
+    uintptr_t        this_module;
     list_head_t      modules;
     void*            data;
     ctor_t*          ctors;
@@ -35,7 +35,7 @@ typedef struct kernel_module kmod_t;
         .this_module = addr(&km_##n), \
         .modules = LIST_INIT(km_##n.modules), \
     }; \
-    static unsigned int MAYBE_UNUSED(this_module) = addr(&km_##n)
+    static uintptr_t MAYBE_UNUSED(this_module) = addr(&km_##n)
 
 #define module_init(init) \
     static int MAYBE_UNUSED(init)(); \

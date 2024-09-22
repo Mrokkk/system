@@ -77,15 +77,15 @@ void ksym_string(uintptr_t addr, char* buffer, size_t size)
 
     if (symbol)
     {
-        snprintf(buffer, size, "[<%08x>] %s+%x/%x",
-            addr,
+        snprintf(buffer, size, "[<%p>] %s+%zx/%zx",
+            ptr(addr),
             symbol->name,
-            addr - symbol->address,
-            symbol->size);
+            (size_t)(addr - symbol->address),
+            (size_t)symbol->size);
     }
     else
     {
-        snprintf(buffer, size, "[<%08x>] unknown", addr);
+        snprintf(buffer, size, "[<%p>] unknown", ptr(addr));
     }
 }
 

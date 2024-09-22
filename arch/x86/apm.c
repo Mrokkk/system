@@ -10,6 +10,8 @@
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 
+#ifdef __i386__
+
 // Reference: https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/apmv12.rtf
 
 #define APM_MODE            APM_32BIT_PROTECTED
@@ -240,3 +242,10 @@ disconnect:
 
     shutdown_fn = &apm_shutdown;
 }
+#else
+
+void apm_initialize(void)
+{
+}
+
+#endif

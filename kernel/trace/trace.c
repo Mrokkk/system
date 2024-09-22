@@ -156,7 +156,7 @@ static int string_print(const char* string, int limit, char* buffer, const char*
 
     if (unlikely(current_vm_verify_string_limit(VM_READ, string, 64)))
     {
-        it = csnprintf(it, end, "%x", addr(string));
+        it = csnprintf(it, end, "%p", string);
         return it - buffer;
     }
 
@@ -401,7 +401,7 @@ int trace_syscall(unsigned long nr, ...)
         {
             case TYPE_CONST_CHAR_PTR:
             {
-                it += string_print((const char*)value, size_limit, it, end);
+                it += string_print(ptr(value), size_limit, it, end);
                 break;
             }
 

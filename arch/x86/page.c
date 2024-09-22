@@ -423,7 +423,7 @@ void clear_first_pde(void)
     kernel_page_dir[0] = 0;
 }
 
-void page_map_panic(uint32_t start, uint32_t end)
+void page_map_panic(uintptr_t start, uintptr_t end)
 {
     kernel_page_dir[0] = kernel_page_dir[KERNEL_PDE_OFFSET];
     pgt_t* pgt = virt_ptr(kernel_page_dir[0] & PAGE_ADDRESS);
@@ -438,9 +438,9 @@ void page_stats_print()
 {
     log_info("memory stats:");
 
-    uint32_t frames_used = 0;
-    uint32_t frames_free = 0;
-    uint32_t frames_unavailable = 0;
+    size_t frames_used = 0;
+    size_t frames_free = 0;
+    size_t frames_unavailable = 0;
     memory_area_t* ma;
 
     for (uint32_t i = 0; i < 10; ++i)
@@ -466,10 +466,10 @@ void page_stats_print()
         }
     }
 
-    log_info("last_pfn=%x", last_pfn);
-    log_info("frames_used=%u (%u kB)", frames_used, frames_used * 4);
-    log_info("frames_free=%u (%u kB)", frames_free, frames_free * 4);
-    log_info("frames_unavailable=%u (%u kB)", frames_unavailable, frames_unavailable * 4);
+    log_info("last_pfn=%p", ptr(last_pfn));
+    log_info("frames_used=%zu (%u kB)", frames_used, frames_used * 4);
+    log_info("frames_free=%zu (%u kB)", frames_free, frames_free * 4);
+    log_info("frames_unavailable=%u (%zu kB)", frames_unavailable, frames_unavailable * 4);
 
     if (regions)
     {

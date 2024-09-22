@@ -16,7 +16,7 @@ extern char _smodules_data[], _emodules_data[];
 
 #define is_kernel_text(addr) \
     ({ \
-        (uint32_t)(addr) >= (uint32_t)_text_init_start && (uint32_t)(addr) <= (uint32_t)_text_end; \
+        (uintptr_t)(addr) >= (uintptr_t)_text_init_start && (uintptr_t)(addr) <= (uintptr_t)_text_end; \
     })
 
 struct section;

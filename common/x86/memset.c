@@ -1,6 +1,7 @@
 #include <common/defs.h>
 #include "bzero.h"
 
+#ifdef __i386__
 void* NAME(memset)(void* s, int c, size_t count)
 {
     int temp;
@@ -20,3 +21,4 @@ void* NAME(memset)(void* s, int c, size_t count)
 }
 
 POST(memset);
+#endif

@@ -13,10 +13,11 @@
 #include <kernel/sections.h>
 #include <kernel/backtrace.h>
 
+#ifdef __i386__
 static inline void paranoia(process_t*, process_t* next)
 {
-    uint32_t* stack;
-    uint32_t stack_end;
+    uintptr_t* stack;
+    uintptr_t stack_end;
 
     switch (next->type)
     {
@@ -60,7 +61,7 @@ static inline void paranoia(process_t*, process_t* next)
             stack_end);
     }
 
-    if (unlikely(*(uint32_t*)stack_end != STACK_MAGIC))
+    if (unlikely(*(uintptr_t*)stack_end != STACK_MAGIC))
     {
         cli();
         memory_dump(KERN_CRIT, stack, 32);
@@ -68,7 +69,7 @@ static inline void paranoia(process_t*, process_t* next)
             next->pid,
             next,
             stack_end,
-            *(uint32_t*)stack_end,
+            *(uintptr_t*)stack_end,
             STACK_MAGIC);
     }
 
@@ -143,3 +144,8 @@ static inline void process_switch(process_t* prev, process_t* next)
           "a" (prev), "d" (next)
         : "memory");
 }
+#elif defined(__x86_64__)
+static inline void process_switch(process_t*, process_t*)
+{
+}
+#endif

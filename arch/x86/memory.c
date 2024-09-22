@@ -50,7 +50,7 @@ static void e820_entries_sort(int* sorted, e820_data_t* map, size_t count)
 int e820_entries_read(e820_data_t* map, int sorted[])
 {
     int count;
-    struct regs regs = {.ebx = 0};
+    regs_t regs = {.ebx = 0};
     e820_data_t* data = map;
 
     for (count = 0; count < E820_ENTRIES_COUNT; ++data, ++count)

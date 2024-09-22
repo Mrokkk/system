@@ -1,5 +1,6 @@
 #include <common/defs.h>
 
+#ifdef __i386__
 char* NAME(strchr)(const char* s, int c)
 {
     int temp;
@@ -25,3 +26,4 @@ char* NAME(strchr)(const char* s, int c)
 }
 
 POST(strchr);
+#endif

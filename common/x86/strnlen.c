@@ -1,5 +1,6 @@
 #include <common/defs.h>
 
+#ifdef __i386__
 size_t NAME(strnlen)(const char* s, size_t maxlen)
 {
     size_t res, temp1, temp2;
@@ -24,3 +25,4 @@ size_t NAME(strnlen)(const char* s, size_t maxlen)
 }
 
 POST(strnlen);
+#endif

@@ -32,10 +32,18 @@
 #define HEADER(x)               <x.c>
 #define FUNC_INCLUDE(a, arch)   HEADER(common/ arch/ a)
 
+#ifdef __x86_64__
+
+#define IS_ARCH_DEFINED 0
+
+#else
+
 #if __has_include(FUNC_INCLUDE(FUNCNAME, ARCH))
 #define IS_ARCH_DEFINED 1
 #else
 #define IS_ARCH_DEFINED 0
+#endif
+
 #endif
 
 #else

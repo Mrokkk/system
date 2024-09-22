@@ -4,7 +4,7 @@
 
 #define errno_get(data) \
     ({ \
-        int __ret = (int)(data); \
+        int __ret = (int)((long)data); \
         int __errno = 0; \
         if (unlikely(__ret < 0 && __ret >= -ERRNO_MAX)) \
         { \

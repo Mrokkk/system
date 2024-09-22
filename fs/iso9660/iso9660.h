@@ -110,7 +110,7 @@ struct rrip
         px_t    px;
         nm_t    nm;
     };
-};
+} PACKED;
 
 struct iso9660_pvd
 {

@@ -45,7 +45,7 @@
 
 #define ASSERT(cond) \
     ({ \
-        int a = (int)(cond); (void)a; \
+        long a = (long)(cond); \
         if (unlikely(!a)) \
         { \
             log_error("%s:%u: assertion "#cond" failed", __builtin_strrchr(__FILE__, '/') + 1, __LINE__); \
@@ -55,9 +55,11 @@
     })
 
 #define ASSERT_NOT_REACHED() \
-    do { \
+    do \
+    { \
         panic("Should not reach!"); \
-    } while (1)
+    } \
+    while (1)
 
 #else
 #define ASSERT(cond) do { } while(0)

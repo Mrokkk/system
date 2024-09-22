@@ -35,7 +35,7 @@ typedef struct ioapic_route ioapic_route_t;
 #define APIC_TIMER_DIV_32           0x8
 #define APIC_TIMER_DIV_64           0x9
 #define APIC_TIMER_DIV_128          0xa
-#define APIC_TIMER_MAXCNT           (~0UL)
+#define APIC_TIMER_MAXCNT           (~(uint32_t)0)
 
 #define IOAPIC_REG_REDIRECT         0x10
 

@@ -9,7 +9,7 @@
 
 static inline void* backtrace_start(void)
 {
-    return ptr(ebp_get());
+    return ptr(bp_get());
 }
 
 static void* backtrace_next(void** frame_ptr)
@@ -17,7 +17,7 @@ static void* backtrace_next(void** frame_ptr)
     void* ret;
     stack_frame_t* frame = *frame_ptr;
 
-    if (!kernel_address(addr(frame)) || !is_kernel_text(addr(ret = frame->ret - 4)))
+    if (!kernel_address(addr(frame)) || !is_kernel_text(addr(ret = frame->ret - sizeof(uintptr_t))))
     {
         return NULL;
     }
@@ -32,34 +32,35 @@ static inline size_t do_backtrace_process(const process_t* p, void** buffer, siz
 {
     void* ret;
     unsigned depth = 0;
-    void* eip = ptr(p->context.eip - 4);
-    uint32_t* stack = ptr(p->context.esp);
+
+    void* ip = ptr(CONTEXT_IP(&p->context) - sizeof(uintptr_t));
+    uintptr_t* stack = ptr(CONTEXT_SP(&p->context));
 
     stack_frame_t frame;
     void* data = &frame;
 
     if (p == process_current)
     {
-        frame.next = ptr(ebp_get());
-        frame.ret = ptr(eip_get());
+        frame.next = ptr(bp_get());
+        frame.ret = ptr(ip_get());
     }
-    else if (p->context.eip == addr(&exit_kernel))
+    else if (CONTEXT_IP(&p->context) == addr(&exit_kernel))
     {
         pt_regs_t* regs = ptr(stack);
-        frame.next = ptr(regs->ebp);
-        frame.ret = ptr(eip);
+        frame.next = ptr(PT_REGS_BP(regs));
+        frame.ret = ptr(ip);
     }
-    else if (p->context.eip == addr(&context_restore))
+    else if (CONTEXT_IP(&p->context) == addr(&context_restore))
     {
         context_switch_frame_t* regs = ptr(stack);
-        frame.next = ptr(regs->ebp);
-        frame.ret = ptr(eip);
+        frame.next = ptr(PT_REGS_BP(regs));
+        frame.ret = ptr(ip);
     }
     else
     {
         pt_regs_t* regs = ptr(stack);
-        frame.next = ptr(regs->ebp);
-        frame.ret = ptr(eip);
+        frame.next = ptr(PT_REGS_BP(regs));
+        frame.ret = ptr(ip);
     }
 
     while ((ret = backtrace_next(&data)) && depth < count)
@@ -105,14 +106,14 @@ void backtrace_exception(const pt_regs_t* regs)
     // address after call. This is not true for exceptions - eip will be set to the
     // instruction which triggered the exception. So to counteract subtraction of 4
     // in below loop, 4 is added
-    stack_frame_t last = {.next = ptr(regs->ebp), .ret = ptr(regs->eip + 4)};
+    stack_frame_t last = {.next = ptr(PT_REGS_BP(regs)), .ret = ptr(PT_REGS_IP(regs) + sizeof(uintptr_t))};
     stack_frame_t* frame = &last;
     void* ret;
 
     log_exception("backtrace:");
     for (int i = 0; frame && i < BACKTRACE_MAX_RECURSION; ++i)
     {
-        if (!kernel_address(addr(frame)) || !is_kernel_text(addr(ret = frame->ret - 4)))
+        if (!kernel_address(addr(frame)) || !is_kernel_text(addr(ret = frame->ret - sizeof(uintptr_t))))
         {
             break;
         }

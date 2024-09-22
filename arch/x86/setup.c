@@ -72,6 +72,7 @@ UNMAP_AFTER_INIT void arch_setup(void)
     bios32_init();
     rtc_print();
 
+#ifdef __i386__
     if (cpu_has(X86_FEATURE_SSE))
     {
         asm volatile(
@@ -92,6 +93,7 @@ UNMAP_AFTER_INIT void arch_setup(void)
             "or "ASM_VALUE(CR4_PGE)", %eax;"
             "mov %eax, %cr4;");
     }
+#endif
 }
 
 int vsyscall_init(void);

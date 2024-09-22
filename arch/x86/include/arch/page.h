@@ -42,11 +42,12 @@
 #error "Include <kernel/page.h>"
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 #include <kernel/compiler.h>
 
-typedef uint32_t pgd_t;
-typedef uint32_t pgt_t;
+typedef uintptr_t pgd_t;
+typedef uintptr_t pgt_t;
 
 #define pde_index(vaddr)        (addr(vaddr) >> 22)
 #define pte_index(vaddr)        ((addr(vaddr) >> 12) & 0x3ff)
@@ -61,12 +62,12 @@ static inline void pgd_load(pgd_t* pgd)
         "mov $1f, %0;"
         "jmp *%0;"
         "1:"
-        :: "r" ((uint32_t)pgd - KERNEL_PAGE_OFFSET) : "memory");
+        :: "r" ((uintptr_t)pgd - KERNEL_PAGE_OFFSET) : "memory");
 }
 
 static inline void pgd_reload(void)
 {
-    register int dummy = 0;
+    register long dummy = 0;
     asm volatile(
         "mov %%cr3, %0;"
         "mov %0, %%cr3;"
@@ -87,9 +88,9 @@ static inline void invlpg(void* address)
 
 #define pte_flags(vaddr, pgd) \
     ({ \
-        uint32_t flags = 0; \
-        uint32_t pde_index = pde_index(addr(vaddr)); \
-        uint32_t pte_index = pte_index(addr(vaddr)); \
+        uintptr_t flags = 0; \
+        uintptr_t pde_index = pde_index(addr(vaddr)); \
+        uintptr_t pte_index = pte_index(addr(vaddr)); \
         if (pgd[pde_index]) \
         { \
             pgt_t* pgt = virt_ptr(pgd[pde_index] & ~PAGE_MASK); \
@@ -99,6 +100,6 @@ static inline void invlpg(void* address)
     })
 
 void clear_first_pde(void);
-void page_map_panic(uint32_t start, uint32_t end);
+void page_map_panic(uintptr_t start, uintptr_t end);
 
 #endif // __ASSEMBLER__

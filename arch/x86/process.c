@@ -15,12 +15,14 @@
 #define push(val, stack) \
     do { (stack)--; *stack = (typeof(*stack))(val); } while (0)
 
-extern void exit_kernel();
+extern void exit_kernel(void);
+static uintptr_t user_process_setup_stack(process_t* dest, process_t*, const pt_regs_t* src_regs);
 
-static void fork_kernel_stack_frame(uint32_t** kernel_stack, const pt_regs_t* regs)
+#ifdef __i386__
+static void fork_kernel_stack_frame(uintptr_t** kernel_stack, const pt_regs_t* regs)
 {
 #define pushk(v) push((v), *kernel_stack)
-    uint32_t eflags = regs->eflags | EFL_IF;
+    uintptr_t eflags = regs->eflags | EFL_IF;
     if (regs->cs == USER_CS)
     {
         pushk(USER_DS);     // ss
@@ -44,11 +46,27 @@ static void fork_kernel_stack_frame(uint32_t** kernel_stack, const pt_regs_t* re
 #undef pushk
 }
 
-static uint32_t user_process_setup_stack(process_t* dest, process_t*, const pt_regs_t* src_regs)
+static void exec_kernel_stack_frame(uintptr_t** kernel_stack, uintptr_t esp, uintptr_t eip)
 {
-    uint32_t* kernel_stack = dest->kernel_stack;
-    fork_kernel_stack_frame(&kernel_stack, src_regs);
-    return addr(kernel_stack);
+#define pushk(v) push((v), *kernel_stack)
+    pushk(USER_DS); // ss
+    pushk(esp);     // esp
+    pushk(EFL_IF);  // eflags
+    pushk(USER_CS); // cs
+    pushk(eip);     // eip
+    pushk(0);       // error_code
+    pushk(USER_TLS); // gs
+    pushk(USER_DS); // fs
+    pushk(USER_DS); // es
+    pushk(USER_DS); // ds
+    pushk(0);       // eax
+    pushk(0);       // ebp
+    pushk(0);       // edi
+    pushk(0);       // esi
+    pushk(0);       // edx
+    pushk(0);       // ecx
+    pushk(0);       // ebx
+#undef pushk
 }
 
 int arch_process_user_spawn(
@@ -78,113 +96,10 @@ int arch_process_user_spawn(
     return 0;
 }
 
-int arch_process_copy(
-    process_t* dest,
-    process_t* src,
-    const pt_regs_t* src_regs)
-{
-    dest->context.esp = user_process_setup_stack(dest, src, src_regs);
-    dest->context.eip = addr(&exit_kernel);
-    dest->context.esp0 = addr(dest->kernel_stack);
-    dest->context.esp2 = src_regs->esp;
-    dest->context.tls_base = src->context.tls_base;
-    return 0;
-}
-
-void arch_process_free(process_t*)
-{
-}
-
-void FASTCALL(__process_switch(process_t* prev, process_t* next))
-{
-    scoped_irq_lock();
-
-    tss.esp = next->context.esp;
-    tss.esp0 = next->context.esp0;
-    tss.esp2 = next->context.esp2;
-
-    descriptor_set_base(gdt_entries, TLS_ENTRY, next->context.tls_base);
-
-    if (next->mm != prev->mm)
-    {
-        pgd_load(next->mm->pgd);
-    }
-}
-
-void syscall_regs_check(pt_regs_t regs)
-{
-    ASSERT(cs_get() == KERNEL_CS);
-    ASSERT(ds_get() == KERNEL_DS);
-    if (process_is_kernel(process_current))
-    {
-        ASSERT(regs.cs == KERNEL_CS);
-        ASSERT(regs.ds == KERNEL_DS);
-        ASSERT(regs.gs == KERNEL_DS);
-        ASSERT(gs_get() == KERNEL_DS);
-        ASSERT(regs.gs == KERNEL_DS);
-    }
-    else
-    {
-        ASSERT(regs.cs == USER_CS);
-        ASSERT(regs.ds == USER_DS);
-        ASSERT(regs.es == USER_DS);
-        ASSERT(regs.fs == USER_DS);
-        ASSERT(regs.gs == USER_TLS);
-    }
-}
-
-static inline void exec_kernel_stack_frame(
-    uint32_t** kernel_stack,
-    uint32_t esp,
-    uint32_t eip)
-{
-#define pushk(v) push((v), *kernel_stack)
-    pushk(USER_DS); // ss
-    pushk(esp);     // esp
-    pushk(EFL_IF);  // eflags
-    pushk(USER_CS); // cs
-    pushk(eip);     // eip
-    pushk(0);       // error_code
-    pushk(USER_TLS); // gs
-    pushk(USER_DS); // fs
-    pushk(USER_DS); // es
-    pushk(USER_DS); // ds
-    pushk(0);       // eax
-    pushk(0);       // ebp
-    pushk(0);       // edi
-    pushk(0);       // esi
-    pushk(0);       // edx
-    pushk(0);       // ecx
-    pushk(0);       // ebx
-#undef pushk
-}
-
-int sys_execve(pt_regs_t regs)
-{
-    int errno;
-
-    const char* pathname = cptr(regs.ebx);
-    const char* const* argv = (const char* const*)(regs.ecx);
-    const char* const* envp = (const char* const*)(regs.edx);
-
-    if ((errno = path_validate(pathname)))
-    {
-        return errno;
-    }
-
-    // FIXME: validate properly instead of checking only 4 bytes
-    if ((errno = vm_verify_array(VERIFY_READ, argv, 4, process_current->mm->vm_areas)))
-    {
-        return errno;
-    }
-
-    return do_exec(pathname, argv, envp);
-}
-
 int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
 {
-    uint32_t* kernel_stack = child->kernel_stack;
-    uint32_t eflags = EFL_IF;
+    uintptr_t* kernel_stack = child->kernel_stack;
+    uintptr_t eflags = EFL_IF;
 
 #define pushk(v) push((v), kernel_stack)
     pushk(args);        // args
@@ -212,6 +127,35 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     child->context.tls_base = 0;
 
     return 0;
+}
+
+int arch_process_copy(
+    process_t* dest,
+    process_t* src,
+    const pt_regs_t* src_regs)
+{
+    dest->context.esp = user_process_setup_stack(dest, src, src_regs);
+    dest->context.eip = addr(&exit_kernel);
+    dest->context.esp0 = addr(dest->kernel_stack);
+    dest->context.esp2 = src_regs->esp;
+    dest->context.tls_base = src->context.tls_base;
+    return 0;
+}
+
+void FASTCALL(__process_switch(process_t* prev, process_t* next))
+{
+    scoped_irq_lock();
+
+    tss.esp = next->context.esp;
+    tss.esp0 = next->context.esp0;
+    tss.esp2 = next->context.esp2;
+
+    descriptor_set_base(gdt_entries, TLS_ENTRY, next->context.tls_base);
+
+    if (next->mm != prev->mm)
+    {
+        pgd_load(next->mm->pgd);
+    }
 }
 
 #define context_set(stack, ip)  \
@@ -315,6 +259,102 @@ void do_signals(pt_regs_t regs)
     ASSERT_NOT_REACHED();
 }
 
+#else
+static void fork_kernel_stack_frame(uintptr_t**, const pt_regs_t*)
+{
+}
+
+static void exec_kernel_stack_frame(uintptr_t**, uintptr_t, uintptr_t)
+{
+}
+
+int arch_process_user_spawn(
+    process_t*,
+    uintptr_t,
+    uintptr_t,
+    uintptr_t)
+{
+    UNUSED(fork_kernel_stack_frame);
+    UNUSED(exec_kernel_stack_frame);
+    UNUSED(user_process_setup_stack);
+    return 0;
+}
+
+int arch_process_spawn(process_t*, process_entry_t, void*, int)
+{
+    return 0;
+}
+
+int arch_process_copy(
+    process_t*,
+    process_t*,
+    const pt_regs_t*)
+{
+    return 0;
+}
+#endif
+
+static uintptr_t user_process_setup_stack(process_t* dest, process_t*, const pt_regs_t* src_regs)
+{
+    uintptr_t* kernel_stack = dest->kernel_stack;
+    fork_kernel_stack_frame(&kernel_stack, src_regs);
+    return addr(kernel_stack);
+}
+
+void arch_process_free(process_t*)
+{
+}
+
+void syscall_regs_check(pt_regs_t regs)
+{
+    ASSERT(cs_get() == KERNEL_CS);
+    ASSERT(ds_get() == KERNEL_DS);
+    if (process_is_kernel(process_current))
+    {
+        ASSERT(regs.cs == KERNEL_CS);
+        ASSERT(regs.ds == KERNEL_DS);
+        ASSERT(regs.gs == KERNEL_DS);
+        ASSERT(gs_get() == KERNEL_DS);
+        ASSERT(regs.gs == KERNEL_DS);
+    }
+    else
+    {
+        ASSERT(regs.cs == USER_CS);
+        ASSERT(regs.ds == USER_DS);
+        ASSERT(regs.es == USER_DS);
+        ASSERT(regs.fs == USER_DS);
+        ASSERT(regs.gs == USER_TLS);
+    }
+}
+
+int sys_execve(pt_regs_t regs)
+{
+    int errno;
+
+#ifdef __i386__
+    const char* pathname = cptr(regs.ebx);
+    const char* const* argv = (const char* const*)(regs.ecx);
+    const char* const* envp = (const char* const*)(regs.edx);
+#else
+    const char* pathname = cptr(regs.rbx);
+    const char* const* argv = (const char* const*)(regs.rcx);
+    const char* const* envp = (const char* const*)(regs.rdx);
+#endif
+
+    if ((errno = path_validate(pathname)))
+    {
+        return errno;
+    }
+
+    // FIXME: validate properly instead of checking only 4 bytes
+    if ((errno = vm_verify_array(VERIFY_READ, argv, 4, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
+    return do_exec(pathname, argv, envp);
+}
+
 int sys_set_thread_area(uintptr_t base)
 {
     process_current->context.tls_base = base;
@@ -334,7 +374,7 @@ int syscall_permission_check(int, pt_regs_t regs)
         return 0;
     }
 
-    if (LIKELY(regs.eip >= p->mm->syscalls_start && regs.eip < p->mm->syscalls_end))
+    if (LIKELY(PT_REGS_IP(&regs) >= p->mm->syscalls_start && PT_REGS_IP(&regs) < p->mm->syscalls_end))
     {
         return 0;
     }

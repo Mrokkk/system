@@ -458,7 +458,7 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
                     bar->space = 0;
                     bar->addr = raw_bar & ~0x1;
                 }
-                pci_config_write_u32(bus, slot, func, addr, ~0UL);
+                pci_config_write_u32(bus, slot, func, addr, ~(uint32_t)0);
                 bar->size = ~(pci_config_read_u32(bus, slot, func, addr) & ~0xf) + 1;
                 pci_config_write_u32(bus, slot, func, addr, raw_bar);
             }

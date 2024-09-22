@@ -6,7 +6,7 @@
 #define FEATURE(id, name) \
     [id] = name
 
-static char* feature_strings[] = {
+static char* feature_strings[NR_FEATURES * 32] = {
     FEATURE(X86_FEATURE_FPU, "fpu"),
     FEATURE(X86_FEATURE_VME, "vme"),
     FEATURE(X86_FEATURE_DE, "de"),
@@ -48,7 +48,18 @@ static char* feature_strings[] = {
 
 static struct cpuid_cache cache[6];
 
-UNMAP_AFTER_INIT static void extended_functions_read()
+static inline const char* cache_type_string(cache_type_t t)
+{
+    switch (t)
+    {
+        case DATA: return "data";
+        case INSTRUCTION: return "instruction";
+        case UNIFIED: return "unified";
+        default: return "unknown";
+    }
+}
+
+UNMAP_AFTER_INIT static void extended_functions_read(void)
 {
     cpuid_regs_t cpuid_regs = {};
     uint32_t max_function;

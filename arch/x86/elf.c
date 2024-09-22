@@ -490,14 +490,14 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
             // FIXME: there's a bug related to .bss - it has 0 size in the ELF itself, but it
             // requires space in actual memory, so currently it's memory simply overlaps with
             // the next section
-            uint32_t relocated;
+            uintptr_t relocated;
             int type = ELF32_R_TYPE(rel->r_info);
             const char* type_str = NULL;
-            uint32_t P = real_addr + rel->r_offset;
-            uint32_t A = *(uint32_t*)P;
-            uint32_t GOT = addr(got);
-            uint32_t S = shift_as(uint32_t, header, symbol_section->sh_offset) + s->st_value;
-            uint32_t G = addr(got_ptr) - addr(got);
+            uintptr_t P = real_addr + rel->r_offset;
+            uintptr_t A = *(uint32_t*)P;
+            uintptr_t GOT = addr(got);
+            uintptr_t S = shift_as(uint32_t, header, symbol_section->sh_offset) + s->st_value;
+            uintptr_t G = addr(got_ptr) - addr(got);
             ksym_t* kernel_symbol;
 
             if (unlikely(G >= GOT_ENTRIES * sizeof(uint32_t)))

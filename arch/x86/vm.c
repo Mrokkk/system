@@ -31,7 +31,7 @@ static void vm_remove_range_impl(
 {
     pgt_t* pgt;
     bool free_pages = false;
-    uint32_t vaddr, pde_index, pte_index;
+    uintptr_t vaddr, pde_index, pte_index;
 
     scoped_irq_lock();
 
@@ -49,7 +49,7 @@ static void vm_remove_range_impl(
 
         if (pgt[pte_index] && free_pages)
         {
-            uint32_t paddr = pgt[pte_index] & PAGE_ADDRESS;
+            uintptr_t paddr = pgt[pte_index] & PAGE_ADDRESS;
             page_t* p = page(paddr);
 
             pages_free(p);
@@ -100,7 +100,7 @@ int vm_free(vm_area_t* vma_list, pgd_t* pgd)
     return 0;
 }
 
-static pgt_t* pgt_get(pgd_t* pgd, uint32_t pde_index, int vm_flags)
+static pgt_t* pgt_get(pgd_t* pgd, uintptr_t pde_index, int vm_flags)
 {
     pgt_t* pgt;
 
@@ -123,7 +123,7 @@ static pgt_t* pgt_get(pgd_t* pgd, uint32_t pde_index, int vm_flags)
     return pgt;
 }
 
-int arch_vm_map_single(pgd_t* pgd, uint32_t pde_index, uint32_t pte_index, page_t* page, int vm_flags)
+int arch_vm_map_single(pgd_t* pgd, uintptr_t pde_index, uintptr_t pte_index, page_t* page, int vm_flags)
 {
     pgt_t* pgt = pgt_get(pgd, pde_index, vm_flags);
 
@@ -137,15 +137,15 @@ int arch_vm_map_single(pgd_t* pgd, uint32_t pde_index, uint32_t pte_index, page_
     return 0;
 }
 
-static int arch_vm_copy_impl(pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
+static int arch_vm_copy_impl(pgd_t* dest_pgd, pgd_t* src_pgd, uintptr_t start, uintptr_t end)
 {
     pgt_t* dest_pgt;
     pgt_t* src_pgt = NULL;
-    uint32_t pde_index, pte_index, pgd_flags;
+    uintptr_t pde_index, pte_index, pgd_flags;
     int prev_pde_index = -1;
-    uint32_t src_pgt_paddr;
+    uintptr_t src_pgt_paddr;
 
-    for (uint32_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE)
+    for (uintptr_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE)
     {
         pde_index = pde_index(vaddr);
         pte_index = pte_index(vaddr);
@@ -206,7 +206,7 @@ cannot_allocate:
     return -ENOMEM;
 }
 
-int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd, uint32_t start, uint32_t end)
+int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd, uintptr_t start, uintptr_t end)
 {
     int errno = arch_vm_copy_impl(dest_pgd, src_pgd, start, end);
     UNUSED(dest_vma);
@@ -267,10 +267,10 @@ int vm_apply(vm_area_t* vmas, pgd_t* pgd, uintptr_t vaddr_start, uintptr_t vaddr
     return 0;
 }
 
-int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uint32_t paddr)
+int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uintptr_t paddr)
 {
     pgt_t* pgt;
-    uint32_t vaddr, pde_index, pte_index, pte_flags = pte_flags_get(vma->vm_flags);
+    uintptr_t vaddr, pde_index, pte_index, pte_flags = pte_flags_get(vma->vm_flags);
 
     for (vaddr = vma->start;
          vaddr < vma->end;

@@ -248,7 +248,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
 
         // get the conversion qualifier
         qualifier = -1;
-        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L')
+        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'z')
         {
             qualifier = *fmt++;
             if (*fmt == 'l')
@@ -377,7 +377,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
             case 'S':
                 s = va_arg(args, char*);
                 len = strnlen(s, precision);
-                str += snprintf(str, end - str, "string{\"%s\", len=%u, ptr=%x}", s, len, (uint32_t)s);
+                str += snprintf(str, end - str, "string{\"%s\", len=%u, ptr=%p}", s, len, s);
                 continue;
 
             case 'O':
@@ -390,7 +390,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                 }
                 else
                 {
-                    str += snprintf(str, end - str, "<%x>", (uint32_t)magic);
+                    str += snprintf(str, end - str, "<%p>", magic);
                     continue;
                 }
             }
@@ -408,32 +408,31 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                 continue;
         }
 
-        if (qualifier == 'l')
+        switch (qualifier)
         {
-            num = va_arg(args, unsigned long);
-        }
-        else if (qualifier == 'h')
-        {
-            num = (unsigned short)va_arg(args, int);
-            if (flags & SIGN)
+            case 'l':
+                num = flags & SIGN
+                    ? (unsigned long)va_arg(args, long)
+                    : va_arg(args, unsigned long);
+                break;
+            case 'z':
+                num = flags & SIGN
+                    ? (unsigned long)va_arg(args, ssize_t)
+                    : (unsigned long)va_arg(args, size_t);
+                break;
+            case 'l' | 'l' << 8:
             {
-                num = (short)num;
+                uint64_t num = va_arg(args, uint64_t);
+                str = number(str, (uint32_t)(num >> 32), base, field_width, precision, flags, end);
+                str = number(str, (uint32_t)(num & ~0UL), base, field_width, precision, flags, end);
+                goto next;
             }
-        }
-        else if (flags & SIGN)
-        {
-            num = va_arg(args, int);
-        }
-        else if (qualifier == ('l' | 'l' << 8))
-        {
-            uint64_t num = va_arg(args, uint64_t);
-            str = number(str, (uint32_t)(num >> 32), base, field_width, precision, flags, end);
-            str = number(str, (uint32_t)(num & ~0UL), base, field_width, precision, flags, end);
-            goto next;
-        }
-        else
-        {
-            num = va_arg(args, unsigned int);
+            case 'h':
+            default:
+                num = flags & SIGN
+                    ? (unsigned long)va_arg(args, int)
+                    : (unsigned long)va_arg(args, unsigned int);
+                break;
         }
 
         str = number(str, num, base, field_width, precision, flags, end);

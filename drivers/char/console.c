@@ -225,7 +225,7 @@ static inline void line_nr_print(console_t* console, size_t nr)
 {
     char buf[32];
     size_t pos;
-    snprintf(buf, sizeof(buf), "[%lu/%lu]", nr, console->current_index);
+    snprintf(buf, sizeof(buf), "[%zu/%zu]", nr, console->current_index);
     pos = console->resx - strlen(buf);
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {
@@ -706,7 +706,7 @@ static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
     {
         case KDSETMODE:
         {
-            int mode = (int)arg;
+            long mode = (long)arg;
             switch (mode)
             {
                 case KD_TEXT:

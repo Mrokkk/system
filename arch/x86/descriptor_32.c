@@ -5,6 +5,7 @@
 #include <kernel/kernel.h>
 #include <kernel/process.h>
 
+#ifdef __i386__
 extern gdt_entry_t unpaged_gdt_entries[];
 
 gdt_entry_t* gdt_entries = virt_ptr(unpaged_gdt_entries);
@@ -122,3 +123,4 @@ UNMAP_AFTER_INIT void idt_init()
 
     idt_load(&idt.idt);
 }
+#endif

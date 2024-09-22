@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.5)
 project(system C)
 
 set(ARCH x86)
+set(BITS 32)
 set(FRAME_POINTER 1)
-set(STACK_PROTECTOR 1)
-set(STATIC_ANALYZER 1)
+set(STACK_PROTECTOR ON)
+set(STATIC_ANALYZER ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -62,6 +63,13 @@ add_subdirectory(kernel)
 
 add_common_library(kernel_common "" OFF)
 
+if(BITS EQUAL 64)
+set_property(SOURCE arch/x86/head_64.S PROPERTY LANGUAGE C)
+add_executable(
+    system
+    arch/x86/head_64.S
+)
+else()
 add_executable(
     system
     $<TARGET_OBJECTS:kernel_common>
@@ -70,6 +78,7 @@ add_executable(
     $<TARGET_OBJECTS:arch>
     $<TARGET_OBJECTS:fs>
 )
+endif()
 
 target_link_libraries(
     system
@@ -97,8 +106,10 @@ add_custom_target(
     COMMENT "Preparing rootfs"
 )
 
+if(NOT BITS EQUAL 64)
 add_subdirectory(lib)
 add_subdirectory(bin)
+endif()
 
 add_custom_target(
    iso

@@ -19,8 +19,8 @@ static inline void bitset_initialize_set(uint32_t* bitset, size_t set_bits)
 {
     uint32_t array_pos = set_bits / BITSET_BITS;
     uint32_t bit_pos = set_bits % BITSET_BITS;
-    for (uint32_t i = 0; i < array_pos; bitset[i++] = ~0UL);
-    bitset[array_pos] = (~0UL >> (BITSET_BITS - bit_pos));
+    for (uint32_t i = 0; i < array_pos; bitset[i++] = (uint32_t)~0UL);
+    bitset[array_pos] = ((uint32_t)~0UL >> (BITSET_BITS - bit_pos));
 }
 
 static inline int bitset_test(uint32_t* bitset, size_t pos)

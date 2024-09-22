@@ -34,21 +34,21 @@ static char* mm_print(const struct mm* mm, char* str, const char* end)
         end - str,
         "mm{\n"
         "\t\taddr = %p,\n"
-        "\t\tstack_start =  %08x,\n"
-        "\t\tstack_end =    %08x,\n"
-        "\t\targs_start =   %08x,\n"
-        "\t\targs_end =     %08x,\n"
-        "\t\tenv_start =    %08x,\n"
-        "\t\tenv_end =      %08x,\n"
-        "\t\tbrk =          %08x,\n"
-        "\t\tpgd =          %08x,\n"
+        "\t\tstack_start =  %p,\n"
+        "\t\tstack_end =    %p,\n"
+        "\t\targs_start =   %p,\n"
+        "\t\targs_end =     %p,\n"
+        "\t\tenv_start =    %p,\n"
+        "\t\tenv_end =      %p,\n"
+        "\t\tbrk =          %p,\n"
+        "\t\tpgd =          %p,\n"
         "\t}",
         mm,
-        mm->stack_start, mm->stack_end,
-        mm->args_start, mm->args_end,
-        mm->env_start, mm->env_end,
-        mm->brk,
-        addr(mm->pgd));
+        ptr(mm->stack_start), ptr(mm->stack_end),
+        ptr(mm->args_start), ptr(mm->args_end),
+        ptr(mm->env_start), ptr(mm->env_end),
+        ptr(mm->brk),
+        mm->pgd);
     return str;
 }
 
@@ -60,7 +60,7 @@ static char* fs_print(const void* data, char* str, const char* end)
         end - str,
         "fs{\n"
         "\t\taddr = %p,\n"
-        "\t\tcount = %x,\n"
+        "\t\trefcount = %u,\n"
         "\t\tcwd = %p\n"
         "\t}", fs, fs->refcount, fs->cwd);
     return str;
@@ -80,7 +80,7 @@ static char* process_print(const process_t* p, char* str, const char* end)
         "\ttype = %u,\n"
         "\tcontext_switches = %u,\n"
         "\tforks = %u,\n"
-        "\t\tkernel_stack = %08x,\n"
+        "\t\tkernel_stack = %p,\n"
         "\tmm = ",
         p,
         p->name,
@@ -90,7 +90,7 @@ static char* process_print(const process_t* p, char* str, const char* end)
         p->type,
         p->context_switches,
         p->forks,
-        addr(p->kernel_stack));
+        p->kernel_stack);
 
     str = mm_print(p->mm, str, end);
     str += snprintf(str, end - str, ",\n\tfs = ");

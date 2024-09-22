@@ -5,16 +5,16 @@
 #include <kernel/debug.h>
 #include <kernel/compiler.h>
 
-typedef uint32_t flags_t;
+typedef uintptr_t flags_t;
 
 #define mb() \
     asm volatile("" : : : "memory")
 
 #define flags_save(x) \
-    asm volatile("pushfl; popl %0" : "=r" (x) :: "memory")
+    asm volatile("pushf; pop %0" : "=rm" (x) :: "memory")
 
 #define flags_restore(x) \
-    asm volatile("pushl %0; popfl" :: "r" (x) : "memory")
+    asm volatile("push %0; popf" :: "g" (x) : "memory", "cc")
 
 #define sti() \
     asm volatile("sti" : : : "memory")

@@ -27,20 +27,28 @@ typedef struct gdt gdt_t;
 
 struct idt_entry
 {
-   uint16_t base_lo;
-   uint16_t sel;
-   uint8_t always0;
-   uint8_t flags;
-   uint16_t base_hi;
+    uint16_t base_lo;
+    uint16_t sel;
+    uint8_t always0;
+    uint8_t flags;
+    uint16_t base_hi;
 } PACKED;
 
 typedef struct idt_entry idt_entry_t;
 
+#ifdef __i386__
 struct idt
 {
-   uint16_t limit;
-   uint32_t base;
+    uint16_t limit;
+    uint32_t base;
 } PACKED;
+#else
+struct idt
+{
+    uint16_t limit;
+    uint64_t base;
+} PACKED;
+#endif
 
 typedef struct idt idt_t;
 
@@ -177,12 +185,20 @@ void idt_write_protect(void);
 #else // __ASSEMBLER__
 
 #define descriptor_entry(flags, base, limit) \
-        .word GDT_LOW_LIMIT(limit); \
-        .word GDT_LOW_BASE(base); \
-        .byte GDT_MID_BASE(base); \
-        .byte GDT_LOW_FLAGS(flags) | (1 << 7); \
-        .byte GDT_HI_LIMIT(limit) | GDT_HI_FLAGS(flags); \
-        .byte GDT_HI_BASE(base);
+    .word GDT_LOW_LIMIT(limit); \
+    .word GDT_LOW_BASE(base); \
+    .byte GDT_MID_BASE(base); \
+    .byte GDT_LOW_FLAGS(flags) | (1 << 7); \
+    .byte GDT_HI_LIMIT(limit) | GDT_HI_FLAGS(flags); \
+    .byte GDT_HI_BASE(base);
+
+#define descriptor_entry64(flags, base, limit) \
+    .word GDT_LOW_LIMIT(limit); \
+    .word GDT_LOW_BASE(base); \
+    .byte GDT_MID_BASE(base); \
+    .byte GDT_LOW_FLAGS(flags) | (1 << 7); \
+    .byte GDT_HI_LIMIT(limit) | GDT_HI_FLAGS(flags) | GDT_FLAGS_LONG_MODE; \
+    .byte GDT_HI_BASE(base);
 
 #endif // !__ASSEMBLER__
 
@@ -202,6 +218,8 @@ void idt_write_protect(void);
 // D in flags
 #define GDT_FLAGS_16BIT         (0 << 7)
 #define GDT_FLAGS_32BIT         (1 << 7)
+
+#define GDT_FLAGS_LONG_MODE     (1 << 5)
 
 // TYPE
 #define GDT_FLAGS_TYPE_CODE         (0x1a)

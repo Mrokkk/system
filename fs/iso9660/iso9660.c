@@ -27,6 +27,9 @@ static_assert(offsetof(iso9660_dirent_t, name) == 33);
 static_assert(offsetof(iso9660_sb_t, pvd) == 8);
 static_assert(offsetof(rrip_t, px) == 4);
 static_assert(sizeof(px_t) == 40);
+static_assert(sizeof(nm_t) == 1);
+static_assert(sizeof(rrip_t) == 44);
+static_assert(sizeof(iso9660_pvd_t) == 184);
 
 static file_system_t iso9660 = {
     .name = "iso9660",
