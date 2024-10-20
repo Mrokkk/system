@@ -21,6 +21,7 @@
 #include <arch/segment.h>
 #include <arch/earlycon.h>
 #include <arch/register.h>
+#include <arch/real_mode.h>
 #include <arch/descriptor.h>
 
 #include <kernel/cpu.h>
@@ -59,6 +60,7 @@ UNMAP_AFTER_INIT void arch_setup(void)
     ASSERT(gs_get() == KERNEL_DS);
     ASSERT(ss_get() == KERNEL_DS);
 
+    real_mode_call_init();
     earlycon_init();
 
     reboot_fn = &reboot_by_8042;

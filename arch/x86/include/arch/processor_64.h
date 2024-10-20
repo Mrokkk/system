@@ -3,7 +3,6 @@
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
-#include <arch/segment.h>
 #include <kernel/compiler.h>
 
 struct tss
@@ -59,15 +58,23 @@ struct pt_regs
     uint64_t rsi;
     uint64_t rdi;
     uint64_t rbp;
-    uint64_t rax;
+    uint64_t r8;
+    uint64_t r9;
+    uint64_t r10;
+    uint64_t r11;
+    uint64_t r12;
+    uint64_t r13;
+    uint64_t r14;
+    uint64_t r15;
     uint16_t ds, __ds[3];
     uint16_t es, __es[3];
     uint16_t fs, __fs[3];
     uint16_t gs, __gs[3];
+    uint64_t rax;
     uint64_t error_code;
     uint64_t rip;
     uint16_t cs, __cs[3];
-    uint64_t eflags;
+    uint32_t eflags, __eflags;
     uint64_t rsp;
     uint16_t ss, __ss[3];
 } PACKED;
@@ -93,53 +100,20 @@ struct context_switch_frame
 } PACKED;
 
 typedef struct context_switch_frame context_switch_frame_t;
-typedef struct signal_context signal_context_t;
-typedef struct signal_frame signal_frame_t;
-
-struct signal_frame
-{
-    int sig;
-    pt_regs_t* context;
-    signal_frame_t* prev;
-};
-
-struct signal_context
-{
-};
 
 #endif // __ASSEMBLER__
 
-#define REGS_EBX    0
-#define REGS_ECX    4
-#define REGS_EDX    8
-#define REGS_ESI    12
-#define REGS_EDI    16
-#define REGS_EBP    20
-#define REGS_EAX    24
-#define REGS_DS     28
-#define REGS_ES     32
-#define REGS_FS     36
-#define REGS_GS     40
-#define REGS_EC     44
-#define REGS_EIP    48
-#define REGS_CS     52
-#define REGS_EFLAGS 56
-#define REGS_ESP    60
-#define REGS_SS     64
+#define REGS_RAX    144
+#define REGS_CS     168
+#define REGS_RSP    184
 
-#define CONTEXT_ESP2 12
+#define CONTEXT_RSP2 24
 
 #define INIT_PROCESS_STACK_SIZE 1024 // number of uint32_t's
 
-#ifdef __i386__
 #define INIT_PROCESS_CONTEXT(name) \
     { \
-        .esp = (uintptr_t)&name##_stack[INIT_PROCESS_STACK_SIZE], \
+        .rsp = (uintptr_t)&name##_stack[INIT_PROCESS_STACK_SIZE], \
     }
-#else
-#define INIT_PROCESS_CONTEXT(name) \
-    { \
-    }
-#endif
 
 #define NEED_RESCHED_SIGNAL_OFFSET  40

@@ -62,6 +62,6 @@
     while (1)
 
 #else
-#define ASSERT(cond) do { } while(0)
-#define ASSERT_NOT_REACHED()
+#define ASSERT(cond) do { } while (0)
+#define ASSERT_NOT_REACHED() do { } while (1)
 #endif

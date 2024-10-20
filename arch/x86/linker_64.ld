@@ -1,7 +1,7 @@
 ENTRY(_start)
 
 _kernel_phys = 0x0000000000100000;
-_kernel_virt = 0x00000000C0100000;
+_kernel_virt = 0xffff800000100000;
 
 _kernel_offset = _kernel_virt - _kernel_phys;
 
@@ -17,15 +17,7 @@ SECTIONS
         KEEP(*(.data.pagetable))
     }
 
-    .unpaged_eternal BLOCK(4K) : ALIGN(4K)
-    {
-        _unpaged_transient_end = .;
-        _unpaged_eternal_start = .;
-        KEEP(*(.data.gdt))
-        KEEP(*(.data.pagedir))
-        . = ALIGN(4K);
-        _unpaged_eternal_end = .;
-    }
+    _unpaged_transient_end = .;
 
     . += _kernel_offset;
 
@@ -47,12 +39,14 @@ SECTIONS
         _text_end = .;
         _rodata_start = .;
         *(.rodata)
+        *(.rodata.*)
     }
 
     .data ALIGN(4K) : AT(ADDR(.data) - _kernel_offset)
     {
         _rodata_end = .;
         _data_start = .;
+        KEEP(*(.data.gdt))
         *(.data)
         . = ALIGN(64);
         _smodules_data = .;
@@ -64,12 +58,14 @@ SECTIONS
     {
         _data_end = .;
         _bss_start = _data_end;
+        _bss_phys_start = _data_end - _kernel_offset;
         *(COMMON)
         *(.bss)
     }
 
     . = ALIGN(4K);
 
+    _bss_phys_end = . - _kernel_offset;
     _bss_end = .;
     _end = .;
 }

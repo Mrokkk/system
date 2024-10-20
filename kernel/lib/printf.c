@@ -311,7 +311,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
             case 'p':
                 if (field_width == -1)
                 {
-                    field_width = 2 * sizeof(void*);
+                    field_width = 2 * sizeof(void*) + 2;
                     flags |= ZEROPAD | SMALL | SPECIAL;
                 }
                 str = number(

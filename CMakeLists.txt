@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.5)
 project(system C)
 
 set(ARCH x86)
-set(BITS 32)
 set(FRAME_POINTER 1)
 set(STACK_PROTECTOR ON)
 set(STATIC_ANALYZER ON)
@@ -47,7 +46,8 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_DEBUG} \
     ${C_FLAGS_FRAME_POINTER} \
     ${C_FLAGS_ADDITIONAL} \
-    -DFRAME_POINTER=${FRAME_POINTER}")
+    -DFRAME_POINTER=${FRAME_POINTER}"
+)
 
 include_directories(
    ${PROJECT_SOURCE_DIR}/include
@@ -64,20 +64,37 @@ add_subdirectory(kernel)
 add_common_library(kernel_common "" OFF)
 
 if(BITS EQUAL 64)
-set_property(SOURCE arch/x86/head_64.S PROPERTY LANGUAGE C)
-add_executable(
-    system
-    arch/x86/head_64.S
-)
+    set_property(SOURCE arch/x86/head_64.S arch/x86/multiboot.S arch/x86/base_64.S arch/x86/real_mode.S PROPERTY LANGUAGE C)
+    add_executable(
+        system
+        kernel/lib/printf.c
+        arch/x86/head_64.S
+        arch/x86/init_64.c
+        arch/x86/multiboot.c
+        arch/x86/multiboot.S
+        arch/x86/descriptor.c
+        arch/x86/pci.c
+        arch/x86/cpuid.c
+        arch/x86/bios32.c
+        arch/x86/register.c
+        arch/x86/real_mode.c
+        arch/x86/memory.c
+        arch/x86/base_64.S
+        arch/x86/real_mode.S
+        kernel/memory.c
+        kernel/lib/bitflag.c
+        kernel/sections.c
+        $<TARGET_OBJECTS:kernel_common>
+    )
 else()
-add_executable(
-    system
-    $<TARGET_OBJECTS:kernel_common>
-    $<TARGET_OBJECTS:kernel>
-    $<TARGET_OBJECTS:drivers>
-    $<TARGET_OBJECTS:arch>
-    $<TARGET_OBJECTS:fs>
-)
+    add_executable(
+        system
+        $<TARGET_OBJECTS:kernel_common>
+        $<TARGET_OBJECTS:kernel>
+        $<TARGET_OBJECTS:drivers>
+        $<TARGET_OBJECTS:arch>
+        $<TARGET_OBJECTS:fs>
+    )
 endif()
 
 target_link_libraries(
@@ -107,8 +124,8 @@ add_custom_target(
 )
 
 if(NOT BITS EQUAL 64)
-add_subdirectory(lib)
-add_subdirectory(bin)
+    add_subdirectory(lib)
+    add_subdirectory(bin)
 endif()
 
 add_custom_target(
@@ -121,6 +138,17 @@ add_custom_target(
    COMMENT "Building ISO image"
 )
 
+if (BITS EQUAL 64)
+add_custom_target(
+    runqemu
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh ${CMAKE_BINARY_DIR}/runqemu
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/debugcon.sh ${CMAKE_BINARY_DIR}/debugcon
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/rungdb.py ${CMAKE_BINARY_DIR}/rungdb
+    COMMAND ./runqemu -k --isa-debugcon
+    DEPENDS rootfs
+    COMMENT "Running qemu"
+)
+else()
 add_custom_target(
     runqemu
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/runqemu.sh ${CMAKE_BINARY_DIR}/runqemu
@@ -130,6 +158,7 @@ add_custom_target(
     DEPENDS rootfs
     COMMENT "Running qemu"
 )
+endif()
 
 add_custom_target(
     runbochs

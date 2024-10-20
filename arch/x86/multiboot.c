@@ -15,7 +15,7 @@ void* ksyms_end;
 static void multiboot_modules_read(multiboot_info_t* mb)
 {
     char* name;
-    uint32_t module_start = 0, module_end = 0;
+    uintptr_t module_start = 0, module_end = 0;
     multiboot_module_t* mod = ptr(mb->mods_addr);
 
     for (size_t i = 0; i < mb->mods_count; ++i)
@@ -39,10 +39,10 @@ static void multiboot_modules_read(multiboot_info_t* mb)
 
         if (!module_start)
         {
-            module_start = virt(mod->mod_start);
+            module_start = virt((uintptr_t)mod->mod_start);
         }
 
-        module_end = virt(mod->mod_end);
+        module_end = virt((uintptr_t)mod->mod_end);
         mod++;
     }
 
@@ -55,11 +55,11 @@ static void multiboot_modules_read(multiboot_info_t* mb)
 UNMAP_AFTER_INIT char* multiboot_read(va_list args)
 {
     multiboot_info_t* mb = va_arg(args, void*);
-    uint32_t magic = va_arg(args, uint32_t);
+    uintptr_t magic = va_arg(args, uintptr_t);
 
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC)
     {
-        log_warning("not Multiboot v1 compilant bootloader!");
+        log_warning("not Multiboot v1 compilant bootloader, magic = %p!", (void*)magic);
         bootloader_name = "unknown";
         return "";
     }

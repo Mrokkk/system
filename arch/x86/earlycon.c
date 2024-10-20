@@ -1,13 +1,14 @@
 #define log_fmt(fmt) "earlycon: " fmt
 #include <arch/io.h>
 #include <arch/bios.h>
+#include <arch/earlycon.h>
+
 #include <kernel/fs.h>
 #include <kernel/dev.h>
 #include <kernel/tty.h>
 #include <kernel/init.h>
 #include <kernel/page.h>
 #include <kernel/kernel.h>
-#include <arch/earlycon.h>
 
 #define VIDEOMEM            ((uint16_t*)0xb8000)
 #define MODE                0x03

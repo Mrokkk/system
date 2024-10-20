@@ -4,7 +4,6 @@
 #include <kernel/compiler.h>
 
 extern char _unpaged_transient_start[], _unpaged_transient_end[];
-extern char _unpaged_eternal_start[], _unpaged_eternal_end[];
 extern char _text_init_start[], _text_init_end[];
 extern char _text_start[], _text_end[];
 extern char _rodata_start[], _rodata_end[];
@@ -18,9 +17,6 @@ extern char _smodules_data[], _emodules_data[];
     ({ \
         (uintptr_t)(addr) >= (uintptr_t)_text_init_start && (uintptr_t)(addr) <= (uintptr_t)_text_end; \
     })
-
-struct section;
-typedef struct section section_t;
 
 #define SECTION_READ                (1 << 0)
 #define SECTION_WRITE               (1 << 1)
@@ -36,12 +32,9 @@ struct section
     int flags;
 };
 
-extern section_t sections[];
+typedef struct section section_t;
 
-static inline void bss_zero(void)
-{
-    memset(_bss_start, 0, addr(_bss_end) - addr(_bss_start));
-}
+extern section_t sections[];
 
 int section_add(const char* name, void* start, void* end, int flags);
 void section_free(section_t* section);
@@ -65,7 +58,7 @@ void sections_print(void);
         section_t* section = sections; \
         for (; section->name; ++section) \
         { \
-            log_notice("[sec %08x - %08x %s] %s", \
+            log_notice("[sec %p - %p %s] %s", \
                 section->start, \
                 section->end, \
                 section_flags_string(section->flags, buf, end), \

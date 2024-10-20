@@ -56,7 +56,6 @@
 #include <stddef.h>
 #include <kernel/printk.h>
 
-#ifdef __i386__
 #define general_reg_union(letter) \
     { \
         uint32_t e##letter##x; \
@@ -73,28 +72,6 @@
         uint32_t e##letter##i; \
         uint16_t letter##i; \
     }
-
-#else
-#define general_reg_union(letter) \
-    { \
-        uint64_t r##letter##x; \
-        uint32_t e##letter##x; \
-        uint16_t letter##x; \
-        struct \
-        { \
-            uint8_t letter##l; \
-            uint8_t letter##h; \
-        }; \
-    }
-
-#define index_reg_union(letter) \
-    { \
-        uint64_t r##letter##i; \
-        uint32_t e##letter##i; \
-        uint16_t letter##i; \
-    }
-
-#endif
 
 struct regs
 {

@@ -2,14 +2,13 @@
 #include <kernel/kernel.h>
 #include <kernel/sections.h>
 
-#define FREE_SECTION 7
+#define FREE_SECTION 6
 
 #define SECTION_DEF(name, flags) \
     {#name, _##name##_start, _##name##_end, flags}
 
 section_t sections[] = {
     SECTION_DEF(unpaged_transient, SECTION_READ | SECTION_WRITE | SECTION_UNPAGED | SECTION_UNMAP_AFTER_INIT),
-    SECTION_DEF(unpaged_eternal, SECTION_READ | SECTION_WRITE | SECTION_UNPAGED),
     SECTION_DEF(text_init, SECTION_READ | SECTION_EXEC | SECTION_UNMAP_AFTER_INIT),
     SECTION_DEF(text, SECTION_READ | SECTION_EXEC),
     SECTION_DEF(rodata, SECTION_READ),

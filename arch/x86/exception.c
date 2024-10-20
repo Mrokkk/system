@@ -57,7 +57,7 @@ static uintptr_t prev_cr2;
 static bool prev_cr2_valid;
 
 extern uintptr_t __stack_chk_guard;
-uintptr_t __stack_chk_guard __attribute__((used));
+uintptr_t __stack_chk_guard __attribute__((used)) = 0xdeadf00d;
 
 void NORETURN(__stack_chk_fail(void))
 {

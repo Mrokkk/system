@@ -10,13 +10,13 @@ static bios32_entry_t entry;
 
 UNMAP_AFTER_INIT int bios32_init(void)
 {
-    for (uint32_t* lowmem = ptr(virt(0xe0000)); lowmem < (uint32_t*)virt(0x100000); ++lowmem)
+    for (uint32_t* lowmem = (uint32_t*)0xe0000; lowmem < (uint32_t*)0x100000; ++lowmem)
     {
         if (*lowmem == BIOS32_SIGNATURE)
         {
             bios32_header = ptr(lowmem);
 
-            log_notice("base: %x; entry: %x", bios32_header, bios32_header->entry);
+            log_notice("base: %lx; entry: %lx", bios32_header, bios32_header->entry);
 
             entry.addr = bios32_header->entry;
             entry.seg = KERNEL_CS;

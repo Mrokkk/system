@@ -1,8 +1,7 @@
-
 if(BITS EQUAL 64)
     set(LINKER_SCRIPT ${PROJECT_SOURCE_DIR}/arch/x86/linker_64.ld)
-    set(EMULATION "")
-    set(C_FLAGS_ARCH "-m${BITS} -mcmodel=large -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
+    set(EMULATION "-Wl,-m -Wl,elf_x86_64")
+    set(C_FLAGS_ARCH "-m${BITS} -mcmodel=large -mno-red-zone -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
 elseif(BITS EQUAL 32)
     set(LINKER_SCRIPT ${PROJECT_SOURCE_DIR}/arch/x86/linker_32.ld)
     set(EMULATION "-Wl,-m -Wl,elf_i386")

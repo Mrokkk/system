@@ -60,7 +60,7 @@ UNMAP_AFTER_INIT static param_t* params_read(char buffer[CMDLINE_SIZE], param_t 
         new_token = strtok_r(tmp, "= ", &save_ptr);
         if (previous_token)
         {
-            bool value_param      = cmdline[new_token - buffer - 1] == '=';
+            bool value_param      = new_token ? cmdline[new_token - buffer - 1] == '=' : false;
             output[count].name    = previous_token;
             output[count++].value = value_param ? new_token : NULL;
             previous_token        = value_param ? NULL : new_token;
@@ -148,8 +148,6 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     const char* temp_cmdline;
     char buffer[CMDLINE_SIZE];
     param_t parameters[CMDLINE_PARAMS_COUNT];
-
-    bss_zero();
 
     va_start(args, data);
     temp_cmdline = multiboot_read(args);

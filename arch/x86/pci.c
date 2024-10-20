@@ -25,7 +25,9 @@ static LIST_DECLARE(pci_devices);
         &regs; \
     })
 
+#ifdef __i386__
 static bios32_entry_t pci_bios_entry;
+#endif
 
 static int pci_devices_list(void)
 {
@@ -95,6 +97,7 @@ UNMAP_AFTER_INIT void pci_scan(void)
 
     scoped_irq_lock();
 
+#ifdef __i386__
     if (!bios32_find(PCI_BIOS_SIGNATURE, &pci_bios_entry))
     {
         log_info("PCI BIOS entry: %04x:%08x", pci_bios_entry.seg, pci_bios_entry.addr);
@@ -114,8 +117,11 @@ UNMAP_AFTER_INIT void pci_scan(void)
         log_continue("; last bus: %x", regs.cl);
         bus_size = regs.cl + 1;
     }
-skip_pci_bios:
+#else
+    goto skip_pci_bios;
+#endif
 
+skip_pci_bios:
     for (bus = 0; bus < bus_size; ++bus)
     {
         for (slot = 0; slot < 32; ++slot)

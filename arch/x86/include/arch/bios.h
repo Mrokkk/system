@@ -1,12 +1,16 @@
 #pragma once
 
-#include <arch/register.h>
-#include <arch/processor.h>
-
 #define BIOS_VIDEO      0x10
 #define BIOS_LOWMEM     0x12
 #define BIOS_SYSTEM     0x15
 #define BIOS_KEYBOARD   0x16
+
+#define BIOS_BDA_START  0x400
+
+#ifndef __ASSEMBLER__
+
+#include <arch/register.h>
+#include <arch/processor.h>
 
 struct bios_bda
 {
@@ -19,7 +23,7 @@ struct bios_bda
 
 typedef struct bios_bda bios_bda_t;
 
-extern void bios_call(uint32_t function_address, regs_t* param);
+void bios_call(uint32_t function_address, regs_t* param);
 
 static inline void* bios_ebda_get(void)
 {
@@ -29,3 +33,5 @@ static inline void* bios_ebda_get(void)
     const farptr_t ptr = {.seg = bda->ebda_seg, .off = 0};
     return farptr(ptr);
 }
+
+#endif // !__ASSEMBLER__

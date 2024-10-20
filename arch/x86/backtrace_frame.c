@@ -104,8 +104,8 @@ void backtrace_exception(const pt_regs_t* regs)
 
     // Normally, when doing stacktrace over frames, return address will contain next
     // address after call. This is not true for exceptions - eip will be set to the
-    // instruction which triggered the exception. So to counteract subtraction of 4
-    // in below loop, 4 is added
+    // instruction which triggered the exception. So to counteract subtraction of
+    // sizeof(uintptr_t) in below loop, sizeof(uintptr_t) is added
     stack_frame_t last = {.next = ptr(PT_REGS_BP(regs)), .ret = ptr(PT_REGS_IP(regs) + sizeof(uintptr_t))};
     stack_frame_t* frame = &last;
     void* ret;

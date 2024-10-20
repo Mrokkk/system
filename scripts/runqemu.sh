@@ -158,7 +158,7 @@ done
 grub_cfg_content="set timeout=0
 set default=0
 menuentry \"system\" {
-    if ! multiboot /boot/system ${kernel_params}; then reboot; fi
+    if ! multiboot /boot/system ${kernel_params}; then sleep 4; reboot; fi
     module /boot/kernel.map kernel.map
     boot
 }"

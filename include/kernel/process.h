@@ -75,7 +75,6 @@ struct signals
     uint32_t         pending;
     sighandler_t     sighandler[NSIGNALS];
     sigrestorer_t    sigrestorer;
-    signal_context_t context;
 #define SIGNALS_INIT \
     { \
         .refcount = 1, \

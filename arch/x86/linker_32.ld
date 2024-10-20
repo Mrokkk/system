@@ -17,15 +17,7 @@ SECTIONS
         KEEP(*(.data.pagetable))
     }
 
-    .unpaged_eternal BLOCK(4K) : ALIGN(4K)
-    {
-        _unpaged_transient_end = .;
-        _unpaged_eternal_start = .;
-        KEEP(*(.data.gdt))
-        KEEP(*(.data.pagedir))
-        . = ALIGN(4K);
-        _unpaged_eternal_end = .;
-    }
+    _unpaged_transient_end = .;
 
     . += _kernel_offset;
 
@@ -53,6 +45,8 @@ SECTIONS
     {
         _rodata_end = .;
         _data_start = .;
+        KEEP(*(.data.pagedir))
+        KEEP(*(.data.gdt))
         *(.data)
         . = ALIGN(64);
         _smodules_data = .;

@@ -13,7 +13,7 @@
 #include <arch/multiboot.h>
 #include <arch/descriptor.h>
 
-extern pgd_t page_dir[];
+extern pgd_t kernel_page_dir[];
 extern pgt_t page0[];
 
 static MUTEX_DECLARE(page_mutex);
@@ -21,7 +21,6 @@ static LIST_DECLARE(free_pages);
 
 page_t* page_map;
 static pgt_t* page_table;
-static pgd_t* kernel_page_dir;
 static uint32_t last_pfn;
 
 static vm_region_t* regions;
@@ -681,7 +680,6 @@ UNMAP_AFTER_INIT int paging_init()
 
     last_pfn = last_phys_address / PAGE_SIZE;
     temp_pgt = virt_ptr(page0);
-    kernel_page_dir = virt_ptr(page_dir);
 
     page_map_size = page_align(last_pfn * sizeof(page_t));
     pgt_size = page_align(min(GiB, page_align(last_phys_address)) / PAGES_IN_PTE);
