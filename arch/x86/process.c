@@ -6,11 +6,11 @@
 
 #include <kernel/fs.h>
 #include <kernel/vm.h>
-#include <kernel/page.h>
 #include <kernel/path.h>
 #include <kernel/debug.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
+#include <kernel/page_table.h>
 
 #define push(val, stack) \
     do { (stack)--; *stack = (typeof(*stack))(val); } while (0)

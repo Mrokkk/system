@@ -2,10 +2,10 @@
 
 #include <arch/io.h>
 
-#include <kernel/page.h>
 #include <kernel/mutex.h>
-#include <kernel/string.h>
+#include <kernel/kernel.h>
 #include <kernel/module.h>
+#include <kernel/string.h>
 
 #include "framebuffer.h"
 

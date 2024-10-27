@@ -2,9 +2,9 @@
 
 #include <kernel/fs.h>
 #include <kernel/list.h>
-#include <kernel/page.h>
 #include <kernel/minmax.h>
 #include <kernel/module.h>
+#include <kernel/page_alloc.h>
 
 KERNEL_MODULE(ramfs);
 module_init(ramfs_init);

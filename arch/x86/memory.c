@@ -1,7 +1,7 @@
 #define log_fmt(fmt) "e820: " fmt
-#include <kernel/page.h>
 #include <kernel/memory.h>
 #include <kernel/kernel.h>
+#include <kernel/page_types.h>
 
 #include <arch/bios.h>
 

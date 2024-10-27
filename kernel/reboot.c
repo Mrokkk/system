@@ -4,12 +4,13 @@
 #include <kernel/module.h>
 #include <kernel/reboot.h>
 #include <kernel/process.h>
-#include <kernel/debug.h>
 
 unsigned shutdown_in_progress;
 
 void prepare_to_shutdown()
 {
+    extern void page_stats_print();
+
     file_systems_print();
     page_stats_print();
     processes_stats_print();

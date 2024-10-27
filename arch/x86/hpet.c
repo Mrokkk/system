@@ -2,10 +2,10 @@
 #include <arch/acpi.h>
 #include <arch/hpet.h>
 
-#include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
 hpet_t* hpet;
 
@@ -43,7 +43,7 @@ UNMAP_AFTER_INIT void hpet_initialize(void)
         return;
     }
 
-    hpet = region_map(addr(sdt->address.address), PAGE_SIZE, "hpet");
+    hpet = mmio_map(addr(sdt->address.address), PAGE_SIZE, "hpet");
 
     hpet_capabilities_t* cap = &hpet->cap;
     hpet_timer_register_t* timers = hpet->timers;

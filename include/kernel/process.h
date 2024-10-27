@@ -2,7 +2,6 @@
 
 #include <kernel/fs.h>
 #include <kernel/vm.h>
-#include <kernel/page.h>
 #include <kernel/wait.h>
 #include <kernel/mutex.h>
 #include <kernel/dentry.h>
@@ -11,6 +10,7 @@
 #include <kernel/api/wait.h>
 #include <kernel/segmexec.h>
 #include <kernel/api/sched.h>
+#include <kernel/page_alloc.h>
 
 typedef struct process process_t;
 

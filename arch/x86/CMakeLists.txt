@@ -6,5 +6,5 @@ else()
 endif()
 
 set_property(SOURCE ${ASM_SRC} PROPERTY LANGUAGE C)
-file(GLOB SRC "*.c")
+file(GLOB_RECURSE SRC "*.c")
 add_library(arch OBJECT ${SRC} ${ASM_SRC})

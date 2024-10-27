@@ -16,6 +16,7 @@
 #include <arch/i8042.h>
 #include <arch/i8253.h>
 #include <arch/i8259.h>
+#include <arch/panic.h>
 #include <arch/bios32.h>
 #include <arch/memory.h>
 #include <arch/segment.h>
@@ -27,7 +28,6 @@
 #include <kernel/cpu.h>
 #include <kernel/elf.h>
 #include <kernel/irq.h>
-#include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
 #include <kernel/memory.h>
@@ -134,10 +134,6 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
 
     vsyscall_init();
 
-    // Make sure IDT is not overwritten by buggy code
-    idt_write_protect();
-
-    clear_first_pde();
 }
 
 void panic_mode_enter(void)

@@ -1,8 +1,8 @@
 #include <arch/cpuid.h>
 #include <kernel/cpu.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>
+#include <kernel/page_types.h>
 
 typedef int (*syscall_t)();
 
@@ -36,8 +36,8 @@ typedef int (*syscall_t)();
 #define __syscall5(...)         __syscall(__VA_ARGS__)
 #define __syscall6(...)         __syscall(__VA_ARGS__)
 
-syscall_t syscalls[] = {
-#include <kernel/api/syscall.h>
+READONLY const syscall_t syscalls[] = {
+    #include <kernel/api/syscall.h>
 };
 
 #define IA32_SYSENTER_CS  0x174
@@ -46,7 +46,7 @@ syscall_t syscalls[] = {
 
 extern void vsyscall_handler();
 
-int vsyscall_init(void)
+UNMAP_AFTER_INIT int vsyscall_init(void)
 {
     page_t* page;
 

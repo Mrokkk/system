@@ -1,7 +1,8 @@
 #define log_fmt(fmt) "ksyms: " fmt
-#include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/ksyms.h>
+#include <kernel/page_alloc.h>
+#include <kernel/page_types.h>
 
 static ksym_t* kernel_symbols;
 
@@ -215,7 +216,7 @@ finish:
     log_info("freeing [%x - %x]", range.start, page_beginning(addr(range.end)));
     memrange_for_each_page(addr, &range)
     {
-        page_free(addr);
+        pages_free(page(phys_addr(addr)));
     }
     kernel_symbols = symbols;
 

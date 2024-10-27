@@ -9,9 +9,9 @@
 
 #include <kernel/cpu.h>
 #include <kernel/irq.h>
-#include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
 #define DEBUG_MADT 0
 #define DEBUG_APIC 0
@@ -31,10 +31,10 @@ static void ioapic_initialize(void);
 static int ioapic_irq_enable(uint32_t irq, int flags);
 void apic_eoi(uint32_t);
 
-apic_t* apic;
-ioapic_t* ioapic;
+READONLY apic_t* apic;
+READONLY ioapic_t* ioapic;
 
-static struct
+READONLY static struct
 {
     uint8_t irq;
     uint8_t flags;
@@ -43,7 +43,7 @@ static struct
     {0xff, 0}, {0xff, 0}, {0xff, 0}, {0xff, 0}, {0xff, 0}, {0xff, 0}, {0xff, 0}, {0xff, 0},
 };
 
-static uint32_t init_cnt;
+READONLY static uint32_t init_cnt;
 
 static clock_source_t apic_timer_clock = {
     .name = "apic_timer",
@@ -89,7 +89,7 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     rdmsr(IA32_APIC_BASE_MSR, eax, edx);
 
     apic_base = eax & APIC_BASE_MASK;
-    apic = region_map(apic_base, PAGE_SIZE, "apic");
+    apic = mmio_map(apic_base, PAGE_SIZE, "apic");
 
     eax = (apic_base & 0xfffff0000) | IA32_APIC_BASE_MSR_ENABLE;
 
@@ -353,7 +353,7 @@ static void ioapic_initialize(void)
                     entry->ioapic.id, entry->ioapic.address, entry->ioapic.gsi);
 
                 offset = entry->ioapic.address - page_beginning(entry->ioapic.address);
-                ioapic = region_map(page_beginning(entry->ioapic.address), PAGE_SIZE, "ioapic");
+                ioapic = mmio_map(page_beginning(entry->ioapic.address), PAGE_SIZE, "ioapic");
                 ioapic = ptr(addr(ioapic) + offset);
                 break;
 

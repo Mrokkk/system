@@ -1,7 +1,7 @@
-#include <kernel/page.h>
 #include <kernel/bitset.h>
 #include <kernel/kernel.h>
 #include <kernel/malloc.h>
+#include <kernel/page_alloc.h>
 
 static char* fmalloc_mem;
 static BITSET_DECLARE(bitset, FAST_MALLOC_AREA / FAST_MALLOC_BLOCK_SIZE);

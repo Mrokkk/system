@@ -1,8 +1,8 @@
 #include <kernel/init.h>
-#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/memory.h>
 #include <kernel/sections.h>
+#include <kernel/page_types.h>
 
 #include <arch/multiboot.h>
 

@@ -15,7 +15,6 @@
 #include <kernel/process.h>
 #include <kernel/sections.h>
 #include <kernel/backtrace.h>
-#include <kernel/api/unistd.h>
 
 #include <arch/idle.h>
 #include <arch/earlycon.h>
@@ -126,15 +125,11 @@ UNMAP_AFTER_INIT static void boot_params_print(void)
 
 UNMAP_AFTER_INIT static void memory_print(void)
 {
-    uintptr_t ram_hi = addr(full_ram >> 32);
-    uintptr_t ram_low = addr(full_ram);
-    uintptr_t mib = 4096 * ram_hi + ram_low / MiB;
-
-    log_notice("RAM: %u MiB", mib);
+    log_notice("RAM: %u MiB", full_ram >> 20);
 
     if (full_ram != (uint64_t)usable_ram)
     {
-        log_continue("; usable %u MiB (%u B)", usable_ram / MiB, usable_ram);
+        log_continue("; usable %u MiB (%u B)", usable_ram >> 20, usable_ram);
     }
 
     memory_areas_print();
@@ -292,13 +287,15 @@ UNMAP_AFTER_INIT static void read_some_data(void)
 {
     int errno;
     scoped_file_t* file = NULL;
-    char* buf = single_page();
-    const char* dev = "/dev/sda";
+    page_t* page = page_alloc1();
 
-    if (unlikely(!buf))
+    if (unlikely(!page))
     {
         return;
     }
+
+    char* buf = page_virt_ptr(page);
+    const char* dev = "/dev/sda";
 
     memset(buf, 0, PAGE_SIZE);
 
@@ -318,20 +315,7 @@ UNMAP_AFTER_INIT static void read_some_data(void)
         memory_dump(KERN_INFO, buf + 508, 1);
     }
 
-    page_free(buf);
-}
-
-static void unmap_sections(void)
-{
-    for (section_t* section = sections; section->name; ++section)
-    {
-        if (!(section->flags & SECTION_UNMAP_AFTER_INIT))
-        {
-            continue;
-        }
-
-        section_free(section);
-    }
+    pages_free(page);
 }
 
 static void timer_callback(ktimer_t* timer)
@@ -345,7 +329,7 @@ static void NORETURN(init(const char* cmdline))
     syslog_configure();
     read_some_data();
 
-    unmap_sections();
+    paging_finalize();
 
     const char* init_path = param_value_or_get(KERNEL_PARAM("init"), "/bin/init");
 

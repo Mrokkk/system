@@ -19,14 +19,14 @@ static inline void process_space_free(process_t* proc)
             *kernel_stack_end);
     }
 
-    page_free(kernel_stack_end);
+    pages_free(page(phys_addr(kernel_stack_end)));
 
     scoped_mutex_lock(&proc->mm->lock);
 
     if (!--proc->mm->refcount)
     {
         vm_free(proc->mm->vm_areas, pgd);
-        page_free(proc->mm->pgd);
+        pages_free(page(phys_addr(proc->mm->pgd)));
         delete(proc->mm);
     }
 }

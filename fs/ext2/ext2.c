@@ -3,12 +3,12 @@
 
 #include <kernel/fs.h>
 #include <kernel/vm.h>
-#include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/page_alloc.h>
 #include <kernel/api/dirent.h>
 
 KERNEL_MODULE(ext2);

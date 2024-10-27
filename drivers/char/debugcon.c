@@ -2,7 +2,6 @@
 
 #include <kernel/fs.h>
 #include <kernel/tty.h>
-#include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/string.h>
 #include <kernel/module.h>

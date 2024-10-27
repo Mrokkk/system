@@ -2,6 +2,7 @@
 #include <kernel/procfs.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
+#include <kernel/page_table.h>
 
 PROCESS_DECLARE(init_process);
 
@@ -120,7 +121,7 @@ int sys_setsid(void)
 int processes_init()
 {
     init_process.kernel_stack = ptr(&init_process_stack[INIT_PROCESS_STACK_SIZE]);
-    init_process.mm->pgd = init_pgd_get();
+    init_process.mm->pgd = kernel_page_dir;
     init_process.mm->vm_areas = NULL;
     mutex_init(&init_process.mm->lock);
     list_add_tail(&init_process.running, &running);

@@ -1,20 +1,20 @@
 #define log_fmt(fmt) "acpi: " fmt
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <arch/io.h>
 #include <arch/acpi.h>
 #include <arch/bios.h>
 #include <arch/bios32.h>
 #include <arch/reboot.h>
+#include <kernel/page_alloc.h>
 
 #define DEBUG_RSDT      0
 #define RSDP_SIGNATURE  U32('R', 'S', 'D', ' ')
 
-static rsdt_t* rsdt;
-static size_t rsdt_count;
-static int acpi_offset;
-static uint16_t reset_port;
-static uint8_t reset_value;
+READONLY static rsdt_t* rsdt;
+READONLY static size_t rsdt_count;
+READONLY static int acpi_offset;
+READONLY static uint16_t reset_port;
+READONLY static uint8_t reset_value;
 
 static inline rsdp_descriptor_t* acpi_rsdp_find(void)
 {
@@ -47,7 +47,7 @@ static void reboot_by_acpi(void)
     outb(reset_value, reset_port);
 }
 
-void acpi_initialize(void)
+UNMAP_AFTER_INIT void acpi_initialize(void)
 {
     uint32_t paddr, start, end;
     void* mapped;
@@ -64,7 +64,7 @@ void acpi_initialize(void)
     paddr = page_beginning(rsdp->rsdt_addr);
 
     // Map initial RSDT area so root SDT can be read
-    mapped = region_map(paddr, PAGE_SIZE, "acpi");
+    mapped = mmio_map(paddr, PAGE_SIZE, "acpi");
 
     if (!mapped)
     {
@@ -101,7 +101,7 @@ void acpi_initialize(void)
     // If range exceeds already mapped PAGE_SIZE, remap
     if (end - start > PAGE_SIZE)
     {
-        mapped = region_map(start, end - start, "acpi_refined");
+        mapped = mmio_map(start, end - start, "acpi_refined");
 
         acpi_offset = addr(mapped) - start;
         rsdt = ptr(rsdp->rsdt_addr + acpi_offset);

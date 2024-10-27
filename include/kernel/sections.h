@@ -6,6 +6,7 @@
 extern char _unpaged_transient_start[], _unpaged_transient_end[];
 extern char _text_init_start[], _text_init_end[];
 extern char _text_start[], _text_end[];
+extern char _rodata_after_init_start[], _rodata_after_init_end[];
 extern char _rodata_start[], _rodata_end[];
 extern char _data_start[], _data_end[];
 extern char _bss_start[], _bss_end[];
@@ -37,8 +38,10 @@ typedef struct section section_t;
 extern section_t sections[];
 
 int section_add(const char* name, void* start, void* end, int flags);
-void section_free(section_t* section);
 void sections_print(void);
+
+uintptr_t section_phys_start(const section_t* section);
+uintptr_t section_phys_end(const section_t* section);
 
 #define section_flags_string(flags, buf, size) \
     ({ \
@@ -67,3 +70,4 @@ void sections_print(void);
     }
 
 #define UNMAP_AFTER_INIT SECTION(.text.init) NOINLINE
+#define READONLY SECTION(.rodata_after_init)

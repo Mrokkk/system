@@ -29,7 +29,8 @@ void param_call_if_set(param_name_t name, int (*action)());
 
 void arch_setup(void);
 void arch_late_setup(void);
-int paging_init(void);
+void paging_init(void);
+void paging_finalize(void);
 
 extern unsigned init_in_progress;
 extern char cmdline[];

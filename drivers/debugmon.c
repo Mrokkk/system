@@ -3,7 +3,6 @@
 #include <kernel/fs.h>
 #include <kernel/cpu.h>
 #include <kernel/irq.h>
-#include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/ksyms.h>
 #include <kernel/module.h>
@@ -168,12 +167,6 @@ static int c_rtc()
     return 0;
 }
 
-static int c_page()
-{
-    page_stats_print();
-    return 0;
-}
-
 static int c_crash()
 {
     ASSERT(cr3_get() == phys_addr(process_current->mm->pgd));
@@ -221,7 +214,6 @@ static struct command {
     COMMAND(ps),
     COMMAND(cpu),
     COMMAND(rtc),
-    COMMAND(page),
     COMMAND(crash),
     COMMAND(kstat),
     COMMAND(running),
@@ -230,19 +222,7 @@ static struct command {
 
 static inline int address_is_mapped(uintptr_t addr)
 {
-    pgt_t* pgt;
-    pgd_t* pgd = process_current->mm->pgd;
-    uintptr_t pde_index = pde_index(addr);
-    uintptr_t pte_index = pte_index(addr);
-
-    if (!pgd[pde_index])
-    {
-        return 0;
-    }
-
-    pgt = virt_ptr(pgd[pde_index] & PAGE_ADDRESS);
-
-    return pgt[pte_index];
+    return vm_paddr(addr, process_current->mm->pgd);
 }
 
 process_t* process_get(int pid)

@@ -1,8 +1,8 @@
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/sections.h>
+#include <kernel/page_alloc.h>
 
-#define FREE_SECTION 6
+#define FREE_SECTION 7
 
 #define SECTION_DEF(name, flags) \
     {#name, _##name##_start, _##name##_end, flags}
@@ -11,6 +11,7 @@ section_t sections[] = {
     SECTION_DEF(unpaged_transient, SECTION_READ | SECTION_WRITE | SECTION_UNPAGED | SECTION_UNMAP_AFTER_INIT),
     SECTION_DEF(text_init, SECTION_READ | SECTION_EXEC | SECTION_UNMAP_AFTER_INIT),
     SECTION_DEF(text, SECTION_READ | SECTION_EXEC),
+    SECTION_DEF(rodata_after_init, SECTION_READ | SECTION_WRITE),
     SECTION_DEF(rodata, SECTION_READ),
     SECTION_DEF(data, SECTION_READ | SECTION_WRITE),
     SECTION_DEF(bss, SECTION_READ | SECTION_WRITE),
@@ -33,24 +34,16 @@ int section_add(const char* name, void* start, void* end, int flags)
     return 0;
 }
 
-void section_free(section_t* section)
+uintptr_t section_phys_start(const section_t* section)
 {
-    uintptr_t start, end;
-    if (section->flags & SECTION_UNPAGED)
-    {
-        start = virt_addr(section->start);
-        end = virt_addr(section->end);
-    }
-    else
-    {
-        start = addr(section->start);
-        end = addr(section->end);
-    }
+    return section->flags & SECTION_UNPAGED
+        ? addr(section->start)
+        : phys_addr(section->start);
+}
 
-    log_notice("freeing [%08x - %08x] %s", section->start, section->end, section->name);
-
-    for (uintptr_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE)
-    {
-        page_free(ptr(vaddr));
-    }
+uintptr_t section_phys_end(const section_t* section)
+{
+    return section->flags & SECTION_UNPAGED
+        ? addr(section->end)
+        : phys_addr(section->end);
 }

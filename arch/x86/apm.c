@@ -6,9 +6,9 @@
 #include <arch/segment.h>
 #include <arch/earlycon.h>
 
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
+#include <kernel/page_alloc.h>
 
 #ifdef __i386__
 
@@ -79,7 +79,7 @@
 
 static int (*apm_call)(regs_t* regs, const char* name);
 
-struct
+READONLY struct
 {
     uint32_t off;
     uint16_t seg;

@@ -1,11 +1,11 @@
 #if FRAME_POINTER
 #include <arch/register.h>
 
-#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/kernel.h>
 #include <kernel/process.h>
 #include <kernel/backtrace.h>
+#include <kernel/page_types.h>
 
 static inline void* backtrace_start(void)
 {

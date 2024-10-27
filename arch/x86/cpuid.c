@@ -6,7 +6,7 @@
 #define FEATURE(id, name) \
     [id] = name
 
-static char* feature_strings[NR_FEATURES * 32] = {
+READONLY static const char* feature_strings[NR_FEATURES * 32] = {
     FEATURE(X86_FEATURE_FPU, "fpu"),
     FEATURE(X86_FEATURE_VME, "vme"),
     FEATURE(X86_FEATURE_DE, "de"),

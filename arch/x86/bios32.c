@@ -2,11 +2,11 @@
 #include <arch/bios32.h>
 #include <arch/register.h>
 
-#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
-static bios32_header_t* bios32_header;
-static bios32_entry_t entry;
+READONLY static bios32_header_t* bios32_header;
+READONLY static bios32_entry_t entry;
 
 UNMAP_AFTER_INIT int bios32_init(void)
 {

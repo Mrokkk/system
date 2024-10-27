@@ -1,7 +1,7 @@
 #define log_fmt(fmt) "smbios: " fmt
 #include <arch/dmi.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
 // Reference: https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.2.0.pdf
 
@@ -12,26 +12,26 @@ typedef struct smbios_header smbios_header_t;
 
 struct smbios_entry
 {
-    char signature[4];
-    uint8_t checksum;
-    uint8_t len;
-    uint8_t major;
-    uint8_t minor;
+    char     signature[4];
+    uint8_t  checksum;
+    uint8_t  len;
+    uint8_t  major;
+    uint8_t  minor;
     uint16_t max_structure_size;
-    uint8_t entry_point_revision;
-    char formatted_area[5];
-    char signature2[5];
-    uint8_t checksum2;
+    uint8_t  entry_point_revision;
+    char     formatted_area[5];
+    char     signature2[5];
+    uint8_t  checksum2;
     uint16_t table_length;
     uint32_t table_address;
     uint16_t structs_count;
-    uint8_t unused;
+    uint8_t  unused;
 } PACKED;
 
 struct smbios_header
 {
-    uint8_t type;
-    uint8_t len;
+    uint8_t  type;
+    uint8_t  len;
     uint16_t handle;
 } PACKED;
 
@@ -160,7 +160,7 @@ static inline const char* memory_type(uint8_t t)
     }
 }
 
-void smbios_entry_handle(smbios_header_t* header)
+UNMAP_AFTER_INIT void smbios_entry_handle(smbios_header_t* header)
 {
     if (header->type == 0)
     {
@@ -218,7 +218,7 @@ void smbios_entry_handle(smbios_header_t* header)
     }
 }
 
-void dmi_read(void)
+UNMAP_AFTER_INIT void dmi_read(void)
 {
     void* mapped;
     uint32_t paddr, len;
@@ -234,7 +234,7 @@ void dmi_read(void)
     paddr = page_beginning(smbios_entry->table_address);
     len = smbios_entry->table_length;
 
-    mapped = region_map(paddr, len + smbios_entry->table_address - paddr, "smbios");
+    mapped = mmio_map(paddr, len + smbios_entry->table_address - paddr, "smbios");
 
     if (unlikely(!mapped))
     {

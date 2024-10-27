@@ -7,7 +7,6 @@
 #include <kernel/dev.h>
 #include <kernel/tty.h>
 #include <kernel/init.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 
 #define VIDEOMEM            ((uint16_t*)0xb8000)

@@ -2,8 +2,8 @@
 
 #include <stdbool.h>
 #include <kernel/list.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/page_types.h>
 
 struct dentry;
 
@@ -54,8 +54,9 @@ int vm_unmap(vm_area_t* vma, pgd_t* pgd);
 int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd);
-int vm_io_apply(vm_area_t* vma, pgd_t* pgd, uintptr_t start);
-int vm_nopage(vm_area_t* vma, pgd_t* pgd, uintptr_t address, bool write);
+int vm_nopage(pgd_t* pgd, uintptr_t address, bool write);
+
+uintptr_t vm_paddr(uintptr_t vaddr, const pgd_t* pgd);
 
 // vm_replace - replace vm areas <replace_start, replace_end> with <new_vmas, new_vmas_end>
 void vm_replace(
@@ -84,9 +85,9 @@ typedef enum
     VERIFY_WRITE    = 2,
 } vm_verify_flag_t;
 
-static inline int vm_verify_wrapper(vm_verify_flag_t flag, const void* ptr, size_t size, vm_area_t* vma)
+static inline int vm_verify_wrapper(vm_verify_flag_t flag, const void* ptr, size_t size, const vm_area_t* vma)
 {
-    extern int vm_verify_impl(vm_verify_flag_t flag, uintptr_t vaddr, size_t size, vm_area_t* vma);
+    extern int vm_verify_impl(vm_verify_flag_t flag, uintptr_t vaddr, size_t size, const vm_area_t* vma);
 
     if (unlikely(kernel_address(addr(ptr))))
     {
@@ -101,7 +102,7 @@ static inline int vm_verify_wrapper(vm_verify_flag_t flag, const void* ptr, size
 // @flag - vm_verify_flag_t as defined above
 // @string - pointer to a string
 // @vma - vm_areas against which access is checked
-int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
+int vm_verify_string(vm_verify_flag_t flag, const char* string, const vm_area_t* vma);
 
 // vm_verify_string - check access to the max limit bytes from string pointed by string
 //
@@ -109,7 +110,7 @@ int vm_verify_string(vm_verify_flag_t flag, const char* string, vm_area_t* vma);
 // @string - pointer to a string
 // @limit - max number of bytes checked
 // @vma - vm_areas against which access is checked
-int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t limit, vm_area_t* vma);
+int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t limit, const vm_area_t* vma);
 
 // vm_verify - check access to the object pointed by data_ptr
 //
@@ -139,8 +140,3 @@ int vm_verify_string_limit(vm_verify_flag_t flag, const char* string, size_t lim
 
 #define vm_for_each(vma, vm_areas) \
     for (vma = vm_areas; vma; vma = vma->next)
-
-#include <arch/vm.h>
-
-int arch_vm_copy(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd, uintptr_t start, uintptr_t end);
-int arch_vm_map_single(pgd_t* pgd, uintptr_t pde_index, uintptr_t pte_index, page_t* page, int vm_flags);

@@ -1,10 +1,11 @@
 #include <arch/asm.h>
 #include <arch/msr.h>
 #include <arch/bios.h>
-#include <arch/page.h>
 #include <arch/segment.h>
 #include <arch/register.h>
 #include <arch/descriptor.h>
+#include <arch/page_table.h>
+#include <arch/page_types.h>
 
 #include <kernel/segmexec.h>
 

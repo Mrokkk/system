@@ -6,6 +6,7 @@
 #include <kernel/vm_print.h>
 #include <kernel/backtrace.h>
 #include <kernel/byteorder.h>
+#include <kernel/page_table.h>
 
 #include <kernel/api/elf.h>
 
@@ -497,7 +498,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     }
 
     vm_free(old_vmas, old_pgd);
-    page_free(old_pgd);
+    pages_free(page(phys_addr(old_pgd)));
 
     arch_exec(bin.entry, p->kernel_stack, user_stack);
 
@@ -512,7 +513,7 @@ restore:
     pgd_load(old_pgd);
     if (new_pgd)
     {
-        page_free(new_pgd);
+        pages_free(page(phys_addr(new_pgd)));
     }
     return errno;
 }

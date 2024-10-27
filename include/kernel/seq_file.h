@@ -9,12 +9,13 @@ typedef int (*seq_show_t)(seq_file_t* seq_file);
 
 struct seq_file
 {
-    char* buffer;
-    size_t size;
-    size_t count;
-    file_t* file;
+    page_t*    pages;
+    char*      buffer;
+    size_t     size;
+    size_t     count;
+    file_t*    file;
     seq_show_t show;
-    void* private;
+    void*      private;
 };
 
 int seq_open(file_t* file, seq_show_t show);

@@ -4,11 +4,11 @@
 #include <kernel/fs.h>
 #include <kernel/irq.h>
 #include <kernel/tty.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
 #include <kernel/process.h>
+#include <kernel/page_alloc.h>
 
 #include "virtio.h"
 
@@ -152,7 +152,7 @@ static int virtio_cap_read(void** notify_bar_ptr, uint32_t* notify_cap_off, uint
 
             if (!mapped_bars[bar])
             {
-                mapped_bars[bar] = region_map(
+                mapped_bars[bar] = mmio_map(
                     console.pci_device->bar[bar].addr,
                     console.pci_device->bar[bar].size,
                     "virtio_console");

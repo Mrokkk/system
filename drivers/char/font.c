@@ -4,8 +4,8 @@
 #include <arch/multiboot.h>
 
 #include <kernel/fs.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
 #define PSF1_FONT_MAGIC 0x0436
 #define PSF2_FONT_MAGIC 0x864ab572

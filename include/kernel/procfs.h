@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stddef.h>
-#include <kernel/page.h>
 #include <kernel/process.h>
 #include <kernel/seq_file.h>
 

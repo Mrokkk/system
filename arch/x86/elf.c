@@ -611,7 +611,7 @@ error:
     return errno;
 }
 
-void elf_register(void)
+UNMAP_AFTER_INIT void elf_register(void)
 {
     int errno;
     if (unlikely(errno = binfmt_register(&elf)))

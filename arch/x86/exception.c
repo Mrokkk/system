@@ -1,6 +1,5 @@
 #include <kernel/vm.h>
 #include <kernel/init.h>
-#include <kernel/page.h>
 #include <kernel/ksyms.h>
 #include <kernel/sysfs.h>
 #include <kernel/reboot.h>
@@ -8,6 +7,8 @@
 #include <kernel/sections.h>
 #include <kernel/segmexec.h>
 #include <kernel/vm_print.h>
+#include <kernel/page_alloc.h>
+#include <kernel/page_table.h>
 
 #include <arch/io.h>
 #include <arch/irq.h>
@@ -48,7 +49,7 @@ static void general_protection_description_print(loglevel_t severity, const pt_r
 
 #define __exception_debug __exception
 
-const exception_t exceptions[] = {
+READONLY const exception_t exceptions[] = {
     #include <arch/exception.h>
 };
 
@@ -83,30 +84,58 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
 {
     char buffer[256];
     const pgd_t* pgd = virt_cptr(cr3);
-    const uintptr_t pde_index = pde_index(cr2);
-    const uintptr_t pte_index = pte_index(cr2);
 
     pf_reason_print(regs->error_code, cr2, buffer, sizeof(buffer));
     log(severity, "%s: %s", header, buffer);
     log(severity, "%s: pgd: cr3 = %p", header, ptr(cr3));
 
-    const uintptr_t pgt = pgd[pde_index];
-    pde_print(pgt, buffer, sizeof(buffer));
+    const pgd_t* pgde = pgd_offset(pgd, cr2);
 
-    log(severity, "%s: pgd[%u]: %s", header, pde_index, buffer);
-
-    const pgt_t* pgt_ptr = virt_cptr(pgt & PAGE_ADDRESS);
-
-    if (!vm_paddr(addr(pgt_ptr), pgd))
+    if (pgd_entry_none(pgde))
     {
-        log(severity, "%s: pgt: not mapped", header);
+        log(severity, "%s: pgd[%u]: not mapped", header, pgde - pgd);
+        return;
     }
-    else
+
+    pgd_print(pgde, buffer, sizeof(buffer));
+    log(severity, "%s: pgd[%u]: %s", header, pgde - pgd, buffer);
+
+    const pud_t* pude = pud_offset(pgde, cr2);
+
+#ifndef PUD_FOLDED
+    if (pud_entry_none(pude))
     {
-        const uintptr_t pg = pgt_ptr[pte_index];
-        pte_print(pg, buffer, sizeof(buffer));
-        log(severity, "%s: pgt[%u]: %s", header, pte_index, buffer);
+        log(severity, "%s: pud[%u]: not mapped", header, pud_index(cr2));
+        return;
     }
+
+    pud_print(pude, buffer, sizeof(buffer));
+    log(severity, "%s: pud[%u]: %s", header, pud_index(cr2), buffer);
+#endif
+
+    const pmd_t* pmde = pmd_offset(pude, cr2);
+
+#ifndef PMD_FOLDED
+    if (pmd_entry_none(pmde))
+    {
+        log(severity, "%s: pmd[%u]: not mapped", header, pmd_index(cr2));
+        return;
+    }
+
+    pmd_print(pmde, buffer, sizeof(buffer));
+    log(severity, "%s: pmd[%u]: %s", header, pmd_index(cr2), buffer);
+#endif
+
+    const pte_t* pte = pte_offset(pmde, cr2);
+
+    if (pte_entry_none(pte))
+    {
+        log(severity, "%s: pte[%u]: not mapped", header, pte_index(cr2));
+        return;
+    }
+
+    pte_print(pte, buffer, sizeof(buffer));
+    log(severity, "%s: pte[%u]: %s", header, pte_index(cr2), buffer);
 }
 
 static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t, uintptr_t, const char* header)
@@ -127,7 +156,6 @@ static inline printer_t printer_get(int nr)
 void do_exception(uintptr_t nr, const pt_regs_t regs)
 {
     char header[48];
-    vm_area_t* vma;
     process_t* p = process_current;
 
     scoped_irq_lock();
@@ -198,16 +226,9 @@ void do_exception(uintptr_t nr, const pt_regs_t regs)
     }
 #endif
 
-    vma = vm_find(cr2, p->mm->vm_areas);
-
-    if (unlikely(!vma))
-    {
-        goto handle_fault;
-    }
-
     current_log_debug(DEBUG_PAGE_FAULT, "page fault at %x caused by access to %x", PT_REGS_IP(&regs), cr2);
 
-    if (unlikely(vm_nopage(vma, p->mm->pgd, cr2, regs.error_code & PF_WRITE)))
+    if (unlikely(vm_nopage(p->mm->pgd, cr2, regs.error_code & PF_WRITE)))
     {
         goto handle_fault;
     }
@@ -251,15 +272,15 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
 {
     const char* header = "kernel";
     char string[80];
-    uint32_t cr0 = cr0_get();
-    uint32_t cr2 = cr2_get();
-    uint32_t cr3 = cr3_get();
-    uint32_t cr4 = cr4_get();
+    uintptr_t cr0 = cr0_get();
+    uintptr_t cr2 = cr2_get();
+    uintptr_t cr3 = cr3_get();
+    uintptr_t cr4 = cr4_get();
     process_t* p = process_current;
 
     ++exception_ongoing;
 
-    pgd_load(init_pgd_get());
+    pgd_load(kernel_page_dir);
 
     panic_mode_enter();
 

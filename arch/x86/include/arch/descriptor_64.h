@@ -2,8 +2,6 @@
 
 #include <arch/descriptor_common.h>
 
-#define IDT_OFFSET 4096
-
 #define APM_CODE_ENTRY       5
 #define APM_CODE_16_ENTRY    6
 #define APM_DATA_ENTRY       7

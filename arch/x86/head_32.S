@@ -1,8 +1,9 @@
 #include <arch/asm.h>
-#include <arch/page.h>
 #include <arch/segment.h>
 #include <arch/register.h>
 #include <arch/descriptor.h>
+#include <arch/page_table.h>
+#include <arch/page_types.h>
 
 #include <kernel/segmexec.h>
 
@@ -81,7 +82,13 @@ ENDPROC(_start)
 
 SECTION(.data.gdt)
 
-ALIGN(32)
+ALIGN(8)
+ENTRY(gdt)
+    .word . - gdt_entries - 1
+    .long gdt_entries
+END(gdt)
+
+ALIGN(8)
 ENTRY(gdt_entries)
 
     // Null segment
@@ -129,12 +136,6 @@ ENTRY(gdt_entries)
     descriptor_entry(DESC_ACCESS_TSS | DESC_ACCESS_RING(0), 0, 0, 0)
 
 END(gdt_entries)
-
-ALIGN(32)
-ENTRY(gdt)
-    .word . - gdt_entries - 1
-    .long gdt_entries
-END(gdt)
 
 SECTION(.data.pagetable)
 ALIGN(PAGE_SIZE)

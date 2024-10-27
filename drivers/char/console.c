@@ -8,10 +8,10 @@
 
 #include <kernel/fs.h>
 #include <kernel/tty.h>
-#include <kernel/page.h>
 #include <kernel/ctype.h>
 #include <kernel/kernel.h>
 #include <kernel/api/ioctl.h>
+#include <kernel/page_alloc.h>
 
 #include "fbcon.h"
 #include "egacon.h"

@@ -2,6 +2,7 @@
 #include <kernel/procfs.h>
 #include <kernel/process.h>
 #include <kernel/vm_print.h>
+#include <kernel/page_table.h>
 #include <kernel/api/unistd.h>
 
 unsigned int total_forks;
@@ -21,7 +22,7 @@ static inline void process_forked(process_t* proc)
 static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
 {
     int errno = -ENOMEM;
-    void* pgd;
+    pgd_t* pgd;
     vm_area_t* new_vma;
     vm_area_t* src_vma;
     page_t* kernel_stack_page;
@@ -136,7 +137,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
 
 free_areas:
     // TODO
-    page_free(pgd);
+    pages_free(page(phys_addr(pgd)));
 free_kstack:
     pages_free(kernel_stack_page);
 free_mm:

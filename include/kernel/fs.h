@@ -4,7 +4,6 @@
 #include <kernel/vm.h>
 #include <kernel/dev.h>
 #include <kernel/list.h>
-#include <kernel/page.h>
 #include <kernel/poll.h>
 #include <kernel/wait.h>
 #include <kernel/magic.h>
@@ -13,6 +12,7 @@
 #include <kernel/api/vfs.h>
 #include <kernel/api/stat.h>
 #include <kernel/api/fcntl.h>
+#include <kernel/page_types.h>
 #include <kernel/api/dirent.h>
 
 #define BLOCK_SIZE       1024

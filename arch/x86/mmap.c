@@ -3,26 +3,26 @@
 #include <kernel/fs.h>
 #include <kernel/vm.h>
 #include <kernel/list.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/vm_print.h>
+#include <kernel/page_table.h>
 
 #define DEBUG_MMAP 0
 #define DEBUG_BRK  0
 
-static inline uint32_t address_space_find(size_t size)
+static inline uintptr_t address_space_find(size_t size)
 {
-    uint32_t as_start = 0x1000;
-    uint32_t as_end =
+    uintptr_t as_start = 0x1000;
+    uintptr_t as_end =
 #if CONFIG_SEGMEXEC
         CODE_START - USER_STACK_SIZE;
 #else
         USER_STACK_VIRT_ADDRESS - USER_STACK_SIZE;
 #endif
 
-    uint32_t last_start;
+    uintptr_t last_start;
     vm_area_t* vma = process_current->mm->vm_areas;
 
     if (!vma)
@@ -453,7 +453,7 @@ apply:
         return -ENOMEM;
     }
 
-    pgd_reload();
+    tlb_flush();
 
     return 0;
 

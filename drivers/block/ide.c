@@ -8,13 +8,13 @@
 #include <kernel/irq.h>
 #include <kernel/mbr.h>
 #include <kernel/wait.h>
-#include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/mutex.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/byteorder.h>
+#include <kernel/page_alloc.h>
 
 #include "ata.h"
 #include "scsi.h"
@@ -162,13 +162,15 @@ static void ide_device_atapi(int device)
     outsw(bus, &packet, 6);
     ide_wait();
 
-    void* buf = single_page();
+    page_t* page = page_alloc1();
 
-    if (unlikely(!buf))
+    if (unlikely(!page))
     {
         log_warning("channel %u: cannot allocate buffer", channel);
         return;
     }
+
+    void* buf = page_virt_ptr(page);
 
     if ((err = ide_polling(channel)))
     {
@@ -180,7 +182,7 @@ static void ide_device_atapi(int device)
     memcpy(ide_buf, buf, ATA_SECTOR_SIZE);
 
 finish:
-    page_free(buf);
+    pages_free(page);
 }
 
 static void ide_device_register(ata_device_t* device)
@@ -332,7 +334,7 @@ static void ide_pci_bm_initialize(bool* use_dma)
         *use_dma = false;
     }
 
-    dma_region = region_map(DMA_PRD, DMA_SIZE, "dma");
+    dma_region = mmio_map(DMA_PRD, DMA_SIZE, "dma");
 
     if (unlikely(!dma_region))
     {

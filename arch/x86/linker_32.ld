@@ -34,9 +34,16 @@ SECTIONS
         *(.text)
     }
 
-    .rodata ALIGN(4K) : AT(ADDR(.rodata) - _kernel_offset)
+    .rodata_after_init ALIGN(4K) : AT(ADDR(.rodata_after_init) - _kernel_offset)
     {
         _text_end = .;
+        _rodata_after_init_start = .;
+        KEEP*(.rodata_after_init)
+    }
+
+    .rodata ALIGN(4K) : AT(ADDR(.rodata) - _kernel_offset)
+    {
+        _rodata_after_init_end = .;
         _rodata_start = .;
         *(.rodata)
     }

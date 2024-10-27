@@ -1,8 +1,8 @@
 #include <arch/segment.h>
 #include <arch/descriptor.h>
 
-#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/page_types.h>
 
 #ifdef __i386__
 #include <kernel/process.h>
@@ -12,25 +12,23 @@ struct idt_data
 {
     union
     {
-        struct
-        {
-            idt_entry_t entries[256];
-            idt_t idt;
-        };
-        uint8_t padding[page_align(256 * sizeof(idt_entry_t) + sizeof(idt_t))];
+        idt_t idt;
+        uint8_t padding[16];
     };
-}
-ALIGN(PAGE_SIZE) idt = {
-    .entries = {},
+    idt_entry_t entries[256];
+};
+
+typedef struct idt_data idt_data_t;
+
+READONLY idt_data_t ALIGN(8) idt = {
     .idt = {
         .limit = sizeof(idt_entry_t) * 256 - 1,
         .base = addr(&idt.entries),
     },
+    .entries = {}
 };
 
 tss_t tss;
-
-static_assert(offsetof(struct idt_data, idt) == IDT_OFFSET);
 
 static inline void idt_set_gate(uint8_t num, uintptr_t base, uint16_t selector, uint32_t flags)
 {
@@ -75,21 +73,6 @@ void idt_set(int nr, uintptr_t addr)
 {
     idt_set_gate(nr, addr, KERNEL_CS, DESC_ACCESS_32TRAP_GATE);
 }
-
-#ifdef __i386__
-UNMAP_AFTER_INIT void idt_write_protect()
-{
-    uint32_t address = addr(&idt);
-    uint32_t pde_index = pde_index(address);
-    uint32_t pte_index = pte_index(address);
-
-    pgt_t* pgt = virt_ptr(init_pgd_get()[pde_index] & PAGE_ADDRESS);
-
-    pgt[pte_index] = (pgt[pte_index] & PAGE_ADDRESS) | PTE_PRESENT;
-
-    pgd_reload();
-}
-#endif
 
 UNMAP_AFTER_INIT void idt_init()
 {

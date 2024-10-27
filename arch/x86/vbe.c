@@ -4,9 +4,10 @@
 #include <arch/i8259.h>
 #include <arch/earlycon.h>
 #include <arch/multiboot.h>
+
 #include <kernel/init.h>
-#include <kernel/page.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
 #define VBE_INFO_BLOCK_ADDR         0x1000
 #define VBE_MODE_INFO_BLOCK_ADDR    0x1400

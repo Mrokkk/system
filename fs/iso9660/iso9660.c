@@ -2,11 +2,11 @@
 #include "iso9660.h"
 
 #include <kernel/fs.h>
-#include <kernel/page.h>
 #include <kernel/malloc.h>
 #include <kernel/minmax.h>
 #include <kernel/module.h>
 #include <kernel/backtrace.h>
+#include <kernel/page_alloc.h>
 
 #define DEBUG_ISO9660   0
 

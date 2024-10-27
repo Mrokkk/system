@@ -2,11 +2,11 @@
 
 #include <kernel/fs.h>
 #include <kernel/vm.h>
-#include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
+#include <kernel/page_alloc.h>
 
 #include <arch/multiboot.h>
 
@@ -14,6 +14,7 @@ static int framebuffer_open();
 static int framebuffer_write(file_t*, const char* data, size_t size);
 static int framebuffer_mmap(file_t* file, vm_area_t* vma);
 static int framebuffer_ioctl(file_t* file, unsigned long request, void* arg);
+static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page);
 
 framebuffer_t framebuffer;
 
@@ -22,6 +23,10 @@ static file_operations_t fops = {
     .write = &framebuffer_write,
     .mmap = &framebuffer_mmap,
     .ioctl = &framebuffer_ioctl,
+};
+
+static vm_operations_t vmops = {
+    .nopage = &framebuffer_nopage,
 };
 
 module_init(framebuffer_init);
@@ -40,11 +45,11 @@ UNMAP_AFTER_INIT static int framebuffer_init()
     if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
     {
         devfs_register("fb0", MAJOR_CHR_FB, 0, &fops);
-        framebuffer.fb = region_map(addr(fb), pitch * height, "framebuffer");
+        framebuffer.fb = mmio_map(addr(fb), pitch * height, "framebuffer");
     }
     else
     {
-        framebuffer.fb = region_map(addr(fb), page_align(2 * pitch * height), "framebuffer");
+        framebuffer.fb = mmio_map(addr(fb), page_align(2 * pitch * height), "framebuffer");
     }
 
     log_notice("framebuffer: %x addr = %x, resolution = %ux%u, pitch = %x, bpp=%u, size = %x",
@@ -80,7 +85,9 @@ static int framebuffer_write(file_t*, const char* data, size_t size)
 
 static int framebuffer_mmap(file_t*, vm_area_t* vma)
 {
-    return vm_io_apply(vma, process_current->mm->pgd, framebuffer_ptr->addr);
+    vma->vm_flags |= VM_IO;
+    vma->ops = &vmops;
+    return 0;
 }
 
 static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
@@ -103,4 +110,11 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
             return 0;
         default: return -EINVAL;
     }
+}
+
+static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t, page_t** page)
+{
+    uintptr_t paddr = (address - vma->start) + addr(framebuffer_ptr->addr);
+    *page = page(paddr);
+    return PAGE_SIZE;
 }

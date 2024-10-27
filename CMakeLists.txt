@@ -99,7 +99,7 @@ endif()
 
 target_link_libraries(
     system
-    PRIVATE "-Wl,-Map=system.map ${LINKER_FLAGS_ARCH}"
+    PRIVATE "-Wl,-Map=system.map -Wl,--no-print-map-discarded -Wl,--print-map-locals ${LINKER_FLAGS_ARCH}"
 )
 
 add_custom_target(

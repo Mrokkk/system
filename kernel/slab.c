@@ -1,7 +1,8 @@
-#include <kernel/page.h>
 #include <kernel/debug.h>
+#include <kernel/kernel.h>
 #include <kernel/malloc.h>
 #include <kernel/printk.h>
+#include <kernel/page_alloc.h>
 
 #define SLAB_REDZONE        0
 #define SLAB_POISON         0x5324

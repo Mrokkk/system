@@ -1,8 +1,8 @@
 #pragma once
 
 #include <arch/io.h>
-#include <kernel/page.h>
 #include <kernel/compiler.h>
+#include <kernel/page_alloc.h>
 
 // References:
 // https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/serial-ata-ahci-spec-rev1-3-1.pdf

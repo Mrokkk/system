@@ -1,7 +1,5 @@
 #pragma once
 
-#include <kernel/page.h>
-
 #define DMA_PRD     0x5000
 #define DMA_SIZE    (2 * PAGE_SIZE)
 #define DMA_START   (DMA_PRD + offsetof(dma_t, buffer))

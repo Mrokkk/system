@@ -1,6 +1,7 @@
 #define log_fmt(fmt) "buffer: " fmt
 #include <kernel/fs.h>
 #include <kernel/kernel.h>
+#include <kernel/page_alloc.h>
 
 #define DEBUG_BUFFER 0
 

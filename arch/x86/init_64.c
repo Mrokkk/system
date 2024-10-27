@@ -14,9 +14,11 @@
 #include <kernel/cpu.h>
 #include <kernel/init.h>
 #include <kernel/init.h>
-#include <kernel/page.h>
 #include <kernel/time.h>
 #include <kernel/kernel.h>
+#include <kernel/memory.h>
+#include <kernel/page_alloc.h>
+#include <kernel/page_table.h>
 
 // FIXME: This file is temporary until long mode paging is implemented
 
@@ -30,6 +32,7 @@ char* bootloader_name;
 void* process_current;
 static param_t* params;
 extern uint64_t pgt4[];
+page_t* page_map;
 
 struct printk_state
 {
@@ -60,9 +63,8 @@ static void write_log(loglevel_t, char* buffer, size_t len, int)
     }
 }
 
-int __page_free(void*)
+void __pages_free(page_t*)
 {
-    return 0;
 }
 
 logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
@@ -152,15 +154,11 @@ void syscall()
 
 UNMAP_AFTER_INIT static void memory_print(void)
 {
-    uintptr_t ram_hi = addr(full_ram >> 32);
-    uintptr_t ram_low = addr(full_ram);
-    uintptr_t mib = 4096 * ram_hi + ram_low / MiB;
-
-    log_notice("RAM: %u MiB", mib);
+    log_notice("RAM: %u MiB", full_ram >> 20);
 
     if (full_ram != (uint64_t)usable_ram)
     {
-        log_continue("; usable %u MiB (%u B)", usable_ram / MiB, usable_ram);
+        log_continue("; usable %lu MiB (%lu B)", usable_ram / MiB, usable_ram);
     }
 
     memory_areas_print();
@@ -300,7 +298,7 @@ void kmain(void* data, ...)
     uint64_t* long_pgt4 = virt_ptr(pgt4);
     long_pgt4[0] = 0;
 
-    pgd_reload();
+    tlb_flush();
 
     asm volatile("int $0x80");
 

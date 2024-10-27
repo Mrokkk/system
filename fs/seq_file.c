@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <kernel/minmax.h>
 #include <kernel/seq_file.h>
+#include <kernel/page_alloc.h>
 
 #define DEBUG_SEQFILE 0
 
@@ -18,6 +19,7 @@ int seq_open(file_t* file, seq_show_t show)
     s->file = file;
     s->size = 0;
     s->count = 0;
+    s->pages = NULL;
     s->buffer = NULL;
     s->private = NULL;
     s->show = show;
@@ -33,12 +35,9 @@ int seq_close(file_t* file)
 
     log_debug(DEBUG_SEQFILE, "closing seq_file=%x", s);
 
-    if (s->buffer)
+    if (s->pages)
     {
-        page_free(s->buffer);
-        page_free(ptr(addr(s->buffer) + PAGE_SIZE));
-        page_free(ptr(addr(s->buffer) + 2 * PAGE_SIZE));
-        page_free(ptr(addr(s->buffer) + 3 * PAGE_SIZE));
+        pages_free(s->pages);
     }
 
     delete(s);
@@ -64,6 +63,7 @@ int seq_read(file_t* file, char* buffer, size_t count)
             return -ENOMEM;
         }
 
+        s->pages = pages;
         s->buffer = page_virt_ptr(pages);
         s->size = 4 * PAGE_SIZE;
 

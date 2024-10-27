@@ -1,10 +1,11 @@
 #include <arch/asm.h>
 #include <arch/msr.h>
 #include <arch/bios.h>
-#include <arch/page.h>
 #include <arch/segment.h>
 #include <arch/register.h>
 #include <arch/real_mode.h>
+#include <arch/page_table.h>
+#include <arch/page_types.h>
 #include <arch/descriptor.h>
 
 #define REAL_ADDR(addr) \
@@ -164,7 +165,7 @@ real_mode_call_end:
 long_mode:
     SEGMENT_REGISTERS_SET(KERNEL_DS, ax)
 
-    movabs $idt + IDT_OFFSET, %rax
+    movabs $idt, %rax
     lidt (%rax)
 
     // Reload global descriptors table (at virtual address)
@@ -204,7 +205,7 @@ jmp_label:
 real_mode_call_end:
 
 protected_paging_32:
-    mov $idt + IDT_OFFSET, %eax
+    mov $idt, %eax
     lidt (%eax)
     mov SAVED_STACK_ADDRESS, %esp
     popf

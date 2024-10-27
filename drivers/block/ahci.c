@@ -4,11 +4,11 @@
 #include <arch/pci.h>
 #include <kernel/fs.h>
 #include <kernel/irq.h>
-#include <kernel/page.h>
 #include <kernel/devfs.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/page_alloc.h>
 
 #include "ata.h"
 #include "sata.h"
@@ -506,7 +506,7 @@ static void ahci_port_detect(ahci_port_t* port)
         ata_device_initialize(device, buf, id, NULL);
     }
 
-    page_free(buf);
+    pages_free(page);
 }
 
 static int ahci_device_register(ata_device_t* device)
@@ -611,7 +611,7 @@ int ahci_init(void)
         return 0;
     }
 
-    if (unlikely(!(ahci = region_map(ahci_pci->bar[5].addr, ahci_pci->bar[5].size, "ahci"))))
+    if (unlikely(!(ahci = mmio_map(ahci_pci->bar[5].addr, ahci_pci->bar[5].size, "ahci"))))
     {
         log_warning("cannot map AHCI's ABAR region");
         return -ENOMEM;
