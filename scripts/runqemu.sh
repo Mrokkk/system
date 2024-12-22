@@ -12,6 +12,7 @@ use_isa_debugcon=
 args="\
 -boot once=c \
 -no-reboot \
+-no-shutdown \
 -rtc base=utc,clock=host \
 -chardev stdio,id=char0,mux=on,signal=off \
 -chardev pipe,id=char1,path=ttyS0 \

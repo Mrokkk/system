@@ -91,6 +91,12 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
 
     const pgd_t* pgde = pgd_offset(pgd, cr2);
 
+    if (unlikely(!vm_paddr(virt(cr3), kernel_page_dir)))
+    {
+        log_critical("bug: page directory %p not mapped in kernel!", cr3);
+        return;
+    }
+
     if (pgd_entry_none(pgde))
     {
         log(severity, "%s: pgd[%u]: not mapped", header, pgde - pgd);
@@ -155,12 +161,13 @@ static inline printer_t printer_get(int nr)
 
 void do_exception(uintptr_t nr, const pt_regs_t regs)
 {
+    bool is_code = false;
     char header[48];
     process_t* p = process_current;
 
     scoped_irq_lock();
 
-    uintptr_t cr2 = cr2_get();
+    uintptr_t cr2 = regs.cr2;
     uintptr_t cr3 = cr3_get();
 
     if (unlikely(nr != PAGE_FAULT))
@@ -223,12 +230,13 @@ void do_exception(uintptr_t nr, const pt_regs_t regs)
     if (unlikely(cr2 >= CODE_START && cr2 < KERNEL_PAGE_OFFSET))
     {
         cr2 -= CODE_START;
+        is_code = true;
     }
 #endif
 
     current_log_debug(DEBUG_PAGE_FAULT, "page fault at %x caused by access to %x", PT_REGS_IP(&regs), cr2);
 
-    if (unlikely(vm_nopage(p->mm->pgd, cr2, regs.error_code & PF_WRITE)))
+    if (unlikely(vm_nopage(p->mm->pgd, cr2, regs.error_code & PF_WRITE, is_code)))
     {
         goto handle_fault;
     }

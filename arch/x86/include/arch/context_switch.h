@@ -6,12 +6,12 @@
 #include <arch/segment.h>
 #include <arch/register.h>
 
-#include <kernel/page.h>
 #include <kernel/debug.h>
 #include <kernel/printk.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
 #include <kernel/backtrace.h>
+#include <kernel/page_table.h>
 
 #ifdef __i386__
 static inline void paranoia(process_t*, process_t* next)
@@ -111,12 +111,13 @@ static inline void paranoia(process_t*, process_t* next)
     }
     else
     {
-        panic("process %d, wrong eip = %x", next->pid, next->context.eip);
+        panic("process %d, wrong eip = %p @ %p", next->pid, next->context.eip, &next->context.eip);
     }
 }
 
 static inline void process_switch(process_t* prev, process_t* next)
 {
+    cli();
 #if PARANOIA_SCHED
     paranoia(prev, next);
 #endif
@@ -126,17 +127,24 @@ static inline void process_switch(process_t* prev, process_t* next)
         "pushl %%esi;"
         "pushl %%edi;"
         "pushl %%ebp;"
+        "push $0xdead;"
         "movl %%esp, %0;"
         "movl %2, %%esp;"
         "movl $context_restore, %1;"
         "pushl %3;"
         "jmp __process_switch;"
         ".global context_restore; context_restore:"
+        "popl %%ecx;"
+#if PARANOIA_SCHED
+        "cmp $0xdead, %%ecx;"
+        "jne __process_switch_bug;"
+#endif
         "popl %%ebp;"
         "popl %%edi;"
         "popl %%esi;"
         "popl %%ecx;"
         "popl %%ebx;"
+        "sti;"
         : "=m" (prev->context.esp),
           "=m" (prev->context.eip)
         : "m" (next->context.esp),

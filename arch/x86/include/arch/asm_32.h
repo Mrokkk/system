@@ -11,21 +11,20 @@
     pushl %es;          /* es */  \
     pushl %ds;          /* ds */  \
     push %eax;          /* eax */ \
+    mov %cr2, %eax;               \
+    push %eax;          /* cr2 */ \
     mov $KERNEL_DS, %eax;         \
     mov %ax, %ds;                 \
     mov %ax, %es;                 \
     mov %ax, %fs;                 \
     mov %ax, %ss;                 \
-    mov (%esp), %eax;             \
+    mov 4(%esp), %eax;            \
     push %ebp;          /* ebp */ \
     push %edi;          /* edi */ \
     push %esi;          /* esi */ \
     push %edx;          /* edx */ \
     push %ecx;          /* ecx */ \
     push %ebx;          /* ebx */ \
-    SAVE_USER_ESP;
-
-#define SAVE_USER_ESP \
     cmpl $KERNEL_CS, REGS_CS(%esp); \
     je 1f; \
     mov SYMBOL_NAME(process_current), %ecx; \
@@ -40,6 +39,7 @@
     pop %esi; \
     pop %edi; \
     pop %ebp; \
+    add $4, %esp; \
     pop %eax; \
     popl %ds; \
     popl %es; \
@@ -77,24 +77,27 @@
 
 #define __exception(x, nr, has_error_code, ...) \
     ENTRY(exc_##x##_handler) \
+        cli; \
         SAVE_ALL(has_error_code); \
         call SYMBOL_NAME(timestamp_update); \
         push $nr; \
         call do_exception; \
         add $4, %esp; \
+        sti; \
         jmp exit_kernel; \
     ENDPROC(exc_##x##_handler)
 
 #define __exception_debug(x, nr, ...) \
     ENTRY(exc_##x##_handler) \
+        cli; \
         SAVE_ALL(0); \
         push $nr; \
         call do_exception; \
         movl $0, %eax; \
         mov %eax, %dr6; \
         add $4, %esp; \
+        sti; \
         jmp exit_kernel; \
-        iret; \
     ENDPROC(exc_##x##_handler)
 
 #endif

@@ -87,14 +87,6 @@ UNMAP_AFTER_INIT void arch_setup(void)
             "mov %eax, %cr4;"
             "movb $1, (%eax);");
     }
-
-    if (cpu_has(X86_FEATURE_PGE))
-    {
-        asm volatile(
-            "mov %cr4, %eax;"
-            "or "ASM_VALUE(CR4_PGE)", %eax;"
-            "mov %eax, %cr4;");
-    }
 #endif
 }
 

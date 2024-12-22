@@ -81,6 +81,7 @@ struct config
     const char* test_to_run;
     bool        run_until_failure;
     bool        verbose;
+    bool        quiet;
 };
 
 struct test_case

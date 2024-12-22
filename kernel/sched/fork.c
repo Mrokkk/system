@@ -10,6 +10,10 @@ pid_t last_pid;
 
 static inline pid_t find_free_pid()
 {
+    if (last_pid == 65535)
+    {
+        panic("no more pids");
+    }
     return ++last_pid;
 }
 

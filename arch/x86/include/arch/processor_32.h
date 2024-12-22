@@ -70,6 +70,7 @@ struct pt_regs
     uint32_t esi;
     uint32_t edi;
     uint32_t ebp;
+    uint32_t cr2;
     uint32_t eax;
     uint16_t ds, __ds;
     uint16_t es, __es;
@@ -96,6 +97,7 @@ typedef struct pt_regs pt_regs_t;
 
 struct context_switch_frame
 {
+    uint32_t canary;
     uint32_t ebp;
     uint32_t edi;
     uint32_t esi;
@@ -113,17 +115,17 @@ typedef struct context_switch_frame context_switch_frame_t;
 #define REGS_ESI    12
 #define REGS_EDI    16
 #define REGS_EBP    20
-#define REGS_EAX    24
-#define REGS_DS     28
-#define REGS_ES     32
-#define REGS_FS     36
-#define REGS_GS     40
-#define REGS_EC     44
-#define REGS_EIP    48
-#define REGS_CS     52
-#define REGS_EFLAGS 56
-#define REGS_ESP    60
-#define REGS_SS     64
+#define REGS_EAX    28
+#define REGS_DS     32
+#define REGS_ES     36
+#define REGS_FS     40
+#define REGS_GS     44
+#define REGS_EC     48
+#define REGS_EIP    52
+#define REGS_CS     56
+#define REGS_EFLAGS 60
+#define REGS_ESP    64
+#define REGS_SS     68
 
 #define CONTEXT_ESP2 12
 

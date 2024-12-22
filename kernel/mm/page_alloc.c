@@ -400,5 +400,3 @@ void page_stats_print()
     }
 #endif
 }
-
-

@@ -94,9 +94,9 @@ static bool arg_parse(
                 if (!strcmp(is_long ? opt->long_v : opt->short_v, arg))
                 {
                     opt->action(user_data);
+                    return true;
                 }
                 break;
-                return true;
             case OPT_VALUE:
                 if (is_long && (long_len = strlen(opt->long_v)))
                 {

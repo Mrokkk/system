@@ -359,7 +359,7 @@ int main()
 
         snake_move();
 
-        if (i % 10 == 0)
+        if (i % 20 == 0)
         {
             struct cell* food_cell;
             do

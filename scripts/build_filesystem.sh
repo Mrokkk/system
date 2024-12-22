@@ -99,7 +99,12 @@ alias ..="cd .."
 alias l="ls -lah"
 alias dmesg="cat /proc/syslog"
 alias f="find . -name"
-alias p="path"'
+alias p="path"
+function k()
+{
+    while ktest -q -t realloc_small_to_small; do echo -n; done
+}
+'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"

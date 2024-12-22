@@ -1,5 +1,7 @@
 #define log_fmt(fmt) "page: " fmt
+#include <arch/asm.h>
 #include <arch/panic.h>
+#include <arch/register.h>
 
 #include <kernel/cpu.h>
 #include <kernel/list.h>
@@ -173,7 +175,11 @@ UNMAP_AFTER_INIT size_t page_tables_prealloc(uintptr_t virt_end)
 
     kernel_page_tables = ptr(virt_end);
 
-    return page_align(min(GiB, page_align(last_phys_address)) / PTRS_PER_PTE);
+    size_t size = page_align(min(GiB, page_align(last_phys_address)) / PTRS_PER_PTE);
+
+    memset(kernel_page_tables, 0, size);
+
+    return size;
 }
 
 UNMAP_AFTER_INIT void page_tables_init(uintptr_t virt_end)
@@ -181,6 +187,17 @@ UNMAP_AFTER_INIT void page_tables_init(uintptr_t virt_end)
     uintptr_t pte_index, pde_index, flags, start, end = 0;
     uintptr_t pfn_end = phys_addr(virt_end) / PAGE_SIZE;
     section_t* section = sections;
+
+    if (cpu_has(X86_FEATURE_PGE))
+    {
+        register uintptr_t dummy = 0;
+        asm volatile(
+            "mov %%cr4, %0;"
+            "or "ASM_VALUE(CR4_PGE)", %0;"
+            "mov %0, %%cr4;"
+            : "=r" (dummy)
+            : "r" (dummy));
+    }
 
     for (pte_index = 0; section->name; ++section)
     {
@@ -195,20 +212,15 @@ UNMAP_AFTER_INIT void page_tables_init(uintptr_t virt_end)
         flags = section_to_pgprot(section);
 
         // Set up section pages as present with proper protection
-        for (uint32_t addr = start; addr < end; addr += PAGE_SIZE, ++pte_index)
+        for (uintptr_t addr = start; addr < end; addr += PAGE_SIZE, ++pte_index)
         {
-            kernel_pte_set(pte_index, pte_index * PAGE_SIZE | PAGE_GLOBAL | flags );
+            kernel_pte_set(pte_index, pte_index * PAGE_SIZE | PAGE_GLOBAL | flags);
         }
     }
 
     for (; pte_index < pfn_end; ++pte_index)
     {
         kernel_pte_set(pte_index, pte_index * PAGE_SIZE | PAGE_PRESENT | PAGE_RW | PAGE_GLOBAL);
-    }
-
-    for (; pte_index < PTRS_PER_PTE; ++pte_index)
-    {
-        kernel_pte_set(pte_index, 0);
     }
 
     // Set up page directory
@@ -224,6 +236,8 @@ UNMAP_AFTER_INIT void page_tables_init(uintptr_t virt_end)
     {
         kernel_pde_set(pde_index, 0);
     }
+
+    tlb_flush();
 
     ASSERT(kernel_page_tables[phys_addr(virt_end) / PAGE_SIZE - 1]);
     ASSERT(kernel_page_dir[min(last_phys_address, GiB) / PAGE_SIZE / PTRS_PER_PMD + KERNEL_PGD_OFFSET - 1]);

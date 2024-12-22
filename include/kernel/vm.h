@@ -54,7 +54,7 @@ int vm_unmap(vm_area_t* vma, pgd_t* pgd);
 int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
 int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd);
-int vm_nopage(pgd_t* pgd, uintptr_t address, bool write);
+int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec);
 
 uintptr_t vm_paddr(uintptr_t vaddr, const pgd_t* pgd);
 

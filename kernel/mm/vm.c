@@ -369,7 +369,7 @@ static int vm_page_map(vm_area_t* vma, pgd_t* pgd, const page_t* page, uintptr_t
     return 0;
 }
 
-int vm_nopage(pgd_t* pgd, uintptr_t address, bool write)
+int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
 {
     int errno, res;
     size_t size;
@@ -459,14 +459,17 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write)
             page->refcount--;
             page = new_page;
         }
-        else if (!write)
+        else if (page->refcount == 0 || exec)
         {
             return -EFAULT;
         }
     }
 
 map_page:
-    page_kernel_unmap(page);
+    if (!(vma->vm_flags & VM_IO))
+    {
+        /*page_kernel_unmap(page);*/
+    }
 
     if ((errno = vm_page_map(vma, pgd, page, address)))
     {
@@ -480,8 +483,8 @@ map_page:
     }
 #endif
 
-    // TODO: is it needed to flush whole TLB?
     tlb_flush();
+    /*tlb_flush_single(address);*/
 
     return 0;
 }

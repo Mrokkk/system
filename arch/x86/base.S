@@ -118,21 +118,17 @@ check_signals:
 
 leave_kernel:
     RESTORE_ALL
-    sti
     iret
 
 run_scheduler:
     movl $0, (%eax)
-    sti
     call SYMBOL_NAME(scheduler)
 
-    cli
     mov SYMBOL_NAME(process_current), %eax
     jmp check_signals
 
 run_signals:
     push leave_kernel
-    sti
     jmp SYMBOL_NAME(do_signals)
 
 ENDPROC(exit_kernel)

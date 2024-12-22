@@ -53,10 +53,16 @@ static void test_set(config_t* config, const char* test)
     config->test_to_run = test;
 }
 
+static void quiet(config_t* config)
+{
+    config->quiet = true;
+}
+
 static option_t options[] = {
     {"-f", "--forever", OPT_BOOL,  "Loop test until failure", &forever_set},
     {"-v", "--verbose", OPT_BOOL,  "Turn on verbose logging", &verbose_set},
     {"-t", "--test",    OPT_VALUE, "Select test to run",      &test_set},
+    {"-q", "--quiet",   OPT_BOOL,  "Quiet mode",              &quiet},
 };
 
 enum
@@ -66,12 +72,15 @@ enum
     TEST_SKIPPED = __TEST_SKIPPED
 };
 
-static int test_run(test_case_t* test, test_suite_t* suite)
+static int test_run(test_case_t* test, test_suite_t* suite, bool quiet)
 {
     const char* suite_name = suite->name;
     const char* const fmt = "%s %s.%s\n";
 
-    fprintf(stdout, fmt, RUN_MSG, suite_name, test->name);
+    if (!quiet)
+    {
+        fprintf(stdout, fmt, RUN_MSG, suite_name, test->name);
+    }
 
     __assert_failed = 0;
 
@@ -83,7 +92,10 @@ static int test_run(test_case_t* test, test_suite_t* suite)
         return TEST_SKIPPED;
     }
 
-    fprintf(stdout, fmt, __assert_failed ? FAIL_MSG : PASS_MSG, suite_name, test->name);
+    if (!quiet || __assert_failed)
+    {
+        fprintf(stdout, fmt, __assert_failed ? FAIL_MSG : PASS_MSG, suite_name, test->name);
+    }
 
     return __assert_failed ? TEST_FAILED : TEST_PASSED;
 }
@@ -94,10 +106,14 @@ static verdict_t suite_run(test_suite_t* suite, list_head_t* failed_tests, confi
     test_case_t* test;
     test_case_t* tests = suite->test_cases;
     size_t count = suite->test_cases_count;
+    bool quiet = config->quiet;
 
     *suite->config = config;
 
-    fprintf(stdout, "%s %u tests from %s\n", GEN_GREEN_MSG, count, suite->name);
+    if (!quiet)
+    {
+        fprintf(stdout, "%s %u tests from %s\n", GEN_GREEN_MSG, count, suite->name);
+    }
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -110,11 +126,11 @@ static verdict_t suite_run(test_suite_t* suite, list_head_t* failed_tests, confi
 
         if (config->test_to_run && config->run_until_failure)
         {
-            while (!(assert_failed = test_run(test, suite)));
+            while (!(assert_failed = test_run(test, suite, quiet)));
         }
         else
         {
-            assert_failed = test_run(test, suite);
+            assert_failed = test_run(test, suite, quiet);
         }
 
         switch (assert_failed)
@@ -132,7 +148,10 @@ static verdict_t suite_run(test_suite_t* suite, list_head_t* failed_tests, confi
         }
     }
 
-    fprintf(stdout, "%s %u tests from %s\n\n", GEN_GREEN_MSG, count, suite->name);
+    if (!quiet)
+    {
+        fprintf(stdout, "%s %u tests from %s\n\n", GEN_GREEN_MSG, count, suite->name);
+    }
 
     return VERDICT(passed, failed, skipped);
 }

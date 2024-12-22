@@ -93,8 +93,6 @@ UNMAP_AFTER_INIT void paging_init(void)
     page_tables_init(virt_end);
     page_map_init(virt_end);
 
-    tlb_flush();
-
     ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].refcount);
     ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].refcount);
     ASSERT(page_map[(phys_addr(virt_end) - PAGE_SIZE) / PAGE_SIZE].refcount);

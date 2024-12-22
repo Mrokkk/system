@@ -19,6 +19,26 @@ extern void exit_kernel(void);
 static uintptr_t user_process_setup_stack(process_t* dest, process_t*, const pt_regs_t* src_regs);
 
 #ifdef __i386__
+static_assert(offsetof(pt_regs_t, ebx) == REGS_EBX);
+static_assert(offsetof(pt_regs_t, ecx) == REGS_ECX);
+static_assert(offsetof(pt_regs_t, edx) == REGS_EDX);
+static_assert(offsetof(pt_regs_t, esi) == REGS_ESI);
+static_assert(offsetof(pt_regs_t, edi) == REGS_EDI);
+static_assert(offsetof(pt_regs_t, ebp) == REGS_EBP);
+static_assert(offsetof(pt_regs_t, eax) == REGS_EAX);
+static_assert(offsetof(pt_regs_t, ds) == REGS_DS);
+static_assert(offsetof(pt_regs_t, es) == REGS_ES);
+static_assert(offsetof(pt_regs_t, fs) == REGS_FS);
+static_assert(offsetof(pt_regs_t, gs) == REGS_GS);
+static_assert(offsetof(pt_regs_t, error_code) == REGS_EC);
+static_assert(offsetof(pt_regs_t, eip) == REGS_EIP);
+static_assert(offsetof(pt_regs_t, cs) == REGS_CS);
+static_assert(offsetof(pt_regs_t, eflags) == REGS_EFLAGS);
+static_assert(offsetof(pt_regs_t, esp) == REGS_ESP);
+static_assert(offsetof(pt_regs_t, ss) == REGS_SS);
+#endif
+
+#ifdef __i386__
 static void fork_kernel_stack_frame(uintptr_t** kernel_stack, const pt_regs_t* regs)
 {
 #define pushk(v) push((v), *kernel_stack)
@@ -37,6 +57,7 @@ static void fork_kernel_stack_frame(uintptr_t** kernel_stack, const pt_regs_t* r
     pushk(regs->es);    // es
     pushk(regs->ds);    // ds
     pushk(0);           // eax; return value in child
+    pushk(0);           // cr2
     pushk(regs->ebp);   // ebp
     pushk(regs->edi);   // edi
     pushk(regs->esi);   // esi
@@ -60,6 +81,7 @@ static void exec_kernel_stack_frame(uintptr_t** kernel_stack, uintptr_t esp, uin
     pushk(USER_DS); // es
     pushk(USER_DS); // ds
     pushk(0);       // eax
+    pushk(0);       // cr2
     pushk(0);       // ebp
     pushk(0);       // edi
     pushk(0);       // esi
@@ -113,6 +135,7 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     pushk(KERNEL_DS);   // es
     pushk(KERNEL_DS);   // ds
     pushk(0);           // eax
+    pushk(0);           // cr2
     pushk(0);           // ebp
     pushk(0);           // edi
     pushk(0);           // esi
@@ -140,6 +163,12 @@ int arch_process_copy(
     dest->context.esp2 = src_regs->esp;
     dest->context.tls_base = src->context.tls_base;
     return 0;
+}
+
+void FASTCALL(NORETURN(__process_switch_bug(void*, void*, uintptr_t value)))
+{
+    panic("Invalid canary during process switch to %u:%s: %p", process_current->pid, process_current->name, value);
+    ASSERT_NOT_REACHED();
 }
 
 void FASTCALL(__process_switch(process_t* prev, process_t* next))
@@ -207,8 +236,6 @@ void do_signals(pt_regs_t regs)
     uint32_t* user_stack = ptr(proc->context.esp2);
     signal_frame_t frame;
 
-    cli();
-
     for (int sig = 0; sig < NSIGNALS; ++sig)
     {
         if (!(proc->signals->ongoing & (1 << sig)))
@@ -249,7 +276,6 @@ void do_signals(pt_regs_t regs)
             "mov %%eax, %%fs;"
             "mov "ASM_VALUE(USER_TLS)", %%eax;"
             "mov %%eax, %%gs;"
-            "sti;"
             "iret;"
             :: "m" (user_stack),
                "m" (proc->signals->sighandler[sig])
