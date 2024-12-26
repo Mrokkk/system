@@ -1,6 +1,6 @@
 REPO="git://gcc.gnu.org/git/gcc.git"
 VERSION="13.2.0"
-BRANCH="releases/gcc-${gcc_version}"
+BRANCH="releases/gcc-${VERSION}"
 
 function build()
 {
