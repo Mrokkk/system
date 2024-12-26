@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "page: " fmt
 #include <kernel/list.h>
+#include <kernel/ksyms.h>
 #include <kernel/mutex.h>
 #include <kernel/memory.h>
 #include <kernel/page_alloc.h>
@@ -157,7 +158,6 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
 #if DEBUG_PAGE_DETAILED
     void* caller = __builtin_return_address(0);
     first_page->caller = caller;
-    page_t* temp;
     list_for_each_entry(temp, &first_page->list_entry, list_entry)
     {
         temp->caller = caller;

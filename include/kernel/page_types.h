@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 #include <kernel/list.h>
+#include <kernel/page_debug.h>
+
 #include <arch/page_types.h>
 
 #define page(phys)              ({ extern page_t* page_map; page_map + ((phys) / PAGE_SIZE); })
