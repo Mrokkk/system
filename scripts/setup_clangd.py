@@ -67,7 +67,10 @@ def main():
 
     for entry in compile_commands:
         flags = entry['command'].split()
-        flags.remove('-fanalyzer')
+        try:
+            flags.remove('-fanalyzer')
+        except:
+            pass
         flags.extend(default_clang_flags)
         if 'bin' in entry['file']:
             flags.extend([f'-isystem {x}' for x in include_paths])
