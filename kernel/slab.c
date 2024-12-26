@@ -1,9 +1,12 @@
 #include <kernel/debug.h>
+#include <kernel/mutex.h>
 #include <kernel/kernel.h>
 #include <kernel/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/page_alloc.h>
+#include <string.h>
 
+#define SLAB_ZERO_AFTER_FREE 1
 #define SLAB_REDZONE        0
 #define SLAB_POISON         0x5324
 #define SLAB_REDZONE_POISON 0xffc0deff
@@ -12,13 +15,14 @@
 typedef struct slab
 {
     list_head_t list_entry;
-    uint32_t poison;
+    uint32_t    poison;
 } slab_t;
 
 typedef struct slab_allocator
 {
-    size_t size;
-    page_t* pages;
+    mutex_t     lock;
+    size_t      size;
+    page_t*     pages;
     list_head_t free;
 } slab_allocator_t;
 
@@ -52,6 +56,8 @@ void* slab_alloc(size_t size)
     {
         return NULL;
     }
+
+    scoped_mutex_lock(&allocator->lock);
 
     if (unlikely(list_empty(&allocator->free)))
     {
@@ -98,11 +104,18 @@ void slab_free(void* ptr, size_t size)
     }
 
     list_init(&slab->list_entry);
+
+    scoped_mutex_lock(&allocator->lock);
+
     list_add_tail(&slab->list_entry, &allocator->free);
     slab->poison = SLAB_POISON;
+
+#if SLAB_ZERO_AFTER_FREE
+    memset(shift(slab, sizeof(*slab)), 0, allocator->size - sizeof(*slab));
+#endif
 }
 
-UNMAP_AFTER_INIT static void init(struct slab_allocator* allocator, size_t size, size_t count)
+UNMAP_AFTER_INIT static void init(slab_allocator_t* allocator, size_t size, size_t count)
 {
     uint8_t* ptr;
     page_t* pages;
@@ -111,7 +124,10 @@ UNMAP_AFTER_INIT static void init(struct slab_allocator* allocator, size_t size,
     pages = page_alloc(page_align(count * size) / PAGE_SIZE, PAGE_ALLOC_CONT);
     ptr = page_virt_ptr(pages);
 
+    memset(ptr, 0, count * size);
+
     list_init(&allocator->free);
+    mutex_init(&allocator->lock);
     allocator->pages = pages;
     allocator->size = size;
 

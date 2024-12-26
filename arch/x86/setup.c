@@ -125,7 +125,6 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     elf_register();
 
     vsyscall_init();
-
 }
 
 void panic_mode_enter(void)

@@ -21,13 +21,18 @@ static inline void process_space_free(process_t* proc)
 
     pages_free(page(phys_addr(kernel_stack_end)));
 
-    scoped_mutex_lock(&proc->mm->lock);
+    mutex_lock(&proc->mm->lock);
 
     if (!--proc->mm->refcount)
     {
         vm_free(proc->mm->vm_areas, pgd);
         pages_free(page(phys_addr(proc->mm->pgd)));
+        mutex_unlock(&proc->mm->lock);
         delete(proc->mm);
+    }
+    else
+    {
+        mutex_unlock(&proc->mm->lock);
     }
 }
 
@@ -124,12 +129,14 @@ dont_wait:
         *status = proc->exit_code;
     }
 
+    pid = proc->pid;
+
     if (process_is_zombie(proc))
     {
         process_delete(proc);
     }
 
-    return proc->pid;
+    return pid;
 }
 
 void process_wake_waiting(process_t* proc)
