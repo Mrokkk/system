@@ -1,6 +1,6 @@
 REPO="https://gitlab.com/qemu-project/qemu.git"
 VERSION=
-BRANCH=
+BRANCH="v9.2.0-rc3"
 OPTIONAL=true
 
 function build()

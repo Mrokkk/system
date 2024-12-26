@@ -1,11 +1,17 @@
+commit 6ab8f59d775ea2d9533edbfd2427e3af91e3d0e3
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Thu Dec 26 15:02:08 2024 +0100
+
+    Fix not working PCI BM for piix3-ide
+
 diff --git a/hw/pci/pci.c b/hw/pci/pci.c
-index 324c130..34e62d1 100644
+index 1416ae2..b952367 100644
 --- a/hw/pci/pci.c
 +++ b/hw/pci/pci.c
-@@ -1200,10 +1200,35 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev,
+@@ -1219,10 +1219,36 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev,
      pci_dev->requester_id_cache = pci_req_id_cache_get(pci_dev);
      pstrcpy(pci_dev->name, sizeof(pci_dev->name), name);
-
+ 
 -    memory_region_init(&pci_dev->bus_master_container_region, OBJECT(pci_dev),
 -                       "bus master container", UINT64_MAX);
 -    address_space_init(&pci_dev->bus_master_as,
@@ -39,6 +45,7 @@ index 324c130..34e62d1 100644
 +            &pci_dev->bus_master_container_region,
 +            pci_dev->name);
 +    }
-
-     if (phase_check(PHASE_MACHINE_READY)) {
-         pci_init_bus_master(pci_dev);
++
+     pci_dev->bus_master_as.max_bounce_buffer_size =
+         pci_dev->max_bounce_buffer_size;
+ 
