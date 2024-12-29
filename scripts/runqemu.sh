@@ -84,11 +84,10 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-qemu_path=$(binary_from_native_sysroot "qemu-system-x86_64")
-
-if [[ -z "${qemu_path}" ]]
-then
+if file system | grep -q 32; then
     qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
+else
+    qemu_path=$(binary_from_native_sysroot "qemu-system-x86_64")
 fi
 
 if [[ -z "${qemu_path}" ]]
