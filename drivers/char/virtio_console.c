@@ -317,6 +317,8 @@ static int virtio_write(int queue_id, const char* data, size_t size)
 
     *queue->notify = queue_id;
 
+    while (queue->used->idx != queue->avail->idx);
+
     return size;
 }
 
