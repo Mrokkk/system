@@ -5,6 +5,7 @@
 
 #include <kernel/cpu.h>
 #include <kernel/list.h>
+#include <kernel/mutex.h>
 #include <kernel/memory.h>
 #include <kernel/minmax.h>
 #include <kernel/sections.h>
@@ -18,6 +19,7 @@ extern list_head_t free_pages;
 extern uintptr_t last_pfn;
 
 pte_t* kernel_page_tables;
+static mutex_t lock = MUTEX_INIT(lock);
 
 static inline void kernel_pte_set(uintptr_t pte_index, uintptr_t val)
 {
@@ -98,6 +100,8 @@ pgd_t* pgd_alloc(void)
         return NULL;
     }
 
+    scoped_mutex_lock(&lock);
+
     memcpy(new_pgd, kernel_page_dir, PAGE_SIZE);
 
     return new_pgd;
@@ -121,6 +125,8 @@ int pte_alloc_impl(pmd_t* pmd)
 
 void page_kernel_map(page_t* page, pgprot_t prot)
 {
+    scoped_mutex_lock(&lock);
+
     uintptr_t paddr = page_phys(page);
     uintptr_t vaddr = virt(paddr);
     uintptr_t pfn = paddr / PAGE_SIZE;
@@ -131,6 +137,8 @@ void page_kernel_map(page_t* page, pgprot_t prot)
 
 void page_kernel_unmap(page_t* page)
 {
+    scoped_mutex_lock(&lock);
+
     uintptr_t paddr = page_phys(page);
     void* vaddr = page_virt_ptr(page);
     uintptr_t pfn = paddr / PAGE_SIZE;

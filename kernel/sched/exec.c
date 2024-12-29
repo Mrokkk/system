@@ -413,10 +413,14 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     args_get(argv, true, &argvec[ARGV]);
     args_get(envp, false, &argvec[ENVP]);
 
-    pgd_load(new_pgd);
-
     p->mm->pgd = new_pgd;
     p->mm->vm_areas = NULL;
+
+    // This has to be done after mm->pgd is set to avoid race. If the sequence would be following:
+    // 1. pgd_load, 2. set mm->pgd, then if process switch would happen after step 1, then we would
+    // have old pgd loaded to CR3, which might eventually cause a crash if the page would be allocated
+    // and used by something else (e.g. nopage)
+    pgd_load(new_pgd);
 
     argv0 = list_next_entry(&argvec[ARGV].head, arg_t, list_entry);
 

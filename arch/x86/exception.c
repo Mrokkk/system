@@ -7,7 +7,9 @@
 #include <kernel/sections.h>
 #include <kernel/segmexec.h>
 #include <kernel/vm_print.h>
+#include <kernel/backtrace.h>
 #include <kernel/page_alloc.h>
+#include <kernel/page_debug.h>
 #include <kernel/page_table.h>
 
 #include <arch/io.h>
@@ -83,17 +85,26 @@ static void pf_reason_print(uintptr_t error_code, uintptr_t cr2, char* output, s
 static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t cr2, uintptr_t cr3, const char* header)
 {
     char buffer[256];
-    const pgd_t* pgd = virt_cptr(cr3);
+    pgd_t* pgd = virt_ptr(cr3);
 
     pf_reason_print(regs->error_code, cr2, buffer, sizeof(buffer));
     log(severity, "%s: %s", header, buffer);
-    log(severity, "%s: pgd: cr3 = %p", header, ptr(cr3));
+    log(severity, "%s: pgd: cr3 = %p, mm->pgd = %p", header, ptr(cr3), process_current->mm->pgd);
 
     const pgd_t* pgde = pgd_offset(pgd, cr2);
+
+    if (unlikely(cr3 != phys_addr(process_current->mm->pgd)))
+    {
+        log_critical("bug: cr3 != mm->pgd");
+    }
 
     if (unlikely(!vm_paddr(virt(cr3), kernel_page_dir)))
     {
         log_critical("bug: page directory %p not mapped in kernel!", cr3);
+        page_t* missing_page = page(cr3);
+        page_kernel_map(missing_page, PAGE_PRESENT | PAGE_RW | PAGE_GLOBAL);
+        pgd = page_virt_ptr(missing_page);
+        memory_dump(KERN_CRIT, pgde, 4);
         return;
     }
 
@@ -310,12 +321,13 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
         log_critical("%s: exception during early init...", header);
     }
 
-    log_critical("%s: %s #%x from %x in pid %u",
+    log_critical("%s: %s #%x from %x in pid %u (state %c)",
         header,
         exception->name,
         exception->has_error_code ? regs->error_code : 0,
         PT_REGS_IP(regs),
-        p->pid);
+        p->pid,
+        process_state_char(p->stat));
 
     if (printer)
     {
