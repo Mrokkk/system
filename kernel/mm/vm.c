@@ -439,6 +439,8 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
 
         memset(page_virt_ptr(page), 0, PAGE_SIZE);
 
+        page_kernel_unmap(page);
+
         goto map_page;
     }
     else
@@ -468,7 +470,7 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
 map_page:
     if (!(vma->vm_flags & VM_IO))
     {
-        /*page_kernel_unmap(page);*/
+        page_kernel_unmap(page);
     }
 
     if ((errno = vm_page_map(vma, pgd, page, address)))
@@ -483,8 +485,7 @@ map_page:
     }
 #endif
 
-    tlb_flush();
-    /*tlb_flush_single(address);*/
+    tlb_flush_single(address);
 
     return 0;
 }
@@ -751,6 +752,42 @@ int vm_unmap(vm_area_t* vma, pgd_t* pgd)
     return 0;
 }
 
+static uintptr_t vma_start_get(const vm_area_t* vma)
+{
+    if (!vma)
+    {
+        return 0;
+    }
+
+    if (vma->start == vma->end)
+    {
+        return vma->next ? vma->next->start : 0;
+    }
+
+    return vma->start;
+}
+
+#if CONFIG_SEGMEXEC
+static uintptr_t vma_code_start_get(const vm_area_t* vma)
+{
+    if (!vma)
+    {
+        return 0;
+    }
+
+    while (vma)
+    {
+        if (vma->vm_flags & VM_EXEC)
+        {
+            return vma->start;
+        }
+        vma = vma->next;
+    }
+
+    return 0;
+}
+#endif
+
 int vm_free(vm_area_t* vma_list, pgd_t* pgd)
 {
     vm_area_t* temp;
@@ -770,7 +807,7 @@ int vm_free(vm_area_t* vma_list, pgd_t* pgd)
 
         start = vma->start;
         end = vma->end;
-        next_start = vma->next ? vma->next->start : 0;
+        next_start = vma_start_get(vma->next);
         pgd_range_free(pgd, start, end, 0, next_start, free_pages);
 
 #if CONFIG_SEGMEXEC
@@ -778,13 +815,10 @@ int vm_free(vm_area_t* vma_list, pgd_t* pgd)
         {
             start += CODE_START;
             end += CODE_START;
-            if (next_start && vma->next->vm_flags & VM_EXEC)
+            next_start = vma_code_start_get(vma->next);
+            if (next_start)
             {
                 next_start += CODE_START;
-            }
-            else
-            {
-                next_start = 0;
             }
             pgd_range_free(pgd, start, end, 0, next_start, false);
         }
