@@ -21,7 +21,7 @@
 #define MAJOR_BLK_AHCI            258
 
 #define BLK_NO_PARTITION                -1
-#define BLK_MINOR_DRIVE(drive)          (drive)
+#define BLK_MINOR_DRIVE(drive)          ((drive) << 4)
 #define BLK_MINOR(partition, drive)     (((drive) << 4) | ((partition) + 1))
 #define BLK_PARTITION(minor)            (((minor) & 0xf) - 1)
 #define BLK_DRIVE(minor)                (((minor) >> 4) & 0xf)
