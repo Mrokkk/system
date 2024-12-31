@@ -40,21 +40,26 @@ static int pci_devices_list(void)
     return 0;
 }
 
+static uint32_t pci_io_address(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
+{
+    return 0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc);
+}
+
 static uint16_t pci_config_read_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
 {
-    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc), PCI_CONFIG_ADDRESS);
+    outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
     return inl(PCI_CONFIG_DATA) >> ((offset & 2) * 8) & 0xffff;
 }
 
 static uint32_t pci_config_read_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
 {
-    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | offset, PCI_CONFIG_ADDRESS);
+    outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
     return inl(PCI_CONFIG_DATA);
 }
 
 static void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val)
 {
-    outl(0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | offset, PCI_CONFIG_ADDRESS);
+    outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
     outl(val, PCI_CONFIG_DATA);
 }
 
@@ -71,19 +76,34 @@ int pci_device_initialize(pci_device_t* device)
 int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size)
 {
     uint32_t* buf = buffer;
+
+    if (unlikely(size % 4))
+    {
+        log_error("invalid read from PCI device");
+        return -1;
+    }
+
     for (; size >= 4; size -= 4, buf++, offset += 4)
     {
         *buf = pci_config_read_u32(device->bus, device->slot, device->func, offset);
     }
-    uint16_t* buf16 = ptr(buf);
-    for (; size >= 2; size -= 2, buf16++, offset += 2)
+
+    return 0;
+}
+
+int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, size_t size)
+{
+    const uint32_t* buf = buffer;
+
+    if (unlikely(size % 4))
     {
-        *buf16 = pci_config_read_u16(device->bus, device->slot, device->func, offset);
+        log_error("invalid read from PCI device");
+        return -1;
     }
 
-    if (size)
+    for (; size >= 4; size -= 4, buf++, offset += 4)
     {
-        return -1;
+        pci_config_write_u32(device->bus, device->slot, device->func, offset, *buf);
     }
 
     return 0;
@@ -483,10 +503,13 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
         }
     }
 
+    mb();
+
     list_init(&device->list_entry);
     device->bus = bus;
     device->slot = slot;
     device->func = func;
+    device->capabilities &= ~3;
     list_add_tail(&device->list_entry, &pci_devices);
 }
 

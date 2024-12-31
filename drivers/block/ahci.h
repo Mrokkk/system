@@ -1,6 +1,8 @@
 #pragma once
 
 #include <arch/io.h>
+#include <kernel/list.h>
+#include <kernel/wait.h>
 #include <kernel/compiler.h>
 #include <kernel/page_alloc.h>
 
@@ -8,6 +10,8 @@
 // https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/serial-ata-ahci-spec-rev1-3-1.pdf
 // https://wiki.osdev.org/AHCI
 // https://stackoverflow.com/questions/11739979/ahci-driver-for-own-os
+
+typedef struct request request_t;
 
 typedef struct ahci_port ahci_port_t;
 typedef struct ahci_port_data ahci_port_data_t;
@@ -216,7 +220,7 @@ struct ahci_command
     io16 prdtl;     // Physical region descriptor table length in entries
 
     // DW1
-    io32 prdbc;         // Physical region descriptor byte count transferred
+    io32 prdbc;     // Physical region descriptor byte count transferred
 
     // DW2, 3
     io32 ctba;      // Command table descriptor base address
@@ -416,6 +420,14 @@ struct ahci_hba
 
     // 0x100 - 0x10FF, Port control registers
     ahci_hba_port_t ports[AHCI_PORT_COUNT];
+};
+
+struct request
+{
+    int         slot;
+    int         id;
+    int         errno;
+    list_head_t list_entry;
 };
 
 struct ahci_port

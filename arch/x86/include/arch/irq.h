@@ -5,6 +5,7 @@
 #define PIC_IRQ_VECTOR_OFFSET       0x20
 #define IOAPIC_IRQ_VECTOR_OFFSET    0x30
 #define IRQ_CHIPS_COUNT             2
+#define IRQ_COUNT                   32
 
 struct irq_chip;
 

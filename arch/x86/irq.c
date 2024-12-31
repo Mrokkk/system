@@ -15,7 +15,29 @@ typedef struct
 
 static irq_chip_t* chips[IRQ_CHIPS_COUNT];
 static irq_chip_t* used_chip;
-static irq_t irq_list[16];
+static irq_t irq_list[IRQ_COUNT];
+
+int irq_allocate(void (*handler)(), const char* name, int flags, int* irq_vector)
+{
+    int errno;
+
+    for (int i = 16; i < IRQ_COUNT; ++i)
+    {
+        if (!irq_list[i].handler)
+        {
+            if (unlikely(errno = irq_register(i, handler, name, flags)))
+            {
+                return errno;
+            }
+
+            *irq_vector = i + used_chip->vector_offset;
+
+            return 0;
+        }
+    }
+
+    return -ENOMEM;
+}
 
 int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags)
 {

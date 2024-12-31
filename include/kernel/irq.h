@@ -10,6 +10,7 @@
 #define IRQ_DEFAULT (IRQ_NORMAL | IRQ_ENABLE)
 
 int irqs_initialize(void);
+int irq_allocate(void (*handler)(), const char* name, int flags, int* irq_vector);
 int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags);
 int irq_enable(uint32_t irq);
 int irq_disable(uint32_t irq);

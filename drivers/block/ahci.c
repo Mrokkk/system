@@ -28,10 +28,13 @@ static file_operations_t ops = {
     .read = &ahci_fs_read,
 };
 
+static LIST_DECLARE(requests);
+static bool interrupts;
 static ahci_hba_t* ahci;
 static ahci_port_t ports[AHCI_PORT_COUNT];
 static pci_device_t* ahci_pci;
 ata_device_t devices[AHCI_PORT_COUNT];
+WAIT_QUEUE_HEAD_DECLARE(queue);
 
 static_assert(sizeof(ahci_hba_t) == 0x1100);
 static_assert(sizeof(ahci_hba_port_t) == 0x80);
@@ -101,15 +104,154 @@ static int ahci_wait(io32* reg, uint32_t mask, uint32_t val)
     return timeout == 0;
 }
 
-static uint32_t ahci_port_phys_addr(ahci_port_t* port, void* ptr)
+static int ahci_port_error_check(ahci_port_t* port)
+{
+    if (unlikely(port->regs->is & AHCI_PxIS_TFES))
+    {
+        log_warning("port %u: task file error", port->id);
+        ahci_dump(ahci);
+        return -EIO;
+    }
+    else if (unlikely(port->regs->serr))
+    {
+        log_warning("port %u: error");
+        ahci_dump(ahci);
+        return -EIO;
+    }
+
+    return 0;
+}
+
+static uintptr_t ahci_port_phys_addr(ahci_port_t* port, void* ptr)
 {
     return addr(ptr) - addr(port->data) + page_phys(port->data_pages);
 }
 
+static void ahci_irq_handle(void)
+{
+    scoped_irq_lock();
+
+    uint32_t is = ahci->is;
+
+    for (int i = 0; is && i < AHCI_PORT_COUNT; ++i, is >>= 1)
+    {
+        ahci_port_t* port = ports + i;
+
+        if (!(is & 1))
+        {
+            continue;
+        }
+
+        uint32_t port_is = port->regs->is;
+
+        if (!port_is)
+        {
+            continue;
+        }
+
+        request_t* req;
+        int errno = ahci_port_error_check(port);
+
+        list_for_each_entry_safe(req, &requests, list_entry)
+        {
+            if (req->id != i)
+            {
+                continue;
+            }
+
+            if (port->regs->ci & (1 << req->slot))
+            {
+                continue;
+            }
+
+            req->errno = errno;
+
+            list_del(&req->list_entry);
+
+            process_t* proc = wait_queue_pop(&queue);
+
+            if (unlikely(!proc))
+            {
+                log_warning("no process in the wait queue for request on port %u slot %u",
+                    req->id,
+                    req->slot);
+                continue;
+            }
+
+            process_wake(proc);
+        }
+
+        port->regs->is = port_is;
+    }
+
+    ahci->is = is;
+}
+
 static int ahci_irq_enable(void)
 {
-    ahci->ghc.ie = 1;
-    return ahci->ghc.ie != 1;
+    pci_cap_t cap = {};
+    pci_msi_cap_t msi_cap = {};
+
+    for (uint8_t ptr = ahci_pci->capabilities; ptr; ptr = cap.next)
+    {
+        if (unlikely(pci_config_read(ahci_pci, ptr, &cap, sizeof(cap))))
+        {
+            log_warning("cannot read CAP at %#x", ptr);
+            continue;
+        }
+
+        if (cap.id == PCI_CAP_ID_MSI)
+        {
+            log_info("got MSI support");
+
+            if (unlikely(pci_config_read(ahci_pci, ptr, &msi_cap, sizeof(msi_cap))))
+            {
+                log_warning("cannot read MSI CAP");
+                continue;
+            }
+
+            int irq, errno;
+
+            if (unlikely(errno = irq_allocate(&ahci_irq_handle, "ahci", 0, &irq)))
+            {
+                return errno;
+            }
+
+            interrupts = true;
+
+            msi_cap.msg_addr_low = 0xfee00000;
+            msi_cap.msg_data = irq;
+            msi_cap.msg_ctrl |= PCI_CAP_MSG_CTRL_ENABLE;
+
+            pci_config_write(ahci_pci, ptr + 0x4, &msi_cap.msg_addr_low, 4);
+            if (msi_cap.msg_ctrl & PCI_CAP_MSG_CTRL_64BIT)
+            {
+                pci_config_write(ahci_pci, ptr + 0xc, &msi_cap.msg_data, 4);
+            }
+            else
+            {
+                pci_config_write(ahci_pci, ptr + 0x8, &msi_cap.msg_data, 4);
+            }
+            pci_config_write(ahci_pci, ptr, &msi_cap, 4);
+        }
+        else if (cap.id == PCI_CAP_ID_MSIX)
+        {
+            log_info("got MSI-X support");
+            // TODO
+        }
+    }
+
+    if (interrupts)
+    {
+        ahci->ghc.ie = 1;
+
+        if (unlikely(ahci->ghc.ie != 1))
+        {
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 static void ahci_port_error_clear(ahci_port_t* port)
@@ -136,6 +278,7 @@ static int ahci_drive_wait(ahci_port_t* port)
 
 static int ahci_drive_await_transfer_finish(ahci_port_t* port, int slot)
 {
+    int errno;
     size_t time_elapsed = 0;
 
     while (1)
@@ -146,18 +289,11 @@ static int ahci_drive_await_transfer_finish(ahci_port_t* port, int slot)
             ahci_dump(ahci);
             return -ETIMEDOUT;
         }
-        else if (unlikely(port->regs->is & AHCI_PxIS_TFES))
+        else if (unlikely(errno = ahci_port_error_check(port)))
         {
-            log_warning("port %u: task file error", port->id);
-            ahci_dump(ahci);
-            return -EIO;
+            return errno;
         }
-        else if (unlikely(port->regs->serr))
-        {
-            log_warning("port %u: error");
-            ahci_dump(ahci);
-            return -EIO;
-        }
+
         // In some longer duration reads, it may be helpful to spin on the DPS bit
         // in the PxIS port field as well (1 << 5)
         if (!(port->regs->ci & (1 << slot)))
@@ -202,14 +338,14 @@ static int ahci_port_cmd_slot_find(ahci_hba_port_t *port)
     return -1;
 }
 
-static int ahci_read(ata_device_t* device, uint32_t offset, uint32_t count, char* buffer)
+static int ahci_read(ata_device_t* device, uint32_t offset, uint32_t count, char* buffer, bool irq)
 {
     int errno;
     ahci_port_t* port = ports + device->id;
     int slot = ahci_port_cmd_slot_find(port->regs);
     uint32_t sectors = count / ATA_SECTOR_SIZE;
 
-    if (slot == -1)
+    if (unlikely(slot == -1))
     {
         return -EBUSY;
     }
@@ -230,10 +366,10 @@ static int ahci_read(ata_device_t* device, uint32_t offset, uint32_t count, char
     port->data->cmdlist[slot].prdtl = 1;
 
     ahci_prdt_entry_t* prdt = &port->data->prdt[0];
-    prdt->dba = paddr;
-    prdt->dbau = 0;
-    prdt->dbc = count - 1;
-    prdt->i = 1;
+    prdt->dba       = paddr;
+    prdt->dbau      = 0;
+    prdt->dbc       = count - 1;
+    prdt->i         = 1;
 
     FIS_REG_H2D* fis = ptr(&port->data->cmdtable.cfis);
     fis->fis_type   = FIS_TYPE_REG_H2D;
@@ -250,30 +386,55 @@ static int ahci_read(ata_device_t* device, uint32_t offset, uint32_t count, char
     fis->countl = sectors & 0xff;
     fis->counth = (sectors >> 8) & 0xff;
 
-    if ((errno = ahci_drive_wait(port)))
+    if (unlikely(errno = ahci_drive_wait(port)))
     {
         return errno;
     }
 
-    port->regs->ci = 1 << slot;
-
-    if ((errno = ahci_drive_await_transfer_finish(port, slot)))
+    if (interrupts && irq)
     {
-        return errno;
+        flags_t flags;
+
+        irq_save(flags);
+        request_t req = {.slot = slot, .id = device->id};
+        list_init(&req.list_entry);
+
+        WAIT_QUEUE_DECLARE(q, process_current);
+
+        list_add_tail(&req.list_entry, &requests);
+
+        port->regs->ci = 1 << slot;
+
+        if (unlikely(errno = process_wait_locked(&queue, &q, &flags)))
+        {
+            irq_restore(flags);
+            return errno;
+        }
+
+        if (unlikely(errno = req.errno))
+        {
+            irq_restore(flags);
+            return errno;
+        }
+
+        irq_restore(flags);
+    }
+    else
+    {
+        port->regs->ci = 1 << slot;
+        if ((errno = ahci_drive_await_transfer_finish(port, slot)))
+        {
+            return errno;
+        }
     }
 
     return 0;
 }
 
-static void ahci_irq_handle()
-{
-    log_debug(DEBUG_AHCI, "");
-}
-
 static int ahci_fs_open(file_t* file)
 {
     int drive = BLK_DRIVE(MINOR(file->dentry->inode->rdev));
-    if (!devices[drive].mbr.signature)
+    if (unlikely(!devices[drive].mbr.signature))
     {
         return -ENODEV;
     }
@@ -310,7 +471,7 @@ static int ahci_fs_read(file_t* file, char* buf, size_t count)
         return 0;
     }
 
-    if ((errno = ahci_read(device, offset, count, buf)))
+    if (unlikely(errno = ahci_read(device, offset, count, buf, true)))
     {
         log_warning("read error!");
         return errno;
@@ -403,10 +564,10 @@ static int ahci_port_setup(int id)
     port->regs->cmd &= ~AHCI_PxCMD_FRE;
     while (port->regs->cmd & (AHCI_PxCMD_FRE | AHCI_PxCMD_CR));
 
-    port->regs->clbu    = 0;
     port->regs->clb     = ahci_port_phys_addr(port, &port->data->cmdlist);
-    port->regs->fbu     = 0;
+    port->regs->clbu    = 0;
     port->regs->fb      = ahci_port_phys_addr(port, &port->data->fis);
+    port->regs->fbu     = 0;
 
     log_debug(DEBUG_AHCI, "clb = %x, fb = %x", port->regs->clb, port->regs->fb);
 
@@ -445,8 +606,6 @@ static int ahci_port_setup(int id)
     log_info("port %u: DET = %x, IPM = %x; SIG = %x (%s)", id, det, ipm, sig, ahci_signature_string(sig));
 
     port->signature = sig;
-
-    //port->regs->ie |= 0xf;
 
     return 0;
 }
@@ -506,6 +665,8 @@ static void ahci_port_detect(ahci_port_t* port)
         ata_device_initialize(device, buf, id, NULL);
     }
 
+    port->regs->ie = 0xffffffff;
+
     pages_free(page);
 }
 
@@ -537,7 +698,7 @@ static int ahci_device_register(ata_device_t* device)
 
     memset(buf, 0, PAGE_SIZE);
 
-    if ((errno = ahci_read(device, 0, ATA_SECTOR_SIZE, buf)))
+    if ((errno = ahci_read(device, 0, ATA_SECTOR_SIZE, buf, false)))
     {
         return errno;
     }
@@ -618,8 +779,6 @@ int ahci_init(void)
     }
 
     (void)ahci_reset;
-    (void)ahci_irq_enable;
-    (void)ahci_irq_handle;
 
     pci_device_print(ahci_pci);
 
@@ -630,6 +789,7 @@ int ahci_init(void)
         execute(ahci_reset(),                    "perform reset") ||
         execute(ahci_mode_set(),                 "set AHCI mode after reset") ||
 #endif
+        execute(ahci_irq_enable(),               "enable IRQ") ||
         execute_no_ret(ahci_controller_print()) ||
         execute(ahci_ports_initialize(),         "initialize ports"))
     {

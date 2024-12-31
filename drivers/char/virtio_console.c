@@ -130,7 +130,7 @@ static int virtio_cap_read(void** notify_bar_ptr, uint32_t* notify_cap_off, uint
     void* mapped_bars[6] = {};
     virtio_pci_cap_t virtio_cap[5] = {};
 
-    for (uint8_t ptr = console.pci_device->capabilities[0] & ~0x3; ptr; ptr = cap.next)
+    for (uint8_t ptr = console.pci_device->capabilities; ptr; ptr = cap.next)
     {
         if (pci_config_read(console.pci_device, ptr, &cap, sizeof(cap)))
         {
