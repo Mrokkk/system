@@ -145,6 +145,9 @@ class QemuMon(Process):
                         continue
                 print(f'{vaddr:#010x}: {paddr:#010x} {splitted[2]}')
 
+        def do_help(self, command) -> None:
+            self.qemu_mon.execute('help')
+
         def default(self, command) -> None:
             self.qemu_mon.execute(command)
 
