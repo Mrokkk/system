@@ -55,7 +55,7 @@ UNMAP_AFTER_INIT int vsyscall_init(void)
         return 0;
     }
 
-    page = page_alloc1();
+    page = page_alloc(1, 0);
 
     if (!page)
     {

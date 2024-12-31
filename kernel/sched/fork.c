@@ -38,7 +38,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
         dest->mm = src->mm;
         dest->mm->refcount++;
 
-        kernel_stack_page = page_alloc1();
+        kernel_stack_page = page_alloc(1, 0);
 
         if (unlikely(!kernel_stack_page))
         {
@@ -62,7 +62,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
         goto error;
     }
 
-    kernel_stack_page = page_alloc1();
+    kernel_stack_page = page_alloc(1, 0);
 
     if (unlikely(!kernel_stack_page))
     {

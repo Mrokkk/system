@@ -241,7 +241,7 @@ process_t* process_get(int pid)
 static int initialize(void)
 {
     int errno;
-    page_t* page = page_alloc(1, PAGE_ALLOC_DISCONT);
+    page_t* page = page_alloc(1, 0);
 
     if (unlikely(!page))
     {

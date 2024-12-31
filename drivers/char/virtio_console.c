@@ -219,23 +219,20 @@ static int virtio_queues_setup(void* notify_bar, uint32_t notify_cap_off, uint32
 
     for (int i = 0; i < VIRTIO_CONSOLE_NUMQUEUES; ++i)
     {
-        buffer = page_alloc(BUFFER_PAGES, BUFFER_ALLOC_FLAGS);
+        buffer = page_alloc(BUFFER_PAGES, BUFFER_ALLOC_FLAGS | PAGE_ALLOC_ZEROED);
 
         if (unlikely(!buffer))
         {
             return -ENOMEM;
         }
 
-        control = page_alloc(1, PAGE_ALLOC_UNCACHED);
+        control = page_alloc(1, PAGE_ALLOC_UNCACHED | PAGE_ALLOC_ZEROED);
 
         if (unlikely(!control))
         {
             pages_free(buffer);
             return -ENOMEM;
         }
-
-        memset(page_virt_ptr(buffer), 0, PAGE_SIZE);
-        memset(page_virt_ptr(control), 0, PAGE_SIZE);
 
         console.common_cfg->queue_select = i;
         console.common_cfg->queue_desc = page_phys(control) + desc_off;

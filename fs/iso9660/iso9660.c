@@ -396,9 +396,9 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t
     size_t count = 0;
     buffer_t* b;
 
-    if (unlikely(!(*page = page_alloc1())))
+    if (unlikely(!(*page = page_alloc(1, 0))))
     {
-        log_debug(DEBUG_ISO9660, "cannot allocate pages");
+        log_debug(DEBUG_ISO9660, "cannot allocate page");
         return -ENOMEM;
     }
 

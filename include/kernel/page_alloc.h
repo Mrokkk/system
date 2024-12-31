@@ -9,6 +9,7 @@ typedef enum
     PAGE_ALLOC_CONT         = 1,
     PAGE_ALLOC_UNCACHED     = 2,
     PAGE_ALLOC_NO_KERNEL    = 4,
+    PAGE_ALLOC_ZEROED       = 8,
 } alloc_flag_t;
 
 // Allocate a page(s) and map it/them in kernel; allocation of
@@ -26,7 +27,6 @@ MUST_CHECK(void*) mmio_map(uintptr_t paddr, uintptr_t size, const char* name);
 
 #define pages_free(ptr)         __pages_free(ptr)
 #define page_alloc(c, f)        __page_alloc(c, f)
-#define page_alloc1()           page_alloc(1, PAGE_ALLOC_DISCONT)
 
 #define single_page() \
     ({ page_t* res = page_alloc(1, PAGE_ALLOC_DISCONT); res ? page_virt_ptr(res) : NULL; })

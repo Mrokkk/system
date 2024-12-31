@@ -428,7 +428,7 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
 
     if (!page)
     {
-        page = page_alloc1();
+        page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
         if (unlikely(!page))
         {
@@ -436,8 +436,6 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
             do_kill(process_current, SIGKILL);
             return 0;
         }
-
-        memset(page_virt_ptr(page), 0, PAGE_SIZE);
 
         page_kernel_unmap(page);
 
@@ -447,7 +445,7 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
     {
         if (page->refcount > 1)
         {
-            page_t* new_page = page_alloc1();
+            page_t* new_page = page_alloc(1, 0);
 
             if (unlikely(!new_page))
             {

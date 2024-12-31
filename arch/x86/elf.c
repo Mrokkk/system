@@ -148,7 +148,7 @@ static int elf_prepare(const char* name, file_t* file, string_t** interpreter, v
         return -ENOEXEC;
     }
 
-    if (unlikely(!(page = page_alloc1())))
+    if (unlikely(!(page = page_alloc(1, 0))))
     {
         log_debug(DEBUG_ELF, "%s: cannot allocate page for phdr", name);
         errno = -ENOMEM;

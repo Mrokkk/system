@@ -121,10 +121,8 @@ UNMAP_AFTER_INIT static void init(slab_allocator_t* allocator, size_t size, size
     page_t* pages;
     slab_t* slab;
 
-    pages = page_alloc(page_align(count * size) / PAGE_SIZE, PAGE_ALLOC_CONT);
+    pages = page_alloc(page_align(count * size) / PAGE_SIZE, PAGE_ALLOC_CONT | PAGE_ALLOC_ZEROED);
     ptr = page_virt_ptr(pages);
-
-    memset(ptr, 0, count * size);
 
     list_init(&allocator->free);
     mutex_init(&allocator->lock);

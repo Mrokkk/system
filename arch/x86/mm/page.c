@@ -109,14 +109,12 @@ pgd_t* pgd_alloc(void)
 
 int pte_alloc_impl(pmd_t* pmd)
 {
-    page_t* page = page_alloc(1, PAGE_ALLOC_DISCONT);
+    page_t* page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
     if (unlikely(!page))
     {
         return -ENOMEM;
     }
-
-    memset(page_virt_ptr(page), 0, PAGE_SIZE);
 
     pmd_entry_set(pmd, page_phys(page), PAGE_DIR_KERNEL);
 

@@ -29,15 +29,13 @@ buffer_t* block_read(dev_t dev, file_t* file, uint32_t block)
 
     log_debug(DEBUG_BUFFER, "reading buffer");
 
-    page = page_alloc1();
+    page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
     if (unlikely(!page))
     {
         log_warning("cannot allocate page for buffer");
         return ptr(-ENOMEM);
     }
-
-    memset(page_virt_ptr(page), 0, PAGE_SIZE);
 
     for (int i = 0; i < PAGE_SIZE / BLOCK_SIZE; ++i)
     {

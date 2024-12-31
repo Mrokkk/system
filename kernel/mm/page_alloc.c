@@ -27,7 +27,7 @@ extern page_t* page_map;
 static MUTEX_DECLARE(page_mutex);
 LIST_DECLARE(free_pages);
 
-static inline page_t* free_page_find()
+static inline page_t* free_page_find(void)
 {
     if (unlikely(list_empty(&free_pages)))
     {
@@ -130,7 +130,8 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
 {
     page_t* temp;
     page_t* first_page;
-    pgprot_t pgprot = kernel_identity_pgprot(flag);
+    const bool zero = flag & PAGE_ALLOC_ZEROED;
+    const pgprot_t pgprot = kernel_identity_pgprot(flag);
 
     ASSERT(count);
 
@@ -151,8 +152,16 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
         list_for_each_entry(temp, &first_page->list_entry, list_entry)
         {
             page_kernel_map(temp, pgprot);
+            if (zero)
+            {
+                memset(page_virt_ptr(temp), 0, PAGE_SIZE);
+            }
         }
         page_kernel_map(first_page, pgprot);
+        if (zero)
+        {
+            memset(page_virt_ptr(first_page), 0, PAGE_SIZE);
+        }
     }
 
 #if DEBUG_PAGE_DETAILED

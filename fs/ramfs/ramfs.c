@@ -281,7 +281,7 @@ static int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t**
 
     if (parent_node->size + sizeof(*new_node) > parent_node->max_capacity)
     {
-        if (unlikely(!(page = page_alloc1())))
+        if (unlikely(!(page = page_alloc(1, 0))))
         {
             return -ENOMEM;
         }

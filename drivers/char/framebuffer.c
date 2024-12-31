@@ -6,7 +6,6 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
-#include <kernel/page_alloc.h>
 
 #include <arch/multiboot.h>
 

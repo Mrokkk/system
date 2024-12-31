@@ -162,7 +162,7 @@ static void ide_device_atapi(int device)
     outsw(bus, &packet, 6);
     ide_wait();
 
-    page_t* page = page_alloc1();
+    page_t* page = page_alloc(1, 0);
 
     if (unlikely(!page))
     {

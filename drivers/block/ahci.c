@@ -545,7 +545,7 @@ static int ahci_port_setup(int id)
         return -EINVAL;
     }
 
-    port->data_pages = page_alloc(1, PAGE_ALLOC_DISCONT | PAGE_ALLOC_UNCACHED);
+    port->data_pages = page_alloc(1, PAGE_ALLOC_UNCACHED | PAGE_ALLOC_ZEROED);
 
     if (unlikely(!port->data_pages))
     {
@@ -556,7 +556,6 @@ static int ahci_port_setup(int id)
     port->id    = id;
     port->data  = page_virt_ptr(port->data_pages);
     port->regs  = &ahci->ports[id];
-    memset(port->data, 0, PAGE_SIZE);
 
     port->regs->cmd &= ~AHCI_PxCMD_ST;
     while (port->regs->cmd & AHCI_PxCMD_CR);
@@ -618,7 +617,7 @@ static void ahci_port_detect(ahci_port_t* port)
     FIS_REG_H2D* fis = ptr(&port->data->cmdtable.cfis);
     ata_device_t* device = devices + id;
 
-    page_t* page = page_alloc1();
+    page_t* page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
     if (unlikely(!page))
     {
@@ -627,8 +626,6 @@ static void ahci_port_detect(ahci_port_t* port)
     }
 
     uint8_t* buf = page_virt_ptr(page);
-
-    memset(buf, 0, PAGE_SIZE);
 
     if (slot == -1)
     {

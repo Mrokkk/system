@@ -287,7 +287,7 @@ UNMAP_AFTER_INIT static void read_some_data(void)
 {
     int errno;
     scoped_file_t* file = NULL;
-    page_t* page = page_alloc1();
+    page_t* page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
     if (unlikely(!page))
     {

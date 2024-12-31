@@ -548,7 +548,7 @@ static int ext2_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** 
     ext2_inode_t* inode = vma->dentry->inode->fs_data;
     ext2_data_t* data = vma->dentry->inode->sb->fs_data;
 
-    *page = page_alloc1();
+    *page = page_alloc(1, 0);
 
     if (unlikely(!*page))
     {
