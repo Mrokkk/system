@@ -414,6 +414,7 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t
         }
 
         data_size = min(BLOCK_SIZE, GET(dirent->data_len) - pos);
+        data_size = min(data_size, size - count);
 
         log_debug(DEBUG_ISO9660, "copying %u B from block %u %x to %x", data_size, block_nr, b->data, data_ptr);
 
