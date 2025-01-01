@@ -138,4 +138,3 @@ struct ext2_data
     dev_t       dev;
     struct file* file;
 };
-

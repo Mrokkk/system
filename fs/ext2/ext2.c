@@ -229,7 +229,6 @@ static int ext2_lookup(inode_t* parent, const char* name, inode_t** result)
 
     (*result)->ino = ino;
     (*result)->ops = &ext2_inode_ops;
-    (*result)->sb = parent->sb;
     (*result)->size = child_inode->size;
     (*result)->file_ops = &ext2_fops;
     (*result)->fs_data = child_inode;

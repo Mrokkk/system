@@ -159,25 +159,26 @@ int lookup(const char* filename, int flag, dentry_t** result)
             }
             else if (!dentry)
             {
+                inode_t* inode;
+
                 log_debug(DEBUG_LOOKUP, "calling ops->lookup with %O, %S", parent_inode, name);
-                if (unlikely(errno = parent_inode->ops->lookup(parent_inode, name, &parent_inode)))
+                if (unlikely(errno = parent_inode->ops->lookup(parent_inode, name, &inode)))
                 {
                     *result = NULL;
                     return errno;
                 }
 
-                if (!parent_inode->dev)
-                {
-                    parent_inode->dev = parent_inode->sb->dev;
-                }
+                inode->dev = parent_inode->dev;
+                inode->sb = parent_inode->sb;
 
-                dentry = dentry_create(parent_inode, parent_dentry, name);
+                dentry = dentry_create(inode, parent_dentry, name);
 
                 if (unlikely(!dentry))
                 {
                     return -ENOMEM;
                 }
 
+                parent_inode = inode;
                 parent_dentry = dentry;
             }
             else

@@ -353,7 +353,6 @@ static int ramfs_create_node(
     (*result_inode)->ops = &ramfs_inode_ops;
     (*result_inode)->size = sizeof(ram_node_t);
     (*result_inode)->ino = ++sb->last_ino;
-    (*result_inode)->sb = parent->sb;
     (*result_inode)->mode = new_node->mode;
     new_node->inode = *result_inode;
 

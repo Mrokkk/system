@@ -342,7 +342,6 @@ static int iso9660_lookup(inode_t* parent, const char* name, inode_t** result)
 
     (*result)->ino = ino;
     (*result)->ops = &iso9660_inode_ops;
-    (*result)->sb = parent->sb;
     (*result)->size = GET(dirent->data_len);
     (*result)->file_ops = &iso9660_fops;
     (*result)->fs_data = dirent;

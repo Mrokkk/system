@@ -144,7 +144,7 @@ static int procfs_mount(super_block_t* sb, inode_t* inode, void*, int)
     return 0;
 }
 
-static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
+static int procfs_root_lookup(inode_t*, const char* name, inode_t** result)
 {
     int errno, pid = 0, pid_ino;
     inode_t* new_inode;
@@ -165,7 +165,6 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
         new_inode->ops = &procfs_pid_iops;
         new_inode->file_ops = &procfs_pid_fops;
         new_inode->ino = SELF_INO;
-        new_inode->sb = dir->sb;
         new_inode->mode = S_IFLNK | S_IRUGO | S_IXUGO;
         new_inode->fs_data = NULL;
 
@@ -203,7 +202,6 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
         new_inode->ops = &procfs_pid_iops;
         new_inode->file_ops = &procfs_pid_fops;
         new_inode->ino = pid_ino;
-        new_inode->sb = dir->sb;
         new_inode->mode = S_IFDIR | S_IRUGO | S_IXUGO;
         new_inode->fs_data = data;
 
@@ -231,7 +229,6 @@ static int procfs_root_lookup(inode_t* dir, const char* name, inode_t** result)
     new_inode->ops = entry->iops;
     new_inode->file_ops = entry->fops;
     new_inode->ino = entry->ino;
-    new_inode->sb = dir->sb;
     new_inode->mode = entry->mode;
     new_inode->fs_data = entry;
 
@@ -356,7 +353,6 @@ static int procfs_pid_lookup(inode_t* dir, const char* name, inode_t** result)
     new_inode->ops = entry->iops;
     new_inode->file_ops = entry->fops;
     new_inode->ino = dir->ino | entry->ino;
-    new_inode->sb = dir->sb;
     new_inode->mode = entry->mode;
     new_inode->fs_data = entry;
 
@@ -439,7 +435,6 @@ static int procfs_fd_lookup(inode_t* dir, const char* name, inode_t** result)
     new_inode->ops = &procfs_fd_iops;
     new_inode->file_ops = &procfs_fd_fops;
     new_inode->ino = PID_TO_INO(p->pid) | fd << 24;
-    new_inode->sb = dir->sb;
     new_inode->mode = 0644 | S_IFLNK;
 
     list_add(&new_inode->list, &data->entries);

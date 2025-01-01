@@ -100,6 +100,9 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
         return -ENOENT;
     }
 
+    inode->dev = parent_inode->dev;
+    inode->sb = parent_inode->sb;
+
     dentry = dentry_create(inode, parent_dentry, basename);
 
     if (unlikely(!dentry))
@@ -311,6 +314,9 @@ int do_mkdir(const char* path, int mode)
     }
 
     ASSERT(inode);
+
+    inode->dev = parent_dentry->inode->dev;
+    inode->sb = parent_dentry->inode->sb;
 
     new_dentry = dentry_create(inode, parent_dentry, basename);
 
