@@ -146,7 +146,7 @@ int file_system_register(file_system_t* fs);
 #define LOOKUP_NOFOLLOW 0
 #define LOOKUP_FOLLOW   1
 
-int lookup(const char* filename, int flag, dentry_t** result);
+int lookup(const char* filename, int flag, dentry_t* start, dentry_t** result);
 
 int do_mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags);
 int do_chroot(const char* path);

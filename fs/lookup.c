@@ -4,6 +4,8 @@
 #include <kernel/process.h>
 #include <kernel/api/stat.h>
 
+#define DEBUG_LOOKUP 0
+
 static inline void get_next_dir(const char** path, char* output)
 {
     char* next_slash = strchr(*path, '/');
@@ -27,6 +29,7 @@ static int link_follow(dentry_t* dentry, dentry_t** result)
     int res, errno;
     char buffer[PATH_MAX];
     inode_t* inode;
+    dentry_t* parent_dentry = dentry->parent;
 
     while (S_ISLNK(dentry->inode->mode))
     {
@@ -46,10 +49,12 @@ static int link_follow(dentry_t* dentry, dentry_t** result)
 
         buffer[res] = 0;
 
-        if (unlikely(errno = lookup(buffer, LOOKUP_NOFOLLOW, &dentry)))
+        if (unlikely(errno = lookup(buffer, LOOKUP_NOFOLLOW, parent_dentry, &dentry)))
         {
             return errno;
         }
+
+        parent_dentry = dentry->parent;
     }
 
     if (unlikely(!dentry))
@@ -63,7 +68,7 @@ static int link_follow(dentry_t* dentry, dentry_t** result)
     return 0;
 }
 
-int lookup(const char* filename, int flag, dentry_t** result)
+int lookup(const char* filename, int flag, dentry_t* start, dentry_t** result)
 {
     int errno;
     char name[PATH_MAX];
@@ -76,7 +81,14 @@ int lookup(const char* filename, int flag, dentry_t** result)
 
     if (!path_is_absolute(filename))
     {
-        dentry = process_current->fs->cwd;
+        if (!start)
+        {
+            dentry = process_current->fs->cwd;
+        }
+        else
+        {
+            dentry = start;
+        }
         parent_inode = dentry->inode;
         parent_dentry = dentry;
         log_debug(DEBUG_LOOKUP, "relative; %O", dentry);
@@ -162,8 +174,10 @@ int lookup(const char* filename, int flag, dentry_t** result)
                 inode_t* inode;
 
                 log_debug(DEBUG_LOOKUP, "calling ops->lookup with %O, %S", parent_inode, name);
+
                 if (unlikely(errno = parent_inode->ops->lookup(parent_inode, name, &inode)))
                 {
+                    log_debug(DEBUG_LOOKUP, "lookup failed with %d", errno);
                     *result = NULL;
                     return errno;
                 }

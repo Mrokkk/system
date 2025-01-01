@@ -20,7 +20,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
     const char* basename;
     char parent[PATH_MAX];
 
-    lookup(filename, LOOKUP_FOLLOW, &dentry);
+    lookup(filename, LOOKUP_FOLLOW, NULL, &dentry);
 
     if (likely(dentry))
     {
@@ -49,7 +49,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
 
             log_debug(DEBUG_OPEN, "calling lookup for %S; full filename: %S", parent, filename);
 
-            if (unlikely(errno = lookup(parent, LOOKUP_NOFOLLOW, &parent_dentry)))
+            if (unlikely(errno = lookup(parent, LOOKUP_NOFOLLOW, NULL, &parent_dentry)))
             {
                 log_debug(DEBUG_OPEN, "no dentry for parent", filename);
                 return errno;
@@ -70,7 +70,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
             }
             else
             {
-                lookup(parent, LOOKUP_NOFOLLOW, &parent_dentry);
+                lookup(parent, LOOKUP_NOFOLLOW, NULL, &parent_dentry);
                 basename = basename_get(filename);
             }
 
@@ -283,7 +283,7 @@ int do_mkdir(const char* path, int mode)
         }
 
         basename = basename_get(path);
-        lookup(dir_name, LOOKUP_NOFOLLOW, &parent_dentry);
+        lookup(dir_name, LOOKUP_NOFOLLOW, NULL, &parent_dentry);
     }
     else
     {
@@ -361,7 +361,7 @@ int do_chdir(const char* path)
     dentry_t* dentry;
     dentry_t* tmp;
 
-    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, NULL, &dentry)))
     {
         return errno;
     }
@@ -370,7 +370,7 @@ int do_chdir(const char* path)
 
     if (S_ISLNK(mode))
     {
-        if (unlikely(errno = lookup(path, LOOKUP_FOLLOW, &tmp)))
+        if (unlikely(errno = lookup(path, LOOKUP_FOLLOW, NULL, &tmp)))
         {
             return errno;
         }
@@ -477,7 +477,7 @@ static int stat_impl(const char* pathname, struct stat* statbuf, int lookup_flag
     int errno;
     dentry_t* dentry;
 
-    if (unlikely(errno = lookup(pathname, lookup_flag, &dentry)))
+    if (unlikely(errno = lookup(pathname, lookup_flag, NULL, &dentry)))
     {
         return errno;
     }
@@ -529,7 +529,7 @@ int sys_statvfs(const char* path, struct statvfs* buf)
         return errno;
     }
 
-    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, NULL, &dentry)))
     {
         return errno;
     }
@@ -587,7 +587,7 @@ int sys_access(const char* path, int amode)
         return errno;
     }
 
-    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, NULL, &dentry)))
     {
         return errno;
     }
@@ -679,7 +679,7 @@ ssize_t sys_readlink(const char* pathname, char* buf, size_t bufsiz)
     dentry_t* dentry;
 
     if (unlikely(errno = path_validate(pathname))) return errno;
-    if (unlikely(errno = lookup(pathname, LOOKUP_NOFOLLOW, &dentry))) return errno;
+    if (unlikely(errno = lookup(pathname, LOOKUP_NOFOLLOW, NULL, &dentry))) return errno;
     if (unlikely(!S_ISLNK(dentry->inode->mode))) return -EINVAL;
     if (unlikely(!dentry->inode->ops || !dentry->inode->ops->readlink)) return -ENOSYS;
 

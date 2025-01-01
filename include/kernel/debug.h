@@ -24,7 +24,6 @@
 
 #define DEBUG_OPEN          0
 #define DEBUG_DENTRY        0
-#define DEBUG_LOOKUP        0
 #define DEBUG_READDIR       0
 
 #define DEBUG_DEVFS         0

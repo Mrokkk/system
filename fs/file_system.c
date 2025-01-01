@@ -82,7 +82,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
     sb->device_file = file;
     sb->dev = dev;
 
-    lookup(mount_point, LOOKUP_NOFOLLOW, &dentry);
+    lookup(mount_point, LOOKUP_NOFOLLOW, NULL, &dentry);
 
     if (dentry)
     {
@@ -219,7 +219,7 @@ int do_chroot(const char* path)
         return 0;
     }
 
-    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, &dentry)))
+    if (unlikely(errno = lookup(path, LOOKUP_NOFOLLOW, NULL, &dentry)))
     {
         return errno;
     }
