@@ -10,8 +10,6 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_DEBUG} \
     -m${BITS} -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
 
-set(DISABLED_APPS "env" "date")
-
 function(add_application)
 
     get_filename_component(name ${CMAKE_CURRENT_SOURCE_DIR} NAME)
