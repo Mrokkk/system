@@ -39,6 +39,8 @@ int ftruncate(int fildes, off_t length);
 
 size_t confstr(int name, char* buf, size_t size);
 
+int symlink(const char* target, const char* linkpath);
+
 extern char** environ;
 
 #endif // __ASSEMBLER__

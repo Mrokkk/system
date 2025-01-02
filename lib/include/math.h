@@ -19,5 +19,7 @@ typedef double double_t;
 
 #define HUGE_VAL    (__builtin_huge_val())
 
+double log10(double x);
+
 double pow(double x, double y);
 double modf(double x, double* iptr);

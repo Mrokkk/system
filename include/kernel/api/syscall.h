@@ -82,8 +82,9 @@
 #define __NR_munmap         79
 #define __NR_set_thread_area 80
 #define __NR_pinsyscalls    81
+#define __NR_chmod          82
 
-#define __NR_syscalls       82
+#define __NR_syscalls       83
 
 #ifndef __ASSEMBLER__
 
@@ -209,3 +210,4 @@ __syscall2(mimmutable, int, void*, size_t)
 __syscall2(munmap, int, void*, size_t)
 __syscall1(set_thread_area, int, uintptr_t)
 __syscall2(pinsyscalls, int, void*, size_t)
+__syscall2(chmod, int, const char*, mode_t)

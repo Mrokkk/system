@@ -169,16 +169,6 @@ int sys_poll(struct pollfd* fds, unsigned long nfds, int timeout)
     return do_poll(fds, nfds, timeout > 0 ? &t : NULL);
 }
 
-int sys_select(int nfds, fd_set_t* readfds, fd_set_t* writefds, fd_set_t* exceptfds, timeval_t* timeout)
-{
-    UNUSED(nfds);
-    UNUSED(readfds);
-    UNUSED(writefds);
-    UNUSED(exceptfds);
-    UNUSED(timeout);
-    return -ENOSYS;
-}
-
 struct pselect_params
 {
     int nfds;
@@ -195,10 +185,12 @@ int sys_pselect(struct pselect_params* params)
     struct pollfd* fds;
     timeval_t t;
 
+#if 0
     if (params->writefds || params->errorfds)
     {
         return -EINVAL;
     }
+#endif
 
     if (!params->nfds)
     {
@@ -257,4 +249,20 @@ int sys_pselect(struct pselect_params* params)
     delete_array(fds, params->nfds);
 
     return res;
+}
+
+int sys_select(int nfds, fd_set_t* readfds, fd_set_t* writefds, fd_set_t* exceptfds, timeval_t* timeout)
+{
+    struct pselect_params params = {
+        .readfds = readfds,
+        .writefds = writefds,
+        .errorfds = exceptfds,
+        .nfds = nfds,
+    };
+    UNUSED(nfds);
+    UNUSED(readfds);
+    UNUSED(writefds);
+    UNUSED(exceptfds);
+    UNUSED(timeout);
+    return sys_pselect(&params);
 }

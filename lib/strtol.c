@@ -108,6 +108,13 @@ int LIBC(atoi)(const char* nptr)
     STRTOL(int, 0, 0, 0, nptr, endptr, base);
 }
 
+long LIBC(atol)(const char* nptr)
+{
+    int base = 10;
+    char** endptr = NULL;
+    STRTOL(long, 0, 0, 0, nptr, endptr, base);
+}
+
 long LIBC(strtol)(
     const char* nptr,
     char** endptr,
@@ -138,6 +145,7 @@ double LIBC(atof)(const char* nptr)
 }
 
 LIBC_ALIAS(atoi);
+LIBC_ALIAS(atol);
 LIBC_ALIAS(atof);
 LIBC_ALIAS(strtol);
 LIBC_ALIAS(strtoll);

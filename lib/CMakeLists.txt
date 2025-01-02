@@ -63,6 +63,7 @@ set(LIBC_SRC
     strtol.c
     syscall.c
     sysconf.c
+    symlink.c
     syslog.c
     system.c
     termios.c

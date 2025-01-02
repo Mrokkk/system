@@ -571,4 +571,11 @@ syscall_t trace_syscalls[] = {
         .nargs  = 2,
         .args   = { TYPE_VOID_PTR, TYPE_UNSIGNED_LONG },
     },
+
+    {
+        .name   = "chmod",
+        .ret    = TYPE_LONG,
+        .nargs  = 2,
+        .args   = { TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_SHORT },
+    },
 };

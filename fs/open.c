@@ -565,6 +565,12 @@ mode_t sys_umask(mode_t cmask)
     return -ENOSYS;
 }
 
+int sys_chmod(const char* pathname, mode_t mode)
+{
+    UNUSED(pathname); UNUSED(mode);
+    return -ENOSYS;
+}
+
 int sys_fchmod(int fd, mode_t)
 {
     file_t* file;

@@ -22,6 +22,7 @@ int system(const char* command);
 int atexit(void (*function)(void));
 
 int atoi(const char* nptr);
+long atol(const char* nptr);
 double atof(const char* nptr);
 
 long strtol(
@@ -63,6 +64,16 @@ void* bsearch(
 
 int rand(void);
 void srand(unsigned int seed);
+
+static inline int abs(int j)
+{
+    return __builtin_abs(j);
+}
+
+static inline long labs(long j)
+{
+    return __builtin_abs(j);
+}
 
 #define EXIT_SUCCESS    0
 #define EXIT_FAILURE    -1
