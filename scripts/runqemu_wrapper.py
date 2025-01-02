@@ -269,10 +269,13 @@ class Addr2Line:
             if '(inlined' in line:
                 offset = 2
             splitted = re.split(r'[ :]', line)
-            entry = (splitted[offset], splitted[offset + 2], splitted[offset + 3])
-            if len(entries):
-                if entries[-1] == entry:
-                    continue
+            try:
+                entry = (splitted[offset], splitted[offset + 2], splitted[offset + 3])
+                if len(entries):
+                    if entries[-1] == entry:
+                        continue
+            except:
+                entry = ('??', '??', '??')
             entries.append(entry)
 
         self.cache[sys.intern(addr)] = entries
