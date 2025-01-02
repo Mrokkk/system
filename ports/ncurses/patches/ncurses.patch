@@ -1,0 +1,19 @@
+commit 89915ce94de58a008d066b0a0d6f266ea97779fc
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Thu Jan 2 15:41:18 2025 +0100
+
+    Add support for Phoenix
+
+diff --git a/configure b/configure
+index 412e5af..646f1f1 100755
+--- a/configure
++++ b/configure
+@@ -6821,7 +6821,7 @@ echo "${ECHO_T}$cf_cv_ldflags_search_paths_first" >&6
+ 		fi
+ 		cf_cv_rm_so_locs=yes
+ 		;;
+-	(linux*|gnu*|k*bsd*-gnu)
++	(linux*|gnu*|k*bsd*-gnu|phoenix)
+ 		if test "$DFT_LWR_MODEL" = "shared" && test -n "$LD_RPATH_OPT" ; then
+ 			LOCAL_LDFLAGS="${LD_RPATH_OPT}\$(LOCAL_LIBDIR)"
+ 			LOCAL_LDFLAGS2="$LOCAL_LDFLAGS"
