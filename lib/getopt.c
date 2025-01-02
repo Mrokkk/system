@@ -172,7 +172,6 @@ static int getopt_impl(
                 case ORDERED:
                     if (*argv[c->optind] != '-')
                     {
-                        c->optind++;
                         return -1;
                     }
             }
@@ -183,7 +182,7 @@ static int getopt_impl(
             return -1;
         }
 
-        c->nextchar = argv[c->optind++] + 1;
+        c->nextchar = argv[c->optind] + 1;
     }
 
     if (!c->nextchar || !*c->nextchar)
@@ -217,30 +216,35 @@ static int getopt_impl(
                 if (c->nextchar[len] == '=')
                 {
                     c->optarg = c->nextchar + len + 1;
+                    c->optind++;
                     return long_option_found(longopts, i, longindex, c);
                 }
-                else if (c->optind >= c->first_nonopt)
+                else if (c->optind + 1 >= c->first_nonopt)
                 {
                     if (longopts[i].has_arg != optional_argument)
                     {
                         GETOPT_ERR("option requires an argument -- \'%s\'", longopts[i].name);
 
+                        c->optind++;
                         c->nextchar = NULL;
                         return '?';
                     }
                     else
                     {
+                        c->optind++;
                         return long_option_found(longopts, i, longindex, c);
                     }
                 }
                 else
                 {
-                    c->optarg = argv[c->optind++];
+                    c->optarg = argv[c->optind++ + 1];
+                    c->optind++;
                     return long_option_found(longopts, i, longindex, c);
                 }
             }
             else
             {
+                c->optind++;
                 return long_option_found(longopts, i, longindex, c);
             }
         }
@@ -260,7 +264,12 @@ static int getopt_impl(
 
         if (optstring[i + 1] != ':')
         {
-            return *c->nextchar++;
+            int ret = *c->nextchar++;
+            if (!*c->nextchar)
+            {
+                c->optind++;
+            }
+            return ret;
         }
 
         int res = *c->nextchar;
@@ -269,23 +278,29 @@ static int getopt_impl(
         {
             c->optarg = c->nextchar + 1;
             c->nextchar = NULL;
+            c->optind++;
             return res;
         }
-        else if (c->optind == c->first_nonopt)
+        else if (c->optind + 1 == c->first_nonopt)
         {
             if (optstring[i + 2] == ':')
             {
                 c->nextchar = NULL;
+                c->optind++;
                 return *optstring;
             }
 
             GETOPT_ERR("option requires an argument -- \'%c\'", optstring[i]);
 
+            c->optarg = 0;
+            c->optopt = optstring[i];
             c->nextchar = NULL;
+            c->optind++;
             return '?';
         }
         else
         {
+            c->optind++;
             c->optarg = argv[c->optind++];
             c->nextchar = NULL;
             return res;
@@ -296,6 +311,11 @@ invalid_options:
     GETOPT_ERR("invalid option -- \'%c\'", *c->nextchar);
 
     c->optopt = *c->nextchar++;
+
+    if (!*c->nextchar)
+    {
+        c->optind++;
+    }
 
     return '?';
 
