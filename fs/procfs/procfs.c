@@ -246,7 +246,7 @@ static int procfs_pid_readlink(inode_t* inode, char* buffer, size_t size)
         return -EINVAL;
     }
 
-    return snprintf(buffer, size, "/proc/%u", process_current->pid) + 1;
+    return snprintf(buffer, size, "%u", process_current->pid) + 1;
 }
 
 static int procfs_open(file_t*)
