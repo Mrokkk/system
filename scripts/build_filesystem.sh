@@ -103,12 +103,11 @@ alias p="path"
 function k()
 {
     while ktest -q -t realloc_small_to_small; do echo -n; done
-}
-'
+}'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
-create_dir "${mountpoint}/usr/lib"
+create_dir "${mountpoint}/lib"
 create_dir "${mountpoint}/usr/share"
 create_dir "${mountpoint}/lib/modules"
 create_dir "${mountpoint}/tmp"
@@ -126,19 +125,6 @@ do
     copy ${binary} ${mountpoint}/bin
 done
 
-for binary in $(find sysroot -type f -executable)
-do
-    if [[ ${binary} == *"ld.so" ]]
-    then
-        copy ${binary} ${mountpoint}/lib
-    elif [[ ${binary} == *".so"* ]]
-    then
-        copy ${binary} ${mountpoint}/usr/lib
-    else
-        copy ${binary} ${mountpoint}/bin
-    fi
-done
-
 copy_dir_content "modules" "${mountpoint}/lib/modules"
 
 copy ../arch/x86/cpuid.c ${mountpoint}
@@ -147,6 +133,9 @@ copy ../cursor.tga ${mountpoint}
 copy ../close.tga ${mountpoint}
 copy ../close_pressed.tga ${mountpoint}
 copy font.psf ${mountpoint}/usr/share
+copy_dir_content sysroot/usr/share ${mountpoint}/usr/share
+copy_dir_content sysroot/lib ${mountpoint}/lib
+copy_dir_content sysroot/bin ${mountpoint}/bin
 
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"
 copy kernel.map "${boot_dir}"

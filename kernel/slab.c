@@ -4,7 +4,6 @@
 #include <kernel/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/page_alloc.h>
-#include <string.h>
 
 #define SLAB_ZERO_AFTER_FREE 1
 #define SLAB_REDZONE        0

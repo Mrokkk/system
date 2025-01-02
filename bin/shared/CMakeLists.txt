@@ -13,7 +13,7 @@ target_link_libraries(shared
 
 add_custom_target(
     test2_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libtest2.so ../../sysroot/usr/lib/libtest2.so
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libtest2.so ../../sysroot/lib/libtest2.so
     DEPENDS test2
 )
 

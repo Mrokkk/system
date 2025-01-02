@@ -160,8 +160,8 @@ add_custom_target(
 
 add_custom_target(
     libc_install
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc_static.a ../sysroot/usr/lib/libc.a
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.so ../sysroot/usr/lib/libc.so
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc_static.a ../sysroot/lib/libc.a
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.so ../sysroot/lib/libc.so
     DEPENDS crt0_install c c_static loader
     COMMENT "Installing libc")
 
