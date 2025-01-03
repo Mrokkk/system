@@ -31,6 +31,7 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
     poll_data_t* data;
     file_t* file;
     int ready = 0;
+    timer_t timer = 0;
     volatile bool timedout = false;
 
     if (timeout && timeout->tv_sec == 0 && timeout->tv_usec == 0)
@@ -70,7 +71,7 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
 
     if (timeout != NULL)
     {
-        ktimer_create_and_start(KTIMER_ONESHOT, *timeout, &do_poll_timeout, (void*)&timedout);
+        timer = ktimer_create_and_start(KTIMER_ONESHOT, *timeout, &do_poll_timeout, (void*)&timedout);
     }
 
     while (!ready)
@@ -131,6 +132,14 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
 
     delete_array(data, nfds);
 
+    {
+        scoped_irq_lock();
+        if (!timedout && timer)
+        {
+            ktimer_delete(timer);
+        }
+    }
+
     return ready;
 
 error:
@@ -143,6 +152,14 @@ error:
     }
 
 free_data:
+    {
+        scoped_irq_lock();
+        if (!timedout && timer)
+        {
+            ktimer_delete(timer);
+        }
+    }
+
     if (data)
     {
         delete_array(data, nfds);
@@ -196,6 +213,13 @@ int sys_pselect(struct pselect_params* params)
     {
         params->nfds = 1;
     }
+
+#if 0
+    if (params->writefds)
+    {
+        return count;
+    }
+#endif
 
     fds = alloc_array(struct pollfd, params->nfds);
 
@@ -253,16 +277,21 @@ int sys_pselect(struct pselect_params* params)
 
 int sys_select(int nfds, fd_set_t* readfds, fd_set_t* writefds, fd_set_t* exceptfds, timeval_t* timeout)
 {
+    timespec_t timeout2;
+
+    if (timeout)
+    {
+        timeout2.tv_sec = timeout->tv_sec;
+        timeout2.tv_nsec = timeout->tv_usec * 1000;
+    };
+
     struct pselect_params params = {
         .readfds = readfds,
         .writefds = writefds,
         .errorfds = exceptfds,
         .nfds = nfds,
+        .timeout = &timeout2
     };
-    UNUSED(nfds);
-    UNUSED(readfds);
-    UNUSED(writefds);
-    UNUSED(exceptfds);
-    UNUSED(timeout);
+
     return sys_pselect(&params);
 }

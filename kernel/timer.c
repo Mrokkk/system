@@ -24,9 +24,8 @@ static ktimer_list_t timer_list = {
 #define LOCKED(...) \
     do \
     { \
-        mutex_lock(&timer_list.lock); \
+        scoped_mutex_lock(&timer_list.lock); \
         __VA_ARGS__; \
-        mutex_unlock(&timer_list.lock); \
     } \
     while (0)
 
@@ -116,6 +115,24 @@ void ktimers_update(void)
     mutex_unlock(&timer_list.lock);
 }
 
+static int ktimer_delete_internal(ktimer_t* timer)
+{
+    LOCKED(
+        {
+            list_del(&timer->list_entry);
+            list_del(&timer->process_timers);
+        });
+
+    if (timer->cleanup)
+    {
+        timer->cleanup(timer);
+    }
+
+    delete(timer);
+
+    return 0;
+}
+
 static ktimer_t* ktimer_create_internal(timer_cb_t cb, timer_cb_t cleanup, void* data)
 {
     static int last_id;
@@ -165,27 +182,23 @@ timer_t ktimer_create_and_start(int flags, timeval_t value, timer_cb_t cb, void*
 
     if (unlikely(errno = ktimer_start_internal(timer, flags, &value, &value)))
     {
-        ktimer_delete(timer);
+        ktimer_delete_internal(timer);
         return errno;
     }
 
     return timer->id;
 }
 
-int ktimer_delete(ktimer_t* timer)
+int ktimer_delete(timer_t timer_id)
 {
-    LOCKED(
-        {
-            list_del(&timer->list_entry);
-            list_del(&timer->process_timers);
-        });
+    ktimer_t* timer = process_ktimer_find(timer_id);
 
-    if (timer->cleanup)
+    if (unlikely(!timer))
     {
-        timer->cleanup(timer);
+        return -EINVAL;
     }
 
-    delete(timer);
+    ktimer_delete_internal(timer);
 
     return 0;
 }
@@ -222,7 +235,7 @@ unsigned int sys_alarm(unsigned int seconds)
     if ((running = process_ktimer_find(process_current->alarm)))
     {
         left = running->deadline.tv_sec - timestamp.tv_sec;
-        ktimer_delete(running);
+        ktimer_delete_internal(running);
         if (seconds == 0)
         {
             return left;

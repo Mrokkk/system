@@ -36,5 +36,5 @@ timer_t ktimer_create_and_start(
     timer_cb_t cb,
     void* data);
 
-int ktimer_delete(ktimer_t* timer);
+int ktimer_delete(timer_t timer_id);
 void process_ktimers_exit(process_t* p);
