@@ -87,6 +87,29 @@ then
     gzip -d font.psf.gz
 fi
 
+inputrc_content='set bell-style none
+
+set meta-flag on
+set input-meta on
+set convert-meta off
+set output-meta on
+
+$if mode=emacs
+"\e[1~": beginning-of-line
+"\e[4~": end-of-line
+"\e[5~": beginning-of-history
+"\e[6~": end-of-history
+"\e[7~": beginning-of-line
+"\e[3~": delete-char
+"\e[2~": quoted-insert
+"\e[5C": forward-word
+"\e[5D": backward-word
+"\e\e[C": forward-word
+"\e\e[D": backward-word
+"\e[1;5C": forward-word
+"\e[1;5D": backward-word
+$endif'
+
 bashrc_content='export PS1="\u \e[34m\w\e[0m # "
 
 function path()
@@ -96,6 +119,7 @@ function path()
 
 alias ktest=/bin/test
 alias ..="cd .."
+alias ls="ls --color=auto"
 alias l="ls -lah"
 alias dmesg="cat /proc/syslog"
 alias f="find . -name"
@@ -138,6 +162,7 @@ copy_dir_content sysroot/lib ${mountpoint}/lib
 copy_dir_content sysroot/bin ${mountpoint}/bin
 
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"
+write_to "${inputrc_content}" "${mountpoint}/root/.inputrc"
 copy kernel.map "${boot_dir}"
 copy system "${boot_dir}"
 
