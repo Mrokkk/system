@@ -50,7 +50,11 @@ int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
             }
         }
 
-        if (buffer[i] == '\n')
+        if (buffer[i] == '\n' && I_ICRNL(tty))
+        {
+            return ++i;
+        }
+        else if (buffer[i] == '\r')
         {
             return ++i;
         }
@@ -100,6 +104,10 @@ void tty_ldisc_putch(tty_t* tty, int c)
     if (c == '\r' && I_ICRNL(tty))
     {
         c = '\n';
+    }
+    else if (c == 12)
+    {
+        tty->driver->putch(tty, 12);
     }
     else if (c == tty->driver_special_key)
     {

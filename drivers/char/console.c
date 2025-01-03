@@ -129,7 +129,7 @@ static void console_refresh(void* data)
     }
 }
 
-static inline void position_newline(console_t* console)
+static inline void position_newline(console_t* console, bool goto_first_line)
 {
     size_t previous = console->visible_line->pos - console->visible_line->line;
     console->current_line = console->current_line->next;
@@ -146,6 +146,17 @@ static inline void position_newline(console_t* console)
     }
 
     ++console->current_index;
+
+    if (goto_first_line)
+    {
+        console->prev_visible_line = console->prev_visible_line ? : console->visible_line;
+        console->visible_line = console->current_line;
+        console->current_line->pos = console->current_line->line;
+        console->y = 0;
+        redraw_lines_full(console);
+        return;
+    }
+
     if (console->y < console->resy - 1)
     {
         ++console->y;
@@ -166,7 +177,7 @@ static inline void position_next(console_t* console)
 {
     if (console->x == console->resx - 1)
     {
-        position_newline(console);
+        position_newline(console, false);
     }
     else
     {
@@ -316,6 +327,14 @@ static inline void scroll_line(console_t* console, int dir)
     cursor_update(console);
 }
 
+static void getparam_prepare(console_t* console)
+{
+    memset(console->params, 0, sizeof(uint32_t) * PARAMS_SIZE);
+    console->params_nr = 0;
+    console->prev_state = console->state;
+    console->state = ES_GETPARAM;
+}
+
 static command_t escape_sequence(console_t* console, int c)
 {
     switch (console->state)
@@ -327,21 +346,46 @@ static command_t escape_sequence(console_t* console, int c)
                 case '[':
                     log_debug(DEBUG_CONSOLE, "switch to [");
                     console->state = ES_SQUARE;
+                    break;
+            }
+            return C_DROP;
+        case ES_MORE:
+        case ES_QMARK:
+            switch (c)
+            {
+                case '0' ... '9':
+                    log_debug(DEBUG_CONSOLE, "switch to GETPARAM");
+                    getparam_prepare(console);
+                    goto getparam;
             }
             return C_DROP;
         case ES_SQUARE:
-            if (console->tmux_state == '[' &&
-                (c == 'A' || c == 'B' || c == 'C' || c == 'D'))
+            switch (c)
             {
-                scroll_line(console, c);
-                return C_DROP;
+                case 'A' ... 'D':
+                    scroll_line(console, c);
+                    return C_DROP;
+                case 'm':
+                case '0' ... '9':
+                    break;
+                case '?':
+                    log_debug(DEBUG_CONSOLE, "switch to ?");
+                    console->state = ES_QMARK;
+                    return C_DROP;
+                case '>':
+                    log_debug(DEBUG_CONSOLE, "switch to >");
+                    console->state = ES_MORE;
+                    return C_DROP;
+                default:
+                    log_info("unsupported escape sequence: \\e[%c", c);
+                    console->state = ES_NORMAL;
+                    return C_DROP;
             }
-            memset(console->params, 0, sizeof(uint32_t) * PARAMS_SIZE);
-            console->params_nr = 0;
-            console->state = ES_GETPARAM;
             log_debug(DEBUG_CONSOLE, "switch to GETPARAM");
+            getparam_prepare(console);
             fallthrough;
         case ES_GETPARAM:
+        getparam:
             if (c == ';' && console->params_nr < PARAMS_SIZE - 1)
             {
                 ++console->params_nr;
@@ -358,6 +402,11 @@ static command_t escape_sequence(console_t* console, int c)
             console->state = ES_NORMAL;
             switch (c)
             {
+                case 'A':
+                case 'B':
+                case 'C':
+                case 'D':
+                    return C_DROP;
                 case 'm':
                     colors_set(console);
                     return C_DROP;
@@ -491,8 +540,9 @@ static command_t normal_mode(console_t* console, tty_t* tty, int c)
         case '\r':
             carriage_return(console);
             return C_MOVECSR;
+        case '\f':
         case '\n':
-            position_newline(console);
+            position_newline(console, c == '\f');
             return C_MOVECSR;
         case TTY_SPECIAL_MODE:
             TMUX_TRANSITION(0, TTY_SPECIAL_MODE,

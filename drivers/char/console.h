@@ -32,6 +32,8 @@ typedef enum
     ES_ESC,
     ES_SQUARE,
     ES_GETPARAM,
+    ES_QMARK,
+    ES_MORE,
 } state_t;
 
 struct console
@@ -59,6 +61,7 @@ struct console
     size_t params_nr;
     uint32_t params[PARAMS_SIZE];
     state_t state;
+    state_t prev_state;
 };
 
 int console_init(void);
