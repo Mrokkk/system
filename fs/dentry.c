@@ -20,6 +20,11 @@ dentry_t* dentry_create(inode_t* inode, dentry_t* parent_dentry, const char* nam
     size_t len;
     dentry_t* new_dentry = alloc(dentry_t, dentry_init(this, parent_dentry, inode));
 
+    if (unlikely(!new_dentry))
+    {
+        return NULL;
+    }
+
     if (parent_dentry)
     {
         list_add(&new_dentry->child, &parent_dentry->subdirs);

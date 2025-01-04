@@ -10,13 +10,15 @@ static int sysfs_root_lookup(inode_t* dir, const char* name, inode_t** result);
 static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 
 #define SYSFS_ENTRY_READ(name) \
-    static int name##_read(file_t*, char* buffer, size_t count) \
+    static int name##_read(file_t* file, char* buffer, size_t count) \
     { \
-        if (unlikely(count < 3)) \
+        int res = snprintf(buffer, count, "%u\n", sys_config.name); \
+        if ((int)file->offset >= res) \
         { \
-            return -EINVAL; \
+            return 0; \
         } \
-        return snprintf(buffer, count, "%u\n", sys_config.name); \
+        file->offset += res; \
+        return res; \
     }
 
 #define SYSFS_ENTRY_WRITE(name) \

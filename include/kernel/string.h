@@ -37,6 +37,7 @@ void bzero(void* s, size_t n);
 void* memset(void* s, int c, size_t n);
 void* memsetw(unsigned short*, unsigned short, size_t);
 void* memcpy(void* dest, const void* src, size_t n);
+void* memmove(void* dest, const void* src, size_t n);
 int memcmp(const void* s1, const void* s2, size_t n);
 
 size_t strlen(const char* s);
@@ -66,6 +67,10 @@ char* strtok_r(char* str, const char* delim, char** saveptr);
 
 #if __has_builtin(__builtin_memcpy)
 #define memcpy(dst, src, n) __builtin_memcpy(dst, src, n)
+#endif
+
+#if __has_builtin(__builtin_memmove)
+#define memmove(dst, src, n) __builtin_memmove(dst, src, n)
 #endif
 
 #if __has_builtin(__builtin_memcmp)

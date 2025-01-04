@@ -6,8 +6,11 @@
 #include "framebuffer.h"
 #include "console_driver.h"
 
+#define DEBUG_FBCON 0
+
 enum palette
 {
+#if 0
     COLOR_BLACK         = 0x000000,
     COLOR_RED           = 0xcd0000,
     COLOR_GREEN         = 0x00cd00,
@@ -17,6 +20,7 @@ enum palette
     COLOR_CYAN          = 0x00cdcd,
     COLOR_WHITE         = 0x999999,
     COLOR_GRAY          = 0x7f7f7f,
+    COLOR_BRIGHTBLACK   = COLOR_GRAY,
     COLOR_BRIGHTRED     = 0xff0000,
     COLOR_BRIGHTGREEN   = 0x00ff00,
     COLOR_BRIGHTYELLOW  = 0xffff00,
@@ -24,6 +28,25 @@ enum palette
     COLOR_BRIGHTMAGENTA = 0xff00ff,
     COLOR_BRIGHTCYAN    = 0x00ffff,
     COLOR_BRIGHTWHITE   = 0xffffff,
+#else
+    COLOR_BLACK         = 0x282828,
+    COLOR_RED           = 0xea6962,
+    COLOR_GREEN         = 0xa9b665,
+    COLOR_YELLOW        = 0xd8a657,
+    COLOR_BLUE          = 0x7daea3,
+    COLOR_MAGENTA       = 0xd3869b,
+    COLOR_CYAN          = 0x89b482,
+    COLOR_WHITE         = 0xd6d6d6,
+    COLOR_GRAY          = 0x3c3836,
+    COLOR_BRIGHTBLACK   = COLOR_GRAY,
+    COLOR_BRIGHTRED     = 0xea6962,
+    COLOR_BRIGHTGREEN   = 0xa9b665,
+    COLOR_BRIGHTYELLOW  = 0xd8a657,
+    COLOR_BRIGHTBLUE    = 0x7daea3,
+    COLOR_BRIGHTMAGENTA = 0xd3869b,
+    COLOR_BRIGHTCYAN    = 0x89b482,
+    COLOR_BRIGHTWHITE   = 0xd4be98,
+#endif
 };
 
 typedef enum
@@ -42,7 +65,7 @@ typedef struct
     uint32_t cursor_offset;
 } data_t;
 
-static uint32_t lookup_table[] = {
+static uint32_t palette[] = {
     COLOR_BLACK,
     COLOR_RED,
     COLOR_GREEN,
@@ -51,7 +74,7 @@ static uint32_t lookup_table[] = {
     COLOR_MAGENTA,
     COLOR_CYAN,
     COLOR_WHITE,
-    COLOR_GRAY,
+    COLOR_BRIGHTBLACK,
     COLOR_BRIGHTRED,
     COLOR_BRIGHTGREEN,
     COLOR_BRIGHTYELLOW,
@@ -115,7 +138,7 @@ void fbcon_char_print(console_driver_t* drv, size_t y, size_t x, uint8_t c, uint
     }
 }
 
-void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
+void fbcon_setsgr(console_driver_t*, int params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
 {
     color_mode_t mode = NORMAL;
     uint32_t* color = NULL;
@@ -123,11 +146,11 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* 
     for (size_t i = 0; i < count; ++i)
     {
         uint32_t param = params[i];
-        log_debug(DEBUG_CONSOLE, "param %d = %d", i, param);
+        log_debug(DEBUG_FBCON, "param %d = %d", i, param);
 
         if (mode == RGB)
         {
-            log_debug(DEBUG_CONSOLE, "color = %d", param);
+            log_debug(DEBUG_FBCON, "color = %d", param);
             *color = (*color << 8) | param;
             continue;
         }
@@ -140,7 +163,7 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* 
             }
             else if (param < 16)
             {
-                *color = lookup_table[param];
+                *color = palette[param];
             }
             else
             {
@@ -162,8 +185,8 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* 
                 *bgcolor = COLOR_BLACK;
                 break;
             case 30 ... 37:
-                *fgcolor = lookup_table[param - 30];
-                 break;
+                *fgcolor = palette[param - 30];
+                break;
             case 38:
                 color = fgcolor;
                 switch (params[++i])
@@ -177,7 +200,7 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* 
                 }
                 break;
             case 40 ... 47:
-                *bgcolor = lookup_table[param - 40];
+                *bgcolor = palette[param - 40];
                  break;
             case 48:
                 color = bgcolor;
@@ -192,7 +215,7 @@ void fbcon_setsgr(console_driver_t*, uint32_t params[], size_t count, uint32_t* 
                 }
                 break;
             case 90 ... 97:
-                *fgcolor = lookup_table[param - 90 + 8];
+                *fgcolor = palette[param - 90 + 8];
                 break;
         }
     }

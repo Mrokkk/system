@@ -129,6 +129,8 @@ function k()
     while ktest -q -t realloc_small_to_small; do echo -n; done
 }'
 
+vimrc_content='set noswapfile'
+
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
 create_dir "${mountpoint}/lib"
@@ -163,6 +165,7 @@ copy_dir_content sysroot/bin ${mountpoint}/bin
 
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"
 write_to "${inputrc_content}" "${mountpoint}/root/.inputrc"
+write_to "${vimrc_content}" "${mountpoint}/root/.vimrc"
 copy kernel.map "${boot_dir}"
 copy system "${boot_dir}"
 

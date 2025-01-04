@@ -4,64 +4,64 @@
 #include <kernel/fs.h>
 #include "console_driver.h"
 
+typedef struct csi csi_t;
 typedef struct line line_t;
+typedef struct glyph glyph_t;
 typedef struct console console_t;
-typedef struct line_char line_char_t;
-
-struct line_char
-{
-    uint32_t fgcolor;
-    uint32_t bgcolor;
-    uint8_t c;
-} PACKED;
-
-struct line
-{
-    line_char_t* line;
-    line_char_t* pos;
-    size_t index;
-    struct line* next;
-    struct line* prev;
-};
 
 #define PARAMS_SIZE 16
 
-typedef enum
+struct glyph
 {
-    ES_NORMAL,
-    ES_ESC,
-    ES_SQUARE,
-    ES_GETPARAM,
-    ES_QMARK,
-    ES_MORE,
-} state_t;
+    uint32_t fgcolor;
+    uint32_t bgcolor;
+    uint8_t  c;
+};
+
+struct line
+{
+    glyph_t* glyphs;
+};
+
+enum esc
+{
+    ESC_START = 1,
+    ESC_CSI   = 2,
+    ESC_OSC   = 4,
+};
+
+struct csi
+{
+    char   prefix;
+    size_t params_nr;
+    int    params[PARAMS_SIZE];
+};
 
 struct console
 {
-    bool disabled;
-    size_t x, y;
-    size_t resx, resy;
+    bool     disabled;
+    bool     redraw;
+    uint16_t x, y;
+    uint16_t prev_x, prev_y;
+    uint16_t scroll_top, scroll_bottom;
+    uint16_t resx, resy;
 
     console_driver_t* driver;
 
-    size_t capacity;
-    line_t* lines;
-    line_t* current_line;
-    line_t* visible_line;
-    line_t* orig_visible_line;
-    int scrolling;
-    int tmux_state;
-    size_t saved_x, saved_y;
-    size_t current_index;
+    size_t   capacity;
+    line_t*  lines;
+    line_t*  current_line;
+    line_t*  visible_lines;
+    line_t*  orig_visible_lines;
+    int      tmux_state;
+    uint16_t saved_x, saved_y;
     uint32_t current_fgcolor, current_bgcolor;
     uint32_t default_fgcolor, default_bgcolor;
-    bool redraw;
-    line_t* prev_visible_line;
-
-    size_t params_nr;
-    uint32_t params[PARAMS_SIZE];
-    state_t state;
-    state_t prev_state;
+    short    escape_state;
+    csi_t    csi;
+    char     command[32];
+    char     command_buf[32];
+    uint16_t command_it;
 };
 
 int console_init(void);

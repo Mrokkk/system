@@ -12,6 +12,6 @@ void egacon_char_print(
     uint32_t fgcolor,
     uint32_t bgcolor);
 
-void egacon_setsgr(console_driver_t* driver, uint32_t params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor);
+void egacon_setsgr(console_driver_t* driver, int params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor);
 void egacon_defcolor(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);
 void egacon_movecsr(console_driver_t* driver, int x, int y);

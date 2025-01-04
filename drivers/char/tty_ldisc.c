@@ -50,7 +50,11 @@ int tty_ldisc_read(tty_t* tty, file_t* file, char* buffer, size_t count)
             }
         }
 
-        if (buffer[i] == '\n' && I_ICRNL(tty))
+        if (!L_ICANON(tty))
+        {
+            return ++i;
+        }
+        else if (buffer[i] == '\n' && I_ICRNL(tty))
         {
             return ++i;
         }
@@ -105,7 +109,7 @@ void tty_ldisc_putch(tty_t* tty, int c)
     {
         c = '\n';
     }
-    else if (c == 12)
+    else if (c == '\f') // FIXME: should be removed; I must make Bash understand \f properly
     {
         tty->driver->putch(tty, 12);
     }
@@ -115,6 +119,8 @@ void tty_ldisc_putch(tty_t* tty, int c)
         return;
     }
 
+    // In special mode all input is directly forwarded to
+    // underlying driver and does not reach process
     if (L_ECHO(tty) || special_mode)
     {
         tty->driver->putch(tty, c);
