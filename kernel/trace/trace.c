@@ -167,7 +167,7 @@ static int string_print(const char* string, int limit, char* buffer, const char*
 
     for (size_t i = 0; i < to_print; ++i)
     {
-        it = csnprintf(it, end, isprint(string[i]) ? "%c" : "\\%u", string[i]);
+        it = csnprintf(it, end - 5, isprint(string[i]) ? "%c" : "\\%u", string[i] & 0xff);
     }
 
     if (len > to_print)
