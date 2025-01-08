@@ -21,7 +21,29 @@ int LIBC(fgetc)(FILE* stream)
 
 char* LIBC(fgets)(char* s, int size, FILE* stream)
 {
-    NOT_IMPLEMENTED(NULL, "%p, %u, %p", s, size, stream);
+    int i;
+    int ret = SAFE_SYSCALL(read(stream->fd, s, size - 1), NULL);
+
+    // FIXME: implement proper buffering; below workaround will work
+    // only for files
+    for (i = 0; i < ret; ++i)
+    {
+        if (s[i] == '\n')
+        {
+            s[i + 1] = '\0';
+            int cur = lseek(stream->fd, 0, SEEK_CUR);
+            lseek(stream->fd, cur - (ret - i) + 1, SEEK_SET);
+            break;
+        }
+    }
+
+    if (ret == 0)
+    {
+        *s = '\0';
+        return NULL;
+    }
+    s[ret] = '\0';
+    return s;
 }
 
 int LIBC(ungetc)(int c, FILE* stream)

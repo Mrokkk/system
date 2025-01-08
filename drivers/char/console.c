@@ -12,6 +12,7 @@
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 #include <kernel/string.h>
+#include <kernel/process.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/page_alloc.h>
 
@@ -40,6 +41,7 @@ static void scroll_up(console_t* console, size_t origin, size_t count);
 static void scroll_down(console_t* console, size_t origin, size_t count);
 static int extend(console_t* console);
 static int clear_cmd(console_t* console, const char*[]);
+static int font_cmd(console_t* console, const char*[]);
 
 static tty_driver_t tty_driver = {
     .name = "tty",
@@ -65,6 +67,7 @@ typedef struct command command_t;
 
 static READONLY const command_t commands[] = {
     COMMAND(clear),
+    COMMAND(font),
     {NULL, NULL}
 };
 
@@ -101,8 +104,8 @@ static READONLY const command_t commands[] = {
     { \
         glyph_t* _glyph = g; \
         _glyph->c = ' '; \
-        _glyph->fgcolor = console->default_fgcolor; \
-        _glyph->bgcolor = console->default_bgcolor; \
+        _glyph->fgcolor = console->current_fgcolor; \
+        _glyph->bgcolor = console->current_bgcolor; \
     }
 
 static void cursor_update(console_t* console)
@@ -153,7 +156,7 @@ static void current_line_clear(console_t* console, int mode)
     {
         glyph_t* glyph = &line->glyphs[x];
         GLYPH_CLEAR(glyph);
-        drv->putch(console->driver, console->y, x, ' ', console->default_fgcolor, console->default_bgcolor);
+        drv->putch(console->driver, console->y, x, ' ', console->current_fgcolor, console->current_bgcolor);
     }
 }
 
@@ -424,6 +427,22 @@ static int clear_cmd(console_t* console, const char*[])
     return 0;
 }
 
+static int font_cmd(console_t* console, const char* params[])
+{
+    if (!params[0])
+    {
+        return -1;
+    }
+
+    if (console->driver->font_load)
+    {
+        int res = console->driver->font_load(console->driver, params[0]);
+        redraw(console);
+        return res;
+    }
+    return -1;
+}
+
 static void tmux_mode_parse_command(console_t* console, size_t max_count, char** parameters, size_t* count)
 {
     char* save_ptr;
@@ -436,6 +455,7 @@ static void tmux_mode_parse_command(console_t* console, size_t max_count, char**
     {
         new_token = strtok_r(buf, " ", &save_ptr);
         parameters[(*count)++] = new_token;
+        buf = NULL;
     }
     while (new_token && *count < max_count);
 }
@@ -451,7 +471,7 @@ static void tmux_mode_execute_command(console_t* console)
     {
         if (!strcmp(parameters[0] + 1, cmd->name))
         {
-            cmd->fn(console, (const char**)parameters + 1);
+            cmd->fn(console, (const char**)(&parameters[1]));
             return;
         }
     }
@@ -481,9 +501,8 @@ static void tmux_mode_handle_command(console_t* console, char c)
             case '\t':
                 break;
             case '\r':
-                tmux_mode_execute_command(console);
-                console->command_it = 0;
                 console->tmux_state = 0;
+                process_wake(console->kconsole);
                 break;
             case 0x7f:
             case '\b':
@@ -862,6 +881,10 @@ static void csi(console_t* console, int c, int* movecsr)
             }
             break;
         case 'm': // Character Attributes (SGR)
+            if (console->csi.prefix)
+            {
+                goto unknown;
+            }
             sgr(console, console->csi.params, console->csi.params_nr);
             break;
         case 'r': // Set Scrolling Region [top;bottom] (default = full size of
@@ -952,6 +975,18 @@ static void console_putch_internal(console_t* console, tty_t* tty, int c, int* m
         {
             switch (c)
             {
+                case 'M': // Reverse Index (RI)
+                    console->escape_state = 0;
+                    if (console->y == console->scroll_top)
+                    {
+                        scroll_up(console, console->scroll_top, 1);
+                    }
+                    else
+                    {
+                        console->y--;
+                    }
+                    *movecsr = 1;
+                    return;
                 case '[':
                     log_debug(DEBUG_CONSOLE, "switch to [");
                     console->escape_state |= ESC_CSI;
@@ -1017,6 +1052,7 @@ static int console_open(tty_t* tty, file_t*)
             driver->setsgr = &fbcon_setsgr;
             driver->defcolor = &fbcon_defcolor;
             driver->movecsr = &fbcon_movecsr;
+            driver->font_load = &fbcon_font_load;
             break;
         case FB_TYPE_TEXT:
             driver->init = &egacon_init;
@@ -1048,6 +1084,30 @@ error:
     return errno;
 }
 
+static void kconsole(console_t* console)
+{
+    flags_t flags;
+
+    do_chroot(NULL);
+    do_chroot("/root");
+
+    while (1)
+    {
+        irq_save(flags);
+        process_wait2(flags);
+
+        if (console->command_it)
+        {
+            tmux_mode_execute_command(console);
+
+            console->command_it = 0;
+            memset(console->command, 0, sizeof(console->command));
+
+            redraw(console);
+        }
+    }
+}
+
 static int console_setup(console_driver_t* driver)
 {
     int errno;
@@ -1063,7 +1123,8 @@ static int console_setup(console_driver_t* driver)
         return errno;
     }
 
-    size_t size = align(sizeof(console_t), 0x100) + sizeof(glyph_t) * col * INITIAL_CAPACITY + MAX_CAPACITY * sizeof(line_t);
+    size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % row;
+    size_t size = align(sizeof(console_t), 0x100) + sizeof(glyph_t) * col * INITIAL_CAPACITY + max_capacity * sizeof(line_t);
     size_t needed_pages = page_align(size) / PAGE_SIZE;
 
     log_notice("size: %u x %u; need %u B (%u pages) for %u lines", col, row, size, needed_pages, INITIAL_CAPACITY);
@@ -1078,14 +1139,14 @@ static int console_setup(console_driver_t* driver)
 
     console = page_virt_ptr(pages);
     lines = shift_as(line_t*, console, align(sizeof(console_t), 0x100));
-    glyphs = shift_as(glyph_t*, lines, MAX_CAPACITY * sizeof(line_t));
+    glyphs = shift_as(glyph_t*, lines, max_capacity * sizeof(line_t));
 
     for (i = 0; i < INITIAL_CAPACITY; ++i)
     {
         lines[i].glyphs = glyphs + i * col;
     }
 
-    memset(&lines[INITIAL_CAPACITY], 0, (MAX_CAPACITY - INITIAL_CAPACITY) * sizeof(line_t*));
+    memset(&lines[INITIAL_CAPACITY], 0, (max_capacity - INITIAL_CAPACITY) * sizeof(line_t*));
 
     memset(console, 0, sizeof(*console));
     console->resx = col;
@@ -1094,12 +1155,14 @@ static int console_setup(console_driver_t* driver)
     console->current_line = lines;
     console->visible_lines = lines;
     console->capacity = INITIAL_CAPACITY;
+    console->max_capacity = max_capacity;
+    console->scroll_bottom = console->resy - 1;
+    console->scroll_top = 0;
     console->driver = driver;
+
     driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
     console->default_fgcolor = console->current_fgcolor;
     console->default_bgcolor = console->current_bgcolor;
-    console->scroll_bottom = console->resy - 1;
-    console->scroll_top = 0;
 
     for (i = 0; i < INITIAL_CAPACITY; ++i)
     {
@@ -1110,6 +1173,8 @@ static int console_setup(console_driver_t* driver)
     }
 
     tty_driver.driver_data = console;
+
+    console->kconsole = process_spawn("kconsole", &kconsole, console, SPAWN_KERNEL);
 
     redraw(console);
 
@@ -1192,7 +1257,7 @@ static int extend(console_t* console)
     glyph_t* glyphs;
     size_t line_len = console->resx;
     size_t new_lines = console->capacity * 2;
-    size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % console->resy;
+    size_t max_capacity = console->max_capacity;
 
     if (new_lines + console->capacity > max_capacity)
     {

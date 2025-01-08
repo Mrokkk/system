@@ -99,15 +99,12 @@ int lookup(const char* filename, int flag, dentry_t* start, dentry_t** result)
         parent_inode = dentry->inode;
         parent_dentry = dentry;
         log_debug(DEBUG_LOOKUP, "absolute; %O", dentry);
-        ++path;
-    }
-    else if (*filename == '/')
-    {
-        ++path;
     }
 
     while (1)
     {
+        for (; *path && *path == '/'; ++path);
+
         get_next_dir(&path, name);
 
         log_debug(DEBUG_LOOKUP, "dirname=%S", name);

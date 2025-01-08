@@ -6,7 +6,9 @@
 #include "framebuffer.h"
 #include "console_driver.h"
 
-#define DEBUG_FBCON 0
+#define DEBUG_FBCON       0
+#define FONTS_DIR         "/usr/share/"
+#define DEFAULT_FONT_PATH FONTS_DIR "font.psf"
 
 enum palette
 {
@@ -89,7 +91,7 @@ int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
     int errno;
     data_t* data;
 
-    if ((errno = font_load()))
+    if ((errno = font_load(DEFAULT_FONT_PATH)))
     {
         log_warning("cannot load font: %d", errno);
         return errno;
@@ -180,9 +182,19 @@ void fbcon_setsgr(console_driver_t*, int params[], size_t count, uint32_t* fgcol
 
         switch (param)
         {
-            case 0:
+            case 0: // Normal
                 *fgcolor = COLOR_WHITE;
                 *bgcolor = COLOR_BLACK;
+                break;
+            case 1: // Bold
+            case 2: // Faint, decreased intensity
+            case 3: // Italicized
+            case 4: // Underlined TODO
+            case 5: // Blink
+            case 7: // Inverse TODO
+            case 23: // Not italicized
+            case 27: // Positive (not inverse) TODO
+            case 29: // Not crossed-out
                 break;
             case 30 ... 37:
                 *fgcolor = palette[param - 30];
@@ -217,6 +229,8 @@ void fbcon_setsgr(console_driver_t*, int params[], size_t count, uint32_t* fgcol
             case 90 ... 97:
                 *fgcolor = palette[param - 90 + 8];
                 break;
+            default:
+                log_info("unsupported: SGR#%u: %u", i, param);
         }
     }
 }
@@ -252,4 +266,12 @@ void fbcon_movecsr(console_driver_t* drv, int x, int y)
     }
 
     data->cursor_offset = new_offset;
+}
+
+int fbcon_font_load(console_driver_t*, const char* name)
+{
+    char buffer[32];
+    csnprintf(buffer, buffer + array_size(buffer), FONTS_DIR "%s.psf", name);
+
+    return font_load(buffer);
 }

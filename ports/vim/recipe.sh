@@ -34,6 +34,7 @@ function build()
         --disable-xsmp-interact \
         --disable-gtktest \
         --disable-gui \
+        --disable-channel \
         --disable-largefile \
         --disable-acl \
         --disable-nls \
@@ -43,9 +44,10 @@ function build()
         --disable-icon-cache-update \
         --disable-canberra \
         --disable-libsodium \
-        --with-features=tiny
+        --with-features=normal
 
     sed -i 's#default_vim_dir.*#default_vim_dir = (char*)"/usr/share/vim";#g' src/auto/pathdef.c || die "cannot fix pathdef.c"
+    sed
 
     make -O -j4 || die "compilation failed"
 }

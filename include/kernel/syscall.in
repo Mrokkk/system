@@ -82,3 +82,4 @@ munmap: int, void*, size_t
 set_thread_area: int, uintptr_t
 pinsyscalls: int, void*, size_t
 chmod: int, const char*, mode_t
+timer_delete: int, timer_t

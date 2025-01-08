@@ -62,7 +62,8 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
         if (!data[i].file->ops || !data[i].file->ops->poll)
         {
             errno = -ENOSYS;
-            goto error;
+            errno = 0;
+            goto free_data;
         }
 
         data->head = NULL;

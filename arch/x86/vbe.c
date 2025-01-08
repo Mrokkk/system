@@ -312,7 +312,7 @@ setup_fb:
 
     desired_mode = desired_mode ? : mode_find();
 
-    if (desired_mode)
+    if (desired_mode && !param_bool_get(KERNEL_PARAM("nomodeset")))
     {
         video_mode_set(desired_mode);
     }

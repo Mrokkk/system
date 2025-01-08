@@ -1,5 +1,7 @@
 #pragma once
 
+#include <kernel/api/signal.h>
+
 #define WNOHANG                 1
 #define WUNTRACED               2
 #define WCONTINUED              4

@@ -7,3 +7,4 @@ void fbcon_char_print(console_driver_t* driver, size_t y, size_t x, uint8_t c, u
 void fbcon_setsgr(console_driver_t* driver, int params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor);
 void fbcon_defcolor(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);
 void fbcon_movecsr(console_driver_t* driver, int x, int y);
+int fbcon_font_load(console_driver_t* driver, const char* name);

@@ -140,7 +140,7 @@ UNMAP_AFTER_INIT static void init(slab_allocator_t* allocator, size_t size, size
 UNMAP_AFTER_INIT void slab_allocator_init(void)
 {
     init(&allocators[SLAB_32], 32, 512 * 2);
-    init(&allocators[SLAB_64], 64, 256 * 16);
+    init(&allocators[SLAB_64], 64, 512 * 16);
     init(&allocators[SLAB_128], 128, 128 * 2);
     init(&allocators[SLAB_256], 256, 64 * 2);
     init(&allocators[SLAB_512], 512, 32 * 2);

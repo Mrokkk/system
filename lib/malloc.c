@@ -452,7 +452,7 @@ static void* small_realloc(void* ptr, size_t size, slab_allocator_t* allocator, 
         DIE("not aligned ptr %p for class size %zu", ptr, class_size);
     }
 
-    if (diff >= 0 && diff < (int)(class_size / 2))
+    if (diff >= (int)sizeof(uintptr_t) && diff < (int)(class_size / 2))
     {
         return ptr;
     }
@@ -464,7 +464,7 @@ static void* small_realloc(void* ptr, size_t size, slab_allocator_t* allocator, 
 
     memcpy(new_ptr, ptr, to_copy);
 
-    LIBC(free)(ptr);
+    small_free(ptr, allocator, slab);
 
     return new_ptr;
 }
@@ -488,7 +488,7 @@ static void* large_realloc(void* ptr, size_t size, large_region_t* region)
 
     memcpy(new_ptr, ptr, to_copy);
 
-    LIBC(free)(ptr);
+    large_free(ptr, region);
 
     return new_ptr;
 }

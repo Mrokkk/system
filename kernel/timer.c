@@ -314,8 +314,11 @@ int sys_timer_create(clockid_t clockid, sigevent_t* evp, timer_t* timerid)
             callback = &posix_timer_signal_callback;
             break;
         case SIGEV_THREAD:
-            errno = -ENOSYS;
-            goto error;
+            // TODO: add proper support for this
+            callback = &posix_timer_signal_callback;
+            break;
+            // errno = -ENOSYS;
+            // goto error;
         default:
             errno = -EINVAL;
             goto error;
@@ -337,6 +340,20 @@ error:
     return errno;
 }
 
+int sys_timer_delete(timer_t timerid)
+{
+    ktimer_t* timer = process_ktimer_find(timerid);
+
+    if (unlikely(!timer))
+    {
+        return 0;
+    }
+
+    ktimer_delete_internal(timer);
+
+    return 0;
+}
+
 int sys_timer_settime(
     timer_t timerid,
     int flags,
@@ -348,7 +365,8 @@ int sys_timer_settime(
 
     if (unlikely(!timer || timer->process != process_current))
     {
-        return -EINVAL;
+        // FIXME: should be EINVAL
+        return 0;
     }
 
     if (unlikely(errno = current_vm_verify(VERIFY_READ, new_value)) ||

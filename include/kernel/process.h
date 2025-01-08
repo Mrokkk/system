@@ -40,7 +40,7 @@ typedef enum
 #define SPAWN_KERNEL        0
 #define SPAWN_USER          (1 << 1)
 
-#define USER_STACK_SIZE             (32 * KiB)
+#define USER_STACK_SIZE             (256 * KiB)
 #if CONFIG_SEGMEXEC
 #define USER_STACK_VIRT_ADDRESS     (CODE_START - USER_STACK_SIZE)
 #else

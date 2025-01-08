@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "printf_buffer.h"
@@ -244,8 +245,12 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
         qualifier = -1;
         if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'j' || *fmt == 'z')
         {
-            qualifier = *fmt;
-            ++fmt;
+            qualifier = *fmt++;
+            if (*fmt == 'l')
+            {
+                qualifier = qualifier << 8 | 'l';
+                ++fmt;
+            }
         }
 
         // default base
@@ -371,6 +376,26 @@ int vsprintf_internal(printf_buffer_t* buffer, const char* fmt, va_list args)
                 num = flags & SIGN
                     ? (unsigned long)va_arg(args, long)
                     : va_arg(args, unsigned long);
+                break;
+            case 'l' << 8 | 'l':
+                if (flags & SIGN)
+                {
+                    long long val = va_arg(args, long long);
+                    if (val > INTMAX_MAX || val < INTMAX_MIN)
+                    {
+                        __builtin_trap();
+                    }
+                    num = (unsigned long)val;
+                }
+                else
+                {
+                    unsigned long long val = va_arg(args, unsigned long long);
+                    if (val > UINTMAX_MAX)
+                    {
+                        __builtin_trap();
+                    }
+                    num = (unsigned long)val;
+                }
                 break;
             case 'z':
                 num = flags & SIGN

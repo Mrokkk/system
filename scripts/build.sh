@@ -49,6 +49,13 @@ function _prepare()
         elif [[ "${REPO}" == *"svn"* ]]
         then
             svn checkout "${REPO}" "${SRC_DIR}"
+        elif [[ "${REPO}" == *"tar.gz"* ]]
+        then
+            local file="$(basename ${REPO})"
+            wget ${REPO} -O "${file}"
+            tar xf "${file}"
+            mv "$(basename -- "${file}" .tar.gz)" "${SRC_DIR}"
+            rm "${file}"
         fi
 
         pushd_silent ${SRC_DIR}

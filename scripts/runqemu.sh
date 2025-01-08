@@ -34,6 +34,7 @@ supported_kernel_params_bool=(
     "earlycon"
     "pciprint"
     "vbeprint"
+    "nomodeset"
 )
 
 declare -A kernel_params_dict

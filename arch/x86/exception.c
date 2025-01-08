@@ -341,6 +341,10 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
 
     backtrace_exception(regs);
 
+#if 0
+    vm_areas_log(KERN_CRIT, process_current->mm->vm_areas, "process");
+#endif
+
     panic_mode_die();
 
     for (;; halt());

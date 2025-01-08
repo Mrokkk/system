@@ -13,4 +13,5 @@ struct console_driver
     void (*defcolor)(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);
     void (*setsgr)(console_driver_t* driver, int params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor);
     void (*movecsr)(console_driver_t* driver, int x, int y);
+    int (*font_load)(console_driver_t* driver, const char* name);
 };

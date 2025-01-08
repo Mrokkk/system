@@ -148,6 +148,12 @@ static int elf_prepare(const char* name, file_t* file, string_t** interpreter, v
         return -ENOEXEC;
     }
 
+    if (unlikely(elf_data->header.e_machine != EM_386))
+    {
+        log_debug(DEBUG_ELF, "%s: not a proper machine: %x", name, elf_data->header.e_machine);
+        return -ENOEXEC;
+    }
+
     if (unlikely(!(page = page_alloc(1, 0))))
     {
         log_debug(DEBUG_ELF, "%s: cannot allocate page for phdr", name);
@@ -193,25 +199,6 @@ static void elf_cleanup(void* data)
 
     pages_free(elf_data->header_page);
     ffree(elf_data, sizeof(*elf_data));
-}
-
-int elf_header_read(const char* name, file_t* file, elf32_header_t* header)
-{
-    int errno;
-
-    if ((errno = do_read(file, 0, header, sizeof(elf32_header_t))))
-    {
-        log_debug(DEBUG_ELF, "%s: cannot read header: %d", name, errno);
-        return errno;
-    }
-
-    if (elf_validate(name, header))
-    {
-        log_debug(DEBUG_ELF, "%s: not an ELF", name);
-        return -ENOEXEC;
-    }
-
-    return 0;
 }
 
 static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phnum, binary_t* bin, uintptr_t base)

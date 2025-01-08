@@ -578,4 +578,11 @@ syscall_t trace_syscalls[] = {
         .nargs  = 2,
         .args   = { TYPE_CONST_CHAR_PTR, TYPE_UNSIGNED_SHORT },
     },
+
+    {
+        .name   = "timer_delete",
+        .ret    = TYPE_LONG,
+        .nargs  = 1,
+        .args   = { TYPE_UNSIGNED_LONG },
+    },
 };

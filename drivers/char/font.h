@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <kernel/page_alloc.h>
 
 typedef struct
 {
@@ -15,8 +16,9 @@ typedef struct
     uint32_t bytes_per_glyph;
     uint32_t glyphs_count;
     glyph_t* glyphs;
+    page_t*  pages;
 } font_t;
 
 extern font_t font;
 
-int font_load(void);
+int font_load(const char* path);

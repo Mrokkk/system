@@ -19,7 +19,26 @@ typedef double double_t;
 
 #define HUGE_VAL    (__builtin_huge_val())
 
+double ceil(double x);
+double floor(double x);
+
+double exp(double x);
+double log(double x);
 double log10(double x);
 
+double sqrt(double x);
 double pow(double x, double y);
 double modf(double x, double* iptr);
+
+double sin(double x);
+double sinh(double x);
+double cos(double x);
+double cosh(double x);
+double tan(double x);
+double tanh(double x);
+double asin(double x);
+double acos(double x);
+double atan(double x);
+double atan2(double y, double x);
+
+double fmod(double x, double y);

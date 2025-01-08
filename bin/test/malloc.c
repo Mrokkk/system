@@ -160,7 +160,7 @@ TEST(realloc_small_to_small_same_size_class)
         *mem = 49282;
         EXPECT_EQ(*mem, 49282);
 
-        uintptr_t* new_mem = ENSURE(realloc(mem, 15));
+        uintptr_t* new_mem = ENSURE(realloc(mem, 12));
 
         EXPECT_EQ(*new_mem, 49282);
         EXPECT_EQ(new_mem, mem);

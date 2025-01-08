@@ -129,7 +129,25 @@ function k()
     while ktest -q -t realloc_small_to_small; do echo -n; done
 }'
 
-vimrc_content='set noswapfile'
+vimrc_content='let mapleader = ","
+
+nmap <Leader>t :tabnew<CR>
+nmap <Leader>l :tabn<CR>
+nmap <Leader>h :tabp<CR>
+nmap <Leader>q :bd<CR>
+nmap <space> viw
+
+syntax on
+set noswapfile
+set number
+set cursorline
+set nowrap
+set softtabstop=4
+set autoindent
+set smartindent
+set tabstop=4
+set shiftwidth=4
+set expandtab'
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"

@@ -49,6 +49,7 @@ struct console
     console_driver_t* driver;
 
     size_t   capacity;
+    size_t   max_capacity;
     line_t*  lines;
     line_t*  current_line;
     line_t*  visible_lines;
@@ -62,6 +63,8 @@ struct console
     char     command[32];
     char     command_buf[32];
     uint16_t command_it;
+
+    struct process* kconsole;
 };
 
 int console_init(void);
