@@ -66,7 +66,7 @@ static inline void cls(data_t* data)
     memsetw(data->videomem, video_char_make(' ', data->default_attribute), data->resx * data->resy);
 }
 
-int egacon_init(console_driver_t* driver, size_t* row, size_t* col)
+int egacon_init(console_driver_t* driver, console_config_t*, size_t* row, size_t* col)
 {
     data_t* data = alloc(data_t);
 

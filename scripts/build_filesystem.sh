@@ -177,17 +177,20 @@ let g:gruvbox_material_better_performance = 1
 let g:gruvbox_material_disable_italic_comment = 1
 colorscheme gruvbox-material"
 
+vconsone_content="FONT=Lat2-Terminus16"
+
+create_dir "${boot_dir}/grub"
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
+create_dir "${mountpoint}/etc"
 create_dir "${mountpoint}/lib"
-create_dir "${mountpoint}/usr/share"
 create_dir "${mountpoint}/lib/modules"
-create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/proc"
 create_dir "${mountpoint}/root"
 create_dir "${mountpoint}/root/.vim"
 create_dir "${mountpoint}/sys"
-create_dir "${boot_dir}/grub"
+create_dir "${mountpoint}/tmp"
+create_dir "${mountpoint}/usr/share"
 
 for binary in $(find bin -type f -executable)
 do
@@ -210,6 +213,7 @@ copy_dir_content sysroot/usr/share ${mountpoint}/usr/share
 copy_dir_content sysroot/lib ${mountpoint}/lib
 copy_dir_content sysroot/bin ${mountpoint}/bin
 
+write_to "${vconsone_content}" "${mountpoint}/etc/vconsole.conf"
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"
 write_to "${inputrc_content}" "${mountpoint}/root/.inputrc"
 write_to "${vimrc_content}" "${mountpoint}/root/.vimrc"

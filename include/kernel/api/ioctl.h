@@ -6,6 +6,7 @@
 #define     KD_TEXT     0x00
 #define     KD_GRAPHICS 0x01
 #define KDGETMODE       0x4b3b  // get current mode
+#define KDFONTOP        0x4b72
 
 #define TCGETA              0x4400
 #define TCSETA              0x4401
@@ -17,6 +18,7 @@
 #define FBIOGET_FSCREENINFO 0x4602
 
 typedef struct winsize winsize_t;
+typedef struct console_font_op console_font_op_t;
 typedef struct fb_var_screeninfo fb_var_screeninfo_t;
 
 struct fb_var_screeninfo
@@ -25,6 +27,12 @@ struct fb_var_screeninfo
     size_t yres;
     size_t bits_per_pixel;
     size_t pitch;
+};
+
+struct console_font_op
+{
+    void*  data;
+    size_t size;
 };
 
 struct winsize

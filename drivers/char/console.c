@@ -7,6 +7,7 @@
 #include <arch/rtc.h>
 
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/tty.h>
 #include <kernel/ctype.h>
 #include <kernel/kernel.h>
@@ -20,6 +21,7 @@
 #include "egacon.h"
 #include "keyboard.h"
 #include "framebuffer.h"
+#include "console_config.h"
 #include "console_driver.h"
 
 // References:
@@ -30,6 +32,10 @@
 #define CONSOLE_DRIVEN_CURSOR 1
 #define INITIAL_CAPACITY      128
 #define MAX_CAPACITY          4096
+#define FONT_DIR              "/usr/share/kbd/consolefonts/"
+#define FONT_EXTENSION        ".psfu"
+#define DEFAULT_FONT_PATH     FONT_DIR "default8x16" FONT_EXTENSION
+#define CONSOLE_CONFIG_PATH   "/etc/vconsole.conf"
 
 static int console_open(tty_t* tty, file_t* file);
 static int console_setup(console_driver_t* driver);
@@ -42,7 +48,6 @@ static void scroll_up(console_t* console, size_t origin, size_t count);
 static void scroll_down(console_t* console, size_t origin, size_t count);
 static int extend(console_t* console);
 static int clear_cmd(console_t* console, const char*[]);
-static int font_cmd(console_t* console, const char*[]);
 
 static tty_driver_t tty_driver = {
     .name = "tty",
@@ -68,7 +73,6 @@ typedef struct command command_t;
 
 static READONLY const command_t commands[] = {
     COMMAND(clear),
-    COMMAND(font),
     {NULL, NULL}
 };
 
@@ -539,22 +543,6 @@ static int clear_cmd(console_t* console, const char*[])
     redraw(console);
 
     return 0;
-}
-
-static int font_cmd(console_t* console, const char* params[])
-{
-    if (!params[0])
-    {
-        return -1;
-    }
-
-    if (console->driver->font_load)
-    {
-        int res = console->driver->font_load(console->driver, params[0]);
-        redraw(console);
-        return res;
-    }
-    return -1;
 }
 
 static void tmux_mode_parse_command(console_t* console, size_t max_count, char** parameters, size_t* count)
@@ -1228,6 +1216,81 @@ static void kconsole(console_t* console)
     }
 }
 
+static console_config_t console_config_read(void)
+{
+    int errno;
+    console_config_t config = {};
+    scoped_file_t* file = NULL;
+    scoped_string_t* content = NULL;
+
+    if (unlikely(errno = do_open(&file, CONSOLE_CONFIG_PATH, O_RDONLY, 0)))
+    {
+        log_warning("%s: open failed with %d", CONSOLE_CONFIG_PATH, errno);
+        goto set;
+    }
+
+    if (unlikely(errno = string_read(file, 0, file->dentry->inode->size, &content)))
+    {
+        log_warning("%s: read failed with %d", CONSOLE_CONFIG_PATH, errno);
+        goto set;
+    }
+
+    char* save_ptr;
+    char* save_ptr2;
+    char* line;
+    char* key;
+    char* value;
+    size_t line_nr = 1;
+
+    for (char* buf = content->data; buf || line; buf = NULL, line_nr++)
+    {
+        line = strtok_r(buf, "\n", &save_ptr);
+
+        if (!line)
+        {
+            break;
+        }
+
+        key = strtok_r(line, "=", &save_ptr2);
+        value = strtok_r(NULL, "=", &save_ptr2);
+
+        if (unlikely(!value))
+        {
+            log_warning("%s:%u: not a key-value: \"%s\"", CONSOLE_CONFIG_PATH, line_nr, key);
+            continue;
+        }
+
+        if (!strcmp(key, "FONT"))
+        {
+            size_t len = strlen(value) + sizeof(FONT_DIR FONT_EXTENSION) + 1;
+
+            string_t* font_path = string_create(len);
+
+            if (unlikely(!font_path))
+            {
+                log_warning("cannot allocate memory for font path; required size: %u", len);
+                continue;
+            }
+
+            snprintf(font_path->data, len, FONT_DIR "%s" FONT_EXTENSION, value);
+
+            config.font_path = font_path->data;
+        }
+        else
+        {
+            log_info("%s:%u: unsupported key: \"%s\"", CONSOLE_CONFIG_PATH, line_nr, key);
+        }
+    }
+
+set:
+    if (!config.font_path)
+    {
+        config.font_path = DEFAULT_FONT_PATH;
+    }
+
+    return config;
+}
+
 static int console_setup(console_driver_t* driver)
 {
     int errno;
@@ -1236,8 +1299,9 @@ static int console_setup(console_driver_t* driver)
     page_t* pages;
     size_t i, row, col;
     console_t* console;
+    console_config_t config = console_config_read();
 
-    if (unlikely(errno = driver->init(driver, &row, &col)))
+    if (unlikely(errno = driver->init(driver, &config, &row, &col)))
     {
         log_error("driver initialization failed with %d", errno);
         return errno;
@@ -1366,6 +1430,42 @@ static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
             {
                 return 0;
             }
+            break;
+        }
+        case KDFONTOP:
+        {
+            int errno;
+            console_font_op_t* op = arg;
+            console_driver_t* drv = console->driver;
+
+            if (unlikely(!drv->font_load))
+            {
+                return -ENOSYS;
+            }
+
+            if (unlikely(current_vm_verify(VERIFY_READ, op)))
+            {
+                return -EFAULT;
+            }
+
+            if (unlikely(!op->data))
+            {
+                return -EFAULT;
+            }
+
+            if (unlikely(current_vm_verify_buf(VERIFY_READ, op->data, op->size)))
+            {
+                return -EFAULT;
+            }
+
+            if (unlikely(errno = drv->font_load(drv, op->data, op->size)))
+            {
+                return errno;
+            }
+
+            redraw(console);
+
+            return 0;
         }
     }
 

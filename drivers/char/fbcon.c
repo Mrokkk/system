@@ -8,8 +8,6 @@
 #include "console_driver.h"
 
 #define DEBUG_FBCON       0
-#define FONTS_DIR         "/usr/share/"
-#define DEFAULT_FONT_PATH FONTS_DIR "font.psf"
 
 enum palette
 {
@@ -87,12 +85,12 @@ static uint32_t palette[] = {
     COLOR_BRIGHTWHITE,
 };
 
-int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
+int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resy, size_t* resx)
 {
     int errno;
     data_t* data;
 
-    if ((errno = font_load(DEFAULT_FONT_PATH)))
+    if ((errno = font_load_from_file(config->font_path)))
     {
         log_warning("cannot load font: %d", errno);
         return errno;
@@ -227,10 +225,7 @@ void fbcon_movecsr(console_driver_t* drv, int x, int y)
     data->cursor_offset = new_offset;
 }
 
-int fbcon_font_load(console_driver_t*, const char* name)
+int fbcon_font_load(console_driver_t*, const void* buffer, size_t size)
 {
-    char buffer[32];
-    csnprintf(buffer, buffer + array_size(buffer), FONTS_DIR "%s.psf", name);
-
-    return font_load(buffer);
+    return font_load_from_buffer(buffer, size);
 }

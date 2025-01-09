@@ -2,7 +2,7 @@
 
 #include "console_driver.h"
 
-int egacon_init(console_driver_t* driver, size_t* row, size_t* col);
+int egacon_init(console_driver_t* driver, console_config_t* config, size_t* row, size_t* col);
 
 void egacon_glyph_draw(
     console_driver_t* driver,

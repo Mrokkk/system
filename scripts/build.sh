@@ -38,7 +38,7 @@ function _prepare()
     then
         info "${PKG}: downloading ${REPO}..."
 
-        if [[ "${REPO}" == *"git"* ]]
+        if [[ "${REPO}" == *".git"* ]]
         then
             local branch_arg=""
             if [[ -n "${BRANCH}" ]]

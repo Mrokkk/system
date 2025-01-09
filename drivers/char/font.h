@@ -21,4 +21,5 @@ typedef struct
 
 extern font_t font;
 
-int font_load(const char* path);
+int font_load_from_file(const char* path);
+int font_load_from_buffer(const void* buffer, size_t size);
