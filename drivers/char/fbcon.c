@@ -3,6 +3,7 @@
 #include <kernel/kernel.h>
 
 #include "font.h"
+#include "glyph.h"
 #include "framebuffer.h"
 #include "console_driver.h"
 
@@ -118,20 +119,35 @@ int fbcon_init(console_driver_t* driver, size_t* resy, size_t* resx)
     return 0;
 }
 
-void fbcon_char_print(console_driver_t* drv, size_t y, size_t x, uint8_t c, uint32_t fgcolor, uint32_t bgcolor)
+void fbcon_glyph_draw(console_driver_t* drv, size_t y, size_t x, glyph_t* glyph)
 {
     data_t* data = drv->data;
     uint32_t line, mask;
-    uint8_t* glyph = font.glyphs[c].bytes;
+    uint8_t c = glyph->c;
+    uint32_t fgcolor;
+    uint32_t bgcolor;
+
+    if (glyph->attr & GLYPH_ATTR_INVERSED)
+    {
+        bgcolor = glyph->fgcolor;
+        fgcolor = glyph->bgcolor;
+    }
+    else
+    {
+        fgcolor = glyph->fgcolor;
+        bgcolor = glyph->bgcolor;
+    }
+
+    uint8_t* font_glyph = font.glyphs[c].bytes;
     uint32_t offset = data->font_height_offset * y + data->font_width_offset * x;
 
-    for (uint32_t y = 0; y < font.height; y++, ++glyph, offset += data->pitch)
+    for (uint32_t y = 0; y < font.height; y++, ++font_glyph, offset += data->pitch)
     {
         line = offset;
         mask = 1 << 7;
         for (uint32_t x = 0; x < font.width; x++)
         {
-            uint32_t value = *glyph & mask ? fgcolor : bgcolor;
+            uint32_t value = *font_glyph & mask ? fgcolor : bgcolor;
             uint32_t* pixel = (uint32_t*)(data->fb + line);
             *pixel = value;
             mask >>= 1;
@@ -140,99 +156,42 @@ void fbcon_char_print(console_driver_t* drv, size_t y, size_t x, uint8_t c, uint
     }
 }
 
-void fbcon_setsgr(console_driver_t*, int params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
+void fbcon_sgr_rgb(console_driver_t*, uint32_t value, uint32_t* color)
 {
-    color_mode_t mode = NORMAL;
-    uint32_t* color = NULL;
+    *color = value;
+}
 
-    for (size_t i = 0; i < count; ++i)
+void fbcon_sgr_256(console_driver_t*, uint32_t value, uint32_t* color)
+{
+    if (value >= 232)
     {
-        uint32_t param = params[i];
-        log_debug(DEBUG_FBCON, "param %d = %d", i, param);
-
-        if (mode == RGB)
-        {
-            log_debug(DEBUG_FBCON, "color = %d", param);
-            *color = (*color << 8) | param;
-            continue;
-        }
-        else if (mode == COLOR256)
-        {
-            if (param >= 232)
-            {
-                uint8_t c = (param - 232) * 10 + 8;
-                *color = c | c << 8 | c << 16;
-            }
-            else if (param < 16)
-            {
-                *color = palette[param];
-            }
-            else
-            {
-                uint32_t rem;
-                param -= 16;
-
-                uint8_t r = ((uint32_t)param * 255) / (36 * 5);
-                uint8_t g = ((rem = param % 36) * 255) / (6 * 5);
-                uint8_t b = ((rem % 6) * 255) / 5;
-                *color = b | g << 8 | r << 16;
-            }
-            continue;
-        }
-
-        switch (param)
-        {
-            case 0: // Normal
-                *fgcolor = COLOR_WHITE;
-                *bgcolor = COLOR_BLACK;
-                break;
-            case 1: // Bold
-            case 2: // Faint, decreased intensity
-            case 3: // Italicized
-            case 4: // Underlined TODO
-            case 5: // Blink
-            case 7: // Inverse TODO
-            case 23: // Not italicized
-            case 27: // Positive (not inverse) TODO
-            case 29: // Not crossed-out
-                break;
-            case 30 ... 37:
-                *fgcolor = palette[param - 30];
-                break;
-            case 38:
-                color = fgcolor;
-                switch (params[++i])
-                {
-                    case 2:
-                        mode = RGB;
-                        break;
-                    case 5:
-                        mode = COLOR256;
-                        break;
-                }
-                break;
-            case 40 ... 47:
-                *bgcolor = palette[param - 40];
-                 break;
-            case 48:
-                color = bgcolor;
-                switch (params[++i])
-                {
-                    case 2:
-                        mode = RGB;
-                        break;
-                    case 5:
-                        mode = COLOR256;
-                        break;
-                }
-                break;
-            case 90 ... 97:
-                *fgcolor = palette[param - 90 + 8];
-                break;
-            default:
-                log_info("unsupported: SGR#%u: %u", i, param);
-        }
+        uint8_t c = (value - 232) * 10 + 8;
+        *color = c | c << 8 | c << 16;
     }
+    else if (value < 16)
+    {
+        *color = palette[value];
+    }
+    else
+    {
+        uint32_t rem;
+        value -= 16;
+
+        uint8_t r = ((uint32_t)value * 255) / (36 * 5);
+        uint8_t g = ((rem = value % 36) * 255) / (6 * 5);
+        uint8_t b = ((rem % 6) * 255) / 5;
+        *color = b | g << 8 | r << 16;
+    }
+}
+
+void fbcon_sgr_16(console_driver_t*, uint8_t value, uint32_t* color)
+{
+    *color = palette[value];
+}
+
+void fbcon_sgr_8(console_driver_t*, uint8_t value, uint32_t* color)
+{
+    *color = palette[value];
 }
 
 void fbcon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)

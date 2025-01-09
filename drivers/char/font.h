@@ -7,16 +7,16 @@
 typedef struct
 {
     uint8_t bytes[16];
-} glyph_t;
+} fglyph_t;
 
 typedef struct
 {
-    uint32_t height;
-    uint32_t width;
-    uint32_t bytes_per_glyph;
-    uint32_t glyphs_count;
-    glyph_t* glyphs;
-    page_t*  pages;
+    uint32_t  height;
+    uint32_t  width;
+    uint32_t  bytes_per_glyph;
+    uint32_t  glyphs_count;
+    fglyph_t* glyphs;
+    page_t*   pages;
 } font_t;
 
 extern font_t font;

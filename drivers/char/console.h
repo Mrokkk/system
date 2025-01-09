@@ -2,21 +2,14 @@
 
 #include <stdint.h>
 #include <kernel/fs.h>
+#include "glyph.h"
 #include "console_driver.h"
 
 typedef struct csi csi_t;
 typedef struct line line_t;
-typedef struct glyph glyph_t;
 typedef struct console console_t;
 
 #define PARAMS_SIZE 16
-
-struct glyph
-{
-    uint32_t fgcolor;
-    uint32_t bgcolor;
-    uint8_t  c;
-};
 
 struct line
 {
@@ -57,6 +50,7 @@ struct console
     int      tmux_state;
     uint16_t saved_x, saved_y;
     uint32_t current_fgcolor, current_bgcolor;
+    uint8_t  current_attr;
     uint32_t default_fgcolor, default_bgcolor;
     short    escape_state;
     csi_t    csi;

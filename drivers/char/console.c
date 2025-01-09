@@ -20,6 +20,7 @@
 #include "egacon.h"
 #include "keyboard.h"
 #include "framebuffer.h"
+#include "console_driver.h"
 
 // References:
 // https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
@@ -104,6 +105,7 @@ static READONLY const command_t commands[] = {
     { \
         glyph_t* _glyph = g; \
         _glyph->c = ' '; \
+        _glyph->attr = console->current_attr; \
         _glyph->fgcolor = console->current_fgcolor; \
         _glyph->bgcolor = console->current_bgcolor; \
     }
@@ -111,13 +113,15 @@ static READONLY const command_t commands[] = {
 static void cursor_update(console_t* console)
 {
 #if CONSOLE_DRIVEN_CURSOR
-    glyph_t* glyph = &console->visible_lines[console->y].glyphs[console->x];
-    console->driver->putch(console->driver, console->y, console->x, glyph->c, glyph->bgcolor, glyph->fgcolor);
+    glyph_t current = console->visible_lines[console->y].glyphs[console->x];
+    current.attr ^= GLYPH_ATTR_INVERSED;
+    console->driver->glyph_draw(console->driver, console->y, console->x, &current);
 
     if (console->prev_x != console->x || console->prev_y != console->y)
     {
-        glyph = &console->visible_lines[console->prev_y].glyphs[console->prev_x];
-        console->driver->putch(console->driver, console->prev_y, console->prev_x, glyph->c, glyph->fgcolor, glyph->bgcolor);
+        glyph_t previous = console->visible_lines[console->prev_y].glyphs[console->prev_x];
+        previous.attr ^= ~GLYPH_ATTR_INVERSED;
+        console->driver->glyph_draw(console->driver, console->prev_y, console->prev_x, &previous);
 
         console->prev_x = console->x;
         console->prev_y = console->y;
@@ -156,7 +160,7 @@ static void current_line_clear(console_t* console, int mode)
     {
         glyph_t* glyph = &line->glyphs[x];
         GLYPH_CLEAR(glyph);
-        drv->putch(console->driver, console->y, x, ' ', console->current_fgcolor, console->current_bgcolor);
+        drv->glyph_draw(console->driver, console->y, x, glyph);
     }
 }
 
@@ -166,17 +170,19 @@ static void redraw(console_t* console)
     glyph_t* pos;
     line_t* temp;
     console_driver_t* drv = console->driver;
+    glyph_t cursor = console->visible_lines[console->y].glyphs[console->x];
+    cursor.attr ^= GLYPH_ATTR_INVERSED;
 
     for (y = 0, temp = console->visible_lines; y < console->resy; ++y, temp++)
     {
         for (pos = temp->glyphs, x = 0; x < console->resx; ++pos, ++x)
         {
-            drv->putch(console->driver, y, x, pos->c, pos->fgcolor, pos->bgcolor);
+            drv->glyph_draw(console->driver, y, x, pos);
         }
     }
 
     pos = &console->visible_lines[console->y].glyphs[console->y];
-    drv->putch(console->driver, console->y, console->x, pos->c, pos->bgcolor, pos->fgcolor);
+    drv->glyph_draw(console->driver, console->y, console->x, &cursor);
 }
 
 static void console_refresh(void* data)
@@ -259,13 +265,15 @@ static void position_prev(console_t* console)
 static void console_write_char(console_t* console, uint8_t c)
 {
     glyph_t* cur = &console->current_line->glyphs[console->x];
-    cur->c = c;
+
+    cur->c       = c;
+    cur->attr    = console->current_attr;
     cur->fgcolor = console->current_fgcolor;
     cur->bgcolor = console->current_bgcolor;
 
     if (!console->redraw)
     {
-        console->driver->putch(console->driver, console->y, console->x, c, console->current_fgcolor, console->current_bgcolor);
+        console->driver->glyph_draw(console->driver, console->y, console->x, cur);
     }
 
     position_next(console);
@@ -284,10 +292,115 @@ static void tab(console_t* console)
     console_write_char(console, ' ');
 }
 
+static void rgb_set(console_driver_t* drv, int* params, uint32_t* color)
+{
+    if (drv->sgr_rgb)
+    {
+        drv->sgr_rgb(drv, (params[0] << 16) | (params[1] << 8) | (params[2]), color);
+    }
+}
+
+static void color256_set(console_driver_t* drv, int value, uint32_t* color)
+{
+    if (drv->sgr_256)
+    {
+        drv->sgr_256(drv, value, color);
+    }
+    else if (drv->sgr_16 && value < 16)
+    {
+        drv->sgr_16(drv, value, color);
+    }
+    else if (drv->sgr_8 && value < 8)
+    {
+        drv->sgr_8(drv, value, color);
+    }
+}
+
 static void sgr(console_t* console, int* params, size_t params_count)
 {
     console_driver_t* drv = console->driver;
-    drv->setsgr(drv, params, params_count, &console->current_fgcolor, &console->current_bgcolor);
+
+    for (size_t i = 0; i < params_count; ++i)
+    {
+        switch (params[i])
+        {
+            case 0: // Normal
+                console->current_fgcolor = console->default_fgcolor;
+                console->current_bgcolor = console->default_bgcolor;
+                console->current_attr = 0;
+                break;
+            case 1: // Bold
+            case 2: // Faint, decreased intensity
+            case 3: // Italicized
+                break;
+            case 4: // Underlined
+                console->current_attr |= GLYPH_ATTR_UNDERLINED;
+                break;
+            case 5: // Blink
+                break;
+            case 7: // Inverse
+                console->current_attr |= GLYPH_ATTR_INVERSED;
+                break;
+            case 23: // Not italicized
+                break;
+            case 24: // Not underlined
+                console->current_attr &= ~GLYPH_ATTR_UNDERLINED;
+                break;
+            case 27: // Positive (not inverse)
+                console->current_attr &= ~GLYPH_ATTR_INVERSED;
+                break;
+            case 29: // Not crossed-out
+                break;
+            case 30 ... 37: // Set foreground color
+                if (drv->sgr_8)
+                {
+                    drv->sgr_8(drv, params[i] - 30, &console->current_fgcolor);
+                }
+                break;
+            case 38:
+                switch (params[++i])
+                {
+                    case 2: // Set background color using RGB values
+                        rgb_set(drv, params + ++i, &console->current_fgcolor);
+                        break;
+                    case 5: // Set background color using indexed color
+                        color256_set(drv, params[++i], &console->current_fgcolor);
+                        break;
+                }
+                return;
+            case 40 ... 47: // Set background color
+                if (drv->sgr_8)
+                {
+                    drv->sgr_8(drv, params[i] - 40, &console->current_bgcolor);
+                }
+                break;
+            case 48:
+                switch (params[++i])
+                {
+                    case 2: // Set background color using RGB values
+                        rgb_set(drv, params + ++i, &console->current_bgcolor);
+                        break;
+                    case 5: // Set background color using indexed color
+                        color256_set(drv, params[i + 2], &console->current_bgcolor);
+                        break;
+                }
+                return;
+            case 90 ... 97: // Set bright foreground color
+                if (drv->sgr_16)
+                {
+                    drv->sgr_16(drv, params[i] - 90 + 8, &console->current_fgcolor);
+                }
+                break;
+            case 100 ... 107: // Set bright background color
+                if (drv->sgr_16)
+                {
+                    drv->sgr_16(drv, params[i] - 100 + 8, &console->current_bgcolor);
+                }
+                break;
+            default:
+                log_info("unsupported SGR: %u: %u", params[i]);
+        }
+    }
 }
 
 static void line_nr_print(console_t* console)
@@ -301,7 +414,8 @@ static void line_nr_print(console_t* console)
 
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {
-        console->driver->putch(console->driver, 0, pos, buf[i], console->default_fgcolor, console->default_bgcolor);
+        glyph_t glyph = {.c = buf[i], .fgcolor = console->default_fgcolor, .bgcolor = console->default_bgcolor};
+        console->driver->glyph_draw(console->driver, 0, pos, &glyph);
     }
 }
 
@@ -700,6 +814,7 @@ finish:
     {
         cursor_update(console);
         line_nr_print(console);
+        glyph_t glyph = {.fgcolor = console->default_fgcolor, .bgcolor = console->default_bgcolor};
         if (console->command_it)
         {
             for (size_t i = 0; i < sizeof(console->command); ++i)
@@ -709,7 +824,8 @@ finish:
                 {
                     c = ' ';
                 }
-                console->driver->putch(console->driver, console->resy - 1, i, c, console->default_fgcolor, console->default_bgcolor);
+                glyph.c = c;
+                console->driver->glyph_draw(console->driver, console->resy - 1, i, &glyph);
             }
         }
     }
@@ -987,7 +1103,7 @@ static void console_putch_internal(console_t* console, tty_t* tty, int c, int* m
                     }
                     *movecsr = 1;
                     return;
-                case '[':
+                case '[': // Control Sequence Introducer (CSI)
                     log_debug(DEBUG_CONSOLE, "switch to [");
                     console->escape_state |= ESC_CSI;
                     memset(&console->csi, 0, sizeof(console->csi));
@@ -1048,18 +1164,22 @@ static int console_open(tty_t* tty, file_t*)
     {
         case FB_TYPE_RGB:
             driver->init = &fbcon_init;
-            driver->putch = &fbcon_char_print;
-            driver->setsgr = &fbcon_setsgr;
+            driver->glyph_draw = &fbcon_glyph_draw;
             driver->defcolor = &fbcon_defcolor;
             driver->movecsr = &fbcon_movecsr;
             driver->font_load = &fbcon_font_load;
+            driver->sgr_rgb = &fbcon_sgr_rgb;
+            driver->sgr_256 = &fbcon_sgr_256;
+            driver->sgr_16 = &fbcon_sgr_16;
+            driver->sgr_8 = &fbcon_sgr_8;
             break;
         case FB_TYPE_TEXT:
             driver->init = &egacon_init;
-            driver->putch = &egacon_char_print;
-            driver->setsgr = &egacon_setsgr;
+            driver->glyph_draw = &egacon_glyph_draw;
             driver->defcolor = &egacon_defcolor;
             driver->movecsr = &egacon_movecsr;
+            driver->sgr_16 = &egacon_sgr_16;
+            driver->sgr_8 = &egacon_sgr_8;
             break;
         default:
             log_error("cannot initialize console");
@@ -1158,6 +1278,7 @@ static int console_setup(console_driver_t* driver)
     console->max_capacity = max_capacity;
     console->scroll_bottom = console->resy - 1;
     console->scroll_top = 0;
+    console->current_attr = 0;
     console->driver = driver;
 
     driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);

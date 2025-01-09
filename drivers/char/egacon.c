@@ -92,55 +92,44 @@ int egacon_init(console_driver_t* driver, size_t* row, size_t* col)
     return 0;
 }
 
-void egacon_char_print(console_driver_t* drv, size_t row, size_t col, uint8_t c, uint32_t fgcolor, uint32_t bgcolor)
+void egacon_glyph_draw(console_driver_t* drv, size_t row, size_t col, glyph_t* glyph)
 {
     data_t* data = drv->data;
     uint16_t off = row * data->resx + col;
-    videomem_write(data->videomem, video_char_make(c, forecolor(fgcolor) | backcolor(bgcolor)), off);
+    videomem_write(data->videomem, video_char_make(glyph->c, forecolor(glyph->fgcolor) | backcolor(glyph->bgcolor)), off);
 }
 
-void egacon_setsgr(console_driver_t*, int params[], size_t count, uint32_t* fgcolor, uint32_t* bgcolor)
+static void egacon_color_set(uint8_t value, uint32_t* color)
 {
-    for (size_t i = 0; i < count; ++i)
+    switch (value)
     {
-        uint32_t param = params[i];
-        switch (param)
-        {
-            case 0:
-                *fgcolor = COLOR_GRAY;
-                *bgcolor = COLOR_BLACK;
-                break;
-            case 30: *fgcolor = COLOR_BLACK; break;
-            case 31: *fgcolor = COLOR_RED; break;
-            case 32: *fgcolor = COLOR_GREEN; break;
-            case 33: *fgcolor = COLOR_YELLOW; break;
-            case 34: *fgcolor = COLOR_BLUE; break;
-            case 35: *fgcolor = COLOR_MAGENTA; break;
-            case 36: *fgcolor = COLOR_CYAN; break;
-            case 38:
-                if (params[++i] == 2)
-                {
-                    // Unsupported
-                    return;
-                }
-                break;
-            case 40: *bgcolor = COLOR_BLACK; break;
-            case 41: *bgcolor = COLOR_RED; break;
-            case 42: *bgcolor = COLOR_GREEN; break;
-            case 43: *bgcolor = COLOR_YELLOW; break;
-            case 44: *bgcolor = COLOR_BLUE; break;
-            case 45: *bgcolor = COLOR_MAGENTA; break;
-            case 46: *bgcolor = COLOR_CYAN; break;
-            case 90: *fgcolor = COLOR_GRAY; break;
-            case 91: *fgcolor = COLOR_BRIGHTRED; break;
-            case 92: *fgcolor = COLOR_BRIGHTGREEN; break;
-            case 93: *fgcolor = COLOR_BRIGHTYELLOW; break;
-            case 94: *fgcolor = COLOR_BRIGHTBLUE; break;
-            case 95: *fgcolor = COLOR_BRIGHTMAGENTA; break;
-            case 96: *fgcolor = COLOR_BRIGHTCYAN; break;
-            case 97: *fgcolor = COLOR_BRIGHTWHITE; break;
-        }
+        case 0: *color = COLOR_BLACK; break;
+        case 1: *color = COLOR_RED; break;
+        case 2: *color = COLOR_GREEN; break;
+        case 3: *color = COLOR_YELLOW; break;
+        case 4: *color = COLOR_BLUE; break;
+        case 5: *color = COLOR_MAGENTA; break;
+        case 6: *color = COLOR_CYAN; break;
+        case 7: *color = COLOR_WHITE; break;
+        case 8: *color = COLOR_GRAY; break;
+        case 9: *color = COLOR_BRIGHTRED; break;
+        case 10: *color = COLOR_BRIGHTGREEN; break;
+        case 11: *color = COLOR_BRIGHTYELLOW; break;
+        case 12: *color = COLOR_BRIGHTBLUE; break;
+        case 13: *color = COLOR_BRIGHTMAGENTA; break;
+        case 14: *color = COLOR_BRIGHTCYAN; break;
+        case 15: *color = COLOR_BRIGHTWHITE; break;
     }
+}
+
+void egacon_sgr_16(console_driver_t*, uint8_t value, uint32_t* color)
+{
+    egacon_color_set(value, color);
+}
+
+void egacon_sgr_8(console_driver_t*, uint8_t value, uint32_t* color)
+{
+    egacon_color_set(value, color);
 }
 
 void egacon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
