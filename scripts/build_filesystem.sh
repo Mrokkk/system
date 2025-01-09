@@ -129,7 +129,7 @@ function k()
     while ktest -q -t realloc_small_to_small; do echo -n; done
 }'
 
-vimrc_content='let mapleader = ","
+vimrc_content="let mapleader = \",\"
 
 nmap <Leader>t :tabnew<CR>
 nmap <Leader>l :tabn<CR>
@@ -147,7 +147,35 @@ set autoindent
 set smartindent
 set tabstop=4
 set shiftwidth=4
-set expandtab'
+set expandtab
+set nocompatible
+filetype off
+
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+Plugin 'preservim/nerdtree'
+Plugin 'sainnhe/gruvbox-material'
+call vundle#end()
+filetype plugin indent on
+
+let g:NERDTreeDirArrowExpandable=\"+\"
+let g:NERDTreeDirArrowCollapsible=\"-\"
+let NERDTreeShowHidden = 0
+let NERDTreeQuitOnOpen = 0
+let NERDTreeAutoDeleteBuffer = 1
+let NERDTreeMinimalUI = 1
+nmap <Leader>e :NERDTreeToggle<CR>
+nmap <Leader>f :NERDTreeFind<CR>
+
+if has('termguicolors')
+    set termguicolors
+endif
+
+set background=dark
+let g:gruvbox_material_background = 'medium'
+let g:gruvbox_material_better_performance = 1
+let g:gruvbox_material_disable_italic_comment = 1
+colorscheme gruvbox-material"
 
 create_dir "${mountpoint}/bin"
 create_dir "${mountpoint}/dev"
@@ -157,6 +185,7 @@ create_dir "${mountpoint}/lib/modules"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/proc"
 create_dir "${mountpoint}/root"
+create_dir "${mountpoint}/root/.vim"
 create_dir "${mountpoint}/sys"
 create_dir "${boot_dir}/grub"
 
@@ -186,6 +215,18 @@ write_to "${inputrc_content}" "${mountpoint}/root/.inputrc"
 write_to "${vimrc_content}" "${mountpoint}/root/.vimrc"
 copy kernel.map "${boot_dir}"
 copy system "${boot_dir}"
+
+if [[ ! -d "${mountpoint}/root/.vim/bundle" ]]
+then
+    create_dir "${mountpoint}/root/.vim/bundle"
+    git clone https://github.com/VundleVim/Vundle.vim.git "${mountpoint}/root/.vim/bundle/Vundle.vim"
+    git clone https://github.com/preservim/nerdtree.git "${mountpoint}/root/.vim/bundle/nerdtree"
+    if [[ -d "~/.vim/bundle/gruvbox-material" ]] # FIXME: gruvbox-material writes files during first start
+    then
+        create_dir "${mountpoint}/root/.vim/bundle/gruvbox-material"
+        copy_dir_content "~/.vim/bundle/gruvbox-material" "${mountpoint}/root/.vim/bundle/gruvbox-material"
+    fi
+fi
 
 if [[ ! -d ${boot_dir}/grub/i386-pc ]]
 then
