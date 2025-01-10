@@ -4,22 +4,19 @@
 #include <stdint.h>
 #include <kernel/page_alloc.h>
 
-typedef struct
-{
-    uint8_t bytes[16];
-} fglyph_t;
-
-typedef struct
+struct font
 {
     uint32_t  height;
     uint32_t  width;
-    uint32_t  bytes_per_glyph;
+    size_t    bytes_per_glyph;
+    size_t    bytes_per_line;
     uint32_t  glyphs_count;
-    fglyph_t* glyphs;
+    uint8_t*  glyphs;
     page_t*   pages;
-} font_t;
+};
 
-extern font_t font;
+typedef struct font font_t;
 
-int font_load_from_file(const char* path);
-int font_load_from_buffer(const void* buffer, size_t size);
+int font_load_from_file(const char* path, font_t** font);
+int font_load_from_buffer(const void* buffer, size_t size, font_t** font);
+void font_unload(font_t* font);

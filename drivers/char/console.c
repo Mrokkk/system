@@ -13,6 +13,7 @@
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 #include <kernel/string.h>
+#include <kernel/signal.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/page_alloc.h>
@@ -29,7 +30,6 @@
 
 #define DEBUG_CONSOLE         0
 #define DEBUG_CON_SCROLL      0
-#define CONSOLE_DRIVEN_CURSOR 1
 #define INITIAL_CAPACITY      128
 #define MAX_CAPACITY          4096
 #define FONT_DIR              "/usr/share/kbd/consolefonts/"
@@ -38,7 +38,7 @@
 #define CONSOLE_CONFIG_PATH   "/etc/vconsole.conf"
 
 static int console_open(tty_t* tty, file_t* file);
-static int console_setup(console_driver_t* driver);
+static int console_setup(tty_t* tty, console_driver_t* driver);
 static int console_close(tty_t* tty, file_t* file);
 static int console_write(tty_t* tty, const char* buffer, size_t size);
 static int console_ioctl(tty_t* tty, unsigned long request, void* arg);
@@ -46,7 +46,7 @@ static void console_putch_internal(console_t* console, tty_t* tty, int c, int* m
 static void console_putch(tty_t* tty, int c);
 static void scroll_up(console_t* console, size_t origin, size_t count);
 static void scroll_down(console_t* console, size_t origin, size_t count);
-static int extend(console_t* console);
+static int grow(console_t* console);
 static int clear_cmd(console_t* console, const char*[]);
 
 static tty_driver_t tty_driver = {
@@ -116,23 +116,19 @@ static READONLY const command_t commands[] = {
 
 static void cursor_update(console_t* console)
 {
-#if CONSOLE_DRIVEN_CURSOR
     glyph_t current = console->visible_lines[console->y].glyphs[console->x];
     current.attr ^= GLYPH_ATTR_INVERSED;
-    console->driver->glyph_draw(console->driver, console->y, console->x, &current);
+    console->driver->glyph_draw(console->driver, console->x, console->y, &current);
 
     if (console->prev_x != console->x || console->prev_y != console->y)
     {
         glyph_t previous = console->visible_lines[console->prev_y].glyphs[console->prev_x];
         previous.attr ^= ~GLYPH_ATTR_INVERSED;
-        console->driver->glyph_draw(console->driver, console->prev_y, console->prev_x, &previous);
+        console->driver->glyph_draw(console->driver, console->prev_x, console->prev_y, &previous);
 
         console->prev_x = console->x;
         console->prev_y = console->y;
     }
-#else
-    console->driver->movecsr(console->driver, console->x, console->y);
-#endif
 }
 
 static void current_line_clear(console_t* console, int mode)
@@ -164,7 +160,7 @@ static void current_line_clear(console_t* console, int mode)
     {
         glyph_t* glyph = &line->glyphs[x];
         GLYPH_CLEAR(glyph);
-        drv->glyph_draw(console->driver, console->y, x, glyph);
+        drv->glyph_draw(console->driver, x, console->y, glyph);
     }
 }
 
@@ -181,12 +177,12 @@ static void redraw(console_t* console)
     {
         for (pos = temp->glyphs, x = 0; x < console->resx; ++pos, ++x)
         {
-            drv->glyph_draw(console->driver, y, x, pos);
+            drv->glyph_draw(console->driver, x, y, pos);
         }
     }
 
     pos = &console->visible_lines[console->y].glyphs[console->y];
-    drv->glyph_draw(console->driver, console->y, console->x, &cursor);
+    drv->glyph_draw(console->driver, console->x, console->y, &cursor);
 }
 
 static void console_refresh(void* data)
@@ -207,7 +203,7 @@ static void ff(console_t* console)
 
     if (LINE_INDEX(console->current_line) + console->resy >= console->capacity)
     {
-        extend(console);
+        grow(console);
     }
 
     console->visible_lines = console->current_line;
@@ -228,7 +224,7 @@ static void lf(console_t* console)
 
     if (LINE_INDEX(console->current_line) == console->capacity - 1)
     {
-        extend(console);
+        grow(console);
     }
 
     if (console->y < console->resy - 1)
@@ -239,8 +235,24 @@ static void lf(console_t* console)
     {
         scoped_irq_lock();
         console->visible_lines++;
+
+        if (console->redraw)
+        {
+            return;
+        }
+
         console->redraw = true;
-        rtc_schedule(&console_refresh, console);
+
+        int id = rtc_event_schedule(&console_refresh, console);
+
+        if (unlikely(id < 0))
+        {
+            log_error("cannot schedule refresh event");
+            redraw(console);
+            return;
+        }
+
+        console->rtc_event_id = id;
     }
 }
 
@@ -277,7 +289,7 @@ static void console_write_char(console_t* console, uint8_t c)
 
     if (!console->redraw)
     {
-        console->driver->glyph_draw(console->driver, console->y, console->x, cur);
+        console->driver->glyph_draw(console->driver, console->x, console->y, cur);
     }
 
     position_next(console);
@@ -419,7 +431,7 @@ static void line_nr_print(console_t* console)
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {
         glyph_t glyph = {.c = buf[i], .fgcolor = console->default_fgcolor, .bgcolor = console->default_bgcolor};
-        console->driver->glyph_draw(console->driver, 0, pos, &glyph);
+        console->driver->glyph_draw(console->driver, pos, 0, &glyph);
     }
 }
 
@@ -648,7 +660,7 @@ static void scroll_up(console_t* console, size_t origin, size_t count)
 
     if (console->visible_lines + origin + count >= console->lines + console->capacity)
     {
-        extend(console);
+        grow(console);
     }
 
     region_clear(console, console->scroll_bottom - count + 1, console->scroll_bottom);
@@ -669,7 +681,7 @@ static void scroll_down(console_t* console, size_t origin, size_t count)
 
     if (console->visible_lines + console->scroll_bottom >= console->lines + console->capacity)
     {
-        extend(console);
+        grow(console);
     }
 
     region_clear(console, origin, origin + count - 1);
@@ -813,7 +825,7 @@ finish:
                     c = ' ';
                 }
                 glyph.c = c;
-                console->driver->glyph_draw(console->driver, console->resy - 1, i, &glyph);
+                console->driver->glyph_draw(console->driver, i, console->resy - 1, &glyph);
             }
         }
     }
@@ -1148,26 +1160,15 @@ static int console_open(tty_t* tty, file_t*)
         return -ENOMEM;
     }
 
+    memset(driver, 0, sizeof(*driver));
+
     switch (framebuffer.type)
     {
         case FB_TYPE_RGB:
             driver->init = &fbcon_init;
-            driver->glyph_draw = &fbcon_glyph_draw;
-            driver->defcolor = &fbcon_defcolor;
-            driver->movecsr = &fbcon_movecsr;
-            driver->font_load = &fbcon_font_load;
-            driver->sgr_rgb = &fbcon_sgr_rgb;
-            driver->sgr_256 = &fbcon_sgr_256;
-            driver->sgr_16 = &fbcon_sgr_16;
-            driver->sgr_8 = &fbcon_sgr_8;
             break;
         case FB_TYPE_TEXT:
             driver->init = &egacon_init;
-            driver->glyph_draw = &egacon_glyph_draw;
-            driver->defcolor = &egacon_defcolor;
-            driver->movecsr = &egacon_movecsr;
-            driver->sgr_16 = &egacon_sgr_16;
-            driver->sgr_8 = &egacon_sgr_8;
             break;
         default:
             log_error("cannot initialize console");
@@ -1177,7 +1178,7 @@ static int console_open(tty_t* tty, file_t*)
 
     keyboard_init(tty);
 
-    if ((errno = console_setup(driver)))
+    if (unlikely(errno = console_setup(tty, driver)))
     {
         log_error("cannot initialize tty video driver");
         goto error;
@@ -1291,77 +1292,103 @@ set:
     return config;
 }
 
-static int console_setup(console_driver_t* driver)
+static int console_resize(console_t* console, size_t resx, size_t resy)
 {
-    int errno;
+    page_t* pages;
     line_t* lines;
     glyph_t* glyphs;
-    page_t* pages;
-    size_t i, row, col;
-    console_t* console;
-    console_config_t config = console_config_read();
-
-    if (unlikely(errno = driver->init(driver, &config, &row, &col)))
-    {
-        log_error("driver initialization failed with %d", errno);
-        return errno;
-    }
-
-    size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % row;
-    size_t size = align(sizeof(console_t), 0x100) + sizeof(glyph_t) * col * INITIAL_CAPACITY + max_capacity * sizeof(line_t);
+    page_t* prev_pages = console->pages;
+    size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % resy;
+    size_t size = sizeof(glyph_t) * resx * INITIAL_CAPACITY + sizeof(line_t) * max_capacity;
     size_t needed_pages = page_align(size) / PAGE_SIZE;
 
-    log_notice("size: %u x %u; need %u B (%u pages) for %u lines", col, row, size, needed_pages, INITIAL_CAPACITY);
+    log_notice("size: %u x %u; need %u B (%u pages) for %u lines", resx, resy, size, needed_pages, INITIAL_CAPACITY);
 
     pages = page_alloc(needed_pages, PAGE_ALLOC_CONT);
 
     if (unlikely(!pages))
     {
         log_warning("cannot allocate pages for lines!");
-        return -1;
+        return -ENOMEM;
     }
 
-    console = page_virt_ptr(pages);
-    lines = shift_as(line_t*, console, align(sizeof(console_t), 0x100));
+    lines = page_virt_ptr(pages);
     glyphs = shift_as(glyph_t*, lines, max_capacity * sizeof(line_t));
 
-    for (i = 0; i < INITIAL_CAPACITY; ++i)
+    for (size_t i = 0; i < INITIAL_CAPACITY; ++i)
     {
-        lines[i].glyphs = glyphs + i * col;
+        lines[i].glyphs = glyphs + i * resx;
     }
 
     memset(&lines[INITIAL_CAPACITY], 0, (max_capacity - INITIAL_CAPACITY) * sizeof(line_t*));
 
-    memset(console, 0, sizeof(*console));
-    console->resx = col;
-    console->resy = row;
-    console->lines = lines;
-    console->current_line = lines;
-    console->visible_lines = lines;
-    console->capacity = INITIAL_CAPACITY;
-    console->max_capacity = max_capacity;
-    console->scroll_bottom = console->resy - 1;
-    console->scroll_top = 0;
-    console->current_attr = 0;
-    console->driver = driver;
-
-    driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
-    console->default_fgcolor = console->current_fgcolor;
-    console->default_bgcolor = console->current_bgcolor;
-
-    for (i = 0; i < INITIAL_CAPACITY; ++i)
+    for (size_t i = 0; i < INITIAL_CAPACITY; ++i)
     {
-        for (size_t x = 0; x < col; ++x)
+        for (size_t x = 0; x < resx; ++x)
         {
             GLYPH_CLEAR(&lines[i].glyphs[x]);
         }
     }
 
-    tty_driver.driver_data = console;
+    console->resx          = resx;
+    console->resy          = resy;
+    console->redraw        = false;
+    console->lines         = lines;
+    console->current_line  = lines;
+    console->visible_lines = lines;
+    console->capacity      = INITIAL_CAPACITY;
+    console->max_capacity  = max_capacity;
+    console->scroll_bottom = console->resy - 1;
+    console->scroll_top    = 0;
+    console->pages         = pages;
 
+    if (prev_pages)
+    {
+        pages_free(prev_pages);
+    }
+
+    return 0;
+}
+
+static int console_setup(tty_t* tty, console_driver_t* driver)
+{
+    int errno;
+    size_t resx, resy;
+    console_t* console;
+    console_config_t config = console_config_read();
+
+    if (unlikely(errno = driver->init(driver, &config, &resx, &resy)))
+    {
+        log_error("driver initialization failed with %d", errno);
+        return errno;
+    }
+
+    console = alloc(console_t);
+
+    if (unlikely(!console))
+    {
+        log_warning("cannot allocate pages for lines!");
+        return -ENOMEM;
+    }
+
+    memset(console, 0, sizeof(*console));
+
+    driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
+    console->default_fgcolor = console->current_fgcolor;
+    console->default_bgcolor = console->current_bgcolor;
+
+    if (unlikely(errno = console_resize(console, resx, resy)))
+    {
+        delete(console);
+        return errno;
+    }
+
+    console->driver = driver;
     console->kconsole = process_spawn("kconsole", &kconsole, console, SPAWN_KERNEL);
 
     redraw(console);
+
+    tty->driver->driver_data = console;
 
     return 0;
 }
@@ -1395,84 +1422,124 @@ static int console_write(tty_t* tty, const char* buffer, size_t size)
     return size;
 }
 
-static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
+static int kdsetmode(console_t* console, long mode)
 {
-    console_t* console = tty->driver->driver_data;
-    switch (request)
+    switch (mode)
     {
-        case KDSETMODE:
-        {
-            long mode = (long)arg;
-            switch (mode)
-            {
-                case KD_TEXT:
-                    console->disabled = false;
-                    redraw(console);
-                    return 0;
-                case KD_GRAPHICS:
-                    console->disabled = true;
-                    console_refresh(console);
-                    return 0;
-                default: return -EINVAL;
-            }
-        }
-        case TIOCGWINSZ:
-        {
-            winsize_t* w = arg;
-            w->ws_col = console->resx;
-            w->ws_row = console->resy;
-            return 0;
-        }
-        case TIOCSWINSZ:
-        {
-            winsize_t* w = arg;
-            if (w->ws_col == console->resx && w->ws_row == console->resy)
-            {
-                return 0;
-            }
-            break;
-        }
-        case KDFONTOP:
-        {
-            int errno;
-            console_font_op_t* op = arg;
-            console_driver_t* drv = console->driver;
-
-            if (unlikely(!drv->font_load))
-            {
-                return -ENOSYS;
-            }
-
-            if (unlikely(current_vm_verify(VERIFY_READ, op)))
-            {
-                return -EFAULT;
-            }
-
-            if (unlikely(!op->data))
-            {
-                return -EFAULT;
-            }
-
-            if (unlikely(current_vm_verify_buf(VERIFY_READ, op->data, op->size)))
-            {
-                return -EFAULT;
-            }
-
-            if (unlikely(errno = drv->font_load(drv, op->data, op->size)))
-            {
-                return errno;
-            }
-
+        case KD_TEXT:
+            console->disabled = false;
             redraw(console);
-
             return 0;
-        }
+        case KD_GRAPHICS:
+            console->disabled = true;
+            console_refresh(console);
+            return 0;
     }
 
     return -EINVAL;
 }
 
-static int extend(console_t* console)
+static int tiocgwinsz(console_t* console, winsize_t* w)
+{
+    w->ws_col = console->resx;
+    w->ws_row = console->resy;
+    return 0;
+}
+
+static int tiocswinsz(console_t* console, winsize_t* w)
+{
+    if (w->ws_col == console->resx && w->ws_row == console->resy)
+    {
+        return 0;
+    }
+    return -EINVAL;
+}
+
+static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
+{
+    int errno;
+    console_driver_t* drv = console->driver;
+
+    if (unlikely(!drv->font_load))
+    {
+        return -ENOSYS;
+    }
+
+    if (unlikely(current_vm_verify(VERIFY_READ, op)))
+    {
+        return -EFAULT;
+    }
+
+    if (unlikely(!op->data))
+    {
+        return -EFAULT;
+    }
+
+    if (unlikely(current_vm_verify_buf(VERIFY_READ, op->data, op->size)))
+    {
+        return -EFAULT;
+    }
+
+    size_t resx, resy;
+
+    console->disabled = true;
+
+    if (unlikely(errno = drv->font_load(drv, op->data, op->size, &resx, &resy)))
+    {
+        return errno;
+    }
+
+    if (resx != console->resx || resy != console->resy)
+    {
+        scoped_irq_lock();
+
+        if (unlikely(errno = console_resize(console, resx, resy)))
+        {
+            // FIXME: new font is already loaded
+            return errno;
+        }
+
+        if (console->rtc_event_id)
+        {
+            rtc_event_cancel(console->rtc_event_id);
+            console->rtc_event_id = 0;
+        }
+
+        console->prev_x = 0;
+        console->prev_y = 0;
+        console->x      = 0;
+        console->y      = 0;
+
+        tty_session_kill(tty, SIGWINCH);
+    }
+
+    redraw(console);
+
+    console->disabled = false;
+
+    return 0;
+}
+
+static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
+{
+    console_t* console = tty->driver->driver_data;
+
+    switch (request)
+    {
+        case KDSETMODE:
+            return kdsetmode(console, (long)arg);
+        case TIOCGWINSZ:
+            return tiocgwinsz(console, arg);
+        case TIOCSWINSZ:
+            return tiocswinsz(console, arg);
+        case KDFONTOP:
+            return kdfontop(console, tty, arg);
+    }
+
+    return -EINVAL;
+}
+
+static int grow(console_t* console)
 {
     page_t* pages;
     glyph_t* glyphs;
@@ -1488,7 +1555,6 @@ static int extend(console_t* console)
         if (new_lines < offset)
         {
             ASSERT(console->lines[console->capacity - 1].glyphs);
-            ASSERT(!console->lines[console->capacity].glyphs);
 
             page_t* temp = page_alloc(1, 0);
 
@@ -1524,6 +1590,8 @@ static int extend(console_t* console)
                     GLYPH_CLEAR(&line->glyphs[x]);
                 }
             }
+
+            pages_free(temp);
 
             return 0;
         }

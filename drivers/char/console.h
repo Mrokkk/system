@@ -34,6 +34,7 @@ struct console
 {
     bool     disabled;
     bool     redraw;
+    int      rtc_event_id;
     uint16_t x, y;
     uint16_t prev_x, prev_y;
     uint16_t scroll_top, scroll_bottom;
@@ -41,6 +42,7 @@ struct console
 
     console_driver_t* driver;
 
+    page_t*  pages;
     size_t   capacity;
     size_t   max_capacity;
     line_t*  lines;

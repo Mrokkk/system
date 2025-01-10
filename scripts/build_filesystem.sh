@@ -127,6 +127,16 @@ alias p="path"
 function k()
 {
     while ktest -q -t realloc_small_to_small; do echo -n; done
+}
+function sf()
+{
+    local path="/usr/share/kbd/consolefonts/${1}"
+    if [[ -f ${path}.psfu ]]
+    then
+        setfont /usr/share/kbd/consolefonts/${1}.psfu
+    else
+        setfont /usr/share/kbd/consolefonts/${1}.psf
+    fi
 }'
 
 vimrc_content="let mapleader = \",\"
@@ -177,7 +187,7 @@ let g:gruvbox_material_better_performance = 1
 let g:gruvbox_material_disable_italic_comment = 1
 colorscheme gruvbox-material"
 
-vconsone_content="FONT=Lat2-Terminus16"
+vconsole_content="FONT=Lat2-Terminus16"
 
 create_dir "${boot_dir}/grub"
 create_dir "${mountpoint}/bin"
@@ -213,7 +223,7 @@ copy_dir_content sysroot/usr/share ${mountpoint}/usr/share
 copy_dir_content sysroot/lib ${mountpoint}/lib
 copy_dir_content sysroot/bin ${mountpoint}/bin
 
-write_to "${vconsone_content}" "${mountpoint}/etc/vconsole.conf"
+write_to "${vconsole_content}" "${mountpoint}/etc/vconsole.conf"
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"
 write_to "${inputrc_content}" "${mountpoint}/root/.inputrc"
 write_to "${vimrc_content}" "${mountpoint}/root/.vimrc"

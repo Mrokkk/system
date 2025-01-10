@@ -2,6 +2,7 @@
 #include <arch/nmi.h>
 #include <arch/rtc.h>
 #include <kernel/irq.h>
+#include <kernel/list.h>
 #include <kernel/time.h>
 #include <kernel/clock.h>
 #include <kernel/kernel.h>
@@ -15,10 +16,22 @@
 #define RTC_TICK    32768
 #define RTC_RATE    RTC_FREQ_64Hz
 
+struct scheduled_event
+{
+    int         id;
+    void*       data;
+    list_head_t list_entry;
+
+    void (*handler)(void* data);
+};
+
+typedef struct scheduled_event event_t;
+
 static int rtc_enable(void);
 static int rtc_disable(void);
 
-static event_t events[2];
+static LIST_DECLARE(events);
+static int lastId;
 
 static clock_source_t rtc = {
     .name = "rtc",
@@ -67,10 +80,13 @@ void rtc_read(rtc_meas_t* m)
 
 static void rtc_irq()
 {
-    if (events[0].handler)
+    event_t* event;
+
+    list_for_each_entry_safe(event, &events, list_entry)
     {
-        events[0].handler(events[0].data);
-        events[0].handler = NULL;
+        event->handler(event->data);
+        list_del(&event->list_entry);
+        delete(event);
     }
 }
 
@@ -92,12 +108,40 @@ static int rtc_disable(void)
     return 0;
 }
 
-void rtc_schedule(void (*handler)(void* data), void* data)
+int rtc_event_schedule(void (*handler)(void* data), void* data)
 {
     scoped_irq_lock();
-    events[0].handler = handler;
-    events[0].data = data;
+    event_t* event = alloc(event_t);
+
+    if (unlikely(!event))
+    {
+        return -ENOMEM;
+    }
+
+    event->handler = handler;
+    event->data = data;
+    event->id = ++lastId;
+    list_init(&event->list_entry);
+    list_add(&event->list_entry, &events);
+
     rtc_eoi();
+
+    return event->id;
+}
+
+void rtc_event_cancel(int id)
+{
+    event_t* event;
+    scoped_irq_lock();
+    list_for_each_entry(event, &events, list_entry)
+    {
+        if (event->id == id)
+        {
+            list_del(&event->list_entry);
+            delete(event);
+            return;
+        }
+    }
 }
 
 void rtc_print(void)

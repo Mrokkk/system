@@ -49,3 +49,4 @@ tty_t* tty_from_file(struct file* file);
 
 void tty_write_to_all(const char* buffer, size_t len, tty_t* excluded);
 void tty_write_to(tty_t* tty, const char* buffer, size_t len);
+void tty_session_kill(tty_t* tty, int signum);

@@ -7,7 +7,16 @@
 #include "framebuffer.h"
 #include "console_driver.h"
 
-#define DEBUG_FBCON       0
+#define DEBUG_FBCON             0
+#define GLYPH_OFFSET_HORIZONTAL 0
+
+static void fbcon_glyph_draw(console_driver_t* driver, size_t y, size_t x, glyph_t* glyph);
+static void fbcon_sgr_rgb(console_driver_t* driver, uint32_t value, uint32_t* color);
+static void fbcon_sgr_256(console_driver_t* driver, uint32_t value, uint32_t* color);
+static void fbcon_sgr_16(console_driver_t* driver, uint8_t value, uint32_t* color);
+static void fbcon_sgr_8(console_driver_t* driver, uint8_t value, uint32_t* color);
+static void fbcon_defcolor(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);
+static int fbcon_font_load(console_driver_t*, const void* buffer, size_t size, size_t* resx, size_t* resy);
 
 enum palette
 {
@@ -60,10 +69,13 @@ typedef enum
 typedef struct
 {
     uint8_t* fb;
-    uint32_t pitch;
-    uint32_t font_height_offset;
-    uint32_t font_width_offset;
-    uint32_t cursor_offset;
+    font_t*  font;
+    size_t   pitch;
+    size_t   width;
+    size_t   font_height_offset;
+    size_t   font_width_offset;
+    size_t   font_bytes_per_line;
+    uint32_t mask;
 } data_t;
 
 static uint32_t palette[] = {
@@ -85,12 +97,29 @@ static uint32_t palette[] = {
     COLOR_BRIGHTWHITE,
 };
 
-int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resy, size_t* resx)
+static void fbcon_font_set(data_t* data, font_t* font)
+{
+    data->font = font;
+    data->width = font->width + GLYPH_OFFSET_HORIZONTAL;
+    data->font_height_offset = framebuffer.pitch * font->height;
+    data->font_width_offset = (framebuffer.bpp / 8) * data->width;
+    data->font_bytes_per_line = font->bytes_per_line;
+    data->mask = 1 << (font->bytes_per_line * 8 - 1);
+}
+
+static void fbcon_size_set(data_t* data, size_t* resx, size_t* resy)
+{
+    *resx = framebuffer.width / data->width;
+    *resy = framebuffer.height / data->font->height;
+}
+
+int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy)
 {
     int errno;
     data_t* data;
+    font_t* font;
 
-    if ((errno = font_load_from_file(config->font_path)))
+    if (unlikely(errno = font_load_from_file(config->font_path, &font)))
     {
         log_warning("cannot load font: %d", errno);
         return errno;
@@ -106,24 +135,32 @@ int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resy,
 
     data->fb = framebuffer.fb;
     data->pitch = framebuffer.pitch;
-    data->font_height_offset = framebuffer.pitch * font.height;
-    data->font_width_offset =  (framebuffer.bpp / 8) * font.width;
-    data->cursor_offset = 0;
-    driver->data = data;
 
-    *resy = framebuffer.height / font.height;
-    *resx = framebuffer.width / font.width;
+    fbcon_font_set(data, font);
+
+    driver->data       = data;
+    driver->glyph_draw = &fbcon_glyph_draw;
+    driver->defcolor   = &fbcon_defcolor;
+    driver->font_load  = &fbcon_font_load;
+    driver->sgr_rgb    = &fbcon_sgr_rgb;
+    driver->sgr_256    = &fbcon_sgr_256;
+    driver->sgr_16     = &fbcon_sgr_16;
+    driver->sgr_8      = &fbcon_sgr_8;
+
+    fbcon_size_set(data, resx, resy);
 
     return 0;
 }
 
-void fbcon_glyph_draw(console_driver_t* drv, size_t y, size_t x, glyph_t* glyph)
+static void fbcon_glyph_draw(console_driver_t* drv, size_t x, size_t y, glyph_t* glyph)
 {
     data_t* data = drv->data;
+    font_t* font = data->font;
     uint32_t line, mask;
     uint8_t c = glyph->c;
     uint32_t fgcolor;
     uint32_t bgcolor;
+    uint32_t def_mask = data->mask;
 
     if (glyph->attr & GLYPH_ATTR_INVERSED)
     {
@@ -136,16 +173,18 @@ void fbcon_glyph_draw(console_driver_t* drv, size_t y, size_t x, glyph_t* glyph)
         bgcolor = glyph->bgcolor;
     }
 
-    uint8_t* font_glyph = font.glyphs[c].bytes;
+    uint8_t* font_glyph = shift_as(uint8_t*, font->glyphs, c * font->bytes_per_glyph);
     uint32_t offset = data->font_height_offset * y + data->font_width_offset * x;
 
-    for (uint32_t y = 0; y < font.height; y++, ++font_glyph, offset += data->pitch)
+    for (size_t y = 0; y < font->height; y++, font_glyph += data->font_bytes_per_line, offset += data->pitch)
     {
         line = offset;
-        mask = 1 << 7;
-        for (uint32_t x = 0; x < font.width; x++)
+        mask = def_mask;
+        uint32_t g = *((uint32_t*)font_glyph);
+
+        for (size_t x = 0; x < data->width; x++)
         {
-            uint32_t value = *font_glyph & mask ? fgcolor : bgcolor;
+            uint32_t value = g & mask ? fgcolor : bgcolor;
             uint32_t* pixel = (uint32_t*)(data->fb + line);
             *pixel = value;
             mask >>= 1;
@@ -154,12 +193,12 @@ void fbcon_glyph_draw(console_driver_t* drv, size_t y, size_t x, glyph_t* glyph)
     }
 }
 
-void fbcon_sgr_rgb(console_driver_t*, uint32_t value, uint32_t* color)
+static void fbcon_sgr_rgb(console_driver_t*, uint32_t value, uint32_t* color)
 {
     *color = value;
 }
 
-void fbcon_sgr_256(console_driver_t*, uint32_t value, uint32_t* color)
+static void fbcon_sgr_256(console_driver_t*, uint32_t value, uint32_t* color)
 {
     if (value >= 232)
     {
@@ -182,50 +221,47 @@ void fbcon_sgr_256(console_driver_t*, uint32_t value, uint32_t* color)
     }
 }
 
-void fbcon_sgr_16(console_driver_t*, uint8_t value, uint32_t* color)
+static void fbcon_sgr_16(console_driver_t*, uint8_t value, uint32_t* color)
 {
     *color = palette[value];
 }
 
-void fbcon_sgr_8(console_driver_t*, uint8_t value, uint32_t* color)
+static void fbcon_sgr_8(console_driver_t*, uint8_t value, uint32_t* color)
 {
     *color = palette[value];
 }
 
-void fbcon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
+static void fbcon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgcolor)
 {
     *fgcolor = COLOR_WHITE;
     *bgcolor = COLOR_BLACK;
 }
 
-static void fbcon_draw_line(uint32_t* fb, uint32_t len, uint32_t fgcolor)
+static int fbcon_font_load(console_driver_t* drv, const void* buffer, size_t size, size_t* resx, size_t* resy)
 {
-    for (uint32_t x = 0; x < len; x++)
-    {
-        uint32_t value = fgcolor;
-        uint32_t* pixel = fb;
-        *pixel = value;
-        ++fb;
-    }
-}
-
-void fbcon_movecsr(console_driver_t* drv, int x, int y)
-{
+    int errno;
+    font_t* new_font = NULL;
+    font_t* old_font = NULL;
     data_t* data = drv->data;
-    uint32_t old_offset = data->cursor_offset;
-    uint32_t new_offset = data->font_height_offset * y + data->font_width_offset * x + data->pitch * (font.height - 1);
 
-    fbcon_draw_line((uint32_t*)(data->fb + new_offset), font.width, COLOR_WHITE);
-
-    if (new_offset != old_offset)
+    if (unlikely(errno = font_load_from_buffer(buffer, size, &new_font)))
     {
-        fbcon_draw_line((uint32_t*)(data->fb + old_offset), font.width, COLOR_BLACK);
+        return errno;
     }
 
-    data->cursor_offset = new_offset;
-}
+    {
+        scoped_irq_lock();
 
-int fbcon_font_load(console_driver_t*, const void* buffer, size_t size)
-{
-    return font_load_from_buffer(buffer, size);
+        old_font = data->font;
+
+        fbcon_font_set(data, new_font);
+        fbcon_size_set(data, resx, resy);
+    }
+
+    if (old_font)
+    {
+        font_unload(old_font);
+    }
+
+    return 0;
 }

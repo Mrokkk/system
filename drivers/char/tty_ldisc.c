@@ -143,20 +143,7 @@ void tty_ldisc_putch(tty_t* tty, int c)
     if (signal && L_ISIG(tty))
     {
         tty->ldisc_current = tty->ldisc_buf;
-
-        for_each_process(p)
-        {
-            if (p->sid == tty->sid)
-            {
-                do_kill(p, signal);
-            }
-        }
-
-        if (process_current->sid != tty->sid)
-        {
-            process_current->need_resched = true;
-        }
-
+        tty_session_kill(tty, signal);
         return;
     }
 

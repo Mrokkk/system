@@ -44,7 +44,7 @@ UNMAP_AFTER_INIT static int framebuffer_init()
     if (framebuffer_ptr->type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB)
     {
         devfs_register("fb0", MAJOR_CHR_FB, 0, &fops);
-        framebuffer.fb = mmio_map(addr(fb), pitch * height, "framebuffer");
+        framebuffer.fb = mmio_map(addr(fb), page_align(pitch * height), "framebuffer");
     }
     else
     {
