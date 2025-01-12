@@ -289,6 +289,11 @@ static void* allocate_large(size_t size)
         DIE_PERROR("failed to mprotect large region");
     }
 
+    if (UNLIKELY(!metadata))
+    {
+        metadata_init();
+    }
+
     large_region_t* region = large_region_get();
 
     if (UNLIKELY(!region))
