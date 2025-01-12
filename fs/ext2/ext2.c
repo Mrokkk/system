@@ -597,6 +597,8 @@ struct readdir_context
     direntadd_t dirent_add;
     int i;
     ino_t parent_ino;
+    size_t offset;
+    size_t max_size;
 };
 
 static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
@@ -605,11 +607,20 @@ static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
     readdir_context_t* ctx = data;
     ext2_dir_entry_t* dirent;
     size_t total_len;
+    size_t next = 0;
 
     for (dirent = block, total_len = 0;
         total_len < to_copy;
         total_len += dirent->rec_len, dirent = ptr(addr(dirent) + dirent->rec_len), ++ctx->i)
     {
+        next = addr(dirent) - addr(block);
+
+        if (!dirent->rec_len)
+        {
+            ctx->offset += to_copy;
+            return TRAVERSE_CONTINUE;
+        }
+
         log_debug(DEBUG_EXT2FS, "dirent: type=%x, inode=%u, type=%x, name=%S, rec_len=%u, len=%u",
             dirent->file_type,
             dirent->inode,
@@ -620,6 +631,7 @@ static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
 
         if (ctx->parent_ino == EXT2_LOST_FOUND_INO && ctx->i == 2)
         {
+            ctx->offset = ctx->max_size;
             return TRAVERSE_STOP;
         }
 
@@ -627,9 +639,12 @@ static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
 
         if (over)
         {
+            ctx->offset += next;
             return TRAVERSE_STOP;
         }
     }
+
+    ctx->offset += to_copy;
     return TRAVERSE_CONTINUE;
 }
 
@@ -642,7 +657,9 @@ static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
         .buf = buf,
         .dirent_add = dirent_add,
         .i = 0,
-        .parent_ino = file->dentry->inode->ino
+        .parent_ino = file->dentry->inode->ino,
+        .offset = file->offset,
+        .max_size = raw_inode->size,
     };
 
     if (unlikely(!S_ISDIR(raw_inode->mode)))
@@ -655,12 +672,14 @@ static int ext2_readdir(file_t* file, void* buf, direntadd_t dirent_add)
         return 0;
     }
 
-    res = ext2_traverse_blocks(data, raw_inode, 0, raw_inode->size, &ctx, &ext2_readdir_block);
+    res = ext2_traverse_blocks(data, raw_inode, file->offset, raw_inode->size, &ctx, &ext2_readdir_block);
 
     if (unlikely(errno = errno_get(res)))
     {
         return res;
     }
+
+    file->offset = ctx.offset;
 
     return ctx.i;
 }

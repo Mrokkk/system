@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DIR_ALLOC_SIZE  2048
+#define DIR_ALLOC_SIZE  512
 
 struct directory
 {
@@ -90,8 +90,14 @@ struct dirent* readdir(DIR* dirp)
     if (dirp->index >= dirp->count)
     {
         dirp->index = 0;
-        dirp->count = 0;
-        return NULL;
+        dirp->count = SAFE_SYSCALL(getdents(dirp->fd, dirp->buf, DIR_ALLOC_SIZE), NULL);
+
+        if (dirp->count == 0)
+        {
+            return NULL;
+        }
+
+        dirp->current = dirp->buf;
     }
 
     return dirp->current;
