@@ -8,7 +8,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-
 #include "font.h"
 #include "targa.h"
 #include "utils.h"
@@ -34,9 +33,7 @@ static int old_xpos= 0, old_ypos = 0;
 char button_prev;
 int mousefd;
 window_t* main_window;
-
-#define BUFFERED    1
-#define UNBUFFERED  2
+void* font2;
 
 static void cleanup()
 {
@@ -191,7 +188,10 @@ int initialize()
     list_init(&window->dirty);
     main_window_set(window);
 
-    font_load();
+    if (font_load(buffer))
+    {
+        exit(EXIT_FAILURE);
+    }
 
     if (ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS))
     {
@@ -233,9 +233,8 @@ void start(void)
         WINDOW_FRAME_WIDTH * 3,
         WINDOW_FRAME_WIDTH * 3,
         main_window->title,
-        0xffffff,
-        WINDOW_BAR_COLOR,
-        buffer);
+        0xd6d6d6,
+        WINDOW_BAR_COLOR);
 
     list_for_each_entry(o, &main_window->objects, list)
     {
@@ -300,6 +299,7 @@ int main(int argc, char* argv[])
 {
     const char* img_path;
     struct tga_header* img;
+    char buf[256];
 
     if (argc < 2)
     {
@@ -307,6 +307,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+    snprintf(buf, sizeof(buf), "%s \"%s\"", argv[0], argv[1]);
     img_path = argv[1];
 
     if (initialize())
@@ -343,7 +344,7 @@ int main(int argc, char* argv[])
 
     window_object_add(main_window, image);
     window_object_add(main_window, close_button);
-    main_window->title = argv[0];
+    main_window->title = buf;
 
     start();
 

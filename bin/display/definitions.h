@@ -6,4 +6,4 @@
 #define WINDOW_FRAME_WIDTH  2
 #define WINDOW_BAR_HEIGHT   24
 
-#define FONT_PATH "/usr/share/font.psf"
+#define FONT_PATH "/usr/share/fonts/sfn/Hack-Regular.sfn"

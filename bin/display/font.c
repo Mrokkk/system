@@ -1,81 +1,66 @@
 #include "font.h"
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
+#define _STDINT_H
+#define SSFN_IMPLEMENTATION
+#include <ssfn.h>
+
 #include "utils.h"
 #include "definitions.h"
 
-font_t font;
+static ssfn_t ctx;
+static ssfn_buf_t buf;
 
-int font_load(void)
+#define HEIGHT (WINDOW_BAR_HEIGHT - 4)
+
+ssfn_font_t* font;
+
+int font_load(void* framebuffer)
 {
-    uint32_t* data = file_map(FONT_PATH);
+    int err;
+    void* data = file_map(FONT_PATH);
 
     if (!data)
     {
+        perror(FONT_PATH);
         return EXIT_FAILURE;
     }
 
-    if (*data == PSF2_FONT_MAGIC)
+    font = data;
+    buf.ptr = framebuffer;
+    buf.w = vinfo.xres;
+    buf.h = vinfo.yres;
+    buf.p = vinfo.pitch;
+
+    if ((err = ssfn_load(&ctx, data)) != SSFN_OK)
     {
-        psf2_t* psf = (psf2_t*)data;
-
-        font.height = psf->height;
-        font.width = psf->width;
-        font.bytes_per_glyph = psf->bytes_per_glyph;
-        font.glyphs_count = psf->glyph_count;
-        font.glyphs = ptr(addr(psf) + psf->header_size);
-
-        return 0;
-    }
-    else if ((*data & 0xffff) == PSF1_FONT_MAGIC)
-    {
-        psf1_t* psf = (psf1_t*)data;
-
-        font.height = psf->size;
-        font.width = 8;
-        font.bytes_per_glyph = psf->size;
-        font.glyphs_count = psf->mode & 0x1 ? 512 : 256;
-        font.glyphs = ptr(addr(psf) + sizeof(psf1_t));
-
-        return 0;
+        fprintf(stderr, FONT_PATH ": cannot load in ssfn: %d", err);
+        return EXIT_FAILURE;
     }
 
-    return EXIT_FAILURE;
+    if ((err = ssfn_select(&ctx, SSFN_FAMILY_ANY, NULL, SSFN_STYLE_REGULAR, HEIGHT)) < 0)
+    {
+        fprintf(stderr, FONT_PATH ": cannot select in ssfn: %d", err);
+        return EXIT_FAILURE;
+    }
+
+    return 0;
 }
 
-void char_to_framebuffer(int x, int y, int c, uint32_t fgcolor, uint32_t bgcolor, uint8_t* framebuffer)
+void string_to_framebuffer(int x, int y, char* string, uint32_t fgcolor, uint32_t bgcolor)
 {
-    uint32_t line, mask;
-    uint8_t* glyph = font.glyphs[c].bytes;
-    uint32_t offset = vinfo.pitch * y + x * 4;
+    buf.x = x;
+    buf.y = y + HEIGHT - 4; // FIXME: why ssf cannot draw font starting from 0?
+    buf.fg = fgcolor | 0xff000000;
+    buf.bg = bgcolor | 0xff000000;
 
-    for (uint32_t y = 0; y < font.height; y++, ++glyph, offset += vinfo.pitch)
+    for (; *string; string++)
     {
-        line = offset;
-        mask = 1 << 7;
-        for (uint32_t x = 0; x < font.width; x++)
-        {
-            uint32_t value = *glyph & mask ? fgcolor : bgcolor;
-            uint32_t* pixel = (uint32_t*)(framebuffer + line);
-            *pixel = value;
-            mask >>= 1;
-            line += 4;
-        }
-    }
-}
-
-void string_to_framebuffer(int x, int y, char* string, uint32_t fgcolor, uint32_t bgcolor, uint8_t* framebuffer)
-{
-    int offset = 0;
-    while (*string)
-    {
-        char_to_framebuffer(x + offset, y, *string, fgcolor, bgcolor, framebuffer);
-        offset += font.width;
-        ++string;
+        ssfn_render(&ctx, &buf, string);
     }
 }
