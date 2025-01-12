@@ -13,6 +13,7 @@ dev=""
 create_partition=
 mount_loopback=
 rebuild=
+install_src=
 font=/usr/share/kbd/consolefonts/Lat2-Terminus16.psfu.gz
 grub=$(command -v grub-install 2>/dev/null) || die "No grub-install"
 
@@ -24,6 +25,8 @@ while [[ $# -gt 0 ]]; do
             rebuild=1 ;;
         -v|--verbose)
             verbose=1 ;;
+        -s|--src)
+            install_src=1 ;;
         *)
             break ;;
     esac
@@ -124,6 +127,7 @@ alias l="ls -lah"
 alias dmesg="cat /proc/syslog"
 alias f="find . -name"
 alias p="path"
+alias lf="ls -lah /usr/share/kbd/consolefonts"
 function k()
 {
     while ktest -q -t realloc_small_to_small; do echo -n; done
@@ -201,6 +205,7 @@ create_dir "${mountpoint}/root/.vim"
 create_dir "${mountpoint}/sys"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/usr/share"
+create_dir "${mountpoint}/usr/src"
 
 for binary in $(find bin -type f -executable)
 do
@@ -214,11 +219,8 @@ done
 copy_dir_content "modules" "${mountpoint}/lib/modules"
 
 copy ../arch/x86/cpuid.c ${mountpoint}
-copy ../tux.tga ${mountpoint}
-copy ../cursor.tga ${mountpoint}
-copy ../close.tga ${mountpoint}
-copy ../close_pressed.tga ${mountpoint}
 copy font.psf ${mountpoint}/usr/share
+copy_dir_content ../resources ${mountpoint}/usr/share
 copy_dir_content sysroot/usr/share ${mountpoint}/usr/share
 copy_dir_content sysroot/lib ${mountpoint}/lib
 copy_dir_content sysroot/bin ${mountpoint}/bin
@@ -242,7 +244,12 @@ then
     fi
 fi
 
-if [[ ! -d ${boot_dir}/grub/i386-pc ]]
+if [[ -n "${install_src}" ]]
+then
+    rsync -av --exclude build --exclude resources .. mnt/usr/src
+fi
+
+if [[ ! -d "${boot_dir}/grub/i386-pc" ]]
 then
     sudo ${grub} --boot-directory=${boot_dir} --target=i386-pc --modules="ext2 part_msdos" "${dev}"
 fi

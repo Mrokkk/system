@@ -7,3 +7,4 @@
 #define WINDOW_BAR_HEIGHT   24
 
 #define FONT_PATH "/usr/share/fonts/sfn/Hack-Regular.sfn"
+#define ICONS_DIR "/usr/share/icons"

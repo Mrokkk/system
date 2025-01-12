@@ -172,9 +172,9 @@ int initialize()
         return EXIT_FAILURE;
     }
 
-    if (!(cursor = file_map("/cursor.tga")) ||
-        !(close_icon = file_map("/close.tga")) ||
-        !(close_pressed_icon = file_map("/close_pressed.tga")))
+    if (!(cursor = file_map(ICONS_DIR "/cursor.tga")) ||
+        !(close_icon = file_map(ICONS_DIR "/close.tga")) ||
+        !(close_pressed_icon = file_map(ICONS_DIR "/close_pressed.tga")))
     {
         return EXIT_FAILURE;
     }
