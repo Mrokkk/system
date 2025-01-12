@@ -44,6 +44,11 @@ static inline void outb(uint8_t data, uint16_t port)
     asm volatile("outb %1, %0" :: "dN" (port), "a" (data));
 }
 
+static inline void outw(uint16_t data, uint16_t port)
+{
+    asm volatile("outw %0, %1" :: "a" (data), "Nd" (port));
+}
+
 static inline void outl(uint32_t data, uint16_t port)
 {
     asm volatile("outl %0, %1" :: "a" (data), "Nd" (port));

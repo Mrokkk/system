@@ -6,7 +6,9 @@
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
+#include <kernel/page_alloc.h>
 
+#include "font.h"
 #include "glyph.h"
 #include "framebuffer.h"
 
@@ -14,6 +16,7 @@ static void egacon_glyph_draw(console_driver_t* driver, size_t x, size_t y, glyp
 static void egacon_sgr_16(console_driver_t* driver, uint8_t value, uint32_t* color);
 static void egacon_sgr_8(console_driver_t* driver, uint8_t value, uint32_t* color);
 static void egacon_defcolor(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);
+static int egacon_font_load(console_driver_t* driver, const void* buffer, size_t size, size_t* resx, size_t* resy);
 
 enum palette
 {
@@ -41,8 +44,14 @@ enum palette
 
 typedef struct
 {
-    uint16_t* videomem;
-    uint8_t   default_attribute;
+    uint8_t line[32];
+} vga_glyph_t;
+
+typedef struct
+{
+    uint16_t*    videomem;
+    vga_glyph_t* vga_font;
+    uint8_t      default_attribute;
 } data_t;
 
 static inline void videomem_write(uint16_t* video_mem, uint16_t data, uint16_t offset)
@@ -60,9 +69,68 @@ static inline void cls(data_t* data)
     memsetw(data->videomem, video_char_make(' ', data->default_attribute), framebuffer.width * framebuffer.height);
 }
 
-int egacon_init(console_driver_t* driver, console_config_t*, size_t* resx, size_t* resy)
+static int egacon_font_load_internal(console_driver_t* drv, font_t* font, size_t* resx, size_t* resy)
 {
-    data_t* data = alloc(data_t);
+    int errno;
+    data_t* data = drv->data;
+
+    scoped_irq_lock();
+
+    if (font->width != 8 || font->height != 16)
+    {
+        errno = -EINVAL;
+        goto failure;
+    }
+
+    if (!data->vga_font)
+    {
+        data->vga_font = mmio_map(0xa0000, 256 * 32, "vgafont");
+
+        if (unlikely(!data->vga_font))
+        {
+            errno = -ENOMEM;
+            goto failure;
+        }
+    }
+
+    outw(0x0005, 0x3ce);
+    outw(0x0406, 0x3ce);
+    outw(0x0402, 0x3c4);
+    outw(0x0604, 0x3c4);
+
+    void* font_glyphs = font->glyphs;
+
+    for (size_t i = 0; i < font->glyphs_count; ++i, font_glyphs += font->bytes_per_glyph)
+    {
+        memcpy(data->vga_font[i].line, font_glyphs, font->bytes_per_glyph);
+        memset(data->vga_font[i].line + font->bytes_per_glyph, 0, 32 - font->bytes_per_glyph);
+    }
+
+    memset(data->vga_font[font->glyphs_count].line, 0, font->bytes_per_glyph * (256 - font->glyphs_count));
+
+    *resx = framebuffer.width;
+    *resy = framebuffer.height;
+
+    font_unload(font);
+
+    outw(0x0302, 0x3c4);
+    outw(0x0204, 0x3c4);
+    outw(0x1005, 0x3ce);
+    outw(0x0e06, 0x3ce);
+
+    return 0;
+
+failure:
+    font_unload(font);
+    return errno;
+}
+
+int egacon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy)
+{
+    font_t* font;
+    data_t* data;
+
+    data = alloc(data_t);
 
     if (!data)
     {
@@ -70,22 +138,31 @@ int egacon_init(console_driver_t* driver, console_config_t*, size_t* resx, size_
         return -ENOMEM;
     }
 
+    data->vga_font          = NULL;
     data->videomem          = ptr(framebuffer.fb);
     data->default_attribute = forecolor(COLOR_GRAY) | backcolor(COLOR_BLACK);
+    driver->data            = data;
 
-    driver->data       = data;
+    if (!font_load_from_file(config->font_path, &font))
+    {
+        egacon_font_load_internal(driver, font, resx, resy);
+    }
+    else
+    {
+        *resx = framebuffer.width;
+        *resy = framebuffer.height;
+    }
+
     driver->glyph_draw = &egacon_glyph_draw;
     driver->defcolor   = &egacon_defcolor;
     driver->sgr_16     = &egacon_sgr_16;
     driver->sgr_8      = &egacon_sgr_8;
+    driver->font_load  = &egacon_font_load;
 
     cls(data);
 
     outb(0x0a, 0x3d4);
     outb(0x20, 0x3d5);
-
-    *resx = framebuffer.width;
-    *resy = framebuffer.height;
 
     return 0;
 }
@@ -151,4 +228,17 @@ static void egacon_defcolor(console_driver_t*, uint32_t* fgcolor, uint32_t* bgco
 {
     *fgcolor = forecolor(COLOR_GRAY);
     *bgcolor = backcolor(COLOR_BLACK);
+}
+
+static int egacon_font_load(console_driver_t* drv, const void* buffer, size_t size, size_t* resx, size_t* resy)
+{
+    int errno;
+    font_t* font = NULL;
+
+    if (unlikely(errno = font_load_from_buffer(buffer, size, &font)))
+    {
+        return errno;
+    }
+
+    return egacon_font_load_internal(drv, font, resx, resy);
 }
