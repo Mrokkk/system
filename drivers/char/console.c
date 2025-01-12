@@ -1486,6 +1486,7 @@ static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
 
     if (unlikely(errno = drv->font_load(drv, op->data, op->size, &resx, &resy)))
     {
+        console->disabled = false;
         return errno;
     }
 
