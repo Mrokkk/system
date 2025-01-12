@@ -56,6 +56,15 @@ function _prepare()
             tar xf "${file}"
             mv "$(basename -- "${file}" .tar.gz)" "${SRC_DIR}"
             rm "${file}"
+        elif [[ "${REPO}" == *".zip"* ]]
+        then
+            local file="$(basename ${REPO})"
+            mkdir -p "${SRC_DIR}"
+            pushd_silent "${SRC_DIR}"
+            wget "${REPO}" -O "/tmp/${file}"
+            unzip "/tmp/${file}"
+            popd_silent
+            rm "/tmp/${file}"
         fi
 
         pushd_silent ${SRC_DIR}
