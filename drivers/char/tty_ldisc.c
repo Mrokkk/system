@@ -109,10 +109,6 @@ void tty_ldisc_putch(tty_t* tty, int c)
     {
         c = '\n';
     }
-    else if (c == '\f') // FIXME: should be removed; I must make Bash understand \f properly
-    {
-        tty->driver->putch(tty, 12);
-    }
     else if (c == tty->driver_special_key)
     {
         tty->driver->putch(tty, TTY_SPECIAL_MODE);
