@@ -287,11 +287,17 @@ void tty_write_to(tty_t* tty, const char* buffer, size_t len)
 void tty_session_kill(tty_t* tty, int signum)
 {
     process_t* p;
+
+    siginfo_t siginfo = {
+        .si_code = SI_KERNEL,
+        .si_signo = signum,
+    };
+
     for_each_process(p)
     {
         if (p->sid == tty->sid)
         {
-            do_kill(p, signum);
+            do_kill(p, &siginfo);
         }
     }
 

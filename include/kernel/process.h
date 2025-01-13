@@ -69,12 +69,12 @@ struct mm
 
 struct signals
 {
-    int              refcount;
-    uint32_t         ongoing;
-    uint32_t         trapped;
-    uint32_t         pending;
-    sighandler_t     sighandler[NSIGNALS];
-    sigrestorer_t    sigrestorer;
+    int         refcount;
+    uint32_t    ongoing;
+    uint32_t    trapped;
+    uint32_t    pending;
+    list_head_t queue;
+    sigaction_t sighandlers[NSIGNALS];
 #define SIGNALS_INIT \
     { \
         .refcount = 1, \

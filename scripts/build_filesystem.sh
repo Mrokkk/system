@@ -128,6 +128,7 @@ alias dmesg="cat /proc/syslog"
 alias f="find . -name"
 alias p="path"
 alias lf="ls -lah /usr/share/kbd/consolefonts"
+alias d="display /usr/share/images/tux.tga"
 function k()
 {
     while ktest -q -t realloc_small_to_small; do echo -n; done
@@ -218,7 +219,6 @@ done
 
 copy_dir_content "modules" "${mountpoint}/lib/modules"
 
-copy ../arch/x86/cpuid.c ${mountpoint}
 copy font.psf ${mountpoint}/usr/share
 copy_dir_content ../resources ${mountpoint}/usr/share
 copy_dir_content sysroot/usr/share ${mountpoint}/usr/share

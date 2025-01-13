@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -15,12 +16,6 @@
 static int data;
 static int data2 = 13;
 static int data3[1028];
-static int sigreceived;
-
-static void sighan()
-{
-    sigreceived = 1;
-}
 
 TEST_SUITE(kernel);
 
@@ -49,6 +44,22 @@ TEST_SUITE(kernel);
 TEST(bss_is_zeroed)
 {
     EXPECT_EQ(data, 0);
+}
+
+TEST(copy_on_write)
+{
+    data = 93;
+    data3[1027] = 2221;
+    EXPECT_EXIT_WITH(0)
+    {
+        data = 58;
+        data3[1027] = 29304;
+        EXPECT_EQ(data, 58);
+        EXPECT_EQ(data3[1027], 29304);
+        exit(FAILED_EXPECTATIONS());
+    }
+    EXPECT_EQ(data, 93);
+    EXPECT_EQ(data3[1027], 2221);
 }
 
 TEST(vsyscall)
@@ -138,6 +149,13 @@ TEST(getdents_bad_ptr2)
     }
 }
 
+static int sigreceived;
+
+static void sighan()
+{
+    sigreceived = 1;
+}
+
 TEST(signal)
 {
     int status, pid = fork();
@@ -159,9 +177,9 @@ TEST(signal)
     }
 }
 
-int received;
+static int received;
 
-void handler(int sig)
+static void handler(int sig)
 {
     received |= 1 << sig;
     ++received;
@@ -178,31 +196,84 @@ void handler(int sig)
 
 TEST(signal_nested)
 {
+    received = 0;
     EXPECT_EXIT_WITH(0)
     {
-        signal(SIGUSR1, &handler);
-        signal(SIGUSR2, &handler);
-        signal(SIGPIPE, &handler);
-        raise(SIGUSR1);
+        EXPECT_EQ(signal(SIGUSR1, &handler), 0);
+        EXPECT_EQ(signal(SIGUSR2, &handler), 0);
+        EXPECT_EQ(signal(SIGPIPE, &handler), 0);
+        EXPECT_EQ(raise(SIGUSR1), 0);
         EXPECT_EQ(received, 3 | (1 << SIGUSR1) | (1 << SIGUSR2) | (1 << SIGPIPE));
         exit(FAILED_EXPECTATIONS());
     }
 }
 
-TEST(copy_on_write)
+static void handler2(int sig)
 {
-    data = 93;
-    data3[1027] = 2221;
-    EXPECT_EXIT_WITH(0)
+    received |= 1 << sig;
+    ++received;
+}
+
+TEST(sigaction_resethand)
+{
+    received = 0;
+    EXPECT_KILLED_BY(SIGUSR1)
     {
-        data = 58;
-        data3[1027] = 29304;
-        EXPECT_EQ(data, 58);
-        EXPECT_EQ(data3[1027], 29304);
+        struct sigaction s = {
+            .sa_handler = &handler2,
+            .sa_flags = SA_RESETHAND,
+        };
+        EXPECT_EQ(sigaction(SIGUSR1, &s, NULL), 0);
+        EXPECT_EQ(raise(SIGUSR1), 0);
+        EXPECT_EQ(received, 1 | (1 << SIGUSR1));
+        received = 0;
+        EXPECT_EQ(raise(SIGUSR1), 0);
         exit(FAILED_EXPECTATIONS());
     }
-    EXPECT_EQ(data, 93);
-    EXPECT_EQ(data3[1027], 2221);
+}
+
+TEST(sigaction_sigign)
+{
+    received = 0;
+    EXPECT_EXIT_WITH(0)
+    {
+        struct sigaction s = {
+            .sa_handler = SIG_IGN,
+        };
+        EXPECT_EQ(sigaction(SIGUSR1, &s, NULL), 0);
+        EXPECT_EQ(raise(SIGUSR1), 0);
+        EXPECT_EQ(received, 0);
+        EXPECT_EQ(raise(SIGUSR1), 0);
+        EXPECT_EQ(received, 0);
+        exit(FAILED_EXPECTATIONS());
+    }
+}
+
+static siginfo_t received_siginfo;
+
+static void siginfo_handler(int signum, siginfo_t* siginfo, void*)
+{
+    received = 1 | (1 << signum);
+    memcpy(&received_siginfo, siginfo, sizeof(*siginfo));
+}
+
+TEST(sigaction_siginfo)
+{
+    received = 0;
+    EXPECT_EXIT_WITH(0)
+    {
+        struct sigaction s = {
+            .sa_sigaction = &siginfo_handler,
+            .sa_flags = SA_SIGINFO,
+        };
+        EXPECT_EQ(sigaction(SIGUSR1, &s, NULL), 0);
+        EXPECT_EQ(raise(SIGUSR1), 0);
+        EXPECT_EQ(received, 1 | (1 << SIGUSR1));
+        EXPECT_EQ(received_siginfo.si_pid, getpid());
+        EXPECT_EQ(received_siginfo.si_signo, SIGUSR1);
+        EXPECT_EQ(received_siginfo.si_code, SI_USER);
+        exit(FAILED_EXPECTATIONS());
+    }
 }
 
 TEST(sbrk1)

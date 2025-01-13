@@ -342,13 +342,6 @@ syscall_t trace_syscalls[] = {
     },
 
     {
-        .name   = "signal",
-        .ret    = TYPE_LONG,
-        .nargs  = 2,
-        .args   = { TYPE_LONG, TYPE_VOID_PTR },
-    },
-
-    {
         .name   = "sigreturn",
         .ret    = TYPE_LONG,
         .nargs  = 1,

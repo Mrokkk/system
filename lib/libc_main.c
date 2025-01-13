@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-void signals_init(void);
 void stdio_init(void);
 
 int libc_debug;
@@ -21,7 +20,6 @@ void __libc_start_main(int, char* const argv[], char* const envp[])
         libc_debug = 1;
     }
 
-    signals_init();
     stdio_init();
 }
 

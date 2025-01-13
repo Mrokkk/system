@@ -22,5 +22,7 @@
 #define F_GETFL             3 // Get file status flags
 #define F_SETFL             4 // Set file status flags
 
+#define FD_CLOEXEC 1
+
 int fcntl(int fildes, int cmd, ...);
 int open(const char*, int, ...);

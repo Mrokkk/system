@@ -220,7 +220,13 @@ void process_ktimers_exit(process_t* p)
 
 static void alarm_callback(ktimer_t* timer)
 {
-    if (unlikely(do_kill(timer->process, SIGALRM)))
+    siginfo_t siginfo = {
+        .si_code = SI_TIMER,
+        .si_pid = timer->process->pid,
+        .si_signo = SIGALRM,
+    };
+
+    if (unlikely(do_kill(timer->process, &siginfo)))
     {
         log_warning("%u: cannot send SIGALRM", timer->process->pid);
     }
@@ -255,9 +261,15 @@ unsigned int sys_alarm(unsigned int seconds)
 static void posix_timer_signal_callback(ktimer_t* timer)
 {
     sigevent_t* event = timer->data;
-    if (unlikely(do_kill(timer->process, event->sigev_signo)))
+
+    siginfo_t siginfo = {
+        .si_code = SI_TIMER,
+        .si_signo = event->sigev_signo,
+    };
+
+    if (unlikely(do_kill(timer->process, &siginfo)))
     {
-        log_warning("%u: cannot send %s", timer->process->pid, signame(event->sigev_signo));
+        current_log_info("cannot send %s to %u", signame(event->sigev_signo), timer->process->pid);
     }
 }
 

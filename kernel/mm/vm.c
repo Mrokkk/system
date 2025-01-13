@@ -433,7 +433,13 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
         if (unlikely(!page))
         {
             current_log_info("OOM on %x", address);
-            do_kill(process_current, SIGKILL);
+
+            siginfo_t siginfo = {
+                .si_code = SI_KERNEL,
+                .si_signo = SIGKILL,
+            };
+
+            do_kill(process_current, &siginfo);
             return 0;
         }
 

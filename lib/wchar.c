@@ -32,3 +32,8 @@ wchar_t* wmemcpy(wchar_t* dest, const wchar_t* src, size_t n)
     }
     return old_dest;
 }
+
+int wcwidth(wchar_t)
+{
+    return 1;
+}

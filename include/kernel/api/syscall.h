@@ -49,43 +49,42 @@
 #define __NR_setsid         46
 #define __NR_setuid         47
 #define __NR_sigaction      48
-#define __NR_signal         49
-#define __NR_sigreturn      50
-#define __NR_stat           51
-#define __NR_statvfs        52
-#define __NR_time           53
-#define __NR_umask          54
-#define __NR_umount         55
-#define __NR_umount2        56
-#define __NR_unlink         57
-#define __NR_waitpid        58
-#define __NR_write          59
-#define __NR_timer_create   60
-#define __NR_timer_settime  61
-#define __NR_statfs         62
-#define __NR_fstatfs        63
-#define __NR_brk            64
-#define __NR_mprotect       65
-#define __NR_rmdir          66
-#define __NR_pread          67
-#define __NR_pwrite         68
-#define __NR__syslog        69
-#define __NR_gettimeofday   70
-#define __NR_clock_gettime  71
-#define __NR_clock_settime  72
-#define __NR_getpgrp        73
-#define __NR_setpgrp        74
-#define __NR_readlink       75
-#define __NR_fchdir         76
-#define __NR_lstat          77
-#define __NR_mimmutable     78
-#define __NR_munmap         79
-#define __NR_set_thread_area 80
-#define __NR_pinsyscalls    81
-#define __NR_chmod          82
-#define __NR_timer_delete   83
+#define __NR_sigreturn      49
+#define __NR_stat           50
+#define __NR_statvfs        51
+#define __NR_time           52
+#define __NR_umask          53
+#define __NR_umount         54
+#define __NR_umount2        55
+#define __NR_unlink         56
+#define __NR_waitpid        57
+#define __NR_write          58
+#define __NR_timer_create   59
+#define __NR_timer_settime  60
+#define __NR_statfs         61
+#define __NR_fstatfs        62
+#define __NR_brk            63
+#define __NR_mprotect       64
+#define __NR_rmdir          65
+#define __NR_pread          66
+#define __NR_pwrite         67
+#define __NR__syslog        68
+#define __NR_gettimeofday   69
+#define __NR_clock_gettime  70
+#define __NR_clock_settime  71
+#define __NR_getpgrp        72
+#define __NR_setpgrp        73
+#define __NR_readlink       74
+#define __NR_fchdir         75
+#define __NR_lstat          76
+#define __NR_mimmutable     77
+#define __NR_munmap         78
+#define __NR_set_thread_area 79
+#define __NR_pinsyscalls    80
+#define __NR_chmod          81
+#define __NR_timer_delete   82
 
-#define __NR_syscalls       84
+#define __NR_syscalls       83
 
 #ifndef __ASSEMBLER__
 
@@ -178,7 +177,6 @@ __syscall1(setgid, int, gid_t)
 __syscall0(setsid, int)
 __syscall1(setuid, int, uid_t)
 __syscall3(sigaction, int, int, const struct sigaction*, struct sigaction*)
-__syscall2(signal, int, int, void (*)(int))
 __syscall1(sigreturn, int, int)
 __syscall2(stat, int, const char*, struct stat*)
 __syscall2(statvfs, int, const char*, struct statvfs*)

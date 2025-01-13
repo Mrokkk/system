@@ -235,20 +235,28 @@ void do_signals(pt_regs_t regs)
     process_t* proc = process_current;
     uint32_t* user_stack = ptr(proc->context.esp2);
     signal_frame_t frame;
+    signal_t* signal;
 
-    for (int sig = 0; sig < NSIGNALS; ++sig)
+    list_for_each_entry_safe(signal, &proc->signals->queue, list_entry)
     {
-        if (!(proc->signals->ongoing & (1 << sig)))
+        int signum = signal->info.si_signo;
+        sigaction_t* sigaction = &proc->signals->sighandlers[signum];
+
+        if (!(proc->signals->ongoing & (1 << signum)))
         {
             continue;
         }
 
         proc->need_signal = false;
-        proc->signals->ongoing &= ~(1 << sig);
+        proc->signals->ongoing &= ~(1 << signum);
+        list_del(&signal->list_entry);
 
-        log_debug(DEBUG_SIGNAL, "%u: running handler for %s", proc->pid, signame(sig));
+        current_log_debug(DEBUG_SIGNAL, "running handler for %s: %p; restorer: %p",
+            signame(signum),
+            sigaction->sa_handler,
+            sigaction->sa_restorer);
 
-        frame.sig = sig;
+        frame.sig = signum;
         frame.context = &regs;
         frame.prev = ptr(proc->context.esp0);
 
@@ -258,11 +266,20 @@ void do_signals(pt_regs_t regs)
         // back to original esp0
         proc->context.esp0 = addr(&frame);
 
-        // Currently only void(int sig) signal handlers are supported
-        push(sig, user_stack);
-        push(proc->signals->sigrestorer, user_stack);
+        if (sigaction->sa_flags & SA_SIGINFO)
+        {
+            user_stack = shift(user_stack, -sizeof(signal->info));
+            uintptr_t user_siginfo = addr(user_stack);
+            memcpy(user_stack, &signal->info, sizeof(signal->info));
+            push(NULL, user_stack);
+            push(user_siginfo, user_stack);
+        }
+
+        push(signum, user_stack);
+        push(sigaction->sa_restorer, user_stack);
 
         tss.esp0 = addr(&frame);
+        delete(signal);
 
         asm volatile(
             "pushl "ASM_VALUE(USER_DS)";" // ss
@@ -278,9 +295,13 @@ void do_signals(pt_regs_t regs)
             "mov %%eax, %%gs;"
             "iret;"
             :: "m" (user_stack),
-               "m" (proc->signals->sighandler[sig])
+               "m" (sigaction->sa_handler)
             : "memory");
     }
+
+    panic("do_signals: called without signal to handle; ongoing: %x, pending: %x",
+        proc->signals->ongoing,
+        proc->signals->pending);
 
     ASSERT_NOT_REACHED();
 }
@@ -405,7 +426,13 @@ int syscall_permission_check(int, pt_regs_t regs)
         return 0;
     }
 
-    do_kill(p, SIGABRT);
+    siginfo_t siginfo = {
+        .si_code = SI_KERNEL,
+        .si_pid = process_current->pid,
+        .si_signo = SIGABRT,
+    };
+
+    do_kill(p, &siginfo);
 
     return -EPERM;
 }

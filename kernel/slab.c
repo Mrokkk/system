@@ -30,7 +30,8 @@ typedef struct slab_allocator
 #define SLAB_128    2
 #define SLAB_256    3
 #define SLAB_512    4
-#define SLABS_SIZE  5
+#define SLAB_768    5
+#define SLABS_SIZE  6
 
 static slab_allocator_t allocators[SLABS_SIZE];
 
@@ -44,6 +45,7 @@ static inline slab_allocator_t* slab_allocator_get(size_t size)
     else if (size <= 128) return allocators + SLAB_128;
     else if (size <= 256) return allocators + SLAB_256;
     else if (size <= 512) return allocators + SLAB_512;
+    else if (size <= 768) return allocators + SLAB_768;
     else return NULL;
 }
 
@@ -141,7 +143,8 @@ UNMAP_AFTER_INIT void slab_allocator_init(void)
 {
     init(&allocators[SLAB_32], 32, 512 * 2);
     init(&allocators[SLAB_64], 64, 512 * 16);
-    init(&allocators[SLAB_128], 128, 128 * 2);
+    init(&allocators[SLAB_128], 128, 512 * 2);
     init(&allocators[SLAB_256], 256, 64 * 2);
     init(&allocators[SLAB_512], 512, 32 * 2);
+    init(&allocators[SLAB_768], 768, 32 * 2);
 }

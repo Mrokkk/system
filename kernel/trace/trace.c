@@ -258,7 +258,6 @@ static int special_parameter(int nr, size_t id, int value, char** it, const char
     int continuation = 0;
     switch (nr)
     {
-        case __NR_signal:
         case __NR_sigaction:
             FOR_ARGUMENT(0,
                 *it = csnprintf(*it, end, "%s", signame(value));

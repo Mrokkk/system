@@ -1,5 +1,7 @@
 #pragma once
 
+#include <kernel/api/types.h>
+
 #define SIGHUP       1
 #define SIGINT       2
 #define SIGQUIT      3
@@ -42,26 +44,85 @@
 #define SIG_IGN     ((void (*)(int))1)
 #define SIG_HOLD    ((void (*)(int))2)
 
-#define SA_RESTART  1
+#define SA_RESTART      (1 << 0)
+#define SA_RESETHAND    (1 << 1)
+#define SA_SIGINFO      (1 << 2)
 
 typedef void (*sighandler_t)();
 typedef void (*sigrestorer_t)(void);
 
 typedef unsigned long sigset_t;
 
-struct sigaction
-{
-    void     (*sa_handler)(int);
-    void     (*sa_sigaction)(int, void*, void*);
-    sigset_t sa_mask;
-    int      sa_flags;
-    void     (*sa_restorer)(void);
-};
-
 union sigval
 {
     int    sival_int;   // integer signal value
     void*  sival_ptr;   // pointer signal value
+};
+
+typedef union sigval sigval_t;
+
+#define SI_USER     0
+#define SI_KERNEL   0x80
+#define SI_TIMER    0x81
+
+typedef struct
+{
+    int          si_signo;  // Signal number
+    int          si_code;   // Signal code
+    int          si_errno;  // If non-zero, an errno value associated with
+                            // this signal, as defined in <errno.h>
+
+    union
+    {
+        // kill
+        struct
+        {
+            pid_t       _si_pid;     // Sending process ID
+            uid_t       _si_uid;     // Real user ID of sending process
+        } _kill;
+
+        // POSIX.1b timers
+        struct
+        {
+            int         _si_tid;     // Timer ID
+            int         _si_overrun; // Overrun count
+            sigval_t    _si_sigval;  // Signal value
+        } _timer;
+
+        // SIGILL, SIGFPE, SIGSEGV, SIGBUS
+        struct
+        {
+            void*       _si_addr;    // Memory location which caused fault
+        } _sigfault;
+
+        // SIGCHLD
+        struct
+        {
+            pid_t       _si_pid;     // Sending process ID
+            uid_t       _si_uid;     // Real user ID of sending process
+            int         _si_status;  // Exit value or signal
+        } _sigchld;
+    };
+} siginfo_t;
+
+#define si_pid      _kill._si_pid
+#define si_uid      _kill._si_uid
+#define si_addr     _sigfault._si_addr
+#define si_status   _sigchld._si_status
+#define si_value    _timer._si_sigval
+#define si_int      _timer._si_sigval.sival_int
+#define si_ptr      _timer._si_sigval.sival_ptr
+
+struct sigaction
+{
+    union
+    {
+        void     (*sa_handler)(int);
+        void     (*sa_sigaction)(int, siginfo_t*, void*);
+    };
+    sigset_t sa_mask;
+    int      sa_flags;
+    void     (*sa_restorer)(void);
 };
 
 #define SIGEV_NONE      0

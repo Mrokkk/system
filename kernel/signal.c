@@ -41,38 +41,6 @@ const char* signame(int sig)
     return "Unknown signal";
 }
 
-int sys_signal(int signum, sighandler_t handler)
-{
-    if (!signum_exists(signum))
-    {
-        return -EINVAL;
-    }
-
-    if (!signal_can_be_trapped(signum))
-    {
-        return -EINVAL;
-    }
-
-    if (!handler)
-    {
-        process_current->signals->trapped &= ~(1 << signum);
-    }
-    else
-    {
-        process_current->signals->trapped |= (1 << signum);
-    }
-
-    log_debug(DEBUG_SIGNAL, "%u:%x set handler for %s: %x",
-        process_current->pid,
-        process_current,
-        signame(signum),
-        handler);
-
-    process_current->signals->sighandler[signum] = handler;
-
-    return 0;
-}
-
 static void default_sighandler(process_t* p, int signum)
 {
     switch (signum)
@@ -100,6 +68,42 @@ static void default_sighandler(process_t* p, int signum)
     }
 }
 
+static int signal_deliver(process_t* proc, int signum)
+{
+    if (proc->signals->ongoing & (1 << signum))
+    {
+        log_debug(DEBUG_SIGNAL, "ignoring %s in %u; already ongoing", signame(signum), proc->pid);
+        return 0;
+    }
+
+    if (proc->signals->trapped & (1 << signum))
+    {
+        if (proc->signals->sighandlers[signum].sa_handler == SIG_IGN)
+        {
+            log_debug(DEBUG_SIGNAL, "ignoring %s in %u", signame(signum), proc->pid);
+        }
+        else
+        {
+            log_debug(DEBUG_SIGNAL, "scheduling custom handler for %s in %u", signame(signum), proc->pid);
+
+            proc->signals->ongoing |= (1 << signum);
+            proc->need_signal = true;
+        }
+
+        if (proc->signals->sighandlers[signum].sa_flags & SA_RESETHAND)
+        {
+            proc->signals->trapped &= ~(1 << signum);
+        }
+    }
+    else
+    {
+        log_debug(DEBUG_SIGNAL, "calling default handler for %s in %u", signame(signum), proc->pid);
+        default_sighandler(proc, signum);
+    }
+
+    return 0;
+}
+
 int signal_run(process_t* proc)
 {
     uint32_t* pending = &proc->signals->pending;
@@ -120,38 +124,25 @@ int signal_run(process_t* proc)
     return signals;
 }
 
-int signal_deliver(process_t* proc, int signum)
+static signal_t* signal_allocate(int signum)
 {
-    if (proc->signals->ongoing & (1 << signum))
+    signal_t* signal = alloc(signal_t);
+    if (unlikely(!signal))
     {
-        log_debug(DEBUG_SIGNAL, "ignoring %s in %u; already ongoing", signame(signum), proc->pid);
-        return 0;
+        return NULL;
     }
 
-    if (proc->signals->trapped & (1 << signum))
-    {
-        if (proc->signals->sighandler[signum] == SIG_IGN)
-        {
-            log_debug(DEBUG_SIGNAL, "ignoring %s in %u", signame(signum), proc->pid);
-            return 0;
-        }
+    memset(signal, 0, sizeof(*signal));
+    list_init(&signal->list_entry);
+    signal->info.si_signo = signum;
 
-        log_debug(DEBUG_SIGNAL, "scheduling custom handler for %s in %u", signame(signum), proc->pid);
-
-        proc->signals->ongoing |= (1 << signum);
-        proc->need_signal = true;
-    }
-    else
-    {
-        log_debug(DEBUG_SIGNAL, "calling default handler for %s in %u", signame(signum), proc->pid);
-        default_sighandler(proc, signum);
-    }
-
-    return 0;
+    return signal;
 }
 
-int do_kill(process_t* proc, int signum)
+int do_kill(process_t* proc, siginfo_t* siginfo)
 {
+    int signum = siginfo->si_signo;
+
     log_debug(DEBUG_SIGNAL, "%s to %s[%u]", signame(signum), proc->name, proc->pid);
 
     if (!signum_exists(signum))
@@ -167,6 +158,21 @@ int do_kill(process_t* proc, int signum)
     if (unlikely(proc->stat == PROCESS_ZOMBIE))
     {
         return 0;
+    }
+
+    signal_t* signal = signal_allocate(signum);
+
+    if (unlikely(!signal))
+    {
+        return -ENOMEM;
+    }
+
+    memcpy(&signal->info, siginfo, sizeof(*siginfo));
+
+    {
+        scoped_irq_lock();
+
+        list_add(&signal->list_entry, &proc->signals->queue);
     }
 
     if (proc->stat == PROCESS_WAITING)
@@ -197,29 +203,54 @@ int sys_kill(int pid, int signum)
 
     log_debug(DEBUG_SIGNAL, "sending %s to pid %d", signame(signum), pid);
 
-    return do_kill(p, signum);
+    siginfo_t siginfo = {
+        .si_code = SI_USER,
+        .si_pid = process_current->pid,
+        .si_uid = process_current->uid,
+        .si_signo = signum,
+    };
+
+    return do_kill(p, &siginfo);
 }
 
-int sys_sigaction(int sig, const struct sigaction* act, struct sigaction* oact)
+int sys_sigaction(int signum, const sigaction_t* act, sigaction_t* oact)
 {
-    if (sig == 0 && act && act->sa_restorer)
+    if (!signum_exists(signum))
     {
-        process_current->signals->sigrestorer = act->sa_restorer;
-        return 0;
+        return -EINVAL;
+    }
+
+    if (!signal_can_be_trapped(signum))
+    {
+        return -EINVAL;
     }
 
     if (oact)
     {
-        oact->sa_flags = 0;
-        oact->sa_mask = 0;
-        oact->sa_sigaction = NULL;
-        oact->sa_restorer = process_current->signals->sigrestorer;
-        oact->sa_handler = process_current->signals->sighandler[sig];
+        if (current_vm_verify(VERIFY_WRITE, oact))
+        {
+            return -EFAULT;
+        }
+
+        memcpy(oact, &process_current->signals->sighandlers[signum], sizeof(*oact));
     }
 
     if (act)
     {
-        return sys_signal(sig, act->sa_handler);
+        if (current_vm_verify(VERIFY_READ, act))
+        {
+            return -EFAULT;
+        }
+
+        memcpy(&process_current->signals->sighandlers[signum], act, sizeof(*act));
+        if (act->sa_handler == SIG_DFL)
+        {
+            process_current->signals->trapped &= ~(1 << signum);
+        }
+        else
+        {
+            process_current->signals->trapped |= (1 << signum);
+        }
     }
 
     return 0;

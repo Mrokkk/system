@@ -449,7 +449,13 @@ int sys_mprotect(void* addr, size_t len, int prot)
 apply:
     if (unlikely(vm_apply(new_vmas, process_current->mm->pgd, addr(addr), addr(addr) + len)))
     {
-        do_kill(process_current, SIGBUS);
+        siginfo_t siginfo = {
+            .si_code = SI_TIMER,
+            .si_pid = process_current->pid,
+            .si_signo = SIGBUS,
+        };
+
+        do_kill(process_current, &siginfo);
         return -ENOMEM;
     }
 

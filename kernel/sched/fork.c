@@ -235,6 +235,8 @@ static inline int process_files_copy(process_t* child, process_t* parent, int cl
 static inline void signals_init(struct signals* dest, struct signals* src)
 {
     copy_struct(dest, src);
+    dest->pending = 0;
+    list_init(&dest->queue);
     dest->refcount = 1;
 }
 

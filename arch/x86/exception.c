@@ -283,7 +283,14 @@ handle_fault:
             backtrace_user(KERN_INFO, &regs, "");
         }
 
-        do_kill(p, exception->signal);
+        // FIXME: fill si_code and si_addr properly
+        siginfo_t siginfo = {
+            .si_code = SI_KERNEL,
+            .si_signo = exception->signal,
+            .si_addr = ptr(cr2),
+        };
+
+        do_kill(p, &siginfo);
     }
 }
 

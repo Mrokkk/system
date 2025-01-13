@@ -2,7 +2,13 @@
 #include <stddef.h>
 #include <string.h>
 #include <unistd.h>
+#include <kernel/api/signal.h>
 #include <kernel/api/syscall.h>
+
+static void restore(void)
+{
+    syscall(__NR_sigreturn, 0);
+}
 
 int LIBC(raise)(int sig)
 {
@@ -52,16 +58,27 @@ int LIBC(sigismember)(const sigset_t* set, int signum)
     return 0;
 }
 
-static void restore(void)
+int LIBC(sigaction)(int signum, const struct sigaction* act, struct sigaction* oldact);
+
+int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
 {
-    syscall(__NR_sigreturn, 0);
+    if (act)
+    {
+        struct sigaction* wact = (struct sigaction*)act;
+        wact->sa_restorer = &restore;
+    }
+    return LIBC(sigaction)(signum, act, oldact);
 }
 
-void signals_init(void)
+int LIBC(signal)(int signum, sighandler_t handler)
 {
-    struct sigaction s;
-    s.sa_restorer = &restore;
-    sigaction(0, &s, NULL);
+    struct sigaction s = {
+        .sa_flags = SA_RESTART,
+        .sa_handler = handler,
+        .sa_mask = 0,
+        .sa_restorer = &restore,
+    };
+    return sigaction(signum, &s, NULL);
 }
 
 LIBC_ALIAS(raise);
@@ -72,3 +89,4 @@ LIBC_ALIAS(sigfillset);
 LIBC_ALIAS(sigaddset);
 LIBC_ALIAS(sigdelset);
 LIBC_ALIAS(sigismember);
+LIBC_ALIAS(signal);

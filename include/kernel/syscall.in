@@ -48,7 +48,6 @@ setgid: int, gid_t
 setsid: int
 setuid: int, uid_t
 sigaction: int, int, const struct sigaction*, struct sigaction*
-signal: int, int, void (*)(int)
 sigreturn: int, int
 stat: int, const char*, struct stat*
 statvfs: int, const char*, struct statvfs*
