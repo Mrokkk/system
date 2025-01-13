@@ -55,7 +55,7 @@ int font_load(void* framebuffer)
 void string_to_framebuffer(int x, int y, char* string, uint32_t fgcolor, uint32_t bgcolor)
 {
     buf.x = x;
-    buf.y = y + HEIGHT - 4; // FIXME: why ssf cannot draw font starting from 0?
+    buf.y = y + HEIGHT - 6; // FIXME: why ssf cannot draw font starting from 0?
     buf.fg = fgcolor | 0xff000000;
     buf.bg = bgcolor | 0xff000000;
 
