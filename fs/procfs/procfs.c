@@ -46,6 +46,8 @@ struct procfs_pid_data
     list_head_t entries;
 };
 
+#define READDIR_END_OFFSET ((size_t)-1)
+
 #define PROCFS_ENTRY(name) \
     static int name##_open(file_t* file) { return seq_open(file, &name##_show); } \
     static inode_operations_t name##_iops; \
@@ -270,37 +272,42 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 
     log_debug(DEBUG_PROCFS, "inode=%O", file->dentry->inode);
 
-    ++i;
+    if (file->offset == READDIR_END_OFFSET)
+    {
+        return 0;
+    }
+
     if (dirent_add(buf, ".", 4, 0, DT_DIR))
     {
         log_debug(DEBUG_PROCFS, "adding .");
         goto finish;
     }
-
     ++i;
+
     if (dirent_add(buf, "..", 4, 0, DT_DIR))
     {
         log_debug(DEBUG_PROCFS, "adding ..");
         goto finish;
     }
+    ++i;
 
     for_each_process(p)
     {
         len = snprintf(namebuf, sizeof(namebuf), "%u", p->pid);
         log_debug(DEBUG_PROCFS, "adding %s", namebuf);
-        ++i;
         if (dirent_add(buf, namebuf, len, PID_TO_INO(p->pid), DT_DIR))
         {
             goto finish;
         }
+        ++i;
     }
 
-    ++i;
     if (dirent_add(buf, "self", 4, SELF_INO, DT_LNK))
     {
         log_debug(DEBUG_PROCFS, "adding self");
         goto finish;
     }
+    ++i;
 
     for (size_t j = 0; j < array_size(root_entries); ++j, ++i)
     {
@@ -316,6 +323,8 @@ static int procfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
             break;
         }
     }
+
+    file->offset = READDIR_END_OFFSET;
 
 finish:
     return i;
@@ -374,6 +383,11 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 
     log_debug(DEBUG_PROCFS, "inode=%O", file->dentry->inode);
 
+    if (file->offset == READDIR_END_OFFSET)
+    {
+        return 0;
+    }
+
     for (i = 0; i < (int)array_size(pid_entries); ++i)
     {
         type = DT_DIR;
@@ -388,6 +402,8 @@ static int procfs_pid_readdir(file_t* file, void* buf, direntadd_t dirent_add)
             break;
         }
     }
+
+    file->offset = READDIR_END_OFFSET;
 
     return i;
 }
@@ -450,6 +466,11 @@ static int procfs_fd_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     process_t* p;
     char namebuf[12];
 
+    if (file->offset == READDIR_END_OFFSET)
+    {
+        return 0;
+    }
+
     if (unlikely(!(p = procfs_process_from_inode(file->dentry->inode))))
     {
         return -ESRCH;
@@ -470,6 +491,8 @@ static int procfs_fd_readdir(file_t* file, void* buf, direntadd_t dirent_add)
             return count;
         }
     }
+
+    file->offset = READDIR_END_OFFSET;
 
     return count;
 }

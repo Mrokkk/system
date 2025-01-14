@@ -9,6 +9,8 @@ static int sysfs_open(file_t* file);
 static int sysfs_root_lookup(inode_t* dir, const char* name, inode_t** result);
 static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 
+#define READDIR_END_OFFSET ((size_t)-1)
+
 #define SYSFS_ENTRY_READ(name) \
     static int name##_read(file_t* file, char* buffer, size_t count) \
     { \
@@ -114,14 +116,15 @@ static int sysfs_root_lookup(inode_t* parent, const char* name, inode_t** result
     return 0;
 }
 
-static int sysfs_root_readdir(file_t*, void* buf, direntadd_t dirent_add)
+static int sysfs_root_readdir(file_t* file, void* buf, direntadd_t dirent_add)
 {
     int i = 0;
+    size_t j;
     char type;
     size_t len;
     generic_vfs_entry_t* entry;
 
-    for (size_t j = 0; j < array_size(root_entries); ++j, ++i)
+    for (j = file->offset; j < array_size(root_entries); ++j, ++i)
     {
         type = DT_DIR;
         entry = &root_entries[j];
@@ -134,6 +137,8 @@ static int sysfs_root_readdir(file_t*, void* buf, direntadd_t dirent_add)
             break;
         }
     }
+
+    file->offset = j;
 
     return i;
 }

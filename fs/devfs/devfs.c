@@ -2,6 +2,8 @@
 #include <kernel/fs.h>
 #include <kernel/devfs.h>
 
+#define READDIR_END_OFFSET ((size_t)-1)
+
 static int devfs_lookup(inode_t* dir, const char* name, inode_t** result);
 static int devfs_open(file_t* file);
 static int devfs_readdir(file_t* file, void* buf, direntadd_t dirent_add);
@@ -292,6 +294,11 @@ static int devfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     dir_node_t* dir;
     dev_data_t* data;
 
+    if (file->offset == READDIR_END_OFFSET)
+    {
+        return 0;
+    }
+
     log_debug(DEBUG_DEVFS, "inode=%O fs_data=%O", file->dentry->inode, file->dentry->inode->fs_data);
 
     node = file->dentry->inode->fs_data;
@@ -320,6 +327,8 @@ static int devfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
             break;
         }
     }
+
+    file->offset = READDIR_END_OFFSET;
 
     return i;
 }

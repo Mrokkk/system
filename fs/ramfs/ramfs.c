@@ -410,6 +410,7 @@ struct readdir_context
     direntadd_t dirent_add;
     void*       buf;
     size_t      count;
+    size_t      offset;
 };
 
 static cmd_t ramfs_readdir_block(void* data, size_t count, void* cb_data)
@@ -429,11 +430,14 @@ static cmd_t ramfs_readdir_block(void* data, size_t count, void* cb_data)
 
         if (over)
         {
+            ctx->offset += addr(&nodes[i]) - addr(data);
             return TRAVERSE_STOP;
         }
 
         ctx->count++;
     }
+
+    ctx->offset += count;
 
     return TRAVERSE_CONTINUE;
 }
@@ -443,14 +447,21 @@ static int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     int res, errno;
     ram_node_t* parent = file->dentry->inode->fs_data;
 
-    readdir_context_t ctx = {.dirent_add = dirent_add, .buf = buf, .count = 0};
+    readdir_context_t ctx = {
+        .dirent_add = dirent_add,
+        .buf = buf,
+        .count = 0,
+        .offset = file->offset
+    };
 
-    res = ramfs_traverse_blocks(parent, 0, parent->size, &ctx, &ramfs_readdir_block);
+    res = ramfs_traverse_blocks(parent, ctx.offset, parent->size, &ctx, &ramfs_readdir_block);
 
     if (unlikely(errno = errno_get(res)))
     {
         return errno;
     }
+
+    file->offset = ctx.offset;
 
     return ctx.count;
 }
