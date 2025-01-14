@@ -694,6 +694,25 @@ static void scroll_down(console_t* console, size_t origin, size_t count)
     redraw(console);
 }
 
+static void blank_insert(console_t* console, size_t count)
+{
+    ULIMIT(count, console->resx - console->x);
+
+    line_t* line = console->current_line;
+    size_t dest = console->x + count;
+    size_t src = console->x;
+    size_t size = console->resx - dest;
+
+    memmove(&line->glyphs[dest], &line->glyphs[src], size * sizeof(*line->glyphs));
+
+    for (size_t x = src; x < dest; ++x)
+    {
+        GLYPH_CLEAR(&line->glyphs[x]);
+    }
+
+    redraw(console);
+}
+
 #define TMUX_TRANSITION(from, to, ...) \
     do \
     { \
@@ -885,6 +904,10 @@ static void csi(console_t* console, int c, int* movecsr)
 
     switch (c)
     {
+        case '@': // Insert Ps (Blank) Character(s) (default = 1) (ICH)
+            DEFAULT_VALUE(params[0], 1);
+            blank_insert(console, params[0]);
+            break;
         case 'A': // Cursor Up Ps Times (default = 1) (CUU)
             DEFAULT_VALUE(params[0], 1);
             cursor_set_position(
@@ -1155,12 +1178,10 @@ static int console_open(tty_t* tty, file_t*)
     int errno;
     console_driver_t* driver;
 
-    if (unlikely(!(driver = alloc(console_driver_t))))
+    if (unlikely(!(driver = alloc(console_driver_t, memset(this, 0, sizeof(*this))))))
     {
         return -ENOMEM;
     }
-
-    memset(driver, 0, sizeof(*driver));
 
     switch (framebuffer.type)
     {
@@ -1299,8 +1320,8 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
     glyph_t* glyphs;
     page_t* prev_pages = console->pages;
     size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % resy;
-    size_t size = sizeof(glyph_t) * resx * INITIAL_CAPACITY + sizeof(line_t) * max_capacity;
-    size_t needed_pages = page_align(size) / PAGE_SIZE;
+    size_t size = page_align(sizeof(glyph_t) * resx * INITIAL_CAPACITY + sizeof(line_t) * max_capacity);
+    size_t needed_pages = size / PAGE_SIZE;
 
     log_notice("size: %u x %u; need %u B (%u pages) for %u lines", resx, resy, size, needed_pages, INITIAL_CAPACITY);
 
