@@ -720,6 +720,25 @@ static void blank_insert(console_t* console, size_t count)
     redraw(console);
 }
 
+static void char_delete(console_t* console, size_t count)
+{
+    ULIMIT(count, console->resx - console->x);
+
+    line_t* line = console->current_line;
+    size_t dest = console->x;
+    size_t src = console->x + count;
+    size_t size = console->resx - src;
+
+    memmove(&line->glyphs[dest], &line->glyphs[src], size * sizeof(*line->glyphs));
+
+    for (size_t x = console->resx - count; x < console->resx; ++x)
+    {
+        GLYPH_CLEAR(&line->glyphs[x]);
+    }
+
+    redraw(console);
+}
+
 static void alt_buffer_enable(console_t* console)
 {
     if (console->alt_buffer_enabled)
@@ -1030,6 +1049,10 @@ static void csi(console_t* console, int c, int* movecsr)
             DEFAULT_VALUE(params[0], 1);
             scroll_down(console, console->y, params[0]);
             *movecsr = 1;
+            break;
+        case 'P': // Delete Ps Character(s) (default = 1) (DCH)
+            DEFAULT_VALUE(params[0], 1);
+            char_delete(console, params[0]);
             break;
         case 'h':
             if (console->csi.prefix != '?')
