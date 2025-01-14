@@ -233,6 +233,13 @@ static void lf(console_t* console)
     }
     else
     {
+        if (console->alt_buffer_enabled)
+        {
+            console->current_line--;
+            scroll_down(console, console->scroll_top, 1);
+            return;
+        }
+
         scoped_irq_lock();
         console->visible_lines++;
 
@@ -713,6 +720,52 @@ static void blank_insert(console_t* console, size_t count)
     redraw(console);
 }
 
+static void alt_buffer_enable(console_t* console)
+{
+    if (console->alt_buffer_enabled)
+    {
+        return;
+    }
+
+    console->saved.x             = console->x;
+    console->saved.y             = console->y;
+    console->saved.scroll_top    = console->scroll_top;
+    console->saved.scroll_bottom = console->scroll_bottom;
+    console->saved.visible_lines = console->visible_lines;
+    console->saved.current_line  = console->current_line;
+    console->saved.lines         = console->lines;
+
+    console->x                  = 0;
+    console->y                  = 0;
+    console->scroll_top         = 0;
+    console->scroll_bottom      = console->resy - 1;
+    console->lines              = console->alt_buffer;
+    console->visible_lines      = console->alt_buffer;
+    console->current_line       = console->alt_buffer;
+    console->alt_buffer_enabled = true;
+
+    region_clear(console, 0, console->resy - 1);
+}
+
+static void alt_buffer_disable(console_t* console)
+{
+    if (!console->alt_buffer_enabled)
+    {
+        return;
+    }
+
+    console->x                  = console->saved.x;
+    console->y                  = console->saved.y;
+    console->scroll_top         = console->saved.scroll_top;
+    console->scroll_bottom      = console->saved.scroll_bottom;
+    console->visible_lines      = console->saved.visible_lines;
+    console->current_line       = console->saved.current_line;
+    console->lines              = console->saved.lines;
+    console->alt_buffer_enabled = false;
+
+    redraw(console);
+}
+
 #define TMUX_TRANSITION(from, to, ...) \
     do \
     { \
@@ -993,7 +1046,7 @@ static void csi(console_t* console, int c, int* movecsr)
                     break;
                 case 1049: // Save cursor as in DECSC. After saving the cursor,
                            // switch to the Alternate Screen Buffer, clearing it first
-                    // TODO
+                    alt_buffer_enable(console);
                     break;
                 default:
                     goto unknown;
@@ -1013,7 +1066,7 @@ static void csi(console_t* console, int c, int* movecsr)
                 case 2004: // Reset bracketed paste mode
                     break;
                 case 1049: // Use Normal Screen Buffer and restore cursor as in DECRC
-                    // TODO
+                    alt_buffer_disable(console);
                     break;
                 default:
                     goto unknown;
@@ -1316,11 +1369,15 @@ set:
 static int console_resize(console_t* console, size_t resx, size_t resy)
 {
     page_t* pages;
-    line_t* lines;
-    glyph_t* glyphs;
+    line_t* alt_lines;
+    line_t* normal_lines;
+    glyph_t* alt_glyphs;
+    glyph_t* normal_glyphs;
     page_t* prev_pages = console->pages;
     size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % resy;
-    size_t size = page_align(sizeof(glyph_t) * resx * INITIAL_CAPACITY + sizeof(line_t) * max_capacity);
+    size_t normal_size = page_align(sizeof(glyph_t) * resx * INITIAL_CAPACITY + sizeof(line_t) * max_capacity);
+    size_t alt_size = page_align(sizeof(glyph_t) * resx * resy + sizeof(line_t) * resy);
+    size_t size = normal_size + alt_size;
     size_t needed_pages = size / PAGE_SIZE;
 
     log_notice("size: %u x %u; need %u B (%u pages) for %u lines", resx, resy, size, needed_pages, INITIAL_CAPACITY);
@@ -1333,30 +1390,48 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
         return -ENOMEM;
     }
 
-    lines = page_virt_ptr(pages);
-    glyphs = shift_as(glyph_t*, lines, max_capacity * sizeof(line_t));
+    normal_lines = page_virt_ptr(pages);
+    normal_glyphs = shift_as(glyph_t*, normal_lines, max_capacity * sizeof(line_t));
+
+    alt_lines = page_virt_ptr(pages) + normal_size;
+    alt_glyphs = shift_as(glyph_t*, alt_lines, resy * sizeof(line_t));
 
     for (size_t i = 0; i < INITIAL_CAPACITY; ++i)
     {
-        lines[i].glyphs = glyphs + i * resx;
+        normal_lines[i].glyphs = normal_glyphs + i * resx;
     }
 
-    memset(&lines[INITIAL_CAPACITY], 0, (max_capacity - INITIAL_CAPACITY) * sizeof(line_t*));
+    for (size_t i = 0; i < resy; ++i)
+    {
+        alt_lines[i].glyphs = alt_glyphs + i * resx;
+    }
+
+    memset(&normal_lines[INITIAL_CAPACITY], 0, (max_capacity - INITIAL_CAPACITY) * sizeof(line_t*));
 
     for (size_t i = 0; i < INITIAL_CAPACITY; ++i)
     {
         for (size_t x = 0; x < resx; ++x)
         {
-            GLYPH_CLEAR(&lines[i].glyphs[x]);
+            GLYPH_CLEAR(&normal_lines[i].glyphs[x]);
+        }
+    }
+
+    for (size_t i = 0; i < resy; ++i)
+    {
+        for (size_t x = 0; x < resx; ++x)
+        {
+            GLYPH_CLEAR(&alt_lines[i].glyphs[x]);
         }
     }
 
     console->resx          = resx;
     console->resy          = resy;
     console->redraw        = false;
-    console->lines         = lines;
-    console->current_line  = lines;
-    console->visible_lines = lines;
+    console->normal_buffer = normal_lines;
+    console->alt_buffer    = alt_lines;
+    console->lines         = normal_lines;
+    console->current_line  = normal_lines;
+    console->visible_lines = normal_lines;
     console->capacity      = INITIAL_CAPACITY;
     console->max_capacity  = max_capacity;
     console->scroll_bottom = console->resy - 1;
@@ -1568,6 +1643,11 @@ static int grow(console_t* console)
     size_t line_len = console->resx;
     size_t new_lines = console->capacity * 2;
     size_t max_capacity = console->max_capacity;
+
+    if (unlikely(console->alt_buffer_enabled))
+    {
+        panic("alt buffer enabled");
+    }
 
     if (new_lines + console->capacity > max_capacity)
     {

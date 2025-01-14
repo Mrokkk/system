@@ -8,6 +8,7 @@
 typedef struct csi csi_t;
 typedef struct line line_t;
 typedef struct console console_t;
+typedef struct saved_state saved_state_t;
 
 #define PARAMS_SIZE 16
 
@@ -30,10 +31,20 @@ struct csi
     int    params[PARAMS_SIZE];
 };
 
+struct saved_state
+{
+    uint16_t x, y;
+    uint16_t scroll_top, scroll_bottom;
+    line_t*  visible_lines;
+    line_t*  current_line;
+    line_t*  lines;
+};
+
 struct console
 {
     bool     disabled;
     bool     redraw;
+    bool     alt_buffer_enabled;
     int      rtc_event_id;
     uint16_t x, y;
     uint16_t prev_x, prev_y;
@@ -46,9 +57,14 @@ struct console
     size_t   capacity;
     size_t   max_capacity;
     line_t*  lines;
+    line_t*  normal_buffer;
+    line_t*  alt_buffer;
     line_t*  current_line;
     line_t*  visible_lines;
     line_t*  orig_visible_lines;
+
+    saved_state_t saved;
+
     int      tmux_state;
     uint16_t saved_x, saved_y;
     uint32_t current_fgcolor, current_bgcolor;
