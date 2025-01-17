@@ -25,4 +25,5 @@ static inline int clamp(int value, int min, int max)
 void* file_map(const char* path);
 
 extern struct fb_var_screeninfo vinfo;
+extern size_t pitch;
 extern uint8_t* buffer;

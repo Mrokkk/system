@@ -77,6 +77,7 @@ struct console
     uint16_t command_it;
 
     struct process* kconsole;
+    console_config_t config;
 };
 
 int console_init(void);

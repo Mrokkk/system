@@ -12,7 +12,9 @@ struct console_driver
 {
     void* data;
     int (*init)(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy);
+    void (*deinit)(console_driver_t* driver);
     void (*glyph_draw)(console_driver_t* driver, size_t x, size_t y, glyph_t* glyph);
+    void (*screen_clear)(console_driver_t* driver, uint32_t color);
     void (*defcolor)(console_driver_t* driver, uint32_t* fgcolor, uint32_t* bgcolor);
     void (*sgr_rgb)(console_driver_t* driver, uint32_t value, uint32_t* color);
     void (*sgr_256)(console_driver_t* driver, uint32_t value, uint32_t* color);

@@ -121,8 +121,6 @@ int font_load_from_file(const char* path, font_t** font)
 
     pages_needed = page_align(FONT_T_SIZE + file->dentry->inode->size) / PAGE_SIZE;
 
-    log_info("allocating %u pages for font", pages_needed);
-
     if (unlikely(!pages_needed))
     {
         return -ENOENT;

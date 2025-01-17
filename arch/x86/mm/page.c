@@ -1,6 +1,5 @@
 #define log_fmt(fmt) "page: " fmt
 #include <arch/asm.h>
-#include <arch/panic.h>
 #include <arch/register.h>
 
 #include <kernel/cpu.h>
@@ -8,6 +7,7 @@
 #include <kernel/mutex.h>
 #include <kernel/memory.h>
 #include <kernel/minmax.h>
+#include <kernel/process.h>
 #include <kernel/sections.h>
 #include <kernel/page_alloc.h>
 #include <kernel/page_debug.h>
@@ -147,15 +147,37 @@ void page_kernel_unmap(page_t* page)
     tlb_flush_single(vaddr);
 }
 
-void page_map_panic(uintptr_t start, uintptr_t end)
+void page_low_mem_map(pgd_t** pgd)
 {
-    kernel_page_dir[0] = kernel_page_dir[KERNEL_PGD_OFFSET];
-    pte_t* pte = pte_offset(kernel_page_dir, 0);
-    for (uint32_t paddr = start; paddr < end; paddr += PAGE_SIZE, pte++)
+    if (pgd)
     {
-        pte_entry_set(pte, paddr, PAGE_PRESENT | PAGE_RW);
+        *pgd = virt_ptr(cr3_get());
     }
+
+    kernel_page_dir[0] = kernel_page_dir[KERNEL_PGD_OFFSET];
+
+    for (uintptr_t paddr = 0; paddr < 0x100000; paddr += PAGE_SIZE)
+    {
+        pte_entry_set(kernel_page_tables + paddr / PAGE_SIZE, paddr, PAGE_PRESENT | PAGE_RW);
+    }
+
     pgd_load(kernel_page_dir);
+}
+
+void page_low_mem_unmap(pgd_t* pgd)
+{
+    kernel_page_dir[0] = 0;
+
+    for (uintptr_t paddr = 0; paddr < 0x100000; paddr += PAGE_SIZE)
+    {
+        pte_entry_set(kernel_page_tables + paddr / PAGE_SIZE, 0, 0);
+        tlb_flush_single(paddr);
+    }
+
+    if (pgd)
+    {
+        pgd_load(pgd);
+    }
 }
 
 static inline pgprot_t section_to_pgprot(const section_t* section)

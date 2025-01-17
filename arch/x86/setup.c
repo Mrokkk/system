@@ -1,3 +1,4 @@
+#define log_fmt(fmt) "x86-setup: " fmt
 #include <arch/io.h>
 #include <arch/apm.h>
 #include <arch/asm.h>
@@ -7,7 +8,6 @@
 #include <arch/pci.h>
 #include <arch/rtc.h>
 #include <arch/tsc.h>
-#include <arch/vbe.h>
 #include <arch/acpi.h>
 #include <arch/apic.h>
 #include <arch/bios.h>
@@ -16,7 +16,6 @@
 #include <arch/i8042.h>
 #include <arch/i8253.h>
 #include <arch/i8259.h>
-#include <arch/panic.h>
 #include <arch/bios32.h>
 #include <arch/memory.h>
 #include <arch/segment.h>
@@ -24,11 +23,14 @@
 #include <arch/register.h>
 #include <arch/real_mode.h>
 #include <arch/descriptor.h>
+#include <arch/page_low_mem.h>
 
 #include <kernel/cpu.h>
 #include <kernel/elf.h>
 #include <kernel/irq.h>
+#include <kernel/vga.h>
 #include <kernel/time.h>
+#include <kernel/vesa.h>
 #include <kernel/clock.h>
 #include <kernel/memory.h>
 #include <kernel/module.h>
@@ -36,7 +38,9 @@
 #include <kernel/process.h>
 
 struct cpu_info cpu_info;
-static bool panic_mode;
+bool panic_mode;
+
+int vgafb_initialize(void);
 
 static void reboot_by_8042(void)
 {
@@ -117,7 +121,11 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     clock_sources_setup();
     time_setup();
 
-    vbe_initialize();
+    if (vesafb_initialize())
+    {
+        log_info("cannot initialize VESA; using VGA");
+        vgafb_initialize();
+    }
 
     // Make sure PIC is in proper state
     i8259_check();
@@ -125,6 +133,7 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     elf_register();
 
     vsyscall_init();
+    real_mode_finalize();
 }
 
 void panic_mode_enter(void)
@@ -135,14 +144,15 @@ void panic_mode_enter(void)
     }
 
     cli();
+    panic_mode = true;
+
     ensure_printk_will_print();
 
     // Identity map first 1MiB so that
     // earlycon and bios calls will work
-    page_map_panic(0, 0x100000);
+    page_low_mem_map(NULL);
 
     earlycon_enable();
-    panic_mode = true;
 }
 
 void panic_mode_die(void)

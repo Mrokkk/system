@@ -40,4 +40,5 @@ void slab_allocator_init(void);
 #define DESTRUCT_2(object, deinit)  __DESTRUCT(object, deinit)
 
 #define alloc(...)      REAL_VAR_MACRO_2(CONSTRUCT_1, CONSTRUCT_2, __VA_ARGS__)
+#define zalloc(type)    alloc(type, memset(this, 0, sizeof(*this)))
 #define delete(...)     REAL_VAR_MACRO_2(DESTRUCT_1, DESTRUCT_2, __VA_ARGS__)

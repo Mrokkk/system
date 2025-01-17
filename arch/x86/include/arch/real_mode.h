@@ -28,5 +28,6 @@ struct low_mem
 typedef struct low_mem low_mem_t;
 
 void real_mode_call_init(void);
+void real_mode_finalize(void);
 
 #endif

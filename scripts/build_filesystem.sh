@@ -113,7 +113,7 @@ $if mode=emacs
 "\e[1;5D": backward-word
 $endif'
 
-bashrc_content='export PS1="\u \e[34m\w\e[0m # "
+bashrc_content='export PS1="\u \[\e[34m\]\w\e[0m # "
 
 function path()
 {
@@ -246,7 +246,7 @@ fi
 
 if [[ -n "${install_src}" ]]
 then
-    rsync -av --exclude build --exclude resources .. mnt/usr/src
+    rsync -av --exclude build --exclude resources --exclude .git --exclude .cache --exclude .gitignore --exclude compile_commands.json .. mnt/usr/src
 fi
 
 if [[ ! -d "${boot_dir}/grub/i386-pc" ]]

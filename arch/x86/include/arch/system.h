@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <arch/segment.h>
 #include <kernel/debug.h>
 #include <kernel/compiler.h>
@@ -69,3 +70,5 @@ extern void context_restore(void);
 
 void panic_mode_enter(void);
 void panic_mode_die(void);
+
+extern bool panic_mode;

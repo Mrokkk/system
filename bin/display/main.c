@@ -28,6 +28,7 @@ struct tga_header* cursor;
 struct tga_header* close_icon;
 struct tga_header* close_pressed_icon;
 struct fb_var_screeninfo vinfo;
+size_t pitch;
 static int xpos = 0, ypos = 0;
 static int old_xpos= 0, old_ypos = 0;
 char button_prev;
@@ -84,8 +85,8 @@ static void area_refresh(int x, int y, int w, int h)
             {
                 break;
             }
-            uint32_t* pixel = (uint32_t*)(framebuffer + j * vinfo.pitch + i * 4);
-            *pixel = *(uint32_t*)(buffer + j * vinfo.pitch + i * 4);
+            uint32_t* pixel = (uint32_t*)(framebuffer + j * pitch + i * 4);
+            *pixel = *(uint32_t*)(buffer + j * pitch + i * 4);
         }
     }
 }
@@ -104,7 +105,7 @@ static void rectangle_draw(int x, int y, int w, int h, uint32_t color)
             {
                 break;
             }
-            uint32_t* pixel = (uint32_t*)(buffer + j * vinfo.pitch + i * 4);
+            uint32_t* pixel = (uint32_t*)(buffer + j * pitch + i * 4);
             *pixel = color;
         }
     }
@@ -128,7 +129,7 @@ static void cursor_draw(void)
     tga_to_framebuffer(cursor, xpos, ypos, &vinfo, framebuffer);
 }
 
-int initialize()
+int initialize(void)
 {
     int fb_fd;
 
@@ -156,7 +157,9 @@ int initialize()
         return EXIT_FAILURE;
     }
 
-    framebuffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
+    pitch = vinfo.xres * ALIGN_TO(vinfo.bits_per_pixel, 8) / 8;
+
+    framebuffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
 
     if ((int)framebuffer == -1)
     {
@@ -164,7 +167,7 @@ int initialize()
         return EXIT_FAILURE;
     }
 
-    buffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    buffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     if ((int)buffer == -1)
     {
@@ -220,7 +223,7 @@ void start(void)
     xpos = old_xpos = vinfo.xres / 2;
     ypos = old_ypos = vinfo.yres / 2;
 
-    memset(buffer, WINDOW_BODY_COLOR, vinfo.yres * vinfo.pitch);
+    memset(buffer, WINDOW_BODY_COLOR, vinfo.yres * pitch);
 
     rectangle_draw(
         WINDOW_FRAME_WIDTH,
@@ -243,7 +246,7 @@ void start(void)
         area_refresh(o->position.x, o->position.y, o->size.x, o->size.y);
     }
 
-    memcpy(framebuffer, buffer, vinfo.yres * vinfo.pitch);
+    memcpy(framebuffer, buffer, vinfo.yres * pitch);
     cursor_draw();
 
     while (1)

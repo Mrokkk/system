@@ -49,6 +49,7 @@ char current_direction = 'd';
 uint8_t* framebuffer;
 uint8_t* buffer;
 struct fb_var_screeninfo vinfo;
+size_t pitch;
 
 int input_fd;
 
@@ -116,7 +117,7 @@ static void rectangle_draw(int x, int y, int w, int h, uint32_t color)
             {
                 break;
             }
-            uint32_t* pixel = (uint32_t*)(buffer + j * vinfo.pitch + i * 4);
+            uint32_t* pixel = (uint32_t*)(buffer + j * pitch + i * 4);
             *pixel = color;
         }
     }
@@ -159,14 +160,15 @@ static void graphic_mode_initialize()
         die_perror("ioctl");
     }
 
-    framebuffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
+    pitch = vinfo.xres * ALIGN_TO(vinfo.bits_per_pixel, 8) / 8;
+    framebuffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
 
     if ((int)framebuffer == -1)
     {
         die_perror("mmap");
     }
 
-    buffer = mmap(NULL, vinfo.yres * vinfo.pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    buffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     if ((int)buffer == -1)
     {
@@ -373,7 +375,7 @@ int main()
             cell_draw(food_cell, FOOD);
         }
 
-        memcpy(framebuffer, buffer, vinfo.yres * vinfo.pitch);
+        memcpy(framebuffer, buffer, vinfo.yres * pitch);
 
         ++i;
     }

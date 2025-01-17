@@ -315,6 +315,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
         log_critical("%s: %s #%x during another exception handling at %x...",
             header, exception->name, regs->error_code, PT_REGS_IP(regs));
         regs_print(KERN_CRIT, regs, "kernel");
+        backtrace_exception(regs);
         for (;; halt());
     }
 

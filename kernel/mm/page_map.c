@@ -10,6 +10,8 @@ uintptr_t last_pfn;
 page_t* page_map;
 extern list_head_t free_pages;
 
+void page_mmio_init(void);
+
 static inline void page_set_used(uintptr_t pfn)
 {
     page_map[pfn].refcount = 1;
@@ -29,7 +31,7 @@ static inline void page_set_unused(uintptr_t pfn)
 
 static inline void pages_set(uintptr_t start, uintptr_t end, int used)
 {
-    for (uint32_t pfn = start / PAGE_SIZE; pfn < end / PAGE_SIZE; ++pfn)
+    for (uintptr_t pfn = start / PAGE_SIZE; pfn < end / PAGE_SIZE; ++pfn)
     {
         switch (used)
         {
@@ -41,8 +43,8 @@ static inline void pages_set(uintptr_t start, uintptr_t end, int used)
 
 static inline void page_map_init(uintptr_t virt_end)
 {
-    uint32_t start, end;
-    uint32_t phys_end = phys_addr(virt_end);
+    uintptr_t start, end;
+    uintptr_t phys_end = phys_addr(virt_end);
     section_t* section = sections;
 
     // Low memory should be marked as used, as it is necessary for DMA, BIOS, etc
@@ -92,6 +94,7 @@ UNMAP_AFTER_INIT void paging_init(void)
 
     page_tables_init(virt_end);
     page_map_init(virt_end);
+    page_mmio_init();
 
     ASSERT(!page_map[phys_addr(virt_end + PAGE_SIZE) / PAGE_SIZE].refcount);
     ASSERT(!page_map[phys_addr(virt_end) / PAGE_SIZE].refcount);

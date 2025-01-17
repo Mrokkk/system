@@ -45,7 +45,7 @@ int tga_to_framebuffer(
             {
                 continue;
             }
-            pixel_set(x + i, y + j, img[img_index], vinfo->pitch, framebuffer);
+            pixel_set(x + i, y + j, img[img_index], pitch, framebuffer);
         }
     }
 

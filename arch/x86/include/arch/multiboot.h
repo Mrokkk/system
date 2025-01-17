@@ -26,19 +26,6 @@ typedef struct multiboot_info multiboot_info_t;
 struct module;
 typedef struct module multiboot_module_t;
 
-struct framebuffer
-{
-    uint64_t addr;
-    uint32_t pitch;
-    uint32_t width;
-    uint32_t height;
-    uint8_t bpp;
-    uint8_t type;
-#define MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED      0
-#define MULTIBOOT_FRAMEBUFFER_TYPE_RGB          1
-#define MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT     2
-};
-
 struct multiboot_info
 {
     uint32_t flags;
@@ -75,7 +62,6 @@ struct module
 
 char* multiboot_read(va_list args);
 
-extern struct framebuffer* framebuffer_ptr;
 extern void* disk_img;
 extern void* ksyms_module;
 extern void* ksyms_start;

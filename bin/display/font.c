@@ -35,7 +35,7 @@ int font_load(void* framebuffer)
     buf.ptr = framebuffer;
     buf.w = vinfo.xres;
     buf.h = vinfo.yres;
-    buf.p = vinfo.pitch;
+    buf.p = pitch;
 
     if ((err = ssfn_load(&ctx, data)) != SSFN_OK)
     {

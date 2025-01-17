@@ -18,6 +18,7 @@ typedef enum
 // page is list's head)
 MUST_CHECK(page_t*) __page_alloc(int count, alloc_flag_t flag);
 MUST_CHECK(page_t*) pages_split(page_t* pages, size_t pages_to_keep);
+void pages_merge(page_t* new_pages, page_t* pages);
 void __pages_free(page_t* pages);
 
 void page_kernel_map(page_t* page, pgprot_t prot);

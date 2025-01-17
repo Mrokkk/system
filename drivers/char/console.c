@@ -17,11 +17,11 @@
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/page_alloc.h>
+#include <kernel/framebuffer.h>
 
 #include "fbcon.h"
-#include "egacon.h"
+#include "textcon.h"
 #include "keyboard.h"
-#include "framebuffer.h"
 #include "console_config.h"
 #include "console_driver.h"
 
@@ -761,6 +761,9 @@ static void alt_buffer_enable(console_t* console)
     console->lines              = console->alt_buffer;
     console->visible_lines      = console->alt_buffer;
     console->current_line       = console->alt_buffer;
+    console->current_attr       = 0;
+    console->current_fgcolor    = console->default_fgcolor;
+    console->current_bgcolor    = console->default_bgcolor;
     console->alt_buffer_enabled = true;
 
     region_clear(console, 0, console->resy - 1);
@@ -780,6 +783,9 @@ static void alt_buffer_disable(console_t* console)
     console->visible_lines      = console->saved.visible_lines;
     console->current_line       = console->saved.current_line;
     console->lines              = console->saved.lines;
+    console->current_attr       = 0;
+    console->current_fgcolor    = console->default_fgcolor;
+    console->current_bgcolor    = console->default_bgcolor;
     console->alt_buffer_enabled = false;
 
     redraw(console);
@@ -1249,31 +1255,41 @@ static void console_putch(tty_t* tty, int c)
     }
 }
 
+static int console_driver_select(console_driver_t* driver)
+{
+    switch (framebuffer.type)
+    {
+        case FB_TYPE_PACKED_PIXELS:
+            driver->init = &fbcon_init;
+            return 0;
+        case FB_TYPE_TEXT:
+            driver->init = &textcon_init;
+            return 0;
+        default:
+            return -EINVAL;
+    }
+}
+
 static int console_open(tty_t* tty, file_t*)
 {
     int errno;
     console_driver_t* driver;
 
-    if (unlikely(!(driver = alloc(console_driver_t, memset(this, 0, sizeof(*this))))))
+    if (unlikely(!(driver = zalloc(console_driver_t))))
     {
         return -ENOMEM;
     }
 
-    switch (framebuffer.type)
+    if (unlikely(errno = console_driver_select(driver)))
     {
-        case FB_TYPE_RGB:
-            driver->init = &fbcon_init;
-            break;
-        case FB_TYPE_TEXT:
-            driver->init = &egacon_init;
-            break;
-        default:
-            log_error("cannot initialize console");
-            errno = -EINVAL;
-            goto error;
+        log_error("cannot initialize console");
+        return errno;
     }
 
-    keyboard_init(tty);
+    if (unlikely(errno = keyboard_init(tty)))
+    {
+        log_warning("keyboard initialization failed with %d", errno);
+    }
 
     if (unlikely(errno = console_setup(tty, driver)))
     {
@@ -1447,6 +1463,8 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
         }
     }
 
+    console->x             = 0;
+    console->y             = 0;
     console->resx          = resx;
     console->resy          = resy;
     console->redraw        = false;
@@ -1469,6 +1487,55 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
     return 0;
 }
 
+static void console_notify(void* data)
+{
+    int errno;
+    size_t resx, resy;
+    console_t* console = data;
+    console_driver_t* driver;
+
+    if (unlikely(!(driver = zalloc(console_driver_t))))
+    {
+        log_error("%s: cannot allocate console_driver_t", __func__);
+        return;
+    }
+
+    scoped_irq_lock();
+
+    if (unlikely(errno = console_driver_select(driver)))
+    {
+        log_error("%s: cannot select console driver", __func__);
+        return;
+    }
+
+    if (unlikely(errno = driver->init(driver, &console->config, &resx, &resy)))
+    {
+        log_error("%s: driver initialization failed with %d", __func__, errno);
+        return;
+    }
+
+    driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
+    console->default_fgcolor = console->current_fgcolor;
+    console->default_bgcolor = console->current_bgcolor;
+
+    if (console->driver->deinit)
+    {
+        console->driver->deinit(console->driver);
+    }
+    delete(console->driver);
+
+    console->driver = driver;
+
+    if (driver->screen_clear)
+    {
+        driver->screen_clear(driver, console->default_bgcolor);
+    }
+
+    console_resize(console, resx, resy);
+
+    redraw(console);
+}
+
 static int console_setup(tty_t* tty, console_driver_t* driver)
 {
     int errno;
@@ -1482,15 +1549,11 @@ static int console_setup(tty_t* tty, console_driver_t* driver)
         return errno;
     }
 
-    console = alloc(console_t);
-
-    if (unlikely(!console))
+    if (unlikely(!(console = zalloc(console_t))))
     {
-        log_warning("cannot allocate pages for lines!");
+        log_warning("cannot allocate console_t!");
         return -ENOMEM;
     }
-
-    memset(console, 0, sizeof(*console));
 
     driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
     console->default_fgcolor = console->current_fgcolor;
@@ -1504,10 +1567,13 @@ static int console_setup(tty_t* tty, console_driver_t* driver)
 
     console->driver = driver;
     console->kconsole = process_spawn("kconsole", &kconsole, console, SPAWN_KERNEL);
+    memcpy(&console->config, &config, sizeof(config));
 
     redraw(console);
 
     tty->driver->driver_data = console;
+
+    framebuffer_client_register(&console_notify, console);
 
     return 0;
 }
@@ -1522,7 +1588,7 @@ static int console_write(tty_t* tty, const char* buffer, size_t size)
     int movecsr = 0;
     console_t* console = tty->driver->driver_data;
 
-    if (console->disabled)
+    if (unlikely(console->disabled))
     {
         return size;
     }
@@ -1547,6 +1613,12 @@ static int kdsetmode(console_t* console, long mode)
     {
         case KD_TEXT:
             console->disabled = false;
+
+            if (console->driver->screen_clear)
+            {
+                console->driver->screen_clear(console->driver, console->default_bgcolor);
+            }
+
             redraw(console);
             return 0;
         case KD_GRAPHICS:
@@ -1616,6 +1688,7 @@ static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
         if (unlikely(errno = console_resize(console, resx, resy)))
         {
             // FIXME: new font is already loaded
+            log_error("cannot resize: %d", errno);
             return errno;
         }
 
@@ -1746,6 +1819,8 @@ static int grow(console_t* console)
             GLYPH_CLEAR(&line->glyphs[x]);
         }
     }
+
+    pages_merge(pages, console->pages);
 
     console->capacity += new_lines;
 
