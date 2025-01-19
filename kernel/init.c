@@ -117,6 +117,18 @@ void param_call_if_set(param_name_t name, int (*action)())
     }
 }
 
+UNMAP_AFTER_INIT static void premodules_initcalls_run(void)
+{
+    typedef int (*initcall_t)(void);
+    initcall_t* initcalls = (void*)__initcall_premodules_start;
+    initcall_t* it = initcalls;
+
+    for (; it < (initcall_t*)__initcall_premodules_end; ++it)
+    {
+        (*it)();
+    }
+}
+
 UNMAP_AFTER_INIT static void boot_params_print(void)
 {
     log_notice("bootloader: %s", bootloader_name);
@@ -169,6 +181,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 
     arch_late_setup();
 
+    premodules_initcalls_run();
     modules_init();
     pipefs_init();
 

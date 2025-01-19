@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdbool.h>
+#include <kernel/compiler.h>
+#include <kernel/sections.h>
 
 #define KERNEL_PARAM(x)      (param_name_t){x}
 #define CMDLINE_SIZE         128
@@ -35,3 +37,11 @@ void paging_finalize(void);
 extern unsigned init_in_progress;
 extern char cmdline[];
 extern char* bootloader_name;
+
+#define __initcall(fn, type) \
+    SECTION(.initcall_##type) int MAYBE_UNUSED((* __init_##fn)(void)) = &fn
+
+#define premodules_initcall(fn) __initcall(fn, premodules)
+
+extern char __initcall_premodules_start[];
+extern char __initcall_premodules_end[];

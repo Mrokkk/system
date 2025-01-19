@@ -56,7 +56,7 @@ module_init(tty_init);
 module_exit(tty_deinit);
 KERNEL_MODULE(tty);
 
-LIST_DECLARE(ttys);
+static LIST_DECLARE(ttys);
 static tty_t earlycon;
 
 UNMAP_AFTER_INIT static int tty_init()

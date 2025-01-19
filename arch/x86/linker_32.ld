@@ -46,6 +46,9 @@ SECTIONS
         _rodata_after_init_end = .;
         _rodata_start = .;
         *(.rodata)
+        __initcall_premodules_start = .;
+        *(.initcall_premodules)
+        __initcall_premodules_end = .;
     }
 
     .data ALIGN(4K) : AT(ADDR(.data) - _kernel_offset)

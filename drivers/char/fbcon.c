@@ -1,7 +1,8 @@
-#include "fbcon.h"
-
 #include <kernel/vga.h>
+#include <kernel/init.h>
 #include <kernel/kernel.h>
+#include <kernel/sections.h>
+#include <kernel/api/ioctl.h>
 #include <kernel/framebuffer.h>
 
 #include "font.h"
@@ -11,6 +12,9 @@
 #define DEBUG_FBCON             0
 #define GLYPH_OFFSET_HORIZONTAL 0
 
+static int fbcon_probe(framebuffer_t* fb);
+static int fbcon_probe_truecolor(framebuffer_t* fb);
+static int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resy, size_t* resx);
 static void fbcon_glyph_draw(console_driver_t* driver, size_t y, size_t x, glyph_t* glyph);
 static void fbcon_glyph_draw_var(console_driver_t* drv, size_t x, size_t y, glyph_t* glyph);
 static void fbcon_screen_clear(console_driver_t* driver, uint32_t color);
@@ -101,6 +105,36 @@ static uint32_t palette[] = {
     COLOR_BRIGHTWHITE,
 };
 
+static console_driver_ops_t fbcon_ops_truecolor = {
+    .name         = "FB TrueColor Console",
+    .probe        = &fbcon_probe_truecolor,
+    .init         = &fbcon_init,
+    .deinit       = &fbcon_deinit,
+    .glyph_draw   = &fbcon_glyph_draw,
+    .sgr_16       = &fbcon_sgr_16,
+    .sgr_8        = &fbcon_sgr_8,
+    .screen_clear = &fbcon_screen_clear,
+    .defcolor     = &fbcon_defcolor,
+    .font_load    = &fbcon_font_load,
+    .sgr_rgb      = &fbcon_sgr_rgb,
+    .sgr_256      = &fbcon_sgr_256,
+};
+
+static console_driver_ops_t fbcon_ops = {
+    .name         = "FB Console",
+    .probe        = &fbcon_probe,
+    .init         = &fbcon_init,
+    .deinit       = &fbcon_deinit,
+    .glyph_draw   = &fbcon_glyph_draw_var,
+    .sgr_16       = &fbcon_sgr_16,
+    .sgr_8        = &fbcon_sgr_8,
+    .screen_clear = &fbcon_screen_clear,
+    .defcolor     = &fbcon_defcolor,
+    .font_load    = &fbcon_font_load,
+    .sgr_rgb      = &fbcon_sgr_rgb,
+    .sgr_256      = &fbcon_sgr_256,
+};
+
 static void fbcon_fb_set(data_t* data)
 {
     data->fb = framebuffer.vaddr;
@@ -123,7 +157,27 @@ static void fbcon_size_set(data_t* data, size_t* resx, size_t* resy)
     *resy = framebuffer.height / data->font->height;
 }
 
-int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy)
+static int fbcon_probe(framebuffer_t* fb)
+{
+    if (fb->type == FB_TYPE_PACKED_PIXELS && fb->bpp != 32)
+    {
+        return 0;
+    }
+
+    return -ENODEV;
+}
+
+static int fbcon_probe_truecolor(framebuffer_t* fb)
+{
+    if (fb->type == FB_TYPE_PACKED_PIXELS && fb->bpp == 32)
+    {
+        return 0;
+    }
+
+    return -ENODEV;
+}
+
+static int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy)
 {
     int errno;
     data_t* data;
@@ -148,22 +202,6 @@ int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resx,
     fbcon_size_set(data, resx, resy);
 
     driver->data = data;
-    driver->deinit = &fbcon_deinit;
-
-    driver->glyph_draw = framebuffer.bpp == 32
-        ? &fbcon_glyph_draw
-        : &fbcon_glyph_draw_var;
-    driver->sgr_16 = &fbcon_sgr_16;
-    driver->sgr_8 = &fbcon_sgr_8;
-    driver->screen_clear = &fbcon_screen_clear;
-    driver->defcolor = &fbcon_defcolor;
-    driver->font_load = &fbcon_font_load;
-
-    if (framebuffer.bpp != 8)
-    {
-        driver->sgr_rgb = &fbcon_sgr_rgb;
-        driver->sgr_256 = &fbcon_sgr_256;
-    }
 
     return 0;
 }
@@ -272,12 +310,20 @@ static void fbcon_screen_clear(console_driver_t*, uint32_t color)
 
 static void fbcon_sgr_rgb(console_driver_t*, uint32_t value, uint32_t* color)
 {
+    if (unlikely(framebuffer.bpp == 8))
+    {
+        return;
+    }
     *color = fbcon_color_convert(value, framebuffer.bpp);
 }
 
 static void fbcon_sgr_256(console_driver_t*, uint32_t value, uint32_t* color)
 {
     uint32_t temp;
+    if (unlikely(framebuffer.bpp == 8))
+    {
+        return;
+    }
     if (value >= 232)
     {
         uint8_t c = (value - 232) * 10 + 8;
@@ -372,3 +418,12 @@ static void fbcon_deinit(console_driver_t* drv)
         font_unload(data->font);
     }
 }
+
+UNMAP_AFTER_INIT static int fbcon_initialize(void)
+{
+    console_driver_register(&fbcon_ops);
+    console_driver_register(&fbcon_ops_truecolor);
+    return 0;
+}
+
+premodules_initcall(fbcon_initialize);

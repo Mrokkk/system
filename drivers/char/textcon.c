@@ -1,17 +1,19 @@
-#include "textcon.h"
-
 #include <kernel/vga.h>
-#include <kernel/mutex.h>
+#include <kernel/init.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
-#include <kernel/module.h>
 #include <kernel/string.h>
+#include <kernel/sections.h>
+#include <kernel/api/ioctl.h>
 #include <kernel/page_alloc.h>
 #include <kernel/framebuffer.h>
 
 #include "font.h"
 #include "glyph.h"
+#include "console_driver.h"
 
+static int textcon_probe(framebuffer_t* fb);
+static int textcon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy);
 static void textcon_glyph_draw(console_driver_t* driver, size_t x, size_t y, glyph_t* glyph);
 static void textcon_sgr_16(console_driver_t* driver, uint8_t value, uint32_t* color);
 static void textcon_sgr_8(console_driver_t* driver, uint8_t value, uint32_t* color);
@@ -26,6 +28,17 @@ typedef struct
 {
     io16* videomem;
 } data_t;
+
+static console_driver_ops_t textcon_ops = {
+    .name       = "VGA Text Mode Console",
+    .probe      = &textcon_probe,
+    .init       = &textcon_init,
+    .glyph_draw = &textcon_glyph_draw,
+    .defcolor   = &textcon_defcolor,
+    .sgr_16     = &textcon_sgr_16,
+    .sgr_8      = &textcon_sgr_8,
+    .font_load  = &textcon_font_load,
+};
 
 static inline void textcon_fb_write(io16* video_mem, uint16_t data, uint16_t offset)
 {
@@ -57,6 +70,16 @@ failure:
     return errno;
 }
 
+static int textcon_probe(framebuffer_t* fb)
+{
+    if (fb->type == FB_TYPE_TEXT)
+    {
+        return 0;
+    }
+
+    return -ENODEV;
+}
+
 int textcon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy)
 {
     font_t* font;
@@ -78,12 +101,7 @@ int textcon_init(console_driver_t* driver, console_config_t* config, size_t* res
     *resx = framebuffer.width;
     *resy = framebuffer.height;
 
-    driver->data       = data;
-    driver->glyph_draw = &textcon_glyph_draw;
-    driver->defcolor   = &textcon_defcolor;
-    driver->sgr_16     = &textcon_sgr_16;
-    driver->sgr_8      = &textcon_sgr_8;
-    driver->font_load  = &textcon_font_load;
+    driver->data = data;
 
     vga_cursor_disable();
 
@@ -146,3 +164,11 @@ static int textcon_font_load(console_driver_t* drv, const void* buffer, size_t s
 
     return 0;
 }
+
+UNMAP_AFTER_INIT static int textcon_initialize(void)
+{
+    console_driver_register(&textcon_ops);
+    return 0;
+}
+
+premodules_initcall(textcon_initialize);

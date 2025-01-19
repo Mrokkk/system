@@ -19,8 +19,6 @@
 #include <kernel/page_alloc.h>
 #include <kernel/framebuffer.h>
 
-#include "fbcon.h"
-#include "textcon.h"
 #include "keyboard.h"
 #include "console_config.h"
 #include "console_driver.h"
@@ -66,6 +64,7 @@ struct command
     int (*fn)(console_t*, const char*[]);
 };
 
+static LIST_DECLARE(driver_ops);
 typedef struct command command_t;
 
 #define COMMAND(cmd) \
@@ -118,13 +117,13 @@ static void cursor_update(console_t* console)
 {
     glyph_t current = console->visible_lines[console->y].glyphs[console->x];
     current.attr ^= GLYPH_ATTR_INVERSED;
-    console->driver->glyph_draw(console->driver, console->x, console->y, &current);
+    console->driver->ops->glyph_draw(console->driver, console->x, console->y, &current);
 
     if (console->prev_x != console->x || console->prev_y != console->y)
     {
         glyph_t previous = console->visible_lines[console->prev_y].glyphs[console->prev_x];
         previous.attr ^= ~GLYPH_ATTR_INVERSED;
-        console->driver->glyph_draw(console->driver, console->prev_x, console->prev_y, &previous);
+        console->driver->ops->glyph_draw(console->driver, console->prev_x, console->prev_y, &previous);
 
         console->prev_x = console->x;
         console->prev_y = console->y;
@@ -160,7 +159,7 @@ static void current_line_clear(console_t* console, int mode)
     {
         glyph_t* glyph = &line->glyphs[x];
         GLYPH_CLEAR(glyph);
-        drv->glyph_draw(console->driver, x, console->y, glyph);
+        drv->ops->glyph_draw(console->driver, x, console->y, glyph);
     }
 }
 
@@ -177,12 +176,12 @@ static void redraw(console_t* console)
     {
         for (pos = temp->glyphs, x = 0; x < console->resx; ++pos, ++x)
         {
-            drv->glyph_draw(console->driver, x, y, pos);
+            drv->ops->glyph_draw(console->driver, x, y, pos);
         }
     }
 
     pos = &console->visible_lines[console->y].glyphs[console->y];
-    drv->glyph_draw(console->driver, console->x, console->y, &cursor);
+    drv->ops->glyph_draw(console->driver, console->x, console->y, &cursor);
 }
 
 static void console_refresh(void* data)
@@ -296,7 +295,7 @@ static void console_write_char(console_t* console, uint8_t c)
 
     if (!console->redraw)
     {
-        console->driver->glyph_draw(console->driver, console->x, console->y, cur);
+        console->driver->ops->glyph_draw(console->driver, console->x, console->y, cur);
     }
 
     position_next(console);
@@ -317,25 +316,25 @@ static void tab(console_t* console)
 
 static void rgb_set(console_driver_t* drv, int* params, uint32_t* color)
 {
-    if (drv->sgr_rgb)
+    if (drv->ops->sgr_rgb)
     {
-        drv->sgr_rgb(drv, (params[0] << 16) | (params[1] << 8) | (params[2]), color);
+        drv->ops->sgr_rgb(drv, (params[0] << 16) | (params[1] << 8) | (params[2]), color);
     }
 }
 
 static void color256_set(console_driver_t* drv, int value, uint32_t* color)
 {
-    if (drv->sgr_256)
+    if (drv->ops->sgr_256)
     {
-        drv->sgr_256(drv, value, color);
+        drv->ops->sgr_256(drv, value, color);
     }
-    else if (drv->sgr_16 && value < 16)
+    else if (drv->ops->sgr_16 && value < 16)
     {
-        drv->sgr_16(drv, value, color);
+        drv->ops->sgr_16(drv, value, color);
     }
-    else if (drv->sgr_8 && value < 8)
+    else if (drv->ops->sgr_8 && value < 8)
     {
-        drv->sgr_8(drv, value, color);
+        drv->ops->sgr_8(drv, value, color);
     }
 }
 
@@ -375,9 +374,9 @@ static void sgr(console_t* console, int* params, size_t params_count)
             case 29: // Not crossed-out
                 break;
             case 30 ... 37: // Set foreground color
-                if (drv->sgr_8)
+                if (drv->ops->sgr_8)
                 {
-                    drv->sgr_8(drv, params[i] - 30, &console->current_fgcolor);
+                    drv->ops->sgr_8(drv, params[i] - 30, &console->current_fgcolor);
                 }
                 break;
             case 38:
@@ -392,9 +391,9 @@ static void sgr(console_t* console, int* params, size_t params_count)
                 }
                 return;
             case 40 ... 47: // Set background color
-                if (drv->sgr_8)
+                if (drv->ops->sgr_8)
                 {
-                    drv->sgr_8(drv, params[i] - 40, &console->current_bgcolor);
+                    drv->ops->sgr_8(drv, params[i] - 40, &console->current_bgcolor);
                 }
                 break;
             case 48:
@@ -409,15 +408,15 @@ static void sgr(console_t* console, int* params, size_t params_count)
                 }
                 return;
             case 90 ... 97: // Set bright foreground color
-                if (drv->sgr_16)
+                if (drv->ops->sgr_16)
                 {
-                    drv->sgr_16(drv, params[i] - 90 + 8, &console->current_fgcolor);
+                    drv->ops->sgr_16(drv, params[i] - 90 + 8, &console->current_fgcolor);
                 }
                 break;
             case 100 ... 107: // Set bright background color
-                if (drv->sgr_16)
+                if (drv->ops->sgr_16)
                 {
-                    drv->sgr_16(drv, params[i] - 100 + 8, &console->current_bgcolor);
+                    drv->ops->sgr_16(drv, params[i] - 100 + 8, &console->current_bgcolor);
                 }
                 break;
             default:
@@ -438,7 +437,7 @@ static void line_nr_print(console_t* console)
     for (size_t i = 0; i < strlen(buf); ++i, ++pos)
     {
         glyph_t glyph = {.c = buf[i], .fgcolor = console->default_fgcolor, .bgcolor = console->default_bgcolor};
-        console->driver->glyph_draw(console->driver, pos, 0, &glyph);
+        console->driver->ops->glyph_draw(console->driver, pos, 0, &glyph);
     }
 }
 
@@ -922,7 +921,7 @@ finish:
                     c = ' ';
                 }
                 glyph.c = c;
-                console->driver->glyph_draw(console->driver, i, console->resy - 1, &glyph);
+                console->driver->ops->glyph_draw(console->driver, i, console->resy - 1, &glyph);
             }
         }
     }
@@ -1257,17 +1256,18 @@ static void console_putch(tty_t* tty, int c)
 
 static int console_driver_select(console_driver_t* driver)
 {
-    switch (framebuffer.type)
+    console_driver_ops_t* ops;
+    list_for_each_entry(ops, &driver_ops, list_entry)
     {
-        case FB_TYPE_PACKED_PIXELS:
-            driver->init = &fbcon_init;
+        if (!ops->probe(&framebuffer))
+        {
+            log_info("selecting driver: %s", ops->name);
+            driver->ops = ops;
             return 0;
-        case FB_TYPE_TEXT:
-            driver->init = &textcon_init;
-            return 0;
-        default:
-            return -EINVAL;
+        }
     }
+
+    return -ENODEV;
 }
 
 static int console_open(tty_t* tty, file_t*)
@@ -1508,27 +1508,27 @@ static void console_notify(void* data)
         return;
     }
 
-    if (unlikely(errno = driver->init(driver, &console->config, &resx, &resy)))
+    if (unlikely(errno = driver->ops->init(driver, &console->config, &resx, &resy)))
     {
         log_error("%s: driver initialization failed with %d", __func__, errno);
         return;
     }
 
-    driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
+    driver->ops->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
     console->default_fgcolor = console->current_fgcolor;
     console->default_bgcolor = console->current_bgcolor;
 
-    if (console->driver->deinit)
+    if (console->driver->ops->deinit)
     {
-        console->driver->deinit(console->driver);
+        console->driver->ops->deinit(console->driver);
     }
     delete(console->driver);
 
     console->driver = driver;
 
-    if (driver->screen_clear)
+    if (driver->ops->screen_clear)
     {
-        driver->screen_clear(driver, console->default_bgcolor);
+        driver->ops->screen_clear(driver, console->default_bgcolor);
     }
 
     console_resize(console, resx, resy);
@@ -1543,7 +1543,7 @@ static int console_setup(tty_t* tty, console_driver_t* driver)
     console_t* console;
     console_config_t config = console_config_read();
 
-    if (unlikely(errno = driver->init(driver, &config, &resx, &resy)))
+    if (unlikely(errno = driver->ops->init(driver, &config, &resx, &resy)))
     {
         log_error("driver initialization failed with %d", errno);
         return errno;
@@ -1555,7 +1555,7 @@ static int console_setup(tty_t* tty, console_driver_t* driver)
         return -ENOMEM;
     }
 
-    driver->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
+    driver->ops->defcolor(driver, &console->current_fgcolor, &console->current_bgcolor);
     console->default_fgcolor = console->current_fgcolor;
     console->default_bgcolor = console->current_bgcolor;
 
@@ -1614,9 +1614,9 @@ static int kdsetmode(console_t* console, long mode)
         case KD_TEXT:
             console->disabled = false;
 
-            if (console->driver->screen_clear)
+            if (console->driver->ops->screen_clear)
             {
-                console->driver->screen_clear(console->driver, console->default_bgcolor);
+                console->driver->ops->screen_clear(console->driver, console->default_bgcolor);
             }
 
             redraw(console);
@@ -1651,7 +1651,7 @@ static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
     int errno;
     console_driver_t* drv = console->driver;
 
-    if (unlikely(!drv->font_load))
+    if (unlikely(!drv->ops->font_load))
     {
         return -ENOSYS;
     }
@@ -1675,7 +1675,7 @@ static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
 
     console->disabled = true;
 
-    if (unlikely(errno = drv->font_load(drv, op->data, op->size, &resx, &resy)))
+    if (unlikely(errno = drv->ops->font_load(drv, op->data, op->size, &resx, &resy)))
     {
         console->disabled = false;
         return errno;
@@ -1830,4 +1830,11 @@ static int grow(console_t* console)
 UNMAP_AFTER_INIT int console_init(void)
 {
     return tty_driver_register(&tty_driver);
+}
+
+int console_driver_register(console_driver_ops_t* ops)
+{
+    list_init(&ops->list_entry);
+    list_add(&ops->list_entry, &driver_ops);
+    return 0;
 }
