@@ -24,8 +24,6 @@ void __pages_free(page_t* pages);
 void page_kernel_map(page_t* page, pgprot_t prot);
 void page_kernel_unmap(page_t* page);
 
-MUST_CHECK(void*) mmio_map(uintptr_t paddr, uintptr_t size, const char* name);
-
 #define pages_free(ptr)         __pages_free(ptr)
 #define page_alloc(c, f)        __page_alloc(c, f)
 

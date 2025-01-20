@@ -11,7 +11,7 @@
 #include <kernel/irq.h>
 #include <kernel/time.h>
 #include <kernel/kernel.h>
-#include <kernel/page_alloc.h>
+#include <kernel/page_mmio.h>
 
 #define DEBUG_MADT 0
 #define DEBUG_APIC 0
@@ -89,7 +89,7 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     rdmsr(IA32_APIC_BASE_MSR, eax, edx);
 
     apic_base = eax & APIC_BASE_MASK;
-    apic = mmio_map(apic_base, PAGE_SIZE, "apic");
+    apic = mmio_map_uc(apic_base, PAGE_SIZE, "apic");
 
     eax = (apic_base & 0xfffff0000) | IA32_APIC_BASE_MSR_ENABLE;
 
@@ -353,7 +353,7 @@ static void ioapic_initialize(void)
                     entry->ioapic.id, entry->ioapic.address, entry->ioapic.gsi);
 
                 offset = entry->ioapic.address - page_beginning(entry->ioapic.address);
-                ioapic = mmio_map(page_beginning(entry->ioapic.address), PAGE_SIZE, "ioapic");
+                ioapic = mmio_map_uc(page_beginning(entry->ioapic.address), PAGE_SIZE, "ioapic");
                 ioapic = ptr(addr(ioapic) + offset);
                 break;
 

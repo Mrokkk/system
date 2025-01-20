@@ -30,6 +30,16 @@ void slab_allocator_init(void);
 #define alloc_array(type, count) \
     ({ type* this = slab_alloc(sizeof(type) * count); this; })
 
+#define zalloc_array(type, count) \
+    ({ \
+        void* this = slab_alloc(sizeof(type) * count); \
+        if (likely(this)) \
+        { \
+            memset(this, 0, sizeof(type) * count); \
+        } \
+        this; \
+    })
+
 #define delete_array(object, count) \
     ({ slab_free(object, sizeof(*object) * count); })
 

@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "page: " fmt
 #include <arch/asm.h>
+#include <arch/pat.h>
 #include <arch/register.h>
 
 #include <kernel/cpu.h>
@@ -9,6 +10,7 @@
 #include <kernel/minmax.h>
 #include <kernel/process.h>
 #include <kernel/sections.h>
+#include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
 #include <kernel/page_debug.h>
 #include <kernel/page_table.h>
@@ -19,7 +21,7 @@ extern list_head_t free_pages;
 extern uintptr_t last_pfn;
 
 pte_t* kernel_page_tables;
-static mutex_t lock = MUTEX_INIT(lock);
+static MUTEX_DECLARE(lock);
 
 static inline void kernel_pte_set(uintptr_t pte_index, uintptr_t val)
 {
@@ -215,6 +217,8 @@ UNMAP_AFTER_INIT void page_tables_init(uintptr_t virt_end)
     uintptr_t pte_index, pde_index, flags, start, end = 0;
     uintptr_t pfn_end = phys_addr(virt_end) / PAGE_SIZE;
     section_t* section = sections;
+
+    pat_initialize();
 
     if (cpu_has(X86_FEATURE_PGE))
     {

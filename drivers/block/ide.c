@@ -14,6 +14,7 @@
 #include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/byteorder.h>
+#include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
 
 #include "ata.h"
@@ -334,7 +335,7 @@ static void ide_pci_bm_initialize(bool* use_dma)
         *use_dma = false;
     }
 
-    dma_region = mmio_map(DMA_PRD, DMA_SIZE, "dma");
+    dma_region = mmio_map_uc(DMA_PRD, DMA_SIZE, "dma");
 
     if (unlikely(!dma_region))
     {

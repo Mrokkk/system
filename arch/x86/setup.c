@@ -12,6 +12,7 @@
 #include <arch/apic.h>
 #include <arch/bios.h>
 #include <arch/hpet.h>
+#include <arch/mtrr.h>
 #include <arch/cpuid.h>
 #include <arch/i8042.h>
 #include <arch/i8253.h>
@@ -98,6 +99,8 @@ int vsyscall_init(void);
 
 UNMAP_AFTER_INIT void arch_late_setup(void)
 {
+    mtrr_initialize();
+
     dmi_read();
     pci_scan();
 

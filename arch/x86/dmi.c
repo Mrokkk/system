@@ -1,7 +1,7 @@
 #define log_fmt(fmt) "smbios: " fmt
 #include <arch/dmi.h>
 #include <kernel/kernel.h>
-#include <kernel/page_alloc.h>
+#include <kernel/page_mmio.h>
 
 // Reference: https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.2.0.pdf
 
@@ -234,7 +234,7 @@ UNMAP_AFTER_INIT void dmi_read(void)
     paddr = page_beginning(smbios_entry->table_address);
     len = smbios_entry->table_length;
 
-    mapped = mmio_map(paddr, len + smbios_entry->table_address - paddr, "smbios");
+    mapped = mmio_map_uc(paddr, len + smbios_entry->table_address - paddr, "smbios");
 
     if (unlikely(!mapped))
     {

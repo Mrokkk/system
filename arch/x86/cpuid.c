@@ -1,3 +1,4 @@
+#define log_fmt(fmt) "cpu: " fmt
 #include <arch/cpuid.h>
 #include <kernel/cpu.h>
 #include <kernel/kernel.h>
@@ -70,6 +71,8 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     cpuid_read(0x80000000, &cpuid_regs);
     max_function = cpuid_regs.eax;
 
+    log_info("max function: %x", max_function);
+
     if (max_function >= 0x80000001)
     {
         cpuid_read(0x80000001, &cpuid_regs);
@@ -115,6 +118,11 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
         cpuid_read(0x80000007, &cpuid_regs);
         cpu_features_save(CPUID_80000007, cpuid_regs.edx);
     }
+
+#ifdef __i386__
+    cpu_info.phys_bits = 32;
+    cpu_info.virt_bits = 32;
+#endif
 }
 
 UNMAP_AFTER_INIT int cpu_detect(void)
@@ -170,7 +178,9 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         }
     }
 
-    switch (vendor)
+    cpu_info.vendor_id = vendor;
+
+    switch (cpu_info.vendor_id)
     {
         case INTEL:
         case AMD:
@@ -186,12 +196,15 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         cpu_feature_set(X86_FEATURE_INVTSC);
     }
 
-    log_notice("cpu: producer: %s (%s), name: %s",
+    log_notice("producer: %s (%s), name: %s",
         cpu_info.producer,
         cpu_info.vendor,
         cpu_info.name);
 
-    log_notice("cpu: family: %x, model: %x", cpu_info.family, cpu_info.model);
+    log_notice("family: %x, model: %x, stepping: %x",
+        cpu_info.family,
+        cpu_info.model,
+        cpu_info.stepping);
 
     for (uint32_t i = 0; i < 6; ++i)
     {

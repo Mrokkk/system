@@ -5,7 +5,7 @@
 #include <kernel/time.h>
 #include <kernel/clock.h>
 #include <kernel/kernel.h>
-#include <kernel/page_alloc.h>
+#include <kernel/page_mmio.h>
 
 hpet_t* hpet;
 
@@ -43,7 +43,7 @@ UNMAP_AFTER_INIT void hpet_initialize(void)
         return;
     }
 
-    hpet = mmio_map(addr(sdt->address.address), PAGE_SIZE, "hpet");
+    hpet = mmio_map_uc(addr(sdt->address.address), PAGE_SIZE, "hpet");
 
     hpet_capabilities_t* cap = &hpet->cap;
     hpet_timer_register_t* timers = hpet->timers;

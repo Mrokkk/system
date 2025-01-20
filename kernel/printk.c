@@ -80,6 +80,8 @@ static void printk_emit(loglevel_t log_level, char* buffer, size_t len, int cont
         state.fallback_write(NULL, buffer, len);
     }
 
+    UNUSED(log_level); UNUSED(content_start);
+#if 1
     if (log_level >= KERN_NOTICE || (state.prev_loglevel >= KERN_NOTICE && log_level == KERN_CONT))
     {
         if (*buffer == ' ')
@@ -92,6 +94,7 @@ static void printk_emit(loglevel_t log_level, char* buffer, size_t len, int cont
             tty_write_to_all(buffer + content_start, len - content_start - 1, state.dedicated_tty);
         }
     }
+#endif
 }
 
 logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)

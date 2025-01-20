@@ -1,7 +1,7 @@
 #include <kernel/vga.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
-#include <kernel/page_alloc.h>
+#include <kernel/page_mmio.h>
 
 typedef struct
 {
@@ -38,7 +38,7 @@ int vga_font_set(size_t width, size_t height, void* data, size_t bytes_per_glyph
 
     if (!vga_font)
     {
-        vga_font = mmio_map(0xa0000, 256 * 32, "vgafont");
+        vga_font = mmio_map_uc(0xa0000, 256 * 32, "vgafont");
 
         if (unlikely(!vga_font))
         {

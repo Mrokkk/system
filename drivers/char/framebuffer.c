@@ -149,7 +149,6 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
 
             if (unlikely(mode < 0))
             {
-                log_warning("mode get failed: %d", mode);
                 return mode;
             }
 

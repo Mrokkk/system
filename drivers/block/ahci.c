@@ -8,6 +8,7 @@
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
+#include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
 
 #include "ata.h"
@@ -769,7 +770,7 @@ int ahci_init(void)
         return 0;
     }
 
-    if (unlikely(!(ahci = mmio_map(ahci_pci->bar[5].addr, ahci_pci->bar[5].size, "ahci"))))
+    if (unlikely(!(ahci = mmio_map_uc(ahci_pci->bar[5].addr, ahci_pci->bar[5].size, "ahci"))))
     {
         log_warning("cannot map AHCI's ABAR region");
         return -ENOMEM;

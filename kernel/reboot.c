@@ -4,6 +4,7 @@
 #include <kernel/module.h>
 #include <kernel/reboot.h>
 #include <kernel/process.h>
+#include <kernel/page_mmio.h>
 
 unsigned shutdown_in_progress;
 
@@ -13,6 +14,7 @@ void prepare_to_shutdown()
 
     file_systems_print();
     page_stats_print();
+    mmio_print();
     processes_stats_print();
     fmalloc_stats_print();
 

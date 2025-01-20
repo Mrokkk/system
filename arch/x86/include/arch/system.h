@@ -50,6 +50,12 @@ typedef uintptr_t flags_t;
 #define rdmsr(msr, low, high) \
     asm volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr))
 
+#define rdmsrll(msr, val) \
+    asm volatile("rdmsr" : "=A" (val) : "c" (msr) : "memory")
+
+#define wrmsrll(msr, val) \
+    asm volatile("wrmsr" :: "A" (val), "c" (msr) : "memory")
+
 #define wrmsr(msr, low, high) \
     asm volatile("wrmsr" :: "a" (low), "d" (high), "c" (msr))
 

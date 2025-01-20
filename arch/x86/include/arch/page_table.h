@@ -13,7 +13,8 @@
 #define PAGE_PCD            (1 << 4)
 #define PAGE_ACCESSED       (1 << 5)
 #define PAGE_DIRTY          (1 << 6)
-#define PAGE_GLOBAL         (1 << 7)
+#define PAGE_PAT            (1 << 7)
+#define PAGE_GLOBAL         (1 << 8)
 
 #ifdef __x86_64__
 #define PAGE_NX             (1 << 63)
@@ -21,8 +22,7 @@
 #define PAGE_NX             0
 #endif
 
-#define PAGE_MMIO   (PAGE_PRESENT | PAGE_RW | PAGE_GLOBAL | PAGE_PCD)
-#define PAGE_DIR_KERNEL (PAGE_PRESENT | PAGE_RW | PAGE_USER)
+#define PAGE_DIR_KERNEL (PAGE_PRESENT | PAGE_RW | PAGE_USER | PAGE_GLOBAL)
 
 #define kernel_identity_pgprot(flag) \
     ({ \

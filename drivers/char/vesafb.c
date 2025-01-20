@@ -6,6 +6,7 @@
 #include <kernel/vesa.h>
 #include <kernel/kernel.h>
 #include <kernel/api/ioctl.h>
+#include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
 #include <kernel/framebuffer.h>
 
@@ -319,7 +320,7 @@ static mapped_fb_t* vesafb_mapped_fb_get(uintptr_t paddr, size_t size)
         return NULL;
     }
 
-    last->vaddr = mmio_map(paddr, size, "fb");
+    last->vaddr = mmio_map_wc(paddr, size, "fb");
 
     if (unlikely(!last->vaddr))
     {

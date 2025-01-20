@@ -6,8 +6,11 @@
 #include <kernel/vga.h>
 #include <kernel/kernel.h>
 #include <kernel/api/ioctl.h>
-#include <kernel/page_alloc.h>
+#include <kernel/page_mmio.h>
 #include <kernel/framebuffer.h>
+
+// References:
+// https://stanislavs.org/helppc/int_10.html
 
 #define VGA_MODE_TEXT       0
 #define VGA_MODE_GFX        1
@@ -117,7 +120,7 @@ static void vgafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.paddr    = 0xb8000;
     if (!framebuffer.vaddr)
     {
-        framebuffer.vaddr    = mmio_map(framebuffer.paddr, 64 * KiB, "fb");
+        framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, 64 * KiB, "fb");
     }
     framebuffer.ops = &vgafb_ops;
 }
