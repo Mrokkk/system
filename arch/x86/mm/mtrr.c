@@ -216,7 +216,7 @@ void mtrr_initialize(void)
 
     if (pat_enabled())
     {
-        log_info("disabling; PAT available");
+        log_info("PAT available");
         disable = true;
     }
 

@@ -237,11 +237,14 @@ static inline void signals_init(struct signals* dest, struct signals* src)
     copy_struct(dest, src);
     dest->pending = 0;
     list_init(&dest->queue);
+    mutex_init(&dest->lock);
     dest->refcount = 1;
 }
 
 static inline int process_signals_copy(process_t* child, process_t* parent, int clone_flags)
 {
+    scoped_mutex_lock(&parent->signals->lock);
+
     if (clone_flags & CLONE_SIGHAND)
     {
         parent->signals->refcount++;

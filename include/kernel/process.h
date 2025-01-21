@@ -74,10 +74,12 @@ struct signals
     uint32_t    trapped;
     uint32_t    pending;
     list_head_t queue;
+    mutex_t     lock;
     sigaction_t sighandlers[NSIGNALS];
-#define SIGNALS_INIT \
+#define SIGNALS_INIT(signals) \
     { \
         .refcount = 1, \
+        .lock = MUTEX_INIT(signals.lock), \
     }
 };
 
@@ -155,7 +157,7 @@ struct process
     struct files name##_files = FILES_INIT
 
 #define PROCESS_SIGNALS_DECLARE(name) \
-    struct signals name##_signals = SIGNALS_INIT
+    struct signals name##_signals = SIGNALS_INIT(name##_signals)
 
 #define PROCESS_INIT(proc) \
     { \

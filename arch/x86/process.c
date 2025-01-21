@@ -8,6 +8,7 @@
 #include <kernel/vm.h>
 #include <kernel/path.h>
 #include <kernel/debug.h>
+#include <kernel/mutex.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
 #include <kernel/page_table.h>
@@ -36,9 +37,7 @@ static_assert(offsetof(pt_regs_t, cs) == REGS_CS);
 static_assert(offsetof(pt_regs_t, eflags) == REGS_EFLAGS);
 static_assert(offsetof(pt_regs_t, esp) == REGS_ESP);
 static_assert(offsetof(pt_regs_t, ss) == REGS_SS);
-#endif
 
-#ifdef __i386__
 static void fork_kernel_stack_frame(uintptr_t** kernel_stack, const pt_regs_t* regs)
 {
 #define pushk(v) push((v), *kernel_stack)
@@ -80,14 +79,7 @@ static void exec_kernel_stack_frame(uintptr_t** kernel_stack, uintptr_t esp, uin
     pushk(USER_DS); // fs
     pushk(USER_DS); // es
     pushk(USER_DS); // ds
-    pushk(0);       // eax
-    pushk(0);       // cr2
-    pushk(0);       // ebp
-    pushk(0);       // edi
-    pushk(0);       // esi
-    pushk(0);       // edx
-    pushk(0);       // ecx
-    pushk(0);       // ebx
+    (*kernel_stack) -= 8; // eax, cr2, ebp, edi, esi, edx, ecx, ebx
 #undef pushk
 }
 
@@ -134,14 +126,7 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     pushk(KERNEL_DS);   // fs
     pushk(KERNEL_DS);   // es
     pushk(KERNEL_DS);   // ds
-    pushk(0);           // eax
-    pushk(0);           // cr2
-    pushk(0);           // ebp
-    pushk(0);           // edi
-    pushk(0);           // esi
-    pushk(0);           // edx
-    pushk(0);           // ecx
-    pushk(0);           // ebx
+    kernel_stack -= 8; // eax, cr2, ebp, edi, esi, edx, ecx, ebx
 #undef pushk
 
     child->context.esp0 = 0;
@@ -237,6 +222,8 @@ void do_signals(pt_regs_t regs)
     signal_frame_t frame;
     signal_t* signal;
 
+    mutex_lock(&proc->signals->lock);
+
     list_for_each_entry_safe(signal, &proc->signals->queue, list_entry)
     {
         int signum = signal->info.si_signo;
@@ -280,6 +267,8 @@ void do_signals(pt_regs_t regs)
 
         tss.esp0 = addr(&frame);
         delete(signal);
+
+        mutex_unlock(&proc->signals->lock);
 
         asm volatile(
             "pushl "ASM_VALUE(USER_DS)";" // ss

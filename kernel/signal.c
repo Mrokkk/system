@@ -1,3 +1,4 @@
+#include <kernel/mutex.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
 
@@ -68,11 +69,40 @@ static void default_sighandler(process_t* p, int signum)
     }
 }
 
+static signal_t* signal_queued_find(process_t* proc, int signum)
+{
+    signal_t* s;
+    list_for_each_entry(s, &proc->signals->queue, list_entry)
+    {
+        if (s->info.si_signo == signum)
+        {
+            return s;
+        }
+    }
+
+    return NULL;
+}
+
+static void signal_drop(process_t* proc, int signum)
+{
+    signal_t* signal;
+    scoped_mutex_lock(&proc->signals->lock);
+
+    if (unlikely(!(signal = signal_queued_find(proc, signum))))
+    {
+        current_log_error("cannot find queued signal_t for %s for %s[%u]", signame(signum), proc->name, proc->pid);
+        return;
+    }
+
+    list_del(&signal->list_entry);
+    delete(signal);
+}
+
 static int signal_deliver(process_t* proc, int signum)
 {
     if (proc->signals->ongoing & (1 << signum))
     {
-        log_debug(DEBUG_SIGNAL, "ignoring %s in %u; already ongoing", signame(signum), proc->pid);
+        log_debug(DEBUG_SIGNAL, "ignoring %s for %s[%u]; already ongoing", signame(signum), proc->name, proc->pid);
         return 0;
     }
 
@@ -80,11 +110,12 @@ static int signal_deliver(process_t* proc, int signum)
     {
         if (proc->signals->sighandlers[signum].sa_handler == SIG_IGN)
         {
-            log_debug(DEBUG_SIGNAL, "ignoring %s in %u", signame(signum), proc->pid);
+            log_debug(DEBUG_SIGNAL, "ignoring %s for %s[%u]", signame(signum), proc->name, proc->pid);
+            signal_drop(proc, signum);
         }
         else
         {
-            log_debug(DEBUG_SIGNAL, "scheduling custom handler for %s in %u", signame(signum), proc->pid);
+            log_debug(DEBUG_SIGNAL, "scheduling custom handler for %s for %s[%u]", signame(signum), proc->name, proc->pid);
 
             proc->signals->ongoing |= (1 << signum);
             proc->need_signal = true;
@@ -97,8 +128,9 @@ static int signal_deliver(process_t* proc, int signum)
     }
     else
     {
-        log_debug(DEBUG_SIGNAL, "calling default handler for %s in %u", signame(signum), proc->pid);
+        log_debug(DEBUG_SIGNAL, "calling default handler for %s for %s[%u]", signame(signum), proc->name, proc->pid);
         default_sighandler(proc, signum);
+        signal_drop(proc, signum);
     }
 
     return 0;
@@ -126,13 +158,13 @@ int signal_run(process_t* proc)
 
 static signal_t* signal_allocate(int signum)
 {
-    signal_t* signal = alloc(signal_t);
+    signal_t* signal = zalloc(signal_t);
+
     if (unlikely(!signal))
     {
         return NULL;
     }
 
-    memset(signal, 0, sizeof(*signal));
     list_init(&signal->list_entry);
     signal->info.si_signo = signum;
 
@@ -160,6 +192,12 @@ int do_kill(process_t* proc, siginfo_t* siginfo)
         return 0;
     }
 
+    if ((proc->signals->pending | proc->signals->ongoing) & (1 << signum))
+    {
+        log_debug(DEBUG_SIGNAL, "ignoring %s for %s[%u]; already ongoing/pending", signame(signum), proc->name, proc->pid);
+        return 0;
+    }
+
     signal_t* signal = signal_allocate(signum);
 
     if (unlikely(!signal))
@@ -170,8 +208,7 @@ int do_kill(process_t* proc, siginfo_t* siginfo)
     memcpy(&signal->info, siginfo, sizeof(*siginfo));
 
     {
-        scoped_irq_lock();
-
+        scoped_mutex_lock(&proc->signals->lock);
         list_add(&signal->list_entry, &proc->signals->queue);
     }
 
@@ -243,6 +280,7 @@ int sys_sigaction(int signum, const sigaction_t* act, sigaction_t* oact)
         }
 
         memcpy(&process_current->signals->sighandlers[signum], act, sizeof(*act));
+
         if (act->sa_handler == SIG_DFL)
         {
             process_current->signals->trapped &= ~(1 << signum);
