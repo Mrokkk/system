@@ -264,6 +264,26 @@ void backtrace_dump(loglevel_t)
 {
 }
 
+int i8259_disable(void)
+{
+    return 0;
+}
+
+void i8259_enable(void)
+{
+}
+
+bool i8259_used = false;
+bool panic_mode = false;
+
+void page_low_mem_map(pgd_t**)
+{
+}
+
+void page_low_mem_unmap(pgd_t*)
+{
+}
+
 void kmain(void* data, ...)
 {
     va_list args;
