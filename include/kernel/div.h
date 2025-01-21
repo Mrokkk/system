@@ -41,15 +41,16 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
 
 #define do_div(n, base) \
     ({ \
-        typeof(n) mod; \
+        typeof(n) __rem; \
+        uint32_t __base = (base); \
         if (sizeof(n) <= 4) \
         { \
-            mod = n % (base); \
-            n /= (base); \
+            __rem = (uint32_t)(n) % __base; \
+            (n) = (uint32_t)(n) / __base; \
         } \
         else \
         { \
-            mod = __div64_32((uint64_t*)&n, base); \
+            __rem = __div64_32((uint64_t*)&n, base); \
         } \
-        mod; \
+        __rem; \
     })

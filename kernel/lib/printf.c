@@ -25,14 +25,6 @@ static inline int skip_atoi(const char** s)
 #define SMALL   32  // Must be 32 == 0x20
 #define SPECIAL 64  // 0x
 
-#define __do_div(n, base) \
-    ({ \
-        int __res; \
-        __res = ((unsigned long) n) % (unsigned) base; \
-        n = ((unsigned long) n) / (unsigned) base; \
-        __res; \
-    })
-
 // we are called with base 8, 10 or 16, only, thus don't need "G..."
 static const char digits[16] = "0123456789ABCDEF";
 
@@ -42,126 +34,23 @@ static const char digits[16] = "0123456789ABCDEF";
 #define PUTS(s) \
     ({ const char* _s = s; while (*_s) { PUTC(*_s); ++_s; }; 0; })
 
-static char* number(
-    char* str,
-    long num,
-    int base,
-    int size,
-    int precision,
-    int type,
-    const char* end)
-{
-    char tmp[66];
-    char c, sign, locase;
-    int i;
+#define NUMBER_TYPE long
+#define NUMBER_SUFFIX l
+#include "number.c"
+#undef NUMBER_TYPE
+#undef NUMBER_SUFFIX
 
-    // locase = 0 or 0x20. ORing digits or letters with 'locase'
-    // produces same digits or (maybe lowercased) letters
-    locase = (type & SMALL);
-    if (type & LEFT)
-    {
-        type &= ~ZEROPAD;
-    }
-    if (base < 2 || base > 16)
-    {
-        return NULL;
-    }
+#if BITS_PER_LONG == 64
 
-    c = (type & ZEROPAD) ? '0' : ' ';
-    sign = 0;
+#define numberll numberl
 
-    if (type & SIGN)
-    {
-        if (num < 0)
-        {
-            sign = '-';
-            num = -num;
-            size--;
-        }
-        else if (type & PLUS)
-        {
-            sign = '+';
-            size--;
-        }
-        else if (type & SPACE)
-        {
-            sign = ' ';
-            size--;
-        }
-    }
+#else
 
-    if (type & SPECIAL)
-    {
-        if (base == 16)
-        {
-            size -= 2;
-        }
-        else if (base == 8)
-        {
-            size--;
-        }
-    }
+#define NUMBER_TYPE long long
+#define NUMBER_SUFFIX ll
+#include "number.c"
 
-    i = 0;
-    if (num == 0)
-    {
-        tmp[i++] = '0';
-    }
-    else
-    {
-        for (; num != 0; tmp[i++] = (digits[__do_div(num, base)] | locase));
-    }
-
-    if (i > precision)
-    {
-        precision = i;
-    }
-
-    size -= precision;
-    if (!(type & (ZEROPAD + LEFT)))
-    {
-        for (; size-- > 0; PUTC(' '));
-    }
-
-    if (sign)
-    {
-        PUTC(sign);
-    }
-
-    if (type & SPECIAL)
-    {
-        if (base == 8)
-        {
-            PUTC('0');
-        }
-        else if (base == 16)
-        {
-            PUTC('0');
-            PUTC('X' | locase);
-        }
-    }
-
-    if (!(type & LEFT))
-    {
-        for (; size-- > 0; PUTC(c));
-    }
-
-    while (i < precision--)
-    {
-        PUTC('0');
-    }
-
-    while (i-- > 0)
-    {
-        PUTC(tmp[i]);
-    }
-
-    while (size-- > 0)
-    {
-        PUTC(' ');
-    }
-    return str;
-}
+#endif
 
 static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list args)
 {
@@ -253,7 +142,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
             qualifier = *fmt++;
             if (*fmt == 'l')
             {
-                qualifier = qualifier << 8 | 'l';
+                qualifier = 'L';
                 ++fmt;
             }
         }
@@ -314,15 +203,8 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                     field_width = 2 * sizeof(void*) + 2;
                     flags |= ZEROPAD | SMALL | SPECIAL;
                 }
-                str = number(
-                    str,
-                    (unsigned long)va_arg(args, void*),
-                    16,
-                    field_width,
-                    precision,
-                    flags,
-                    end);
-                continue;
+                base = 16;
+                break;
 
             case 'n':
                 if (qualifier == 'l')
@@ -354,18 +236,18 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                 continue;
             }
 
-                // integer number formats - set up the flags and "break"
+            // integer number formats - set up the flags and "break"
             case 'o':
                 base = 8;
                 break;
 
             case 'x':
+                flags |= SMALL;
                 PUTC('0');
                 PUTC('x');
                 fallthrough;
             case 'X':
                 base = 16;
-                flags |= SMALL;
                 break;
 
             case 'd':
@@ -420,11 +302,10 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                     ? (unsigned long)va_arg(args, ssize_t)
                     : (unsigned long)va_arg(args, size_t);
                 break;
-            case 'l' | 'l' << 8:
+            case 'L':
             {
                 uint64_t num = va_arg(args, uint64_t);
-                str = number(str, (uint32_t)(num >> 32), base, field_width, precision, flags, end);
-                str = number(str, (uint32_t)(num & ~0UL), base, field_width, precision, flags, end);
+                str = numberll(str, num, base, field_width, precision, flags, end);
                 goto next;
             }
             case 'h':
@@ -435,7 +316,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                 break;
         }
 
-        str = number(str, num, base, field_width, precision, flags, end);
+        str = numberl(str, num, base, field_width, precision, flags, end);
 next:
     }
 

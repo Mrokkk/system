@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <common/macro.h>
 #include <common/compiler.h>
+#include <arch/bitsperlong.h>
 
 #define MAYBE_UNUSED(var)       __attribute__((unused)) var
 #define ALIAS(name)             __attribute__((alias(#name)))
