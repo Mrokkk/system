@@ -49,13 +49,13 @@ static uint16_t i8042_device_detect(uint8_t port)
 
     if ((byte = i8042_send_and_receive(I8042_SCAN_DISABLE, port)) != I8042_RESP_ACK)
     {
-        log_warning("disable scan failed; %x", byte);
+        log_warning("disable scan failed; %#x", byte);
         return 0xffff;
     }
 
     if ((byte = i8042_send_and_receive(I8042_IDENTIFY, port)) != I8042_RESP_ACK)
     {
-        log_warning("identify failed; %x", byte);
+        log_warning("identify failed; %#x", byte);
         return 0xffff;
     }
 
@@ -65,7 +65,7 @@ static uint16_t i8042_device_detect(uint8_t port)
     i8042_send_data(I8042_SCAN_ENABLE, port);
     if ((byte = i8042_receive()) != I8042_RESP_ACK)
     {
-        log_warning("enable scan failed; %x", byte);
+        log_warning("enable scan failed; %#x", byte);
     }
 
     return res;
@@ -82,14 +82,14 @@ int i8042_initialize(void)
     i8042_send_cmd(I8042_SELF_TEST);
     if ((data = i8042_receive()) != 0x55)
     {
-        log_warning("test failed: %x", data);
+        log_warning("test failed: %#x", data);
         return -ENODEV;
     }
 
     i8042_send_cmd(I8042_KBD_PORT_TEST);
     if ((data = i8042_receive() != 0x00))
     {
-        log_error("port0: test failed: %x", data);
+        log_error("port0: test failed: %#x", data);
         goto second_port;
     }
 
@@ -99,7 +99,7 @@ int i8042_initialize(void)
 
     if ((data = i8042_device_reset(I8042_KBD_PORT)) != I8042_RESP_SUCCESS)
     {
-        log_warning("port0: reset failed: %x", data);
+        log_warning("port0: reset failed: %#x", data);
     }
 
 second_port:
@@ -107,7 +107,7 @@ second_port:
     i8042_send_cmd(I8042_AUX_PORT_TEST);
     if ((data = i8042_receive() != 0x00))
     {
-        log_error("port1: test failed: %x", data);
+        log_error("port1: test failed: %#x", data);
         goto finish;
     }
 
@@ -117,7 +117,7 @@ second_port:
 
     if ((data = i8042_device_reset(I8042_AUX_PORT)) != I8042_RESP_SUCCESS)
     {
-        log_warning("port1: reset failed: %x", data);
+        log_warning("port1: reset failed: %#x", data);
     }
 
     i8042_send_cmd(I8042_AUX_PORT_DISABLE);

@@ -48,7 +48,7 @@ int process_find_free_fd_at(process_t* p, int at, int* fd)
 
     *fd = i;
 
-    log_debug(DEBUG_PROCESS, "found %d, %x", *fd, p->files + i);
+    log_debug(DEBUG_PROCESS, "found %d, %p", *fd, p->files + i);
 
     return 0;
 }

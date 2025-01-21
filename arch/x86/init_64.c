@@ -129,7 +129,7 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
 
 void do_exception(uintptr_t nr, const pt_regs_t* regs)
 {
-    log_critical("Exception %u error code %x cs: %x!", nr, regs->error_code, regs->cs);
+    log_critical("Exception %u error code %#x cs: %#x!", nr, regs->error_code, regs->cs);
     if (nr == 14)
     {
         uintptr_t cr2 = cr2_get();

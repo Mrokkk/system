@@ -81,7 +81,7 @@ UNMAP_AFTER_INIT void paging_init(void)
     size_t page_map_size = page_align(last_pfn * sizeof(*page_map));
     size_t page_table_size = page_tables_prealloc(virt_end);
 
-    log_notice("page map size = %u B (%u kiB, %u pages; %u entries, %u B each)",
+    log_notice("page map size = %zu B (%zu kiB, %zu pages; %u entries, %zu B each)",
         page_map_size,
         page_map_size / KiB,
         page_map_size / PAGE_SIZE,

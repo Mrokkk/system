@@ -71,7 +71,7 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     cpuid_read(0x80000000, &cpuid_regs);
     max_function = cpuid_regs.eax;
 
-    log_info("max function: %x", max_function);
+    log_info("max function: %#x", max_function);
 
     if (max_function >= 0x80000001)
     {
@@ -201,7 +201,7 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         cpu_info.vendor,
         cpu_info.name);
 
-    log_notice("family: %x, model: %x, stepping: %x",
+    log_notice("family: %#x, model: %#x, stepping: %#x",
         cpu_info.family,
         cpu_info.model,
         cpu_info.stepping);
@@ -215,7 +215,7 @@ UNMAP_AFTER_INIT int cpu_detect(void)
             break;
         }
 
-        log_info("L%u %s %u KiB, %u-way associative, %u B line size",
+        log_info("L%u %s %lu KiB, %u-way associative, %u B line size",
             c->layer,
             cache_type_string(c->type),
             (c->sets * c->line_size * c->partitions * c->ways) / KiB,

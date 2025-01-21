@@ -171,7 +171,7 @@ void* mmio_map(uintptr_t paddr, uintptr_t size, int flags, const char* name)
             break;
     }
 
-    log_debug(DEBUG_PAGE_MMIO, "mapping %p => %p; size = %lx; prot = %x", paddr, vaddr, size, pgprot);
+    log_debug(DEBUG_PAGE_MMIO, "mapping %p => %p; size = %#lx; prot = %#x", paddr, vaddr, size, pgprot);
 
     if (unlikely(page_mmio_map(paddr, vaddr, size, pgprot)))
     {

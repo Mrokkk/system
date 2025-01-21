@@ -67,7 +67,7 @@ static uint8_t ide_read(uint8_t channel, uint8_t reg)
 
 static void ide_write(uint8_t channel, uint8_t reg, uint8_t data)
 {
-    log_debug(DEBUG_IDE, "outb(data=%x, port=%x)", data, channels[channel].base + reg);
+    log_debug(DEBUG_IDE, "outb(data=%#x, port=%#x)", data, channels[channel].base + reg);
     outb(data, channels[channel].base + reg);
 }
 
@@ -93,13 +93,13 @@ static uint8_t bm_readb(uint8_t channel, uint8_t reg)
 
 static void bm_writeb(uint8_t channel, uint8_t reg, uint8_t data)
 {
-    log_debug(DEBUG_IDE, "outb(data=%x, port=%x)", data, channels[channel].bmide + reg);
+    log_debug(DEBUG_IDE, "outb(data=%#x, port=%#x)", data, channels[channel].bmide + reg);
     outb(data, channels[channel].bmide + reg);
 }
 
 static void bm_writel(uint8_t channel, uint8_t reg, uint32_t data)
 {
-    log_debug(DEBUG_IDE, "outl(data=%x, reg=%x)", data, channels[channel].bmide + reg);
+    log_debug(DEBUG_IDE, "outl(data=%#x, reg=%#x)", data, channels[channel].bmide + reg);
     outl(data, channels[channel].bmide + reg);
 }
 
@@ -226,7 +226,7 @@ static void ide_device_register(ata_device_t* device)
         ide_device_atapi(device->id);
     }
 
-    log_info("  mbr: id = %x, signature = %x", mbr->id, mbr->signature);
+    log_info("  mbr: id = %#x, signature = %#x", mbr->id, mbr->signature);
 
     if (mbr->signature != MBR_SIGNATURE)
     {
@@ -244,7 +244,7 @@ static void ide_device_register(ata_device_t* device)
             continue;
         }
 
-        log_info("  mbr: part[%u]:%x: [%08x - %08x]",
+        log_info("  mbr: part[%u]:%#x: [%#010x - %#010x]",
             part_id, p->type, p->lba_start, p->lba_start + p->sectors);
 
         devfs_blk_register(
@@ -424,7 +424,7 @@ static uint8_t ide_polling(uint8_t channel)
         status = ide_read(channel, ATA_REG_STATUS);
         if (time_elapsed > IDE_POLLING_TIMEOUT_MS)
         {
-            log_warning("channel %u: timeout, status: %x", channel, status);
+            log_warning("channel %u: timeout, status: %#x", channel, status);
             return 2;
         }
         if (status & ATA_SR_ERR)
@@ -560,7 +560,7 @@ static int ide_pio_request(request_t* req)
         {
             if ((err = ide_polling(channel)))
             {
-                log_warning("polling error: %x", err);
+                log_warning("polling error: %#x", err);
                 return -EIO;
             }
             insw(channels[channel].data_reg, buf, words);
@@ -602,7 +602,7 @@ static int ide_dma_request(request_t* req)
     // the process before it manages to clear the request
     if (unlikely(*current_request))
     {
-        log_warning("cannot perform DMA request, another one is ongoing: %x", current_request);
+        log_warning("cannot perform DMA request, another one is ongoing: %#x", current_request);
         errno = -EAGAIN;
         goto error;
     }
@@ -621,7 +621,7 @@ static int ide_dma_request(request_t* req)
     dma_region->prdt->addr = DMA_START;
     dma_region->prdt->count = req->sectors * ATA_SECTOR_SIZE | DMA_EOT;
 
-    log_debug(DEBUG_IDE, "dma: ch%u buffer: {phys=%x, virt=%x}, PRD: addr: %x, size: %x",
+    log_debug(DEBUG_IDE, "dma: ch%u buffer: {phys=%#x, virt=%#x}, PRD: addr: %#x, size: %#x",
         channel,
         DMA_START,
         dma_region->buffer,
@@ -658,7 +658,7 @@ static int ide_dma_request(request_t* req)
 
     delete(*current_request);
     *current_request = NULL;
-    log_debug(DEBUG_IDE, "copying %u B from %x to %x", req->count, dma_region->buffer, req->buffer);
+    log_debug(DEBUG_IDE, "copying %u B from %#x to %#x", req->count, dma_region->buffer, req->buffer);
     memcpy(req->buffer, dma_region->buffer, req->count);
     irq_restore(flags);
 
@@ -704,7 +704,7 @@ static int ide_atapi_request(request_t* req)
 
     if (unlikely(*current_request))
     {
-        log_warning("cannot perform DMA request, another one is ongoing: %x", *current_request);
+        log_warning("cannot perform DMA request, another one is ongoing: %#x", *current_request);
         errno = -EAGAIN;
         goto error;
     }
@@ -798,7 +798,7 @@ static int ide_atapi_read_capacity(ata_device_t* device)
 
     if (unlikely(*current_request))
     {
-        log_warning("cannot perform DMA request, another one is ongoing: %x", *current_request);
+        log_warning("cannot perform DMA request, another one is ongoing: %#x", *current_request);
         errno = -EAGAIN;
         goto error;
     }
@@ -896,19 +896,19 @@ static void ide_irq(int nr)
 
     if (unlikely(ide_devices[current_request->drive].dma && !(bm_status & BM_STATUS_INTERRUPT)))
     {
-        log_warning("IRQ%u: channel %u without proper BM status; status: %x", nr, channel, bm_status);
+        log_warning("IRQ%u: channel %u without proper BM status; status: %#x", nr, channel, bm_status);
     }
 
     if (unlikely((ata_status = ide_read(channel, ATA_REG_STATUS)) & ATA_SR_ERR))
     {
         error = ide_read(channel, ATA_REG_ERROR);
-        log_warning("irq: error %x (%s)", error, ide_error_string(error));
+        log_warning("irq: error %#x (%s)", error, ide_error_string(error));
         errno = -EIO;
     }
 
     if (unlikely(bm_status & BM_STATUS_ACTIVE))
     {
-        log_warning("DMA request not finished, error: %x, command: %x", ide_pci->status, ide_pci->command);
+        log_warning("DMA request not finished, error: %#x, command: %#x", ide_pci->status, ide_pci->command);
         errno = -EIO;
     }
 
@@ -935,7 +935,7 @@ static void ide_irq(int nr)
         ide_disable_irq(channel);
     }
 
-    log_debug(DEBUG_IDE, "waking %u, bm status: %x, ata status: %x", proc->pid, bm_status, ata_status);
+    log_debug(DEBUG_IDE, "waking %u, bm status: %#x, ata status: %#x", proc->pid, bm_status, ata_status);
     process_wake(proc);
 }
 
@@ -985,7 +985,7 @@ static request_t ide_request_create(int direction, file_t* file, char* buf, size
         ? max_count
         : count;
 
-    log_debug(DEBUG_IDE, "drive=%x, dir=%u, offset=%x, sectors=%x, count=%x",
+    log_debug(DEBUG_IDE, "drive=%#x, dir=%u, offset=%#x, sectors=%#x, count=%#x",
         drive,
         direction,
         offset,

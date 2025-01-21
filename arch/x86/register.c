@@ -46,16 +46,16 @@ void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
         snprintf(header_buffer, sizeof(header_buffer), "%s: ", header);
     }
 
-    log(severity, "%seax: %08x ebx: %08x ecx: %08x", header_buffer, regs->eax, regs->ebx, regs->ecx);
-    log(severity, "%sedx: %08x esi: %08x edi: %08x", header_buffer, regs->edx, regs->esi, regs->edi);
+    log(severity, "%seax: %#010x ebx: %#010x ecx: %#010x", header_buffer, regs->eax, regs->ebx, regs->ecx);
+    log(severity, "%sedx: %#010x esi: %#010x edi: %#010x", header_buffer, regs->edx, regs->esi, regs->edi);
 
-    log(severity, "%sebp: %08x esp: %02x:%08x",
+    log(severity, "%sebp: %#010x esp: %02x:%#010x",
         header_buffer,
         regs->ebp,
         regs->cs == KERNEL_CS ? ss_get() : regs->ss,
         regs->esp);
 
-    log(severity, "%seip: %02x:%08x",
+    log(severity, "%seip: %02x:%#010x",
         header_buffer,
         regs->cs,
         regs->eip);
@@ -67,7 +67,7 @@ void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
         regs->fs,
         regs->gs);
 
-    log(severity, "%seflags: %08x: (iopl=%d %s)",
+    log(severity, "%seflags: %#010x: (iopl=%d %s)",
         header_buffer,
         regs->eflags,
         (regs->eflags >> 12) & 0x3,
@@ -109,7 +109,7 @@ void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
         regs->fs,
         regs->gs);
 
-    log(severity, "%seflags: %08x: (iopl=%d %s)",
+    log(severity, "%seflags: %#010x: (iopl=%d %s)",
         header_buffer,
         regs->eflags,
         (regs->eflags >> 12) & 0x3,

@@ -51,7 +51,7 @@ static page_t* ramfs_starting_page(ram_node_t* node, size_t offset)
 
         if (unlikely(current == head))
         {
-            log_error("bug: %s(node=%x, offset=%u): fewer pages than asked offset; missing: %u",
+            log_error("bug: %s(node=%p, offset=%u): fewer pages than asked offset; missing: %u",
                 __func__, node, offset, page_id + 1);
             return NULL;
         }
@@ -134,7 +134,7 @@ static int ramfs_lookup(inode_t* parent, const char* name, inode_t** result)
 
     if (unlikely(!parent_node))
     {
-        log_error("no node for parent inode: %x, ino: %u", parent, parent->ino);
+        log_error("no node for parent inode: %p, ino: %u", parent, parent->ino);
         return -ENOENT;
     }
 
@@ -316,7 +316,7 @@ static int ramfs_create_raw_node(inode_t* parent, const char* name, ram_node_t**
 
     ram_node_init(new_node, mode, name);
 
-    log_debug(DEBUG_RAMFS, "added %x:\"%s\" to parent node %x", new_node, new_node->name, parent_node);
+    log_debug(DEBUG_RAMFS, "added %p:\"%s\" to parent node %p", new_node, new_node->name, parent_node);
 
     *result = new_node;
     return 0;

@@ -199,14 +199,14 @@ UNMAP_AFTER_INIT int clock_sources_setup(void)
         systick_clock->freq_khz / 1000,
         systick_clock->freq_khz % 1000);
 
-    log_notice("monotonic source: %- 10s freq: %u.%03u MHz; mult = %x shift = %u",
+    log_notice("monotonic source: %- 10s freq: %u.%03u MHz; mult = %#x shift = %u",
         monotonic_clock->name,
         monotonic_clock->freq_khz / 1000,
         monotonic_clock->freq_khz % 1000,
         monotonic_clock->mult,
         monotonic_clock->shift);
 
-    log_continue("; mult_ns = %x shift_ns = %u",
+    log_continue("; mult_ns = %#x shift_ns = %u",
         monotonic_clock->mult_ns,
         monotonic_clock->shift_ns);
 

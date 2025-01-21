@@ -89,11 +89,11 @@ int earlycon_enable(void)
     {
         bios_call(BIOS_VIDEO, VIDEO_MODE_GET(regs));
 
-        log_info("current mode: %x", regs.al, regs.ah);
+        log_info("current mode: %#x", regs.al);
 
         if (regs.al != MODE)
         {
-            log_info("setting mode %02x", MODE);
+            log_info("setting mode %#04x", MODE);
             bios_call(BIOS_VIDEO, VIDEO_MODE_SET(regs));
         }
 

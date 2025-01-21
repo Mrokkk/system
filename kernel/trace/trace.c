@@ -185,18 +185,19 @@ static const char* format_get(type_t t, int value)
     switch (t)
     {
         case TYPE_CHAR:
-            return isprint(value) ? "\'%c\'" : "\'%x\'";
+            return isprint(value) ? "\'%c\'" : "\'%#lx\'";
         case TYPE_SHORT:
-        case TYPE_LONG: return "%d";
+        case TYPE_LONG: return "%ld";
         case TYPE_CHAR_PTR:
         case TYPE_UNSIGNED_CHAR:
         case TYPE_UNSIGNED_SHORT:
         case TYPE_UNSIGNED_LONG:
+            return "%#lx";
         case TYPE_VOID_PTR:
-            return "%x";
+            return "%p";
         case TYPE_VOID:
             return "void";
-        default: return "unrecognized{%x}";
+        default: return "unrecognized{%#lx}";
     }
 }
 
@@ -243,7 +244,7 @@ static int* parameters_get(int* buf, va_list args, size_t count)
 #define BITFLAG_LEFT() \
     if (value) \
     { \
-        *it = csnprintf(*it, end, "%s%x", continuation ? "|" : "", value); \
+        *it = csnprintf(*it, end, "%s%#x", continuation ? "|" : "", value); \
     }
 
 #define FOR_ARGUMENT(nr, ...) \
@@ -385,7 +386,7 @@ int trace_syscall(unsigned long nr, ...)
     for (size_t i = 0; i < call->nargs; ++i, ({ i < call->nargs ? it += snprintf(it, end - it, ", ") : 0; }))
     {
         type_t arg = call->args[i];
-        int value = params[i];
+        long value = params[i];
 
         if (special_parameter(nr, i, value, &it, end))
         {

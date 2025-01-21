@@ -183,11 +183,11 @@ struct vma_printer_data
 
 static void vm_area_columns_fill(table_t* table)
 {
-    table_column_add(table, "vma", "%08x", 10, ' ');
-    table_column_add(table, "start", "%08x", 10, '-');
-    table_column_add(table, "end", "%08x", 10, ' ');
-    table_column_add(table, "size", "%08x", 10, ' ');
-    table_column_add(table, "offset", "%08x", 10, ' ');
+    table_column_add(table, "vma", "%#010x", 10, ' ');
+    table_column_add(table, "start", "%#010x", 10, '-');
+    table_column_add(table, "end", "%#010x", 10, ' ');
+    table_column_add(table, "size", "%#010x", 10, ' ');
+    table_column_add(table, "offset", "%#010x", 10, ' ');
     table_column_add(table, "flag", "%s", 4, ' ');
     table_column_add(table, "name", "%s", 0, '\0');
 }
@@ -325,10 +325,10 @@ int maps_show(seq_file_t* s)
 {
     TABLE_DECLARE(table, &maps_row_fill, &maps_line_print);
 
-    table_column_add(&table, "start", "%08x", 10, '-');
-    table_column_add(&table, "end", "%08x", 10, ' ');
+    table_column_add(&table, "start", "%#010x", 10, '-');
+    table_column_add(&table, "end", "%#010x", 10, ' ');
     table_column_add(&table, "prot", "%s", 4, ' ');
-    table_column_add(&table, "offset", "%08x", 10, ' ');
+    table_column_add(&table, "offset", "%#010x", 10, ' ');
     table_column_add(&table, "ino", "%d", 10, ' ');
     table_column_add(&table, "name", "%s", 0, '\0');
 

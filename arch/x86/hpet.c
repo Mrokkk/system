@@ -56,7 +56,7 @@ UNMAP_AFTER_INIT void hpet_initialize(void)
 
     for (int i = 0; i < cap->num_tim_cap + 1; ++i)
     {
-        log_notice("timer[%u]: periodic mode: %s; IRQ routing cap: %x; %u bits",
+        log_notice("timer[%u]: periodic mode: %s; IRQ routing cap: %#x; %u bits",
             i,
             timers[i].periodic_mode ? "supported" : "unsupported",
             timers[i].routing_cap,

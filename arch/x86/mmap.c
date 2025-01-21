@@ -73,7 +73,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     size_t file_size = len;
     size_t size = page_align(len);
 
-    current_log_debug(DEBUG_MMAP, "addr = %x, size = %x, prot = %x, flags = %x, file = %x", addr, size, prot, flags, file);
+    current_log_debug(DEBUG_MMAP, "addr = %p, size = %#zx, prot = %#x, flags = %#x, file = %p", addr, size, prot, flags, file);
 
     if (unlikely(!size
         || (offset & PAGE_MASK)
@@ -160,7 +160,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
     }
 
     vma->actual_end = vma->start + file_size;
-    log_debug(DEBUG_MMAP, "returning %x; vm area:", vaddr);
+    log_debug(DEBUG_MMAP, "returning %#x; vm area:", vaddr);
     vm_area_log_debug(DEBUG_MMAP, vma);
 
     return ptr(vaddr);
@@ -529,11 +529,11 @@ int sys_brk(void* addr)
     vm_area_t* new_brk_vma = vm_find(addr(addr), process_current->mm->vm_areas);
     vm_area_t* old_brk_vma = process_current->mm->brk_vma;
 
-    current_log_debug(DEBUG_BRK, "%x, new vma: %x old: %x", addr, new_brk_vma, old_brk_vma);
+    current_log_debug(DEBUG_BRK, "%p, new vma: %p old: %p", addr, new_brk_vma, old_brk_vma);
 
     if (unlikely(!old_brk_vma))
     {
-        current_log_error("brk vm_area missing; brk address: %x", process_current->mm->brk);
+        current_log_error("brk vm_area missing; brk address: %#x", process_current->mm->brk);
         return -ENOMEM;
     }
 
@@ -581,13 +581,13 @@ void* sys_sbrk(int incr)
     previous_page = page_beginning(previous_brk);
     next_page = page_align(current_brk);
 
-    current_log_debug(DEBUG_BRK, "incr=%x previous_brk=%x", incr, previous_brk);
+    current_log_debug(DEBUG_BRK, "incr=%#x previous_brk=%#x", incr, previous_brk);
 
     brk_vma = process_current->mm->brk_vma;
 
     if (unlikely(!brk_vma))
     {
-        current_log_error("brk vm_area missing; brk address: %x", previous_brk);
+        current_log_error("brk vm_area missing; brk address: %#x", previous_brk);
         process_vm_areas_log(KERN_ERR, process_current);
         return ptr(-ENOMEM);
     }

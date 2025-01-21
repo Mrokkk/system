@@ -65,7 +65,7 @@ static ino_t ino_get(const buffer_t* block, void* ptr)
 
 static buffer_t* block(iso9660_data_t* data, uint32_t block)
 {
-    log_debug(DEBUG_ISO9660, "reading block %x", block);
+    log_debug(DEBUG_ISO9660, "reading block %#x", block);
     return block_read(data->dev, data->file, block_nr_convert(block));
 }
 
@@ -187,7 +187,7 @@ static int iso9660_traverse(
         }
         else if (iso9660_px_nm_find(dirent, &px, &nm))
         {
-            log_debug(DEBUG_ISO9660, "cannot find required entries: PX=%x, NM=%x", px, nm);
+            log_debug(DEBUG_ISO9660, "cannot find required entries: PX=%#x, NM=%#x", px, nm);
             continue;
         }
 
@@ -382,7 +382,7 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t
 
     if (unlikely(!dirent || !data))
     {
-        log_error("internal error: sb->fs_data=%x, inode->fs_data=%x", data, dirent);
+        log_error("internal error: sb->fs_data=%p, inode->fs_data=%p", data, dirent);
         return -EINVAL;
     }
 
@@ -415,7 +415,7 @@ static int iso9660_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t
         data_size = min(BLOCK_SIZE, GET(dirent->data_len) - pos);
         data_size = min(data_size, size - count);
 
-        log_debug(DEBUG_ISO9660, "copying %u B from block %u %x to %x", data_size, block_nr, b->data, data_ptr);
+        log_debug(DEBUG_ISO9660, "copying %u B from block %u %p to %p", data_size, block_nr, b->data, data_ptr);
 
         memcpy(data_ptr, b->data, data_size);
 
@@ -440,7 +440,7 @@ static int iso9660_read(file_t* file, char* buffer, size_t count)
 
     if (unlikely(!dirent || !data))
     {
-        log_error("internal error: sb->fs_data=%x, inode->fs_data=%x", data, dirent);
+        log_error("internal error: sb->fs_data=%p, inode->fs_data=%p", data, dirent);
         backtrace_dump(KERN_ERR);
         return -EINVAL;
     }
@@ -454,7 +454,7 @@ static int iso9660_read(file_t* file, char* buffer, size_t count)
     char* block_data;
     size_t lba = GET(dirent->lba);
 
-    log_debug(DEBUG_ISO9660, "count: %u, dirent: %x, size: %u B, lba: %u, block_nr: %u",
+    log_debug(DEBUG_ISO9660, "count: %u, dirent: %p, size: %u B, lba: %u, block_nr: %u",
         count,
         dirent,
         GET(dirent->data_len),
@@ -474,7 +474,7 @@ static int iso9660_read(file_t* file, char* buffer, size_t count)
         block_data = b->data;
         block_data += block_offset;
 
-        log_debug(DEBUG_ISO9660, "copying %u B from block %u %x to %x", to_copy, block_nr, block_data, buffer);
+        log_debug(DEBUG_ISO9660, "copying %u B from block %u %p to %p", to_copy, block_nr, block_data, buffer);
         memcpy(buffer, block_data, to_copy);
         buffer += to_copy;
         ++block_nr;

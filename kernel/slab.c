@@ -96,7 +96,7 @@ void slab_free(void* ptr, size_t size)
     // FIXME: this can be randomly happen on some data which happens to set exact same value
     if (unlikely(slab->poison == SLAB_POISON))
     {
-        log_info("possibly freeing already free block %x", ptr);
+        log_info("possibly freeing already free block %p", ptr);
     }
 
     if (unlikely(!allocator))

@@ -77,7 +77,7 @@ static int address_fill(uintptr_t ip, vm_area_t* vm_areas, user_address_t* addr)
 
 static void backtrace_user_format(user_address_t* addr, char* buffer, size_t size)
 {
-    snprintf(buffer, size, "USER:%08x %08x %s:", addr->vaddr, addr->file_offset, addr->path);
+    snprintf(buffer, size, "USER:%#010x %#010x %s:", addr->vaddr, addr->file_offset, addr->path);
 }
 
 static void* backtrace_user_next(void** data_ptr, user_address_t* addr)

@@ -318,7 +318,7 @@ static int ahci_port_check(int nr)
 
     if (det != AHCI_PxSSTS_DET_PRESENT || ipm != AHCI_PxSSTS_IPM_ACTIVE)
     {
-        log_info("port %u: DET=%x, IPM=%x", nr, det, ipm);
+        log_info("port %u: DET=%#x, IPM=%#x", nr, det, ipm);
         return AHCI_DEV_NULL;
     }
 
@@ -530,10 +530,10 @@ static void ahci_controller_print(void)
     uint32_t cap = ahci->cap.value;
 
     log_info("AHCI mode: %B", ahci->ghc.ae);
-    log_continue("; speed: %s (%x); 64-bit: %B", ahci_iss_string(ahci->cap.iss), ahci->cap.iss, ahci->cap.s64a);
+    log_continue("; speed: %s (%#x); 64-bit: %B", ahci_iss_string(ahci->cap.iss), ahci->cap.iss, ahci->cap.s64a);
     log_continue("; ver: %X.%X", ahci->vs.mjr, ahci->vs.mnr);
     log_continue("; cmd slots: %u", ((cap & AHCI_CAP_NCS) >> AHCI_CAP_NCS_BIT) + 1);
-    log_continue("; pi: %x", ahci->pi);
+    log_continue("; pi: %#x", ahci->pi);
 }
 
 static int ahci_port_setup(int id)
@@ -569,13 +569,13 @@ static int ahci_port_setup(int id)
     port->regs->fb      = ahci_port_phys_addr(port, &port->data->fis);
     port->regs->fbu     = 0;
 
-    log_debug(DEBUG_AHCI, "clb = %x, fb = %x", port->regs->clb, port->regs->fb);
+    log_debug(DEBUG_AHCI, "clb = %#x, fb = %#x", port->regs->clb, port->regs->fb);
 
     for (int i = 0; i < 1; ++i)
     {
         ahci_command_t* cmdheader = &port->data->cmdlist[i];
         cmdheader->ctba = ahci_port_phys_addr(port, &port->data->cmdtable);
-        log_debug(DEBUG_AHCI, "ctba = %x", cmdheader->ctba);
+        log_debug(DEBUG_AHCI, "ctba = %#x", cmdheader->ctba);
     }
 
     if (ahci->cap.sss)
@@ -603,7 +603,7 @@ static int ahci_port_setup(int id)
     uint32_t det = ssts & AHCI_PxSSTS_DET;
 
     uint32_t sig = ahci->ports[id].sig;
-    log_info("port %u: DET = %x, IPM = %x; SIG = %x (%s)", id, det, ipm, sig, ahci_signature_string(sig));
+    log_info("port %u: DET = %#x, IPM = %#x; SIG = %#x (%s)", id, det, ipm, sig, ahci_signature_string(sig));
 
     port->signature = sig;
 
@@ -701,7 +701,7 @@ static int ahci_device_register(ata_device_t* device)
         return errno;
     }
 
-    log_info("  mbr: id = %x, signature = %x", mbr->id, mbr->signature);
+    log_info("  mbr: id = %#x, signature = %#x", mbr->id, mbr->signature);
 
     if (mbr->signature != MBR_SIGNATURE)
     {
@@ -719,7 +719,7 @@ static int ahci_device_register(ata_device_t* device)
             continue;
         }
 
-        log_info("  mbr: part[%u]:%x: [%08x - %08x]",
+        log_info("  mbr: part[%u]:%#x: [%#010x - %#010x]",
             part_id, p->type, p->lba_start, p->lba_start + p->sectors);
 
         devfs_blk_register(

@@ -42,7 +42,7 @@ static inline page_t* free_page_range_find_discont(const int count)
             goto no_pages;
         }
 
-        log_debug(DEBUG_PAGE, "[alloc] %x", page_phys(temp_page));
+        log_debug(DEBUG_PAGE, "[alloc] %p", ptr(page_phys(temp_page)));
 
         list_del(&temp_page->list_entry);
         temp_page->refcount = 1;
@@ -98,7 +98,7 @@ static inline page_t* free_page_range_find(const int count)
 
     for (int i = 0; i < count; ++i)
     {
-        log_debug(DEBUG_PAGE, "[alloc] %x", page_phys(&first_page[i]));
+        log_debug(DEBUG_PAGE, "[alloc] %#zx", page_phys(&first_page[i]));
         first_page[i].refcount = 1;
         first_page[i].pages_count = 0;
         list_del(&first_page[i].list_entry);
@@ -164,7 +164,7 @@ page_t* __page_alloc(int count, alloc_flag_t flag)
 
 static void page_free(page_t* page)
 {
-    log_debug(DEBUG_PAGE, "[free] paddr=%x count_after_free=%u", page_phys(page), page->refcount - 1);
+    log_debug(DEBUG_PAGE, "[free] paddr=%#zx count_after_free=%u", page_phys(page), page->refcount - 1);
 
     if (unlikely(!page->refcount))
     {
@@ -269,8 +269,8 @@ void page_stats_print()
     }
 
     log_info("last_pfn=%p", ptr(last_pfn));
-    log_info("frames_used=%zu (%u kB)", frames_used, frames_used * 4);
-    log_info("frames_free=%zu (%u kB)", frames_free, frames_free * 4);
+    log_info("frames_used=%zu (%zu kB)", frames_used, frames_used * 4);
+    log_info("frames_free=%zu (%zu kB)", frames_free, frames_free * 4);
     log_info("frames_unavailable=%u (%zu kB)", frames_unavailable, frames_unavailable * 4);
 
 #if DEBUG_PAGE_DETAILED
@@ -282,7 +282,7 @@ void page_stats_print()
         {
             void* caller = page_map[i].caller;
             ksym_string(addr(caller), symbol, sizeof(symbol));
-            log_info("%- 5u %08x %s",
+            log_info("%- 5u %#010lx %s",
                 page_map[i].refcount,
                 page_phys(&page_map[i]),
                 symbol);

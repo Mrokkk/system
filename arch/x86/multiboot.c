@@ -21,7 +21,7 @@ static void multiboot_modules_read(multiboot_info_t* mb)
     for (size_t i = 0; i < mb->mods_count; ++i)
     {
         name = virt_ptr(mod->string);
-        log_debug(DEBUG_MULTIBOOT, "%d: %s = %x : %x",
+        log_debug(DEBUG_MULTIBOOT, "%d: %s = %#x : %#x",
             i,
             name,
             virt(mod->mod_start),

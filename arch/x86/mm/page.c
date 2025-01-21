@@ -49,7 +49,7 @@ static void section_free(section_t* section)
         end = page(phys_addr(section->end));
     }
 
-    log_notice("freeing [%08x - %08x] %s", section->start, section->end, section->name);
+    log_notice("freeing [%#010x - %#010x] %s", section->start, section->end, section->name);
 
     for (page_t* page = start; page != end; page++)
     {

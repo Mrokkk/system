@@ -159,7 +159,7 @@ void i8259_check(void)
 
     if (unlikely(data != mask))
     {
-        log_warning("mask configured in controller: %x, expected: %x; reconfiguring");
+        log_warning("mask configured in controller: %#x, expected: %#x; reconfiguring", data, mask);
         i8259_enable();
     }
 }

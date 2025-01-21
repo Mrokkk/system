@@ -10,6 +10,8 @@
 #define KERN_ERR        5
 #define KERN_CRIT       6
 
+#define PRINTK_FORMAT_CHECK 0
+
 struct printk_entry
 {
     const char  log_level;
@@ -25,7 +27,11 @@ typedef struct printk_entry printk_entry_t;
 struct tty;
 struct file;
 
-logseq_t printk(const printk_entry_t* entry, const char*, ...);
+logseq_t printk(const printk_entry_t* entry, const char*, ...)
+#if PRINTK_FORMAT_CHECK
+    __attribute__((format(printf, 2, 3)))
+#endif
+;
 void NORETURN(panic(const char* fmt, ...));
 
 void printk_register(struct tty* tty);

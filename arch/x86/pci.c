@@ -120,7 +120,7 @@ UNMAP_AFTER_INIT void pci_scan(void)
 #ifdef __i386__
     if (!bios32_find(PCI_BIOS_SIGNATURE, &pci_bios_entry))
     {
-        log_info("PCI BIOS entry: %04x:%08x", pci_bios_entry.seg, pci_bios_entry.addr);
+        log_info("PCI BIOS entry: %#06x:%#010x", pci_bios_entry.seg, pci_bios_entry.addr);
 
         regs_t regs = {};
 
@@ -128,13 +128,13 @@ UNMAP_AFTER_INIT void pci_scan(void)
 
         if (regs.ah != PCI_BIOS_SUCCESSFUL)
         {
-            log_info("PCI BIOS call unsuccessful: %x", regs.ah);
+            log_info("PCI BIOS call unsuccessful: %#x", regs.ah);
             goto skip_pci_bios;
         }
 
-        log_continue("; config mechanism: %x", regs.al & 0x3);
-        log_continue("; special cycle: %x", (regs.al >> 4) & 0x3);
-        log_continue("; last bus: %x", regs.cl);
+        log_continue("; config mechanism: %#x", regs.al & 0x3);
+        log_continue("; special cycle: %#x", (regs.al >> 4) & 0x3);
+        log_continue("; last bus: %#x", regs.cl);
         bus_size = regs.cl + 1;
     }
 #else
@@ -204,7 +204,7 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
             it = csnprintf(it, end, serial_bus_subclass_string(device->subclass));
             break;
     }
-    it = csnprintf(it, end, " [%02X%02X]: ", device->class, device->subclass);
+    it = csnprintf(it, end, " [%02x%02x]: ", device->class, device->subclass);
     switch (device->vendor_id)
     {
         case PCI_AMD:
@@ -399,7 +399,7 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
         default:
             it = csnprintf(it, end, "Device");
     }
-    it = csnprintf(it, end, " [%04X:%04X]", device->vendor_id, device->device_id);
+    it = csnprintf(it, end, " [%04x:%04x]", device->vendor_id, device->device_id);
 
     return buf;
 }
@@ -424,7 +424,7 @@ static inline char* pci_device_subsystem_description(pci_device_t* device, char*
             it = csnprintf(it, end, "Unknown");
             break;
     }
-    it = csnprintf(it, end, " [%04X:%04X]", device->subsystem_vendor_id, device->subsystem_id);
+    it = csnprintf(it, end, " [%04x:%04x]", device->subsystem_vendor_id, device->subsystem_id);
     return buf;
 }
 
@@ -436,11 +436,11 @@ static inline char* pci_bar_description(bar_t* bar, char* buf, size_t size)
     if (bar->region == PCI_MEMORY)
     {
         human_size(bar_size, unit);
-        snprintf(buf, size, "memory %x [size=%u %s]", bar->addr, bar_size, unit);
+        snprintf(buf, size, "memory %#x [size=%u %s]", bar->addr, bar_size, unit);
     }
     else
     {
-        snprintf(buf, size, "io %x [size=%u]", bar->addr, bar_size);
+        snprintf(buf, size, "io %#x [size=%u]", bar->addr, bar_size);
     }
 
     return buf;
@@ -517,15 +517,15 @@ void pci_device_print(pci_device_t* device)
 {
     char description[256] = {0, };
 
-    log_notice("%X:%X.%X %s",
+    log_notice("%x:%x.%x %s",
         device->bus, device->slot, device->func,
         pci_device_description(device, description, sizeof(description)));
 
     description[0] = 0;
     log_notice("\tSubsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
-    log_notice("\tStatus: %04x", device->status);
-    log_notice("\tCommand: %04x", device->command);
-    log_notice("\tProg IF: %02x", device->prog_if);
+    log_notice("\tStatus: %#06x", device->status);
+    log_notice("\tCommand: %#06x", device->command);
+    log_notice("\tProg IF: %#04x", device->prog_if);
     if (device->interrupt_line)
     {
         log_notice("\tInterrupt: pin %u IRQ %u", device->interrupt_pin, device->interrupt_line);

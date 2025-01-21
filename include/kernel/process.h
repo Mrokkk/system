@@ -265,7 +265,7 @@ static inline void NONNULL() process_wake(process_t* p)
 {
     if (p->stat == PROCESS_ZOMBIE)
     {
-        log_warning("process %u:%x is zombie", p->pid, p);
+        log_warning("process %u:%p is zombie", p->pid, p);
         return;
     }
 
@@ -283,7 +283,7 @@ static inline int process_wait(wait_queue_head_t* wq, wait_queue_t* q)
 {
     if (process_current->stat == PROCESS_ZOMBIE)
     {
-        log_warning("process %u:%x is zombie", process_current->pid, process_current);
+        log_warning("process %u:%p is zombie", process_current->pid, process_current);
         scheduler();
         return 0;
     }

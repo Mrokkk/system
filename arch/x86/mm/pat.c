@@ -53,7 +53,7 @@ int pat_initialize(void)
 
     for (int i = 0; i < 8; ++i)
     {
-        log_continue(" PAT%u: %x", i, pat_entries[i]);
+        log_continue(" PAT%u: %#x", i, pat_entries[i]);
     }
 
     wrmsrll(IA32_MSR_PAT, *(uint64_t*)pat_entries);

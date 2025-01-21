@@ -16,7 +16,7 @@ buffer_t* block_read(dev_t dev, file_t* file, uint32_t block)
     size_t pages = block / (PAGE_SIZE / BLOCK_SIZE);
     size_t offset = block % (PAGE_SIZE / BLOCK_SIZE);
 
-    log_debug(DEBUG_BUFFER, "reading block %u; page = %u, offset = %u", block, pages, offset);
+    log_debug(DEBUG_BUFFER, "reading block %u; page = %zu, offset = %zu", block, pages, offset);
 
     list_for_each_entry(t, &buffers, entry)
     {

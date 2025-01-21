@@ -37,7 +37,7 @@ void scheduler(void)
 #if PARANOIA_SCHED
     if (unlikely(process_current->stat != PROCESS_RUNNING))
     {
-        panic("bug: process %u:%x stat is %u; expected %u",
+        panic("bug: process %u:%p stat is %u; expected %u",
             process_current->pid,
             process_current,
             process_current->stat,

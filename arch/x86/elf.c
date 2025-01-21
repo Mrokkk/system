@@ -150,7 +150,7 @@ static int elf_prepare(const char* name, file_t* file, string_t** interpreter, v
 
     if (unlikely(elf_data->header.e_machine != EM_386))
     {
-        log_debug(DEBUG_ELF, "%s: not a proper machine: %x", name, elf_data->header.e_machine);
+        log_debug(DEBUG_ELF, "%s: not a proper machine: %#x", name, elf_data->header.e_machine);
         return -ENOEXEC;
     }
 
@@ -207,7 +207,7 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
 
     for (uint32_t i = 0; i < phnum; ++i)
     {
-        log_debug(DEBUG_ELF, "%8s %08x %08x %08x %08x %08x %x %x", elf_phdr_type_get(phdr[i].p_type),
+        log_debug(DEBUG_ELF, "%8s %#010x %#010x %#010x %#010x %#010x %#x %#x", elf_phdr_type_get(phdr[i].p_type),
             phdr[i].p_offset,
             phdr[i].p_vaddr,
             phdr[i].p_paddr,
@@ -236,9 +236,9 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
             file,
             phdr[i].p_offset & ~PAGE_MASK);
 
-        if ((errno = errno_get(ptr)))
+        if (unlikely(errno = errno_get(ptr)))
         {
-            log_debug(DEBUG_ELF, "failed mmap: %d", ptr);
+            log_debug(DEBUG_ELF, "failed mmap: %d", errno);
             return errno;
         }
 
@@ -252,9 +252,9 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
                 NULL,
                 0);
 
-            if ((errno = errno_get(ptr)))
+            if (unlikely(errno = errno_get(ptr)))
             {
-                log_debug(DEBUG_ELF, "failed mmap: %d", ptr);
+                log_debug(DEBUG_ELF, "failed mmap: %d", errno);
                 return errno;
             }
         }
@@ -292,7 +292,7 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
 
     bin->entry = ptr(header->e_entry + base);
 
-    log_debug(DEBUG_ELF, "entry: %x", bin->entry);
+    log_debug(DEBUG_ELF, "entry: %p", bin->entry);
 
     if (!aux_insert(AT_ENTRY, addr(bin->entry), argvecs) ||
         !aux_insert(AT_PHDR, base + header->e_phoff, argvecs) ||
@@ -544,7 +544,7 @@ int elf_module_load(const char* name, file_t* file, kmod_t** module)
                     continue;
             }
 
-            log_debug(DEBUG_ELF, "  %-16s %02x, off: %04x: %s: at %x (from section %s at offset %x): setting to %x",
+            log_debug(DEBUG_ELF, "  %-16s %02x, off: %04x: %s: at %#x (from section %s at offset %#x): setting to %#x",
                 type_str,
                 type,
                 rel->r_offset,

@@ -41,7 +41,7 @@ static inline const char* memory_area_type_string(int type)
         { \
             ma = &memory_areas[i]; \
             if (ma->end == 0) continue; \
-            log_notice("[mem %08llx - %08llx] %s", \
+            log_notice("[mem %#018llx - %#018llx] %s", \
                 ma->start, \
                 ma->end - 1, \
                 memory_area_type_string(ma->type)); \

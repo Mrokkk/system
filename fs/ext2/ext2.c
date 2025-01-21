@@ -621,8 +621,7 @@ static cmd_t ext2_readdir_block(void* block, size_t to_copy, void* data)
             return TRAVERSE_CONTINUE;
         }
 
-        log_debug(DEBUG_EXT2FS, "dirent: type=%x, inode=%u, type=%x, name=%S, rec_len=%u, len=%u",
-            dirent->file_type,
+        log_debug(DEBUG_EXT2FS, "dirent: inode=%u, type=%#x, name=%S, rec_len=%u, len=%u",
             dirent->inode,
             dirent->file_type,
             dirent->name,
@@ -732,7 +731,7 @@ static int ext2_mount(super_block_t* sb, inode_t* inode, void*, int)
 
     if (raw_sb->magic != EXT2_SIGNATURE)
     {
-        log_info("invalid signature: %x", raw_sb->magic);
+        log_info("invalid signature: %#x", raw_sb->magic);
         return -ENODEV;
     }
 

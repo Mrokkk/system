@@ -198,11 +198,7 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
                 continue;
 
             case 'p':
-                if (field_width == -1)
-                {
-                    field_width = 2 * sizeof(void*) + 2;
-                    flags |= ZEROPAD | SMALL | SPECIAL;
-                }
+                flags |= ZEROPAD | SMALL | SPECIAL;
                 base = 16;
                 break;
 
@@ -243,8 +239,6 @@ static int vsnprintf_impl(char* buf, const char* end, const char* fmt, va_list a
 
             case 'x':
                 flags |= SMALL;
-                PUTC('0');
-                PUTC('x');
                 fallthrough;
             case 'X':
                 base = 16;

@@ -46,7 +46,7 @@ int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags)
         return -EBUSY;
     }
 
-    log_debug(DEBUG_IRQ, "%u:%s flags: %x", nr, name, flags);
+    log_debug(DEBUG_IRQ, "%u:%s flags: %#x", nr, name, flags);
 
     irq_list[nr].handler = handler;
     irq_list[nr].name = name;

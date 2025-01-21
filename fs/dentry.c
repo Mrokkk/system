@@ -42,7 +42,7 @@ dentry_t* dentry_create(inode_t* inode, dentry_t* parent_dentry, const char* nam
     strcpy(new_dentry->name, name);
     inode->dentry = new_dentry;
 
-    log_debug(DEBUG_DENTRY, "added %O for parent %O", new_dentry, parent_dentry);
+    log_debug(DEBUG_DENTRY, "added %p for parent %p", new_dentry, parent_dentry);
 
     return new_dentry;
 }
@@ -60,7 +60,7 @@ dentry_t* dentry_lookup(dentry_t* parent_dentry, const char* name)
     {
         if (!strcmp(dentry->name, name))
         {
-            log_debug(DEBUG_DENTRY, "found %O", dentry);
+            log_debug(DEBUG_DENTRY, "found %p", dentry);
             return dentry;
         }
     }
@@ -72,7 +72,7 @@ void dentry_delete(dentry_t* dentry)
 {
     if (!--dentry->refcount)
     {
-        log_debug(DEBUG_DENTRY, "removing dentry %s %x", dentry->name, dentry->inode);
+        log_debug(DEBUG_DENTRY, "removing dentry %s %p", dentry->name, dentry->inode);
         list_del(&dentry->child);
         slab_free(dentry->name, strlen(dentry->name) + 1);
         delete(dentry);

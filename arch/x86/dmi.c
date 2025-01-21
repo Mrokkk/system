@@ -170,7 +170,7 @@ UNMAP_AFTER_INIT void smbios_entry_handle(smbios_header_t* header)
             dmi_string(header, 0x04),
             dmi_string(header, 0x05));
 
-        log_continue("; start: %x; ROM size: %u KB",
+        log_continue("; start: %#x; ROM size: %u KB",
             (0x10000 - dmi_word(header, 0x06)) * 16,
             64 * (dmi_byte(header, 0x09) + 1));
 

@@ -47,7 +47,7 @@ int sys_getdents(unsigned int fd, void* dirp, size_t count)
 
     if (unlikely((errno = current_vm_verify_buf(VERIFY_WRITE, dirp, count))))
     {
-        log_debug(DEBUG_READDIR, "invalid ptr passed: %x", dirp);
+        log_debug(DEBUG_READDIR, "invalid ptr passed: %p", dirp);
         return errno;
     }
 
@@ -65,7 +65,7 @@ int sys_getdents(unsigned int fd, void* dirp, size_t count)
 
     if (unlikely(!file->ops || !file->ops->readdir))
     {
-        log_debug(DEBUG_READDIR, "no operation for file: %x", file);
+        log_debug(DEBUG_READDIR, "no operation for file: %p", file);
         return -ENOSYS;
     }
 

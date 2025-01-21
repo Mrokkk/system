@@ -97,7 +97,7 @@ UNMAP_AFTER_INIT int apic_initialize(void)
 
     apic->siv |= APIC_SIV_ENABLE;
 
-    log_notice("base: %x; id: %x (CPUID: %x); version: %x", apic_base, apic->id, cpu_info.lapic_id, apic->version);
+    log_notice("base: %#x; id: %#x (CPUID: %#x); version: %#x", apic_base, apic->id, cpu_info.lapic_id, apic->version);
 
     switch (apic->version)
     {
@@ -344,12 +344,12 @@ static void ioapic_initialize(void)
         switch (entry->type)
         {
             case MADT_TYPE_LAPIC:
-                MADT_LOG(log_continue, " (Local APIC), cpu id: %x, id = %x, flags = %x",
+                MADT_LOG(log_continue, " (Local APIC), cpu id: %#x, id = %#x, flags = %#x",
                     entry->lapic.cpu_id, entry->lapic.apic_id, entry->lapic.flags);
                 break;
 
             case MADT_TYPE_IOAPIC:
-                MADT_LOG(log_continue, " (IOAPIC), id = %x, address = %x, gsi_base = %x",
+                MADT_LOG(log_continue, " (IOAPIC), id = %#x, address = %#x, gsi_base = %#x",
                     entry->ioapic.id, entry->ioapic.address, entry->ioapic.gsi);
 
                 offset = entry->ioapic.address - page_beginning(entry->ioapic.address);
@@ -358,7 +358,7 @@ static void ioapic_initialize(void)
                 break;
 
             case MADT_TYPE_IOAPIC_OVERRIDE:
-                MADT_LOG(log_continue, " (IOAPIC Interrupt Source Override), bus = %x, irq = %u, gsi = %x, flags = %x",
+                MADT_LOG(log_continue, " (IOAPIC Interrupt Source Override), bus = %#x, irq = %u, gsi = %#x, flags = %#x",
                     entry->ioapic_override.bus,
                     entry->ioapic_override.irq,
                     entry->ioapic_override.gsi,
@@ -369,7 +369,7 @@ static void ioapic_initialize(void)
                 break;
 
             case MADT_TYPE_LAPIC_NMI:
-                MADT_LOG(log_continue, " (Local APIC NMI), cpu id: %x, LINT#%u, flags: %x",
+                MADT_LOG(log_continue, " (Local APIC NMI), cpu id: %#x, LINT#%u, flags: %#x",
                     entry->lapic_nmi.cpu_id,
                     entry->lapic_nmi.lint,
                     entry->lapic_nmi.flags);
@@ -381,7 +381,7 @@ static void ioapic_initialize(void)
                 break;
 
             case MADT_TYPE_X2LAPIC:
-                MADT_LOG(log_continue, " (Local x2APIC), local x2APIC ID: %u, APIC ID: %u, flags: %x",
+                MADT_LOG(log_continue, " (Local x2APIC), local x2APIC ID: %u, APIC ID: %u, flags: %#x",
                     entry->x2apic.x2apic_id,
                     entry->x2apic.apic_id,
                     entry->x2apic.flags);
@@ -397,7 +397,7 @@ static void ioapic_initialize(void)
 
     id = (ioapic_read(ioapic, 0x0) >> 24) & 0xf;
     data = ioapic_read(ioapic, 0x1);
-    ioapic_debug("id: %u, version: %x, routes: %u", id, data & 0xff, (data >> 16) + 1);
+    ioapic_debug("id: %u, version: %#x, routes: %u", id, data & 0xff, (data >> 16) + 1);
 
     irq_chip_register(&ioapic_chip);
 }

@@ -78,8 +78,8 @@ UNMAP_AFTER_INIT void acpi_initialize(void)
     header = &rsdt->header;
     rsdt_count = (header->len - sizeof(sdt_header_t)) / sizeof(uint32_t);
 
-    log_notice("oem: \"%.6s\" revision: %x rsdt = %x", rsdp->oemid, rsdp->revision, rsdp->rsdt_addr);
-    log_notice("root: %.4s len: %u entries: %u", header->signature, header->len, rsdt_count);
+    log_notice("oem: \"%.6s\" revision: %#x rsdt = %#x", rsdp->oemid, rsdp->revision, rsdp->rsdt_addr);
+    log_notice("root: %.4s len: %u entries: %zu", header->signature, header->len, rsdt_count);
 
     start = paddr, end = paddr + PAGE_SIZE;
 
@@ -96,7 +96,7 @@ UNMAP_AFTER_INIT void acpi_initialize(void)
         }
     }
 
-    log_notice("[mem %08x - %08x %x]", start, end - 1, end - start);
+    log_notice("[mem %#010x - %#010x %#x]", start, end - 1, end - start);
 
     // If range exceeds already mapped PAGE_SIZE, remap
     if (end - start > PAGE_SIZE)
@@ -112,7 +112,7 @@ UNMAP_AFTER_INIT void acpi_initialize(void)
         header = ptr(rsdt->table[i] + acpi_offset);
         if (DEBUG_RSDT)
         {
-            log_notice("%x %.4s len: %u", rsdt->table[i], header->signature, header->len);
+            log_notice("%#x %.4s len: %u", rsdt->table[i], header->signature, header->len);
         }
 
         if (!strncmp(header->signature, "FACP", 4))
@@ -128,10 +128,10 @@ UNMAP_AFTER_INIT void acpi_initialize(void)
 
     static_assert(offsetof(fadt_t, reset_req) == 116, "Wrong offset of reset_req");
 
-    log_notice("fadt: version: %x", fadt->header.revision);
-    log_notice("fadt: facs: %x", fadt->firmware_ctrl);
-    log_notice("fadt: SCI interrupt: %x", fadt->sci_int);
-    log_notice("fadt: PM timer: %x", fadt->pm_tmr_blk);
+    log_notice("fadt: version: %#x", fadt->header.revision);
+    log_notice("fadt: facs: %#x", fadt->firmware_ctrl);
+    log_notice("fadt: SCI interrupt: %#x", fadt->sci_int);
+    log_notice("fadt: PM timer: %#x", fadt->pm_tmr_blk);
 
     if (fadt->header.revision >= 2)
     {
@@ -145,7 +145,7 @@ UNMAP_AFTER_INIT void acpi_initialize(void)
             ? "supported"
             : "unsupported");
 
-        log_notice("reset req: space: %x, access_size: %x, addr: %x, value: %x",
+        log_notice("reset req: space: %#x, access_size: %#x, addr: %#llx, value: %#x",
             fadt->reset_req.address_space, fadt->reset_req.access_size,
             fadt->reset_req.address, fadt->reset_value);
 

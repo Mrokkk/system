@@ -56,7 +56,7 @@ static void ktimer_add(ktimer_t* timer)
             temp = list_entry(pos, ktimer_t, list_entry);
             if (ts_gt(&temp->deadline, &timer->deadline))
             {
-                log_debug(DEBUG_TIMER, "adding %u:%x before %u:%x",
+                log_debug(DEBUG_TIMER, "adding %u:%p before %u:%p",
                     timer->id, timer, temp->id, temp);
                 list_merge(&timer->list_entry, pos);
                 return;
@@ -64,7 +64,7 @@ static void ktimer_add(ktimer_t* timer)
         }
     }
 
-    log_debug(DEBUG_TIMER, "adding %u:%x at the end",
+    log_debug(DEBUG_TIMER, "adding %u:%p at the end",
         timer->id, timer, temp->id, temp);
 
     list_merge(&timer_list.timers, &timer->list_entry);
@@ -103,7 +103,7 @@ void ktimers_update(void)
         ktimer_t* front = list_next_entry(&timer_list.timers, ktimer_t, list_entry);
         if (timer_overdue(&front->deadline))
         {
-            log_debug(DEBUG_TIMER, "remove %u:%x", front->id, front);
+            log_debug(DEBUG_TIMER, "remove %u:%p", front->id, front);
             list_del(&front->list_entry);
             ktimer_callback(front);
         }

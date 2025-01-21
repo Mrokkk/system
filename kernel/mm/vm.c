@@ -392,7 +392,7 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
 
     scoped_irq_lock();
 
-    log_debug(DEBUG_NOPAGE, "address: %x, vma:", address);
+    log_debug(DEBUG_NOPAGE, "address: %p, vma:", ptr(address));
     vm_area_log_debug(DEBUG_NOPAGE, vma);
 
     address = page_beginning(address);
@@ -432,7 +432,7 @@ int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec)
 
         if (unlikely(!page))
         {
-            current_log_info("OOM on %x", address);
+            current_log_info("OOM on %p", ptr(address));
 
             siginfo_t siginfo = {
                 .si_code = SI_KERNEL,

@@ -245,7 +245,7 @@ static int devfs_lookup(inode_t* dir, const char* name, inode_t** result)
 
     if (dir_node != dev_root)
     {
-        log_debug(DEBUG_DEVFS, "not a root: %O", dir);
+        log_debug(DEBUG_DEVFS, "not a root: %p", dir);
         return -ENOTDIR;
     }
 
@@ -275,7 +275,7 @@ static int devfs_lookup(inode_t* dir, const char* name, inode_t** result)
 
     *result = new_inode;
 
-    log_debug(DEBUG_DEVFS, "finished succesfully %O", *result);
+    log_debug(DEBUG_DEVFS, "finished succesfully %p", *result);
 
     return 0;
 }
@@ -299,13 +299,13 @@ static int devfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
         return 0;
     }
 
-    log_debug(DEBUG_DEVFS, "inode=%O fs_data=%O", file->dentry->inode, file->dentry->inode->fs_data);
+    log_debug(DEBUG_DEVFS, "inode=%p fs_data=%p", file->dentry->inode, file->dentry->inode->fs_data);
 
     node = file->dentry->inode->fs_data;
 
     if (node != dev_root)
     {
-        log_debug(DEBUG_DEVFS, "not a root: %O", file->dentry->inode);
+        log_debug(DEBUG_DEVFS, "not a root: %p", file->dentry->inode);
         return -ENOTDIR;
     }
 

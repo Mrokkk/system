@@ -112,7 +112,7 @@ void param_call_if_set(param_name_t name, int (*action)())
     {
         if ((error = action(p)))
         {
-            log_warning("action associated with %s failed with %d", name, error);
+            log_warning("action associated with %s failed with %d", name.name, error);
         }
     }
 }
@@ -137,7 +137,7 @@ UNMAP_AFTER_INIT static void boot_params_print(void)
 
 UNMAP_AFTER_INIT static void memory_print(void)
 {
-    log_notice("RAM: %u MiB", full_ram >> 20);
+    log_notice("RAM: %zu MiB", (size_t)(full_ram >> 20));
 
     if (full_ram != (uint64_t)usable_ram)
     {

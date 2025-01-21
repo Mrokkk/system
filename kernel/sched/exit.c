@@ -13,7 +13,7 @@ static inline void process_space_free(process_t* proc)
 
     if (unlikely(*kernel_stack_end != STACK_MAGIC))
     {
-        panic("kernel stack overflow; stack @ %x, expected: %x; got: %x",
+        panic("kernel stack overflow; stack @ %p, expected: %#x; got: %#x",
             kernel_stack_end,
             STACK_MAGIC,
             *kernel_stack_end);

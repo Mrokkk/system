@@ -81,7 +81,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
         goto free_kstack;
     }
 
-    log_debug(DEBUG_PROCESS, "pgd=%x", pgd);
+    log_debug(DEBUG_PROCESS, "pgd=%p", pgd);
 
     dest->kernel_stack = ptr(addr(kernel_stack_end) + PAGE_SIZE);
     mutex_init(&dest->mm->lock);
@@ -266,7 +266,7 @@ static int process_fork(process_t* parent, struct pt_regs* regs)
     process_t* child;
     scoped_irq_lock();
 
-    log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
+    log_debug(DEBUG_PROCESS, "parent: %p:%s[%u]", parent, parent->name, parent->pid);
 
     if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, 0)) goto cannot_allocate;
@@ -310,7 +310,7 @@ int sys_clone(int (*fn)(void*), void* stack, int clone_flags, void*, void* tls)
 
     process_t* parent = process_current;
 
-    log_debug(DEBUG_PROCESS, "parent: %x:%s[%u]", parent, parent->name, parent->pid);
+    log_debug(DEBUG_PROCESS, "parent: %p:%s[%u]", parent, parent->name, parent->pid);
 
     if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
     if (process_space_copy(child, parent, clone_flags)) goto cannot_allocate;

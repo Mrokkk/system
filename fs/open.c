@@ -114,7 +114,7 @@ int do_open(file_t** new_file, const char* filename, int flags, int mode)
 set_file:
     if (unlikely(!inode))
     {
-        log_error("VFS issue: null inode in dentry %x", dentry);
+        log_error("VFS issue: null inode in dentry %p", dentry);
         return -ENOENT;
     }
 
@@ -418,7 +418,7 @@ int sys_fchdir(int fd)
 
     if (unlikely(!dentry))
     {
-        log_error("VFS issue: missing dentry in file %x", file);
+        log_error("VFS issue: missing dentry in file %p", file);
         return -ENOENT;
     }
 
@@ -510,7 +510,7 @@ int sys_fstat(int fd, struct stat* statbuf)
 
     if (unlikely(!dentry))
     {
-        log_error("VFS issue: missing dentry in file %x", file);
+        log_error("VFS issue: missing dentry in file %p", file);
         return -ENOENT;
     }
 

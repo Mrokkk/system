@@ -100,7 +100,7 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
 
     if (unlikely(!vm_paddr(virt(cr3), kernel_page_dir)))
     {
-        log_critical("bug: page directory %p not mapped in kernel!", cr3);
+        log_critical("bug: page directory %p not mapped in kernel!", ptr(cr3));
         page_t* missing_page = page(cr3);
         page_kernel_map(missing_page, PAGE_PRESENT | PAGE_RW | PAGE_GLOBAL);
         pgd = page_virt_ptr(missing_page);
@@ -110,12 +110,12 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
 
     if (pgd_entry_none(pgde))
     {
-        log(severity, "%s: pgd[%u]: not mapped", header, pgde - pgd);
+        log(severity, "%s: pgd[%zu]: not mapped", header, pgde - pgd);
         return;
     }
 
     pgd_print(pgde, buffer, sizeof(buffer));
-    log(severity, "%s: pgd[%u]: %s", header, pgde - pgd, buffer);
+    log(severity, "%s: pgd[%zu]: %s", header, pgde - pgd, buffer);
 
     const pud_t* pude = pud_offset(pgde, cr2);
 
@@ -157,7 +157,7 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
 
 static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t, uintptr_t, const char* header)
 {
-    log(severity, "%s: error code: %x", header, regs->error_code);
+    log(severity, "%s: error code: %#x", header, regs->error_code);
 }
 
 static inline printer_t printer_get(int nr)
@@ -198,7 +198,7 @@ void do_exception(uintptr_t nr, const pt_regs_t regs)
             0)
         {
             uintptr_t paddr = vm_paddr(cr2, p->mm->pgd);
-            current_log_info("page fault from %x caused by %x (paddr %x)", PT_REGS_IP(&regs), cr2, paddr);
+            current_log_info("page fault from %#x caused by %#x (paddr %#x)", PT_REGS_IP(&regs), cr2, paddr);
         }
     }
 
@@ -245,7 +245,7 @@ void do_exception(uintptr_t nr, const pt_regs_t regs)
     }
 #endif
 
-    current_log_debug(DEBUG_PAGE_FAULT, "page fault at %x caused by access to %x", PT_REGS_IP(&regs), cr2);
+    current_log_debug(DEBUG_PAGE_FAULT, "page fault at %#x caused by access to %#x", PT_REGS_IP(&regs), cr2);
 
     if (unlikely(vm_nopage(p->mm->pgd, cr2, regs.error_code & PF_WRITE, is_code)))
     {
@@ -265,7 +265,7 @@ handle_fault:
         }
 
         snprintf(header, sizeof(header), "%s[%u]", p->name, p->pid);
-        log_info("%s: %s #%x at %x",
+        log_info("%s: %s #%#x at %#x",
             header,
             exception->name,
             exception->has_error_code ? regs.error_code : 0,
@@ -312,7 +312,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
 
     if (exception_ongoing > 1)
     {
-        log_critical("%s: %s #%x during another exception handling at %x...",
+        log_critical("%s: %s #%#x during another exception handling at %#x...",
             header, exception->name, regs->error_code, PT_REGS_IP(regs));
         regs_print(KERN_CRIT, regs, "kernel");
         backtrace_exception(regs);
@@ -329,7 +329,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
         log_critical("%s: exception during early init...", header);
     }
 
-    log_critical("%s: %s #%x from %x in pid %u (state %c)",
+    log_critical("%s: %s #%#x from %#x in pid %u (state %c)",
         header,
         exception->name,
         exception->has_error_code ? regs->error_code : 0,
@@ -343,9 +343,9 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
     }
 
     regs_print(KERN_CRIT, regs, header);
-    log_critical("%s: cr0: %08x: (%s)", header, cr0, cr0_bits_string_get(cr0, string, sizeof(string)));
-    log_critical("%s: cr2: %08x cr3: %08x", header, cr2, cr3);
-    log_critical("%s: cr4: %08x: (%s)", header, cr4, cr4_bits_string_get(cr4, string, sizeof(string)));
+    log_critical("%s: cr0: %#010x: (%s)", header, cr0, cr0_bits_string_get(cr0, string, sizeof(string)));
+    log_critical("%s: cr2: %#010x cr3: %#010x", header, cr2, cr3);
+    log_critical("%s: cr4: %#010x: (%s)", header, cr4, cr4_bits_string_get(cr4, string, sizeof(string)));
 
     backtrace_exception(regs);
 

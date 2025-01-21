@@ -147,11 +147,11 @@ int vgafb_initialize(void)
 {
     regs_t regs;
 
-    log_notice("calling INT %x AH=0xf", BIOS_VIDEO);
+    log_notice("calling INT %#x AH=0xf", BIOS_VIDEO);
 
     bios_call(BIOS_VIDEO, BIOS_VIDEO_STATE_GET(regs));
 
-    log_info("curent mode: %x, columns: %u; current display page: %x",
+    log_info("curent mode: %#x, columns: %u; current display page: %#x",
         regs.al, regs.ah, regs.bh);
 
     if (regs.al < array_size(standard_modes))
@@ -160,7 +160,7 @@ int vgafb_initialize(void)
     }
     else
     {
-        log_notice("unknown mode: %x, setting default text mode", regs.al);
+        log_notice("unknown mode: %#x, setting default text mode", regs.al);
         bios_call(BIOS_VIDEO, BIOS_VIDEO_MODE_SET(regs, DEFAULT_TEXT_MODE));
         current_mode = &standard_modes[DEFAULT_TEXT_MODE];
     }

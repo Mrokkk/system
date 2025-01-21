@@ -15,7 +15,7 @@ struct e820_data
 
 typedef struct e820_data e820_data_t;
 
-#define E820_PRINT          0
+#define E820_PRINT          1
 #define E820_MAGIC          0x534d4150
 #define E820_USABLE         0x1
 #define E820_RESERVED       0x2
@@ -65,7 +65,7 @@ int e820_entries_read(e820_data_t* map, int sorted[])
 
 #if E820_PRINT
         e820_data_t* e = map + count;
-        log_notice("[mem %08llx - %08llx] %s(%x)",
+        log_notice("[mem %#018llx - %#018llx] %s(%#x)",
             e->base,
             e->base + e->len - 1,
             e->type == E820_USABLE ? "usable" : "reserved",

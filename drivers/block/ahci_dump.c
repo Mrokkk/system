@@ -128,54 +128,54 @@ void ahci_port_dump(ahci_hba_port_t* port)
     if (!(port->ssts & AHCI_PxSSTS_DET_PRESENT))
     {
         log_continue("not detected");
-        log_info("    PxSSTS=%x;", port->ssts);
+        log_info("    PxSSTS=%#x;", port->ssts);
         return;
     }
-    log_info("    PxCLB=%x; PxCLBU=%x", port->clb, port->clbu);
-    log_info("    PxFB=%x; PxFBU=%x", port->fb, port->fbu);
-    log_info("    PxIS=%x;", port->is);
+    log_info("    PxCLB=%#x; PxCLBU=%#x", port->clb, port->clbu);
+    log_info("    PxFB=%#x; PxFBU=%#x", port->fb, port->fbu);
+    log_info("    PxIS=%#x;", port->is);
     bits_print(port->is, px_is);
-    log_info("    PxIE=%x;", port->ie);
-    log_info("    PxCMD=%x; ", port->cmd);
+    log_info("    PxIE=%#x;", port->ie);
+    log_info("    PxCMD=%#x; ", port->cmd);
     bits_print(port->cmd, px_cmd);
-    log_info("    PxTFD=%x;", port->tfd);
+    log_info("    PxTFD=%#x;", port->tfd);
     bits_print(port->tfd, px_tfd);
-    log_info("    PxSIG=%x;", port->sig);
-    log_info("    PxSSTS=%x; IPM=%x SPD=%x DET=%x",
+    log_info("    PxSIG=%#x;", port->sig);
+    log_info("    PxSSTS=%#x; IPM=%#x SPD=%#x DET=%#x",
         port->ssts,
         (port->ssts & AHCI_PxSSTS_IPM_MASK) >> AHCI_PxSSTS_IPM_BIT,
         (port->ssts & AHCI_PxSSTS_SPD_MASK) >> AHCI_PxSSTS_SPD_BIT,
         port->ssts & AHCI_PxSSTS_DET);
-    log_info("    PxSCTL=%x;", port->sctl);
-    log_info("    PxSERR=%x;", port->serr);
+    log_info("    PxSCTL=%#x;", port->sctl);
+    log_info("    PxSERR=%#x;", port->serr);
     bits_print(port->serr, px_serr);
-    log_info("    PxSACT=%x;", port->sact);
-    log_info("    PxCI=%x;", port->ci);
-    log_info("    PxSNTF=%x;", port->sntf);
-    log_info("    PxFBS=%x;", port->fbs);
+    log_info("    PxSACT=%#x;", port->sact);
+    log_info("    PxCI=%#x;", port->ci);
+    log_info("    PxSNTF=%#x;", port->sntf);
+    log_info("    PxFBS=%#x;", port->fbs);
 }
 
 void ahci_dump(ahci_hba_t* ahci)
 {
-    log_info("AHCI dump (%x):", ahci);
-    log_info("  GHC.CAP=%x; ", ahci->cap);
+    log_info("AHCI dump (%p):", ahci);
+    log_info("  GHC.CAP=%#x; ", ahci->cap.value);
     log_continue("NP=%u ", ahci->cap.np);
     log_continue("NCS=%u ", ahci->cap.ncs);
-    log_continue("ISS=%x ", ahci->cap.iss);
+    log_continue("ISS=%#x ", ahci->cap.iss);
     bits_print(ahci->cap.value, ghc_cap);
-    log_info("  GHC.GHC=%x; ", ahci->ghc);
+    log_info("  GHC.GHC=%#x; ", ahci->ghc.value);
     bits_print(ahci->ghc.value, ghc_ghc);
-    log_info("  GHC.IS=%x; ", ahci->is);
+    log_info("  GHC.IS=%#x; ", ahci->is);
     ahci_ports_print(ahci->is);
-    log_info("  GHC.PI=%x; ", ahci->pi);
+    log_info("  GHC.PI=%#x; ", ahci->pi);
     ahci_ports_print(ahci->pi);
-    log_info("  GHC.VS=%x; %X.%X", ahci->vs.value, ahci->vs.mjr, ahci->vs.mnr);
-    log_info("  GHC.CCC_CTL=%x;", ahci->ccc_ctl);
-    log_info("  GHC.CCC_PORTS=%x; ", ahci->ccc_pts);
+    log_info("  GHC.VS=%#x; %X.%X", ahci->vs.value, ahci->vs.mjr, ahci->vs.mnr);
+    log_info("  GHC.CCC_CTL=%#x;", ahci->ccc_ctl);
+    log_info("  GHC.CCC_PORTS=%#x; ", ahci->ccc_pts);
     ahci_ports_print(ahci->ccc_pts);
-    log_info("  GHC.CCC_PORTS=%x; ", ahci->ccc_pts);
-    log_info("  GHC.CAP2=%x; ", ahci->cap2);
-    log_info("  GHC.BOHC=%x; ", ahci->bohc);
+    log_info("  GHC.CCC_PORTS=%#x; ", ahci->ccc_pts);
+    log_info("  GHC.CAP2=%#x; ", ahci->cap2);
+    log_info("  GHC.BOHC=%#x; ", ahci->bohc);
 
     for (int i = 0, j = 1; i < 32; ++i, j <<= 1)
     {

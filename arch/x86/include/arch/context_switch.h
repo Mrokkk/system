@@ -25,7 +25,7 @@ static inline void paranoia(process_t*, process_t* next)
         case KERNEL_PROCESS:
             break;
         default:
-            panic("process %u:%x: invalid type %x",
+            panic("process %u:%#x: invalid type %#x",
                 next->pid,
                 next,
                 next->type);
@@ -33,7 +33,7 @@ static inline void paranoia(process_t*, process_t* next)
 
     if (unlikely((unsigned long)next->pid > (unsigned long)last_pid))
     {
-        panic("process %u:%x: memory corruption; pid[%x] = %u",
+        panic("process %u:%#x: memory corruption; pid[%#x] = %u",
             next->pid,
             next,
             &next->pid,
@@ -53,7 +53,7 @@ static inline void paranoia(process_t*, process_t* next)
     {
         cli();
         memory_dump(KERN_CRIT, stack, 32);
-        panic("process %u:%x: kernel stack overflow at %x; esp = %x, stack_end = %x",
+        panic("process %u:%#x: kernel stack overflow at %#x; esp = %#x, stack_end = %#x",
             next->pid,
             next,
             next->context.eip,
@@ -65,7 +65,7 @@ static inline void paranoia(process_t*, process_t* next)
     {
         cli();
         memory_dump(KERN_CRIT, stack, 32);
-        panic("process %u:%x: memory corruption; %x = %x; expected: %x",
+        panic("process %u:%#x: memory corruption; %#x = %#x; expected: %#x",
             next->pid,
             next,
             stack_end,
@@ -85,7 +85,7 @@ static inline void paranoia(process_t*, process_t* next)
                 if (seg != val) \
                 { \
                     cli(); \
-                    memory_dump(KERN_CRIT, stack, 32); panic(#seg " = %x", seg); \
+                    memory_dump(KERN_CRIT, stack, 32); panic(#seg " = %#x", seg); \
                 }
 
             case USER_PROCESS:
@@ -104,7 +104,7 @@ static inline void paranoia(process_t*, process_t* next)
                 CHECK(regs->gs, KERNEL_DS);
                 if (!is_kernel_text(regs->eip))
                 {
-                    panic("regs->eip = %x", regs->eip);
+                    panic("regs->eip = %#x", regs->eip);
                 }
                 break;
         }

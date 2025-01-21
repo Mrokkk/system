@@ -61,25 +61,25 @@ static int pipe_read(file_t* file, char* buffer, size_t count)
         {
             if (!pipe->writers)
             {
-                log_debug(DEBUG_PIPE, "%u: pipe %x: no more writers", process_current->pid, pipe);
+                log_debug(DEBUG_PIPE, "%u: pipe %p: no more writers", process_current->pid, pipe);
                 irq_restore(flags);
                 goto finish;
             }
 
-            log_debug(DEBUG_PIPE, "%u: pipe %x: waiting", process_current->pid, pipe);
+            log_debug(DEBUG_PIPE, "%u: pipe %p: waiting", process_current->pid, pipe);
             WAIT_QUEUE_DECLARE(q, process_current);
             if ((errno = process_wait_locked(&pipe->wq, &q, &flags)))
             {
                 irq_restore(flags);
                 return errno;
             }
-            log_debug(DEBUG_PIPE, "%u: pipe %x: woken", process_current->pid, pipe);
+            log_debug(DEBUG_PIPE, "%u: pipe %p: woken", process_current->pid, pipe);
             irq_restore(flags);
         }
     }
 
 finish:
-    log_debug(DEBUG_PIPE, "%u: pipe: %x: read %u B", process_current->pid, pipe, read);
+    log_debug(DEBUG_PIPE, "%u: pipe: %p: read %u B", process_current->pid, pipe, read);
     return read;
 }
 
@@ -99,7 +99,7 @@ static int pipe_write(file_t* file, const char* buffer, size_t count)
 
     process_t* proc = wait_queue_pop(&pipe->wq);
 
-    log_debug(DEBUG_PIPE, "%u: pipe %x: written %u B", process_current->pid, pipe, count);
+    log_debug(DEBUG_PIPE, "%u: pipe %p: written %u B", process_current->pid, pipe, count);
 
     if (proc)
     {
@@ -113,11 +113,11 @@ static int pipe_write(file_t* file, const char* buffer, size_t count)
 static int pipe_r_close(file_t* file)
 {
     pipe_t* pipe = file->private;
-    log_debug(DEBUG_PIPE, "%u: pipe %x: closing; refcount %u", process_current->pid, pipe, pipe->count);
+    log_debug(DEBUG_PIPE, "%u: pipe %p: closing; refcount %u", process_current->pid, pipe, pipe->count);
     --pipe->readers;
     if (!--pipe->count)
     {
-        log_debug(DEBUG_PIPE, "%u: pipe %x: removing", process_current->pid, pipe);
+        log_debug(DEBUG_PIPE, "%u: pipe %p: removing", process_current->pid, pipe);
         delete(pipe);
     }
     dentry_delete(file->dentry);
@@ -127,7 +127,7 @@ static int pipe_r_close(file_t* file)
 static int pipe_w_close(file_t* file)
 {
     pipe_t* pipe = file->private;
-    log_debug(DEBUG_PIPE, "%u: pipe %x: closing; refcount %u", process_current->pid, pipe, pipe->count);
+    log_debug(DEBUG_PIPE, "%u: pipe %p: closing; refcount %u", process_current->pid, pipe, pipe->count);
     if (!--pipe->writers)
     {
         process_t* proc = wait_queue_pop(&pipe->wq);
@@ -140,7 +140,7 @@ static int pipe_w_close(file_t* file)
     }
     if (!--pipe->count)
     {
-        log_debug(DEBUG_PIPE, "%u: pipe %x: removing", process_current->pid, pipe);
+        log_debug(DEBUG_PIPE, "%u: pipe %p: removing", process_current->pid, pipe);
         delete(pipe);
     }
     dentry_delete(file->dentry);

@@ -16,7 +16,7 @@ UNMAP_AFTER_INIT int bios32_init(void)
         {
             bios32_header = ptr(lowmem);
 
-            log_notice("base: %lx; entry: %lx", bios32_header, bios32_header->entry);
+            log_notice("base: %p; entry: %p", bios32_header, ptr(bios32_header->entry));
 
             entry.addr = bios32_header->entry;
             entry.seg = KERNEL_CS;

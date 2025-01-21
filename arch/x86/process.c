@@ -288,7 +288,7 @@ void do_signals(pt_regs_t regs)
             : "memory");
     }
 
-    panic("do_signals: called without signal to handle; ongoing: %x, pending: %x",
+    panic("do_signals: called without signal to handle; ongoing: %#x, pending: %#x",
         proc->signals->ongoing,
         proc->signals->pending);
 

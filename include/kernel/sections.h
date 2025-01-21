@@ -61,7 +61,7 @@ uintptr_t section_phys_end(const section_t* section);
         section_t* section = sections; \
         for (; section->name; ++section) \
         { \
-            log_notice("[sec %p - %p %s] %s", \
+            log_notice("[sec %010p - %010p %s] %s", \
                 section->start, \
                 section->end, \
                 section_flags_string(section->flags, buf, end), \

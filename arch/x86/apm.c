@@ -136,7 +136,7 @@ static inline int apm_32bit_call(regs_t* regs, const char* name)
 
     if (unlikely(regs->eflags & EFL_CF))
     {
-        log_info("%s: %s (%x)", name, apm_error(regs->ah), regs->ah);
+        log_info("%s: %s (%#x)", name, apm_error(regs->ah), regs->ah);
         return -1;
     }
 
@@ -149,7 +149,7 @@ static int apm_bios_call(regs_t* regs, const char* name)
 
     if (unlikely(regs->eflags & EFL_CF))
     {
-        log_info("%s: %s (%x)", name, apm_error(regs->ah), regs->ah);
+        log_info("%s: %s (%#x)", name, apm_error(regs->ah), regs->ah);
         return -1;
     }
 
@@ -205,13 +205,13 @@ void apm_initialize(void)
         return;
     }
 
-    log_info("ver: %x", regs.ax);
+    log_info("ver: %#x", regs.ax);
 
 disconnect:
     bios_call(BIOS_SYSTEM, APM_INTERFACE_DISCONNECT(regs));
     if (regs.eflags & EFL_CF && regs.ah != APM_NOIF)
     {
-        log_warning("disconnect failed; error code: %x (%s)", regs.ah, apm_error(regs.ah));
+        log_warning("disconnect failed; error code: %#x (%s)", regs.ah, apm_error(regs.ah));
         return;
     }
 

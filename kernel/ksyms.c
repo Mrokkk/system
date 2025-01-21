@@ -213,7 +213,7 @@ UNMAP_AFTER_INIT int ksyms_load(void* start, void* end)
     errno = 0;
 
 finish:
-    log_info("freeing [%x - %x]", range.start, page_beginning(addr(range.end)));
+    log_info("freeing [%p - %p]", range.start, ptr(page_beginning(addr(range.end))));
     memrange_for_each_page(addr, &range)
     {
         pages_free(page(phys_addr(addr)));

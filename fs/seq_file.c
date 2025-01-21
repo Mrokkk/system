@@ -14,7 +14,7 @@ int seq_open(file_t* file, seq_show_t show)
         return -ENOMEM;
     }
 
-    log_debug(DEBUG_SEQFILE, "created seq_file=%x", s);
+    log_debug(DEBUG_SEQFILE, "created seq_file=%p", s);
 
     s->file = file;
     s->size = 0;
@@ -33,7 +33,7 @@ int seq_close(file_t* file)
 {
     seq_file_t* s = file->private;
 
-    log_debug(DEBUG_SEQFILE, "closing seq_file=%x", s);
+    log_debug(DEBUG_SEQFILE, "closing seq_file=%p", s);
 
     if (s->pages)
     {
@@ -51,7 +51,7 @@ int seq_read(file_t* file, char* buffer, size_t count)
     size_t copy_count;
     seq_file_t* s = file->private;
 
-    log_debug(DEBUG_SEQFILE, "seq_file=%x, count=%u", s, count);
+    log_debug(DEBUG_SEQFILE, "seq_file=%p, count=%u", s, count);
 
     if (!s->buffer)
     {

@@ -35,7 +35,7 @@ int sys_reboot(int magic, int magic2, int cmd)
     irq_save(flags);
 
     shutdown_in_progress = SHUTDOWN_IN_PROGRESS;
-    log_info("magic=%x, magic2=%x, cmd=%u", magic, magic2, cmd);
+    log_info("magic=%#x, magic2=%#x, cmd=%u", magic, magic2, cmd);
 
     prepare_to_shutdown();
 
