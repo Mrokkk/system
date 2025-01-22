@@ -49,18 +49,18 @@ void regs_print(loglevel_t severity, const pt_regs_t* regs, const char* header)
     log(severity, "%seax: %#010x ebx: %#010x ecx: %#010x", header_buffer, regs->eax, regs->ebx, regs->ecx);
     log(severity, "%sedx: %#010x esi: %#010x edi: %#010x", header_buffer, regs->edx, regs->esi, regs->edi);
 
-    log(severity, "%sebp: %#010x esp: %02x:%#010x",
+    log(severity, "%sebp: %#010x esp: %#04x:%#010x",
         header_buffer,
         regs->ebp,
         regs->cs == KERNEL_CS ? ss_get() : regs->ss,
         regs->esp);
 
-    log(severity, "%seip: %02x:%#010x",
+    log(severity, "%seip: %#04x:%#010x",
         header_buffer,
         regs->cs,
         regs->eip);
 
-    log(severity, "%sds: %02x; es: %02x; fs: %02x; gs: %02x",
+    log(severity, "%sds: %#04x; es: %#04x; fs: %#04x; gs: %#04x",
         header_buffer,
         regs->ds,
         regs->es,

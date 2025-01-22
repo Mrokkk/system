@@ -39,14 +39,12 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
         return 0;
     }
 
-    data = alloc_array(poll_data_t, nfds);
+    data = zalloc_array(poll_data_t, nfds);
 
     if (unlikely(!data))
     {
         return -ENOMEM;
     }
-
-    memset(data, 0, sizeof(*data) * nfds);
 
     for (size_t i = 0; i < nfds; ++i)
     {
@@ -61,8 +59,8 @@ static int do_poll(struct pollfd* fds, const unsigned long nfds, timeval_t* time
 
         if (!data[i].file->ops || !data[i].file->ops->poll)
         {
-            errno = -ENOSYS;
-            errno = 0;
+            errno = 1;
+            fds[i].revents = fds[i].events;
             goto free_data;
         }
 
