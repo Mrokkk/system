@@ -1465,6 +1465,8 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
 
     console->x             = 0;
     console->y             = 0;
+    console->prev_x        = 0;
+    console->prev_y        = 0;
     console->resx          = resx;
     console->resy          = resy;
     console->redraw        = false;

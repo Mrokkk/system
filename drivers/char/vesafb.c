@@ -14,13 +14,6 @@
 #define VBE_MODE_INFO_BLOCK_ADDR    0x1300
 #define VBE_EDID_ADDR               0x1400
 
-struct mapped_fb
-{
-    uintptr_t paddr;
-    size_t    size;
-    void*     vaddr;
-};
-
 struct mode_info
 {
     union
@@ -50,7 +43,6 @@ static int vesafb_fb_mode_set(int mode);
 static mode_info_t* desired_mode;
 static mode_info_t* current_mode;
 static mode_info_t* modes;
-static mapped_fb_t mapped_fbs[8];
 static size_t total_memory;
 
 static struct
@@ -297,46 +289,10 @@ static int vesafb_fb_mode_set(int mode)
     return -EINVAL;
 }
 
-static mapped_fb_t* vesafb_mapped_fb_get(uintptr_t paddr, size_t size)
-{
-    mapped_fb_t* last = NULL;
-    for (size_t i = 0; i < array_size(mapped_fbs); ++i)
-    {
-        mapped_fb_t* m = &mapped_fbs[i];
-        if (!m->paddr)
-        {
-            last = m;
-            break;
-        }
-
-        if (m->paddr == paddr && m->size == size)
-        {
-            return m;
-        }
-    }
-
-    if (unlikely(!last))
-    {
-        return NULL;
-    }
-
-    last->vaddr = mmio_map_wc(paddr, size, "fb");
-
-    if (unlikely(!last->vaddr))
-    {
-        return NULL;
-    }
-
-    last->paddr = paddr;
-    last->size  = size;
-
-    return last;
-}
-
 static int vesafb_framebuffer_setup(mode_info_t* mode)
 {
-    mapped_fb_t* mapped_fb;
     size_t size = mode->fb_size;
+    uintptr_t prev_paddr = framebuffer.paddr;
 
     switch (mode->memory_model)
     {
@@ -369,15 +325,19 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.accel    = FB_ACCEL_NONE;
     framebuffer.ops      = &vesafb_ops;
 
-    mapped_fb = vesafb_mapped_fb_get(framebuffer.paddr, size);
-
-    if (unlikely(!mapped_fb))
+    if (prev_paddr != framebuffer.paddr)
     {
-        log_error("cannot map framebuffer");
-        return -ENOMEM;
+        if (framebuffer.vaddr)
+        {
+            mmio_unmap(framebuffer.vaddr);
+        }
+        framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, size, "fb");
+        if (unlikely(!framebuffer.vaddr))
+        {
+            log_error("cannot map framebuffer");
+            return -ENOMEM;
+        }
     }
-
-    framebuffer.vaddr = mapped_fb->vaddr;
 
     return 0;
 }

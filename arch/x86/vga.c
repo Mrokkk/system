@@ -8,8 +8,6 @@ typedef struct
     uint8_t line[32];
 } vga_glyph_t;
 
-static vga_glyph_t* vga_font;
-
 uint8_t vga_palette[] = {
     VGA_COLOR_BLACK,
     VGA_COLOR_RED,
@@ -31,19 +29,16 @@ uint8_t vga_palette[] = {
 
 int vga_font_set(size_t width, size_t height, void* data, size_t bytes_per_glyph, size_t glyphs_count)
 {
+    vga_glyph_t* vga_font;
+
     if (width != 8 || height > 32)
     {
         return -EINVAL;
     }
 
-    if (!vga_font)
+    if (unlikely(!(vga_font = mmio_map_uc(0xa0000, 256 * 32, "vgafont"))))
     {
-        vga_font = mmio_map_uc(0xa0000, 256 * 32, "vgafont");
-
-        if (unlikely(!vga_font))
-        {
-            return -ENOMEM;
-        }
+        return -ENOMEM;
     }
 
     vga_gfx_write(VGA_GFX_MODE, 0x00);
@@ -65,6 +60,8 @@ int vga_font_set(size_t width, size_t height, void* data, size_t bytes_per_glyph
     vga_seq_write(VGA_SEQ_MEMORY_MODE, 0x02);
     vga_gfx_write(VGA_GFX_MODE, 0x10);
     vga_gfx_write(VGA_GFX_MISC, 0x0e);
+
+    mmio_unmap(vga_font);
 
     return 0;
 }

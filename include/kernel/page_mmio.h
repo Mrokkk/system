@@ -17,4 +17,5 @@ enum mmio_flags
 #define mmio_map_wt(paddr, size, name) mmio_map(paddr, size, MMIO_WRITE_THROUGH, name)
 
 MUST_CHECK(void*) mmio_map(uintptr_t paddr, uintptr_t size, int flags, const char* name);
+void mmio_unmap(void* vaddr);
 void mmio_print(void);

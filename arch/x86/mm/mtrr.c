@@ -258,8 +258,8 @@ void mtrr_initialize(void)
             size_t size = mtrr_size_get(mask);
             log_info("clearing entry %u: [%llx - %llx]", i, paddr, paddr + size - 1);
 
-            wrmsrll(IA32_MSR_MTRR_PHYSMASK(i), 0);
-            wrmsrll(IA32_MSR_MTRR_PHYSBASE(i), 0);
+            wrmsrll(IA32_MSR_MTRR_PHYSMASK(i), 0ULL);
+            wrmsrll(IA32_MSR_MTRR_PHYSBASE(i), 0ULL);
         }
     }
 

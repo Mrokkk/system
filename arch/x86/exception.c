@@ -8,6 +8,7 @@
 #include <kernel/segmexec.h>
 #include <kernel/vm_print.h>
 #include <kernel/backtrace.h>
+#include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
 #include <kernel/page_debug.h>
 #include <kernel/page_table.h>
