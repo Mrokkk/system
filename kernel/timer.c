@@ -64,8 +64,7 @@ static void ktimer_add(ktimer_t* timer)
         }
     }
 
-    log_debug(DEBUG_TIMER, "adding %u:%p at the end",
-        timer->id, timer, temp->id, temp);
+    log_debug(DEBUG_TIMER, "adding %u:%p at the end", timer->id, timer);
 
     list_merge(&timer_list.timers, &timer->list_entry);
 }
@@ -160,6 +159,7 @@ static ktimer_t* ktimer_create_internal(timer_cb_t cb, timer_cb_t cleanup, void*
 
 static int ktimer_start_internal(ktimer_t* timer, int flags, timeval_t* value, timeval_t* interval)
 {
+    LOCKED(list_del(&timer->list_entry));
     timer->flags = flags;
     memcpy(&timer->interval, interval, sizeof(*interval));
     memcpy(&timer->deadline, value, sizeof(*value));

@@ -65,7 +65,7 @@ uintptr_t __stack_chk_guard __attribute__((used)) = 0xdeadf00d;
 
 void NORETURN(__stack_chk_fail(void))
 {
-    panic("Stack smashing detected!");
+    panic("Stack smashing detected at %p!", __builtin_return_address(0));
 }
 
 static void pf_reason_print(uintptr_t error_code, uintptr_t cr2, char* output, size_t size)

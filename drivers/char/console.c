@@ -1571,7 +1571,14 @@ static int console_setup(tty_t* tty, console_driver_t* driver)
     console->kconsole = process_spawn("kconsole", &kconsole, console, SPAWN_KERNEL);
     memcpy(&console->config, &config, sizeof(config));
 
-    redraw(console);
+    if (console->driver->ops->screen_clear)
+    {
+        console->driver->ops->screen_clear(console->driver, console->default_bgcolor);
+    }
+    else
+    {
+        redraw(console);
+    }
 
     tty->driver->driver_data = console;
 

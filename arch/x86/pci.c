@@ -522,13 +522,13 @@ void pci_device_print(pci_device_t* device)
         pci_device_description(device, description, sizeof(description)));
 
     description[0] = 0;
-    log_notice("\tSubsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
-    log_notice("\tStatus: %#06x", device->status);
-    log_notice("\tCommand: %#06x", device->command);
-    log_notice("\tProg IF: %#04x", device->prog_if);
+    log_notice("  Subsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
+    log_notice("  Status: %#06x", device->status);
+    log_notice("  Command: %#06x", device->command);
+    log_notice("  Prog IF: %#04x", device->prog_if);
     if (device->interrupt_line)
     {
-        log_notice("\tInterrupt: pin %u IRQ %u", device->interrupt_pin, device->interrupt_line);
+        log_notice("  Interrupt: pin %u IRQ %u", device->interrupt_pin, device->interrupt_line);
     }
 
     if ((device->header_type & 0x7f) == 0)
@@ -540,7 +540,7 @@ void pci_device_print(pci_device_t* device)
             {
                 continue;
             }
-            log_notice("\tBAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
+            log_notice("  BAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
         }
     }
 }

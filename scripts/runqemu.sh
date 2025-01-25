@@ -9,6 +9,7 @@ use_kvm=
 use_cdrom=
 use_nographic=
 use_isa_debugcon=
+use_virtio_vga=
 args="\
 -boot once=c \
 -no-reboot \
@@ -67,6 +68,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --isa-debugcon)
             use_isa_debugcon=1
+            ;;
+        --virtio-vga)
+            use_virtio_vga=1
             ;;
         *)
             param="${1#--}"
@@ -128,7 +132,12 @@ else
     args="-enable-kvm -cpu host ${args}"
     if [[ -z ${use_nographic} ]]
     then
-        args="${args} -device virtio-gpu,edid=on,xres=1600,yres=900"
+        if [[ -n "${use_virtio_vga}" ]]
+        then
+            args="${args} -device virtio-vga"
+        else
+            args="${args} -device virtio-gpu,edid=on,xres=1920,yres=1124 -vga none"
+        fi
     fi
 fi
 

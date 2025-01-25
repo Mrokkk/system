@@ -12,6 +12,7 @@
 #include <kernel/mutex.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
+#include <kernel/execute.h>
 #include <kernel/process.h>
 #include <kernel/byteorder.h>
 #include <kernel/page_mmio.h>
@@ -24,12 +25,6 @@
 #define DISABLE_DMA_AFTER_FAILURE   1
 #define IDE_POLLING_TIMEOUT_MS      1000
 #define IDE_IO_DELAY                2
-
-#define execute(operation, fail_string) \
-    ({ int ret = operation; if (ret) { log_warning("%s: failed with %d", fail_string, ret);  }; ret; })
-
-#define execute_no_ret(operation) \
-    ({ operation; 0; })
 
 static int ide_fs_open(file_t* file);
 static int ide_fs_read(file_t* file, char* buf, size_t count);

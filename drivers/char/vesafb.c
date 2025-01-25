@@ -180,7 +180,7 @@ static void vesafb_edid_read(vbe_info_block_t* vbe, int* resx, int* resy)
 
     if (regs.al != 0x4f || regs.ah == 1 || *(uint64_t*)VBE_EDID_ADDR != EDID_SIGNATURE)
     {
-        log_warning("EDID reading unsupported/failed; al=%x ah=%x sig=%llx",
+        log_info("EDID reading unsupported/failed; al=%#x ah=%#x sig=%#llx",
             regs.al,
             regs.ah,
             *(uint64_t*)VBE_EDID_ADDR);

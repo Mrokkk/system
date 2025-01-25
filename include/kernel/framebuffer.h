@@ -6,6 +6,7 @@
 
 struct fb_ops
 {
+    void (*dirty_set)(size_t x, size_t y, size_t w, size_t h);
     int (*mode_get)(int resx, int resy, int bpp);
     int (*mode_set)(int mode);
 };

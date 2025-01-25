@@ -2,18 +2,23 @@
 
 #include <stdint.h>
 #include <arch/io.h>
+#include <arch/pci.h>
+#include <kernel/page_types.h>
 
 // References:
 // https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs01.html
 
-typedef uint64_t le64;
-typedef uint32_t le32;
-typedef uint16_t le16;
-typedef uint8_t u8;
+typedef volatile uint64_t le64;
+typedef volatile uint32_t le32;
+typedef volatile uint16_t le16;
+typedef volatile uint8_t u8;
 
 typedef struct virtq_desc virtq_desc_t;
 typedef struct virtq_used virtq_used_t;
 typedef struct virtq_avail virtq_avail_t;
+typedef struct virtio_queue virtio_queue_t;
+typedef struct virtio_buffer virtio_buffer_t;
+typedef struct virtio_device virtio_device_t;
 typedef struct virtio_pci_cap virtio_pci_cap_t;
 typedef struct virtq_used_elem virtq_used_elem_t;
 typedef struct virtio_pci_common_cfg virtio_pci_common_cfg_t;
@@ -106,3 +111,40 @@ struct virtq_used
     io16 idx;
     virtq_used_elem_t ring[ /* Queue Size */];
 };
+
+struct virtio_queue
+{
+    int            queue_id;
+    page_t*        buffers;
+    char*          buffer_cur;
+    virtq_desc_t*  desc;
+    virtq_avail_t* avail;
+    virtq_used_t*  used;
+    uint16_t       size;
+    io32*          notify;
+};
+
+struct virtio_device
+{
+    const char*              name;
+    pci_device_t*            pci_device;
+    virtio_pci_common_cfg_t* common_cfg;
+    size_t                   config_offset;
+    virtio_queue_t           queues[];
+};
+
+struct virtio_buffer
+{
+    void*     buffer;
+    uintptr_t paddr;
+    int       type;
+    size_t    size;
+};
+
+#define VIRTQ_ALIGN        64
+#define BUFFER_PAGES       4
+
+int virtio_initialize(const char* name, pci_device_t* pci_device, size_t num_queues, virtio_device_t** result);
+virtio_buffer_t virtio_buffer_create(virtio_queue_t* queue, size_t size, int type);
+void virtio_buffers_submit(virtio_queue_t* queue, ... /*, NULL */);
+void virtio_buffer_submit(virtio_queue_t* queue, virtio_buffer_t* buffer);

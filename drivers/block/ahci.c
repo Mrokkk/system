@@ -7,6 +7,7 @@
 #include <kernel/devfs.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
+#include <kernel/execute.h>
 #include <kernel/process.h>
 #include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
@@ -65,12 +66,6 @@ static_assert(offsetof(ahci_port_data_t, prdt) == 0x880);
 // [0x0400 - 0x04ff] Port 0 Command List (ahci_command_t); must be 1K aligned
 //   ctba = Physical Address of Port 0 Command Table[n]
 // [0x0800 - 0x08bf] Port 0 Command Table (ahci_command_table_t + ahci_prdt_entry_t * 4)
-
-#define execute(operation, fail_string) \
-    ({ int ret = operation; if (ret) { log_warning("%s: failed with %d", fail_string, ret);  }; ret; })
-
-#define execute_no_ret(operation) \
-    ({ operation; 0; })
 
 static const char* ahci_signature_string(uint32_t sig)
 {

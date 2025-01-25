@@ -52,7 +52,7 @@ UNMAP_AFTER_INIT static int framebuffer_init(void)
     size_t bpp = framebuffer.bpp;
     size_t size = framebuffer.size;
 
-    log_notice("%x addr = %x, resolution = %ux%u, pitch = %x, bpp=%u, size = %x",
+    log_notice("paddr = %#x vaddr = %#x, resolution = %ux%u, pitch = %#x, bpp=%u, size = %#x",
         paddr, framebuffer.vaddr, width, height, pitch, bpp, size);
 
     if (unlikely(errno = devfs_register("fb0", MAJOR_CHR_FB, 0, &fops)))
