@@ -1,3 +1,4 @@
+#ifdef NUMBER_SUFFIX
 #ifdef __number_func
 #undef __number_func
 #endif
@@ -126,3 +127,4 @@ __number_func(NUMBER_SUFFIX, NUMBER_TYPE)
 
     return str;
 }
+#endif
