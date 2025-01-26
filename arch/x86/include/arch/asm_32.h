@@ -3,6 +3,7 @@
 #ifdef __ASSEMBLER__
 
 #define SAVE_ALL(has_error_code) \
+    cld; \
     .if has_error_code == 0; \
         sub $4, %esp; \
     .endif; \
