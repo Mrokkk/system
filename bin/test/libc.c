@@ -77,6 +77,18 @@ TEST(strncmp)
     EXPECT_EQ(strncmp(string, "test1", 4), 0);
 }
 
+TEST(strcasecmp)
+{
+    static const char* string = "Test";
+
+    EXPECT_EQ(strcasecmp(string, "test"), 0);
+    EXPECT_EQ(strcasecmp(string, "TEST"), 0);
+    EXPECT_EQ(strcasecmp(string, "teS"), 't');
+    EXPECT_EQ(strcasecmp(string, "Est"), 't' - 'e');
+    EXPECT_EQ(strcasecmp(string, "test1"), 0 - '1');
+    EXPECT_EQ(strcasecmp(string, "\0"), 't' - 0);
+}
+
 TEST(strspn)
 {
     static const char* string = "test123_test456\xff";

@@ -97,6 +97,7 @@ set(LIBC_SRC
 
     string/bzero.c
     string/memchr.c
+    string/strcasecmp.c
     string/strcat.c
     string/strcoll.c
     string/strdup.c
