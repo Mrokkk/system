@@ -1,5 +1,6 @@
 #include "elf.h"
 
+#include <stdio.h>
 #include <sys/mman.h>
 #include <kernel/api/elf.h>
 

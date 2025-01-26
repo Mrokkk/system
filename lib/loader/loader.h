@@ -2,11 +2,13 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <syslog.h>
+#include <unistd.h>
 
 typedef int (*entry_t)();
 
-#define DEBUG(...) \
-    do { if (UNLIKELY(debug)) { fprintf(stderr, __VA_ARGS__); } } while (0)
+#define DEBUG(fmt, ...) \
+    ({ if (UNLIKELY(debug)) print(LOG_INFO, fmt, __VA_ARGS__); 0; })
 
 #define SYSCALL(call) \
     ({ typeof(call) __v = call; if (UNLIKELY((int)__v == -1)) { die_errno(#call); }; __v; })
@@ -16,6 +18,8 @@ typedef int (*entry_t)();
 
 extern int debug;
 
+void print_init(void);
+void print(int error, const char* fmt, ...);
 [[noreturn]] void die(const char* fmt, ...);
 [[noreturn]] void die_errno(const char* string);
 

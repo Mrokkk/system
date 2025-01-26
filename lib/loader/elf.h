@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <common/list.h>
@@ -127,7 +126,7 @@ struct lib
 #define PHDR_PRINT(phdr) \
     do \
     { \
-        printf("%8s %#010x %#010x %#010x %#010x %#010x %#010x %#010x\n", \
+        DEBUG("%8s %#010x %#010x %#010x %#010x %#010x %#010x %#010x", \
             elf_phdr_type_get((phdr)->p_type), \
             (phdr)->p_offset, \
             (phdr)->p_vaddr, \
@@ -160,7 +159,7 @@ static inline void phdr_print(elf32_phdr_t* phdr, size_t phnum)
         return;
     }
 
-    printf("%8s %10s %10s %10s %10s %10s %10s %10s\n",
+    DEBUG("%8s %10s %10s %10s %10s %10s %10s %10s",
         "type", "offset", "vaddr", "paddr", "filesz", "memsz", "flags", "align");
 
     for (size_t i = 0; i < phnum; ++i)

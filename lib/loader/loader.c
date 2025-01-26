@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <common/list.h>
@@ -18,9 +19,7 @@
 // https://www.sco.com/developers/devspecs/abi386-4.pdf
 
 int debug;
-static auxv_t saved_auxv = {
-    ._AT_EXECFD = -1
-};
+static auxv_t saved_auxv = { ._AT_EXECFD = -1 };
 static LIST_DECLARE(libs);
 static void* syscalls_start;
 static size_t syscalls_size;
@@ -155,7 +154,7 @@ static void missing_symbol_add(const char* name, elf32_sym_t* symbol, elf32_rel_
 {
     symbol_t* missing = ALLOC(malloc(sizeof(*missing)));
 
-    DEBUG("adding missing symbol %s\n", name);
+    DEBUG("adding missing symbol %s", name);
 
     list_init(&missing->missing);
     missing->name = name;
@@ -295,7 +294,7 @@ static void missing_symbols_verify(list_head_t* missing_symbols)
     }
 }
 
-static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_base, uintptr_t* brk_address)
+static void link(dynamic_t* dynamic, uintptr_t base_address, uintptr_t lib_base, uintptr_t* brk_address)
 {
     uintptr_t page_size = AUX_GET(AT_PAGESZ);
     LIST_DECLARE(missing_symbols);
@@ -364,7 +363,7 @@ static void link(dynamic_t* dynamic, int, uintptr_t base_address, uintptr_t lib_
                         if (symbol && symbol->st_shndx)
                         {
                             symbol_relocate(symbol, s->rel, s->base_address, lib_base);
-                            DEBUG("resolved symbol: %s\n", s->name);
+                            DEBUG("resolved symbol: %s", s->name);
                             list_del(&s->missing);
                         }
                     }
@@ -469,7 +468,7 @@ void relocate_itself(elf32_auxv_t** auxv)
     }
 }
 
-static __attribute__((noreturn)) void loader_main(int argc, char* argv[], char* envp[], elf32_auxv_t** auxv, void* stack_ptr)
+static __attribute__((noreturn,noinline)) void loader_main(int argc, char* argv[], char* envp[], elf32_auxv_t** auxv, void* stack_ptr)
 {
     int exec_fd = 0;
     elf32_phdr_t* phdr = NULL;
@@ -486,6 +485,8 @@ static __attribute__((noreturn)) void loader_main(int argc, char* argv[], char* 
     __libc_start_main(argc, argv, envp);
 
     debug = !!getenv("L");
+
+    print_init();
 
     auxv_read(auxv);
 
@@ -518,7 +519,7 @@ static __attribute__((noreturn)) void loader_main(int argc, char* argv[], char* 
         }
     }
 
-    link(&dynamic, exec_fd, base_address, lib_base, &brk_address);
+    link(&dynamic, base_address, lib_base, &brk_address);
 
     close(exec_fd);
     brk((void*)brk_address);
