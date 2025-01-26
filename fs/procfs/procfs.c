@@ -10,6 +10,7 @@
 #include <kernel/seq_file.h>
 #include <kernel/vm_print.h>
 #include <kernel/api/dirent.h>
+#include <kernel/page_table.h>
 #include <kernel/generic_vfs.h>
 
 #define DEBUG_PROCFS 0
@@ -630,16 +631,38 @@ static int meminfo_show(seq_file_t* s)
     return 0;
 }
 
-static const char* kernel_address_get(process_t* p, uintptr_t addr)
+struct mapped_addr
 {
-    uintptr_t paddr = vm_paddr(addr, p->mm->pgd);
+    page_t* page;
+    void* vaddr;
+};
 
-    if (!paddr)
+typedef struct mapped_addr mapped_addr_t;
+
+static mapped_addr_t mapped_address_get(process_t* p, uintptr_t addr)
+{
+    page_t* page;
+    uintptr_t paddr = vm_paddr(addr, p->mm->pgd);
+    mapped_addr_t mapped_addr = {};
+
+    if (unlikely(!paddr))
     {
-        return NULL;
+        return mapped_addr;
     }
 
-    return virt_ptr(paddr);
+    page = page(paddr);
+
+    page_kernel_map(page, kernel_identity_pgprot(0));
+
+    mapped_addr.page = page;
+    mapped_addr.vaddr = page_virt_ptr(page) + (addr & PAGE_MASK);
+
+    return mapped_addr;
+}
+
+static void mapped_address_put(mapped_addr_t* addr)
+{
+    page_kernel_unmap(addr->page);
 }
 
 static void memory_to_seq_file(seq_file_t* s, const char* data, size_t n)
@@ -656,14 +679,18 @@ static int cmdline_show(seq_file_t* s)
 
     if (p)
     {
-        const char* env = kernel_address_get(p, p->mm->args_start);
+        mapped_addr_t addr = mapped_address_get(p, p->mm->args_start);
 
-        if (unlikely(!env))
+        const char* cmdline = addr.vaddr;
+
+        if (unlikely(!cmdline))
         {
             return -ENOMEM;
         }
 
-        memory_to_seq_file(s, env, p->mm->args_end - p->mm->args_start);
+        memory_to_seq_file(s, cmdline, p->mm->args_end - p->mm->args_start);
+
+        mapped_address_put(&addr);
 
         return 0;
     }
@@ -690,7 +717,9 @@ static int environ_show(seq_file_t* s)
         return -ESRCH;
     }
 
-    const char* env = kernel_address_get(p, p->mm->env_start);
+    mapped_addr_t addr = mapped_address_get(p, p->mm->env_start);
+
+    const char* env = addr.vaddr;
 
     if (unlikely(!env))
     {
@@ -698,6 +727,8 @@ static int environ_show(seq_file_t* s)
     }
 
     memory_to_seq_file(s, env, p->mm->env_end - p->mm->env_start);
+
+    mapped_address_put(&addr);
 
     return 0;
 }
