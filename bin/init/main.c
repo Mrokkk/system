@@ -1,4 +1,5 @@
 #include <time.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -144,14 +145,21 @@ static int shell_run(const char* pathname, const char* console_device)
 
     setvbuf(stdout, NULL, _IOLBF, 0);
 
+    struct termios t;
+    if (tcgetattr(0, &t))
+    {
+        syslog(LOG_ERR, "cannot read termios: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
     printf(RED "W" GREEN "e" YELLOW "l" BLUE "c" MAGENTA "o" CYAN "m" MAGENTA "e!\n" RESET);
     printf(BG"Have fun..."RESET"\n");
     printf("\e[38;2;35;135;39m...with colors :)"RESET"\n");
 
-    const char* shell = shell_find();
+    time_t ts = time(NULL);
+    printf("%s", ctime(&ts));
 
-    time_t t = time(NULL);
-    printf("%s", ctime(&t));
+    const char* shell = shell_find();
 
     if (!shell)
     {
@@ -180,14 +188,8 @@ static int shell_run(const char* pathname, const char* console_device)
 
         int count;
         char tmp[128] = {0, };
-        struct termios t;
 
-        if (!tcgetattr(0, &t))
-        {
-            t.c_lflag |= ECHO | ICANON | ISIG | IEXTEN | ECHOE| ECHOKE | ECHOCTL;
-            t.c_cc[VEOF] = 4;
-            tcsetattr(0, 0, &t);
-        }
+        tcsetattr(0, 0, &t);
 
         printf("; type sh to rerun, press CTRL+D to reboot\n");
 
