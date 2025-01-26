@@ -32,6 +32,8 @@
 
 #ifndef __ASSEMBLER__
 
+#include <kernel/printk.h>
+
 static inline void pgd_load(pgd_t* pgd)
 {
     asm volatile(
@@ -56,5 +58,7 @@ static inline void pgd_reload(void)
 
 #define tlb_flush()            pgd_reload()
 #define tlb_flush_single(addr) invlpg(addr)
+
+void page_tables_print(const char* header, loglevel_t severity, uintptr_t address, const pgd_t* pgd);
 
 #endif

@@ -20,10 +20,7 @@ static inline int pmd_alloc_impl(pud_t*, uintptr_t)
 
 int pte_alloc_impl(pmd_t* pmd);
 
-void pgd_print(const pgd_t* pgd, char* output, size_t size);
-void pud_print(const pud_t* pud, char* output, size_t size);
-void pmd_print(const pmd_t* pmd, char* output, size_t size);
-void pte_print(const pte_t* pte, char* output, size_t size);
+#define PAGE_TABLES 2
 
 #define PGD_SHIFT 22
 #define PUD_SHIFT PGD_SHIFT

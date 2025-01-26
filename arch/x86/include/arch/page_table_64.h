@@ -20,6 +20,8 @@ static inline int pmd_alloc_impl(pud_t*, uintptr_t)
 
 int pte_alloc_impl(pmd_t* pmd);
 
+#define PAGE_TABLES 4
+
 #define PGD_SHIFT 39
 #define PUD_SHIFT 30
 #define PMD_SHIFT 21

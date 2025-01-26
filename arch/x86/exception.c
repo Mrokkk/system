@@ -85,19 +85,19 @@ static void pf_reason_print(uintptr_t error_code, uintptr_t cr2, char* output, s
 
 static void page_fault_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t cr2, uintptr_t cr3, const char* header)
 {
-    char buffer[256];
+    char buffer[128];
     pgd_t* pgd = virt_ptr(cr3);
 
     pf_reason_print(regs->error_code, cr2, buffer, sizeof(buffer));
     log(severity, "%s: %s", header, buffer);
     log(severity, "%s: pgd: cr3 = %p, mm->pgd = %p", header, ptr(cr3), process_current->mm->pgd);
 
-    const pgd_t* pgde = pgd_offset(pgd, cr2);
-
     if (unlikely(cr3 != phys_addr(process_current->mm->pgd)))
     {
         log_critical("bug: cr3 != mm->pgd");
     }
+
+    const pgd_t* pgde = pgd_offset(pgd, cr2);
 
     if (unlikely(!vm_paddr(virt(cr3), kernel_page_dir)))
     {
@@ -109,51 +109,7 @@ static void page_fault_description_print(loglevel_t severity, const pt_regs_t* r
         return;
     }
 
-    if (pgd_entry_none(pgde))
-    {
-        log(severity, "%s: pgd[%zu]: not mapped", header, pgde - pgd);
-        return;
-    }
-
-    pgd_print(pgde, buffer, sizeof(buffer));
-    log(severity, "%s: pgd[%zu]: %s", header, pgde - pgd, buffer);
-
-    const pud_t* pude = pud_offset(pgde, cr2);
-
-#ifndef PUD_FOLDED
-    if (pud_entry_none(pude))
-    {
-        log(severity, "%s: pud[%u]: not mapped", header, pud_index(cr2));
-        return;
-    }
-
-    pud_print(pude, buffer, sizeof(buffer));
-    log(severity, "%s: pud[%u]: %s", header, pud_index(cr2), buffer);
-#endif
-
-    const pmd_t* pmde = pmd_offset(pude, cr2);
-
-#ifndef PMD_FOLDED
-    if (pmd_entry_none(pmde))
-    {
-        log(severity, "%s: pmd[%u]: not mapped", header, pmd_index(cr2));
-        return;
-    }
-
-    pmd_print(pmde, buffer, sizeof(buffer));
-    log(severity, "%s: pmd[%u]: %s", header, pmd_index(cr2), buffer);
-#endif
-
-    const pte_t* pte = pte_offset(pmde, cr2);
-
-    if (pte_entry_none(pte))
-    {
-        log(severity, "%s: pte[%u]: not mapped", header, pte_index(cr2));
-        return;
-    }
-
-    pte_print(pte, buffer, sizeof(buffer));
-    log(severity, "%s: pte[%u]: %s", header, pte_index(cr2), buffer);
+    page_tables_print(header, severity, cr2, pgd);
 }
 
 static void general_protection_description_print(loglevel_t severity, const pt_regs_t* regs, uintptr_t, uintptr_t, const char* header)
