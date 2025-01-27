@@ -25,6 +25,7 @@ double floor(double x);
 double exp(double x);
 double log(double x);
 double log10(double x);
+double ldexp(double x, int exp);
 
 double sqrt(double x);
 double pow(double x, double y);

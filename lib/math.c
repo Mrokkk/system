@@ -23,6 +23,12 @@ BUILTIN1(asin, double, x);
 BUILTIN1(acos, double, x);
 BUILTIN1(atan, double, x);
 
+double LIBC(ldexp)(double x, int exp)
+{
+    return __builtin_ldexp(x, exp);
+}
+LIBC_ALIAS(ldexp);
+
 double LIBC(atan2)(double y, double x)
 {
     return __builtin_atan2(y, x);

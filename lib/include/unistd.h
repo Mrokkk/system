@@ -2,6 +2,7 @@
 
 #include <time.h>
 #include <bits/getopt.h>
+#include <common/bits.h>
 #include <kernel/api/unistd.h>
 
 // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/basedefs/unistd.h.html
@@ -31,7 +32,7 @@ unsigned int sleep(unsigned int seconds);
 int gethostname(char* name, size_t namelen);
 int getpagesize(void);
 
-[[noreturn]] void _exit(int retcode);
+__NORETURN void _exit(int retcode);
 
 long sysconf(int name);
 

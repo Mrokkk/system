@@ -90,8 +90,7 @@ function _step_execute()
 
     pushd_silent "${BUILD_DIR}"
 
-    (set -eo pipefail; \
-    SRC_DIR=${SRC_DIR} \
+    (SRC_DIR=${SRC_DIR} \
     PREFIX=${prefix} \
     TARGET=${target} \
     SYSROOT=${sysroot} \
@@ -133,6 +132,8 @@ function _args_parse()
     while [[ $# -gt 0 ]]; do
         arg="$1"
         case $arg in
+            -d|--dbg)
+                set -x ;;
             -v|--verbose)
                 verbose=1 ;;
             -n|--dry-run)

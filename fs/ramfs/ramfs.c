@@ -18,6 +18,8 @@ static int ramfs_mkdir(inode_t* parent, const char* name, int, int, inode_t** re
 static int ramfs_create(inode_t* parent, const char* name, int, int, inode_t** result);
 static int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add);
 static int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int);
+static int ramfs_mmap(file_t* file, vm_area_t* vma);
+static int ramfs_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page);
 
 static file_system_t ramfs = {
     .name = "ramfs",
@@ -31,12 +33,17 @@ static file_operations_t ramfs_fops = {
     .write = &ramfs_write,
     .open = &ramfs_open,
     .readdir = &ramfs_readdir,
+    .mmap = &ramfs_mmap,
 };
 
 static inode_operations_t ramfs_inode_ops = {
     .lookup = &ramfs_lookup,
     .mkdir = &ramfs_mkdir,
     .create = &ramfs_create
+};
+
+static vm_operations_t ramfs_vmops = {
+    .nopage = &ramfs_nopage,
 };
 
 static page_t* ramfs_starting_page(ram_node_t* node, size_t offset)
@@ -464,6 +471,66 @@ static int ramfs_readdir(file_t* file, void* buf, direntadd_t dirent_add)
     file->offset = ctx.offset;
 
     return ctx.count;
+}
+
+static int ramfs_mmap(file_t*, vm_area_t* vma)
+{
+    vma->ops = &ramfs_vmops;
+    return 0;
+}
+
+typedef struct readpage_context readpage_context_t;
+
+struct readpage_context
+{
+    size_t offset; // Offset within current page
+    page_t* current_page;
+};
+
+static cmd_t ramfs_nopage_block(void* block, size_t to_copy, void* data)
+{
+    readpage_context_t* ctx = data;
+    page_t* current_page = ctx->current_page;
+
+    memcpy(shift(page_virt_ptr(current_page), ctx->offset), block, to_copy);
+
+    if ((ctx->offset += to_copy) == PAGE_SIZE)
+    {
+        ctx->current_page = list_next_entry(&current_page->list_entry, page_t, list_entry);
+        ctx->offset = 0;
+    }
+
+    return TRAVERSE_CONTINUE;
+}
+
+static int ramfs_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page)
+{
+    int res, errno;
+    ram_node_t* node = vma->dentry->inode->fs_data;
+
+    *page = page_alloc(1, 0);
+
+    if (unlikely(!*page))
+    {
+        return -ENOMEM;
+    }
+
+    readpage_context_t ctx = {
+        .current_page = *page,
+        .offset = 0,
+    };
+
+    off_t vma_off = address - vma->start;
+
+    res = ramfs_traverse_blocks(node, vma->offset + vma_off, size, &ctx, &ramfs_nopage_block);
+
+    if (unlikely(errno = errno_get(res)))
+    {
+        pages_free(*page);
+        return errno;
+    }
+
+    return res;
 }
 
 static int ramfs_mount(super_block_t* sb, inode_t* inode, void*, int)

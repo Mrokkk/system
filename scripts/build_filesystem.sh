@@ -142,6 +142,19 @@ function sf()
     else
         setfont /usr/share/kbd/consolefonts/${1}.psf
     fi
+}
+function h()
+{
+    cd /tmp
+    echo "#include <stdio.h>
+
+int main()
+{
+    printf(\"Hello world!\n\");
+}
+" > /tmp/h.c
+    tcc -rdynamic /tmp/h.c
+    ./a.out
 }'
 
 vimrc_content="let mapleader = \",\"
@@ -207,6 +220,7 @@ create_dir "${mountpoint}/sys"
 create_dir "${mountpoint}/tmp"
 create_dir "${mountpoint}/usr/share"
 create_dir "${mountpoint}/usr/src"
+create_dir "${mountpoint}/usr/include"
 
 for binary in $(find bin -type f -executable)
 do
@@ -224,6 +238,9 @@ copy_dir_content ../resources ${mountpoint}/usr/share
 copy_dir_content sysroot/usr/share ${mountpoint}/usr/share
 copy_dir_content sysroot/lib ${mountpoint}/lib
 copy_dir_content sysroot/bin ${mountpoint}/bin
+copy_dir_content sysroot/include ${mountpoint}/usr/include
+copy_dir_content sysroot/usr/include ${mountpoint}/usr/include
+copy_dir_content sysroot/usr/lib "${mountpoint}/lib"
 
 write_to "${vconsole_content}" "${mountpoint}/etc/vconsole.conf"
 write_to "${bashrc_content}" "${mountpoint}/root/.bashrc"

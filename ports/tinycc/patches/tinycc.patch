@@ -1,0 +1,102 @@
+commit 46ad4ff3b4af63f7fd70b6336a60ff5879755551
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Mon Jan 27 18:59:12 2025 +0100
+
+    Make it build binaries
+    
+    * don't run uname to get target OS name
+    * don't link tcc with libm and libdl (part of libc)
+    * set ELF_START_ADDR to 0x1000
+    * remove linking with libtcc1.a
+    * use crt0.o instead crt1.o
+    * small fix for crash in filling GOT
+    * remove usage of scanf
+
+diff --git a/Makefile b/Makefile
+index 3ae466f..c6d87fc 100644
+--- a/Makefile
++++ b/Makefile
+@@ -30,9 +30,7 @@ ifdef CONFIG_WIN32
+  CFGWIN = -win
+  NATIVE_TARGET = $(ARCH)-win$(if $(findstring arm,$(ARCH)),ce,32)
+ else
+- LIBS=-lm
+  ifneq ($(CONFIG_ldl),no)
+-  LIBS+=-ldl
+  endif
+  # make libtcc as static or dynamic library?
+  ifeq ($(CONFIG_static),no)
+diff --git a/configure b/configure
+index 1ee3acb..ae41727 100755
+--- a/configure
++++ b/configure
+@@ -49,7 +49,7 @@ gcc_major=0
+ gcc_minor=0
+ 
+ # OS specific
+-targetos=`uname`
++targetos="Phoenix"
+ case $targetos in
+   Darwin)
+     confvars="$confvars OSX"
+diff --git a/i386-link.c b/i386-link.c
+index aea3c21..692322f 100644
+--- a/i386-link.c
++++ b/i386-link.c
+@@ -12,7 +12,7 @@
+ 
+ #define R_NUM       R_386_NUM
+ 
+-#define ELF_START_ADDR 0x08048000
++#define ELF_START_ADDR 0x1000
+ #define ELF_PAGE_SIZE  0x1000
+ 
+ #define PCRELATIVE_DLLPLT 0
+diff --git a/libtcc.c b/libtcc.c
+index 1e9dd97..026100a 100644
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -765,9 +765,8 @@ LIBTCCAPI TCCState *tcc_new(void)
+     define_push(TOK___COUNTER__, MACRO_OBJ, NULL, NULL);
+     {
+         /* define __TINYC__ 92X  */
+-        char buffer[32]; int a,b,c;
+-        sscanf(TCC_VERSION, "%d.%d.%d", &a, &b, &c);
+-        sprintf(buffer, "%d", a*10000 + b*100 + c);
++        char buffer[32];
++        sprintf(buffer, "%d", 927);
+         tcc_define_symbol(s, "__TINYC__", buffer);
+     }
+ 
+@@ -975,7 +974,7 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
+     if ((output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) &&
+         !s->nostdlib) {
+         if (output_type != TCC_OUTPUT_DLL)
+-            tcc_add_crt(s, "crt1.o");
++            tcc_add_crt(s, "crt0.o");
+         tcc_add_crt(s, "crti.o");
+     }
+ #endif
+diff --git a/tccelf.c b/tccelf.c
+index 70d47e1..4d97d82 100644
+--- a/tccelf.c
++++ b/tccelf.c
+@@ -1200,7 +1200,6 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
+                 tcc_add_dll(s1, TCC_LIBGCC, 0);
+         }
+ #endif
+-        tcc_add_support(s1, TCC_LIBTCC1);
+         /* add crt end if not memory output */
+         if (s1->output_type != TCC_OUTPUT_MEMORY)
+             tcc_add_crt(s1, "crtn.o");
+@@ -1359,6 +1358,10 @@ ST_FUNC void fill_got(TCCState *s1)
+ static void fill_local_got_entries(TCCState *s1)
+ {
+     ElfW_Rel *rel;
++    if (!s1->got->reloc) {
++        fprintf(stderr, "no reloc\n");
++        return;
++    }
+     for_each_elem(s1->got->reloc, 0, rel, ElfW_Rel) {
+ 	if (ELFW(R_TYPE)(rel->r_info) == R_RELATIVE) {
+ 	    int sym_index = ELFW(R_SYM) (rel->r_info);

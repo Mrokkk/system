@@ -173,7 +173,29 @@ DIAG_RESTORE();
         die(__VA_ARGS__); \
     }
 
+static const char* rel_name(int type)
+{
+    switch (type)
+    {
+        case R_386_NONE:     return "R_386_NONE";
+        case R_386_32:       return "R_386_32";
+        case R_386_PC32:     return "R_386_PC32";
+        case R_386_GOT32:    return "R_386_GOT32";
+        case R_386_PLT32:    return "R_386_PLT32";
+        case R_386_COPY:     return "R_386_COPY";
+        case R_386_GLOB_DAT: return "R_386_GLOB_DAT";
+        case R_386_JMP_SLOT: return "R_386_JMP_SLOT";
+        case R_386_RELATIVE: return "R_386_RELATIVE";
+        case R_386_GOTOFF:   return "R_386_GOTOFF";
+        case R_386_GOTPC:    return "R_386_GOTPC";
+        case R_386_32PLT:    return "R_386_32PLT";
+        case R_386_GOT32X:   return "R_386_GOT32X";
+        default:             return "unknown";
+    }
+}
+
 static void symbol_relocate(
+    const char* symbol_name,
     const elf32_sym_t* symbol,
     const elf32_rel_t* rel,
     uintptr_t base_address, // base address of the binary where symbol is needed
@@ -196,6 +218,7 @@ static void symbol_relocate(
             uintptr_t B = lib_base_address;
             uintptr_t A = *memory;
             *memory = B + A;
+            DEBUG("%s: %p = %p + %p", rel_name(type), memory, B, A);
             break;
         }
 
@@ -205,6 +228,7 @@ static void symbol_relocate(
             ENSURE(symbol, "missing symbol for %#x relocation at %p", type, memory);
             uintptr_t S = lib_base_address + symbol->st_value;
             *memory = S;
+            DEBUG("%s: %p = %p (symbol: %s)", rel_name(type), memory, S, symbol_name);
             break;
         }
 
@@ -215,6 +239,7 @@ static void symbol_relocate(
             uintptr_t A = *memory;
 
             *memory = S + A;
+            DEBUG("%s: %p = %p + %p (symbol: %s)", rel_name(type), memory, S, A, symbol_name);
             break;
         }
 
@@ -226,17 +251,20 @@ static void symbol_relocate(
             uintptr_t P = ADDR(memory);
 
             *memory = S + A - P;
+            DEBUG("%s: %p = %p + %p - %p (symbol: %s)", rel_name(type), memory, S, A, P, symbol_name);
             break;
         }
 
         case R_386_NONE: // none
+        case R_386_COPY:
         {
+            DEBUG("%s (symbol: %s)", rel_name(type), symbol_name);
             break;
         }
 
         default:
         {
-            fprintf(stderr, "warning: unsupported rel type: %#x\n", type);
+            die("unsupported rel type: %s (%#x)", rel_name(type), type);
         }
     }
 }
@@ -274,7 +302,7 @@ static void relocate(rel_t* rel, dynamic_t* dynamic, uintptr_t base_address, lis
 
             default:
             {
-                symbol_relocate(symbol, entry, base_address, base_address);
+                symbol_relocate(NULL, symbol, entry, base_address, base_address);
             }
         }
     });
@@ -282,7 +310,7 @@ static void relocate(rel_t* rel, dynamic_t* dynamic, uintptr_t base_address, lis
 
 static void missing_symbols_verify(list_head_t* missing_symbols)
 {
-    if (!list_empty(missing_symbols))
+    if (UNLIKELY(!list_empty(missing_symbols)))
     {
         symbol_t* s;
         fprintf(stderr, "%s: cannot load executable\n", AUX_GET(AT_EXECFN));
@@ -362,8 +390,7 @@ static void link(dynamic_t* dynamic, uintptr_t base_address, uintptr_t lib_base,
                         const elf32_sym_t* symbol = elf_lookup(&lib_dynamic, s->name);
                         if (symbol && symbol->st_shndx)
                         {
-                            symbol_relocate(symbol, s->rel, s->base_address, lib_base);
-                            DEBUG("resolved symbol: %s", s->name);
+                            symbol_relocate(s->name, symbol, s->rel, s->base_address, lib_base);
                             list_del(&s->missing);
                         }
                     }
@@ -497,12 +524,20 @@ static __attribute__((noreturn,noinline)) void loader_main(int argc, char* argv[
 
     phdr_print(phdr, AUX_GET(AT_PHNUM));
 
-    loader_breakpoint(AUX_GET(AT_EXECFN), base_address);
-
     PHDR_FOR_EACH(p, phdr, AUX_GET(AT_PHNUM))
     {
         switch (p->p_type)
         {
+            case PT_PHDR:
+            {
+                // FIXME: hack for ET_EXEC built by tcc
+                if (UNLIKELY((p->p_vaddr & ~(page_size - 1)) == base_address))
+                {
+                    base_address = 0;
+                }
+                break;
+            }
+
             case PT_DYNAMIC:
             {
                 dynamic_read(p, &dynamic, &libs, base_address);
@@ -518,6 +553,8 @@ static __attribute__((noreturn,noinline)) void loader_main(int argc, char* argv[
             }
         }
     }
+
+    loader_breakpoint(AUX_GET(AT_EXECFN), base_address);
 
     link(&dynamic, base_address, lib_base, &brk_address);
 
@@ -543,7 +580,7 @@ static __attribute__((noreturn,noinline)) void loader_main(int argc, char* argv[
         :: "r" (AUX_GET(AT_ENTRY)), "r" (stack_ptr)
         : "memory");
 
-    while (1);
+    __builtin_trap();
 }
 
 __attribute__((noreturn)) int main(int argc, char* argv[], char* envp[])

@@ -1,16 +1,17 @@
 #pragma once
 
 #include <stddef.h>
+#include <common/bits.h>
 
 void* malloc(size_t size);
 void* calloc(size_t nmemb, size_t size);
 void* realloc(void* ptr, size_t size);
 void free(void* ptr);
 
-[[noreturn]] void exit(int retcode);
-[[noreturn]] void _exit(int retcode);
-[[noreturn]] void _Exit(int retcode);
-[[noreturn]] void abort(void);
+__NORETURN void exit(int retcode);
+__NORETURN void _exit(int retcode);
+__NORETURN void _Exit(int retcode);
+__NORETURN void abort(void);
 
 int setenv(const char* name, const char* value, int overwrite);
 int unsetenv(const char* name);
@@ -40,7 +41,14 @@ unsigned long strtoul(
     char** restrict endptr,
     int base);
 
+unsigned long long strtoull(
+    const char* restrict nptr,
+    char** restrict endptr,
+    int base);
+
 double strtod(const char* restrict nptr, char** restrict endptr);
+float strtof(const char* restrict nptr, char** restrict endptr);
+long double strtold(const char* nptr, char** endptr);
 
 void qsort(
     void* base,

@@ -78,5 +78,3 @@
 #define DIAG_IGNORE(...)
 #define DIAG_RESTORE()
 #endif
-
-

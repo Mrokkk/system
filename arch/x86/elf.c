@@ -201,11 +201,23 @@ static void elf_cleanup(void* data)
     ffree(elf_data, sizeof(*elf_data));
 }
 
-static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phnum, binary_t* bin, uintptr_t base)
+struct elf_params
+{
+    elf32_phdr_t* phdr;
+    size_t phnum;
+    uintptr_t base;
+    uintptr_t phdr_vaddr;
+};
+
+typedef struct elf_params elf_params_t;
+
+static int elf_program_headers_load(file_t* file, binary_t* bin, elf_params_t* params)
 {
     int errno;
+    elf32_phdr_t* phdr = params->phdr;
+    uintptr_t base = params->base;
 
-    for (uint32_t i = 0; i < phnum; ++i)
+    for (uint32_t i = 0; i < params->phnum; ++i)
     {
         log_debug(DEBUG_ELF, "%8s %#010x %#010x %#010x %#010x %#010x %#x %#x", elf_phdr_type_get(phdr[i].p_type),
             phdr[i].p_offset,
@@ -216,9 +228,15 @@ static int elf_program_headers_load(file_t* file, elf32_phdr_t* phdr, size_t phn
             phdr[i].p_flags,
             phdr[i].p_align);
 
-        if (phdr[i].p_type != PT_LOAD)
+        switch (phdr[i].p_type)
         {
-            continue;
+            case PT_LOAD:
+                break;
+            case PT_PHDR:
+                params->phdr_vaddr = phdr[i].p_vaddr;
+                fallthrough;
+            default:
+                continue;
         }
 
         int flags = mmap_flags_get(&phdr[i]);
@@ -277,7 +295,7 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
     elf_data_t* elf_data = data;
     elf32_header_t* header = &elf_data->header;
     elf32_phdr_t* phdr = page_virt_ptr(elf_data->header_page);
-    uint32_t base = 0;
+    uintptr_t base = 0;
 
     if (header->e_type == ET_DYN)
     {
@@ -285,7 +303,13 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
         base = 0x1000;
     }
 
-    if ((errno = elf_program_headers_load(file, phdr, header->e_phnum, bin, base)))
+    elf_params_t params = {
+        .base = base,
+        .phdr = phdr,
+        .phnum = header->e_phnum,
+    };
+
+    if (unlikely(errno = elf_program_headers_load(file, bin, &params)))
     {
         return errno;
     }
@@ -295,7 +319,7 @@ static int elf_load(file_t* file, binary_t* bin, void* data, argvecs_t argvecs)
     log_debug(DEBUG_ELF, "entry: %p", bin->entry);
 
     if (!aux_insert(AT_ENTRY, addr(bin->entry), argvecs) ||
-        !aux_insert(AT_PHDR, base + header->e_phoff, argvecs) ||
+        !aux_insert(AT_PHDR, base + params.phdr_vaddr, argvecs) ||
         !aux_insert(AT_PHENT, header->e_phentsize, argvecs) ||
         !aux_insert(AT_PHNUM, header->e_phnum, argvecs))
     {
@@ -316,7 +340,13 @@ static int elf_interp_load(file_t* file, binary_t* bin, void* data, argvecs_t ar
         ? 0x5ff80000
         : 0xbff00000;
 
-    if ((errno = elf_program_headers_load(file, phdr, header->e_phnum, bin, base)))
+    elf_params_t params = {
+        .base = base,
+        .phdr = phdr,
+        .phnum = header->e_phnum,
+    };
+
+    if (unlikely(errno = elf_program_headers_load(file, bin, &params)))
     {
         return errno;
     }

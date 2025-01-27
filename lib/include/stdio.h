@@ -94,6 +94,8 @@ int ferror(FILE* stream);
 int fflush(FILE* stream);
 int fpurge(FILE *stream);
 
+int remove(const char* pathname);
+
 #define P_tmpdir    "/tmp"
 #define L_tmpnam    20
 #define TMP_MAX     238328

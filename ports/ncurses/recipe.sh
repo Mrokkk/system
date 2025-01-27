@@ -21,16 +21,17 @@ function build()
         --without-cxx-binding \
         --without-tests \
         --without-manpages \
-        --disable-stripping
+        --disable-stripping | exit 1
 
     sed -i 's/^.* TERMINFO_DIRS .*/#define TERMINFO_DIRS \"\/usr\/share\/terminfo\"/g;
             s/^.* TERMINFO .*/#define TERMINFO_DIRS \"\/usr\/share\/terminfo\"/g' \
         ${BUILD_DIR}/include/ncurses_cfg.h || die "cannot fix ncurses_cfg.h"
 
-    make -O -j${NPROC} || die "compilation failed"
+    make -O -j${NPROC} || exit 1
 }
 
 function install()
 {
-    make -O -j${NPROC} install || die "installation failed"
+    make -O -j${NPROC} install || exit 1
+    rm ${SYSROOT}/usr/lib/terminfo
 }

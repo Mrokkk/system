@@ -32,6 +32,7 @@ set(LIBC_SRC
     confstr.c
     ctype.c
     dirent.c
+    dlfcn.c
     env.c
     errno.c
     error.c
@@ -87,6 +88,7 @@ set(LIBC_SRC
     stdio/fseek.c
     stdio/fwrite.c
     stdio/gnulib.c
+    stdio/remove.c
     stdio/scanf.c
     stdio/setvbuf.c
     stdio/sprintf.c
@@ -139,6 +141,12 @@ target_compile_options(crt0
 
 add_library(crt0_shared OBJECT crt0_shared.c)
 
+set_property(SOURCE "crti.S" PROPERTY LANGUAGE C)
+set_property(SOURCE "crtn.S" PROPERTY LANGUAGE C)
+
+add_library(crti OBJECT crti.S)
+add_library(crtn OBJECT crtn.S)
+
 add_subdirectory(loader)
 
 add_custom_target(
@@ -152,18 +160,20 @@ add_dependencies(c libc_headers_install)
 add_dependencies(c_static libc_headers_install)
 
 add_custom_target(
-    crt0_install
+    crt_install
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0> ../sysroot/usr/lib/crt0.o
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crt0_shared> ../sysroot/usr/lib/crt0_shared.o
-    DEPENDS crt0 crt0_shared libc_headers_install
-    COMMENT "Installing crt0"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crti> ../sysroot/usr/lib/crti.o
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_OBJECTS:crtn> ../sysroot/usr/lib/crtn.o
+    DEPENDS crt0 crti crtn crt0_shared libc_headers_install
+    COMMENT "Installing crt files"
 )
 
 add_custom_target(
     libc_install
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc_static.a ../sysroot/lib/libc.a
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different libc.so ../sysroot/lib/libc.so
-    DEPENDS crt0_install c c_static loader
+    DEPENDS crt_install c c_static loader
     COMMENT "Installing libc")
 
 add_dependencies(rootfs libc_install)

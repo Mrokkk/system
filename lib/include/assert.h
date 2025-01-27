@@ -1,7 +1,11 @@
 #ifndef _ASSERT_H
 #define _ASSERT_H
 
+#ifdef __GNUC__
 #define static_assert _Static_assert
+#else
+#define static_assert(...)
+#endif
 
 #endif
 

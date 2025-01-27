@@ -297,7 +297,7 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
         file = NULL;
         tmp = NULL;
 
-        if ((errno = do_open(&file, pathname, O_RDONLY, 0)))
+        if (unlikely(errno = do_open(&file, pathname, O_RDONLY, 0)))
         {
             return errno;
         }
@@ -341,7 +341,7 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
             return -ENOEXEC;
         }
 
-        if ((errno = binfmt->prepare(pathname, file, &tmp, &data)))
+        if (unlikely(errno = binfmt->prepare(pathname, file, &tmp, &data)))
         {
             return errno;
         }
@@ -428,7 +428,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
 
     execfn = aux_data_insert(AT_EXECFN, copied_path, strlen(copied_path) + 1, argvec);
 
-    if (!aux_insert(AT_PAGESZ, PAGE_SIZE, argvec) || !execfn)
+    if (unlikely(!aux_insert(AT_PAGESZ, PAGE_SIZE, argvec) || !execfn))
     {
         errno = -ENOMEM;
         goto restore;
@@ -439,7 +439,7 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
         argvec[ARGV].count,
         argvec[ENVP].count);
 
-    if ((errno = binary_image_load(copied_path, &bin, argvec)))
+    if (unlikely(errno = binary_image_load(copied_path, &bin, argvec)))
     {
         goto restore;
     }

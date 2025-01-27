@@ -105,7 +105,7 @@ target_link_libraries(
 add_custom_target(
     kernel_headers_install
     COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/include" sysroot/usr/include
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/common/include/common/" sysroot/usr/include
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory_if_different "${PROJECT_SOURCE_DIR}/common/include/common/" sysroot/usr/include/common
     COMMENT "Installing kernel headers"
 )
 

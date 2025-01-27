@@ -1,5 +1,6 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/types.h>
 
 #define SEEK_SET    1
@@ -20,10 +21,10 @@
 int fork(void);
 int getpid(void);
 int getppid(void);
-[[noreturn]] void exit(int);
-int write(int, const char*, size_t);
+__NORETURN void exit(int);
+int write(int, const void*, size_t);
 int pwrite(int fd, const void* buffer, size_t size, off_t offset);
-int read(int, char*, size_t);
+int read(int, void*, size_t);
 int pread(int fd, void* buffer, size_t size, off_t offset);
 int open(const char*, int, ...);
 int close(int);
