@@ -27,6 +27,18 @@ uint8_t vga_palette[] = {
     VGA_COLOR_BRIGHTWHITE,
 };
 
+int vga_probe(void)
+{
+    vga_crt_write(VGA_CRTC_CURSOR_HI, 0);
+
+    if (vga_crt_read(VGA_CRTC_CURSOR_HI))
+    {
+        return -ENODEV;
+    }
+
+    return 0;
+}
+
 int vga_font_set(size_t width, size_t height, void* data, size_t bytes_per_glyph, size_t glyphs_count)
 {
     vga_glyph_t* vga_font;

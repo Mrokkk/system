@@ -5,6 +5,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/dev.h>
+#include <kernel/vga.h>
 #include <kernel/tty.h>
 #include <kernel/init.h>
 #include <kernel/kernel.h>
@@ -72,6 +73,12 @@ static tty_driver_t tty_driver = {
 
 UNMAP_AFTER_INIT void earlycon_init(void)
 {
+    if (vga_probe())
+    {
+        log_info("not available");
+        return;
+    }
+
     tty_driver_register(&tty_driver);
     param_call_if_set(KERNEL_PARAM("earlycon"), &earlycon_enable);
 }

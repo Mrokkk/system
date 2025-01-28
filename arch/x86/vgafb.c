@@ -17,8 +17,7 @@
 
 #define DEFAULT_TEXT_MODE   3
 
-static int vgafb_fb_mode_get(int resx, int resy, int bpp);
-static int vgafb_fb_mode_set(int mode);
+static int vgafb_fb_mode_set(int resx, int resy, int bpp);
 
 struct mode_info
 {
@@ -70,7 +69,6 @@ static mode_info_t standard_modes[] = {
 static mode_info_t* current_mode;
 
 static fb_ops_t vgafb_ops = {
-    .mode_get = &vgafb_fb_mode_get,
     .mode_set = &vgafb_fb_mode_set,
 };
 
@@ -90,20 +88,6 @@ static fb_ops_t vgafb_ops = {
         regs.ah = 0xf; \
         &regs; \
     })
-
-static int vgafb_fb_mode_get(int resx, int resy, int bpp)
-{
-    for (size_t i = 0; i < array_size(standard_modes); ++i)
-    {
-        mode_info_t* m = &standard_modes[i];
-        if (m->resx == resx && m->resy == resy && m->bits == bpp)
-        {
-            return m->mode;
-        }
-    }
-
-    return -EINVAL;
-}
 
 static void vgafb_framebuffer_setup(mode_info_t* mode)
 {
@@ -125,27 +109,37 @@ static void vgafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.ops = &vgafb_ops;
 }
 
-static int vgafb_fb_mode_set(int mode)
+static int vgafb_fb_mode_set(int resx, int resy, int bpp)
 {
-    regs_t regs;
-
-    if (mode < 0 || mode > (int)array_size(standard_modes))
+    for (size_t i = 0; i < array_size(standard_modes); ++i)
     {
-        return -EINVAL;
+        mode_info_t* m = &standard_modes[i];
+        if (m->resx == resx && m->resy == resy && m->bits == bpp)
+        {
+            regs_t regs;
+
+            bios_call(BIOS_VIDEO, BIOS_VIDEO_MODE_SET(regs, m->mode));
+
+            current_mode = m;
+
+            vgafb_framebuffer_setup(current_mode);
+
+            return 0;
+        }
     }
 
-    bios_call(BIOS_VIDEO, BIOS_VIDEO_MODE_SET(regs, mode));
-
-    current_mode = &standard_modes[mode];
-
-    vgafb_framebuffer_setup(current_mode);
-
-    return 0;
+    return -EINVAL;
 }
 
 int vgafb_initialize(void)
 {
     regs_t regs;
+
+    if (vga_probe())
+    {
+        log_info("not available");
+        return -ENODEV;
+    }
 
     log_notice("calling INT %#x AH=0xf", BIOS_VIDEO);
 

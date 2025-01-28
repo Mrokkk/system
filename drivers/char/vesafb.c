@@ -1,6 +1,4 @@
 #define log_fmt(fmt) "vesafb: " fmt
-#include <arch/earlycon.h> // FIXME: remove this
-
 #include <kernel/init.h>
 #include <kernel/unit.h>
 #include <kernel/vesa.h>
@@ -37,8 +35,7 @@ typedef struct mode_info mode_info_t;
 typedef struct mapped_fb mapped_fb_t;
 
 static int vesafb_framebuffer_setup(mode_info_t* mode);
-static int vesafb_fb_mode_get(int resx, int resy, int bpp);
-static int vesafb_fb_mode_set(int mode);
+static int vesafb_fb_mode_set(int resx, int resy, int bpp);
 
 static mode_info_t* desired_mode;
 static mode_info_t* current_mode;
@@ -59,7 +56,6 @@ static struct
 };
 
 static fb_ops_t vesafb_ops = {
-    .mode_get = &vesafb_fb_mode_get,
     .mode_set = &vesafb_fb_mode_set,
 };
 
@@ -82,14 +78,14 @@ static const char* vesafb_memory_model_string(uint8_t model)
 static const char* vesafb_mode_string(mode_info_t* m, char* buf, size_t size)
 {
     int i;
-    i = snprintf(buf, size, "%04x:% 5d x% 5d x% 3d ", m->mode, m->resx, m->resy, m->bits);
+    i = snprintf(buf, size, "%#06x:% 5d x% 5d x% 3d ", m->mode, m->resx, m->resy, m->bits);
     i += snprintf(buf + i, size - i, "%s %s",
         m->type == VBE_MODE_GRAPHICS ? "graphics" : "text",
         m->color ? "color" : "mono");
 
     if (m->has_lfb)
     {
-        i += snprintf(buf + i, size - i, " fb=%x", m->fb_paddr);
+        i += snprintf(buf + i, size - i, " fb=%#x", m->fb_paddr);
     }
 
     snprintf(buf + i, size - i, " %s", vesafb_memory_model_string(m->memory_model));
@@ -148,7 +144,7 @@ static uint16_t vesafb_mode_read(void)
 
     if (unlikely(vbe_call(&regs)))
     {
-        log_warning("cannot read mode: %x", regs.ax);
+        log_warning("cannot read mode: %#x", regs.ax);
         return 0;
     }
 
@@ -245,13 +241,13 @@ static mode_info_t* vesafb_mode_find(void)
     return desired;
 }
 
-static int vesafb_fb_mode_get(int resx, int resy, int bpp)
+static int vesafb_fb_mode_set(int resx, int resy, int bpp)
 {
     for (mode_info_t* m = modes; m->is_valid; ++m)
     {
         if (m->resx == resx && m->resy == resy && m->bits == bpp)
         {
-            return m->mode;
+            return vesafb_mode_set(m);
         }
     }
 
@@ -274,19 +270,6 @@ static bool vesafb_is_mode_supported(mode_info_t* mode)
     }
 
     return false;
-}
-
-static int vesafb_fb_mode_set(int mode)
-{
-    for (mode_info_t* m = modes; m->is_valid; ++m)
-    {
-        if (m->mode == mode)
-        {
-            return vesafb_mode_set(m);
-        }
-    }
-
-    return -EINVAL;
 }
 
 static int vesafb_framebuffer_setup(mode_info_t* mode)
@@ -354,17 +337,17 @@ int vesafb_initialize(void)
 
     if (vbe_call(VBE_MODE_GET(regs)))
     {
-        log_info("VBE_GET_MODE_INFO failed with %x", regs.ah);
+        log_info("VBE_GET_MODE_INFO failed with %#x", regs.ah);
         return -ENOSYS;
     }
 
     if (vbe->version < 0x200)
     {
-        log_warning("too old version: %x", vbe->version);
+        log_warning("too old version: %#x", vbe->version);
         return -ENOSYS;
     }
 
-    log_notice("product name: %s; version: %x", farptr(vbe->oem_product_name), vbe->version);
+    log_notice("product name: %s; version: %#x", farptr(vbe->oem_product_name), vbe->version);
 
     page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
@@ -421,8 +404,6 @@ int vesafb_initialize(void)
         log_notice("current: %s", vesafb_mode_string(current_mode, buf, sizeof(buf)));
     }
 
-    earlycon_disable();
-
     desired_mode = desired_mode ? : vesafb_mode_find();
 
     if (desired_mode && !param_bool_get(KERNEL_PARAM("nomodeset")))
@@ -433,7 +414,7 @@ int vesafb_initialize(void)
         }
         else
         {
-            log_warning("incompatible mode: %x type %x fb %x",
+            log_warning("incompatible mode: %#x type %#x fb %#x",
                 desired_mode->mode,
                 desired_mode->type,
                 desired_mode->fb_paddr);

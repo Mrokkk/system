@@ -14,8 +14,8 @@
 
 static int fbcon_probe(framebuffer_t* fb);
 static int fbcon_probe_truecolor(framebuffer_t* fb);
-static int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resy, size_t* resx);
-static void fbcon_glyph_draw(console_driver_t* driver, size_t y, size_t x, glyph_t* glyph);
+static int fbcon_init(console_driver_t* driver, console_config_t* config, size_t* resx, size_t* resy);
+static void fbcon_glyph_draw(console_driver_t* driver, size_t x, size_t y, glyph_t* glyph);
 static void fbcon_glyph_draw_var(console_driver_t* drv, size_t x, size_t y, glyph_t* glyph);
 static void fbcon_screen_clear(console_driver_t* driver, uint32_t color);
 static void fbcon_sgr_rgb(console_driver_t* driver, uint32_t value, uint32_t* color);
@@ -159,7 +159,7 @@ static void fbcon_size_set(data_t* data, size_t* resx, size_t* resy)
 
 static int fbcon_probe(framebuffer_t* fb)
 {
-    if (fb->type == FB_TYPE_PACKED_PIXELS && fb->bpp != 32)
+    if (fb->type == FB_TYPE_PACKED_PIXELS && fb->bpp != 32 && fb->vaddr)
     {
         return 0;
     }
@@ -169,7 +169,7 @@ static int fbcon_probe(framebuffer_t* fb)
 
 static int fbcon_probe_truecolor(framebuffer_t* fb)
 {
-    if (fb->type == FB_TYPE_PACKED_PIXELS && fb->bpp == 32)
+    if (fb->type == FB_TYPE_PACKED_PIXELS && fb->bpp == 32 && fb->vaddr)
     {
         return 0;
     }

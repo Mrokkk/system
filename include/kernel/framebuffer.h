@@ -4,11 +4,12 @@
 #include <stddef.h>
 #include <kernel/api/ioctl.h>
 
+#define FB_VIRTFB 1
+
 struct fb_ops
 {
     void (*dirty_set)(size_t x, size_t y, size_t w, size_t h);
-    int (*mode_get)(int resx, int resy, int bpp);
-    int (*mode_set)(int mode);
+    int (*mode_set)(int resx, int resy, int bpp);
 };
 
 typedef struct fb_ops fb_ops_t;
@@ -27,6 +28,7 @@ struct framebuffer
     uint8_t     type_aux;
     uint8_t     visual;
     int         accel;
+    int         flags;
 
     fb_ops_t*   ops;
 };

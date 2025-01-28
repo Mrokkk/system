@@ -16,16 +16,14 @@
 static virtio_device_t* gpu;
 static volatile bool dirty;
 static int error;
-static size_t resx, resy;
+static size_t fb_resx, fb_resy;
 static page_t* fb_pages;
 
 static void virtio_gpu_fb_dirty_set(size_t x, size_t y, size_t w, size_t h);
-static int virtio_gpu_fb_mode_get(int resx, int resy, int bpp);
-static int virtio_gpu_fb_mode_set(int mode);
+static int virtio_gpu_fb_mode_set(int resx, int resy, int bpp);
 
 static fb_ops_t fb_ops = {
     .dirty_set = &virtio_gpu_fb_dirty_set,
-    .mode_get = &virtio_gpu_fb_mode_get,
     .mode_set = &virtio_gpu_fb_mode_set,
 };
 
@@ -205,8 +203,8 @@ static int virtio_gpu_resource_flush(void)
         .hdr = {.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH},
         .resource_id = 1,
         .r = {
-            .width = resx,
-            .height = resy,
+            .width = fb_resx,
+            .height = fb_resy,
         }
     };
     virtio_gpu_ctrl_hdr_t* resp;
@@ -224,18 +222,19 @@ static int virtio_gpu_resource_flush(void)
 
 static void virtio_gpu_fb_setup(void)
 {
-    framebuffer.size = resx * resy * 4;
+    framebuffer.size = fb_resx * fb_resy * 4;
     framebuffer.accel = false;
     framebuffer.bpp = 32;
     framebuffer.paddr = page_phys(fb_pages);
     framebuffer.vaddr = page_virt_ptr(fb_pages);
-    framebuffer.width = resx;
-    framebuffer.height = resy;
+    framebuffer.width = fb_resx;
+    framebuffer.height = fb_resy;
     framebuffer.id = "VirtIO GPU FB";
     framebuffer.type = FB_TYPE_PACKED_PIXELS;
     framebuffer.type_aux = 0;
     framebuffer.visual = FB_VISUAL_TRUECOLOR;
-    framebuffer.pitch = resx * 4;
+    framebuffer.pitch = fb_resx * 4;
+    framebuffer.flags = FB_VIRTFB;
     framebuffer.ops = &fb_ops;
 }
 
@@ -244,27 +243,19 @@ static void virtio_gpu_fb_dirty_set(size_t, size_t, size_t, size_t)
     dirty = true;
 }
 
-static int virtio_gpu_fb_mode_get(int resx, int resy, int bpp)
+static int virtio_gpu_fb_mode_set(int resx, int resy, int bpp)
 {
     if (resx < 0 || resy < 0 || resx > 0xffff || resy > 0xffff || bpp != 32)
     {
         return -EINVAL;
     }
 
-    return (resx) | (resy << 16);
-}
-
-static int virtio_gpu_fb_mode_set(int mode)
-{
-    int temp_resx = mode & 0xffff;
-    int temp_resy = (mode >> 16) & 0xffff;
-
-    log_info("setting %u x %u", temp_resx, temp_resy);
+    log_info("setting %u x %u", resx, resy);
 
     dirty = false;
 
-    resx = temp_resx;
-    resy = temp_resy;
+    fb_resx = resx;
+    fb_resy = resy;
 
     if (virtio_gpu_resource_unref() ||
         virtio_gpu_resource_create_2d(resx, resy) ||
@@ -287,7 +278,7 @@ static void refresh_callback(ktimer_t*)
     {
         return;
     }
-    virtio_gpu_transfer_to_host_2d(0, 0, resx, resy);
+    virtio_gpu_transfer_to_host_2d(0, 0, fb_resx, fb_resy);
     virtio_gpu_resource_flush();
     dirty = false;
 }
@@ -317,14 +308,14 @@ UNMAP_AFTER_INIT int virtio_gpu_init(void)
         return -ENODEV;
     }
 
-    resx = resp->pmodes[0].r.width;
-    resy = resp->pmodes[0].r.height;
+    fb_resx = resp->pmodes[0].r.width;
+    fb_resy = resp->pmodes[0].r.height;
 
-    if (!resx || !resy)
+    if (!fb_resx || !fb_resy)
     {
         log_info("[display info] no preffered resolution; using 1024x768");
-        resx = 1024;
-        resy = 768;
+        fb_resx = 1024;
+        fb_resy = 768;
     }
 
     size_t framebuffer_size = VIRTIO_GPU_FB_SIZE;
@@ -336,9 +327,9 @@ UNMAP_AFTER_INIT int virtio_gpu_init(void)
     }
 
     if (virtio_gpu_get_display_info(&resp) ||
-        virtio_gpu_resource_create_2d(resx, resy) ||
+        virtio_gpu_resource_create_2d(fb_resx, fb_resy) ||
         virtio_gpu_resource_attach_backing() ||
-        virtio_gpu_set_scanout(resx, resy))
+        virtio_gpu_set_scanout(fb_resx, fb_resy))
     {
         log_warning("failed with %s (%#x)", virtio_gpu_response_string(error), error);
     }

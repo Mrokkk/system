@@ -137,6 +137,8 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
         }
     }
 
+    earlycon_disable();
+
     // Make sure PIC is in proper state
     i8259_check();
 

@@ -108,9 +108,20 @@ enum vga_palette
     VGA_COLOR_BRIGHTWHITE   = 15,
 };
 
+static inline uint8_t vga_read(uint16_t port, uint8_t reg)
+{
+    outb(reg, port);
+    return inb(port + 1);
+}
+
 static inline void vga_write(uint16_t port, uint8_t reg, uint8_t value)
 {
     outw(VGA_OUT16VAL(value, reg), port);
+}
+
+static inline uint8_t vga_crt_read(uint8_t reg)
+{
+    return vga_read(VGA_CRT_IC, reg);
 }
 
 static inline void vga_crt_write(uint8_t reg, uint8_t value)
@@ -128,6 +139,7 @@ static inline void vga_seq_write(uint8_t reg, uint8_t value)
     vga_write(VGA_SEQ_I, reg, value);
 }
 
+int vga_probe(void);
 int vga_font_set(size_t width, size_t height, void* data, size_t bytes_per_glyph, size_t glyphs_count);
 void vga_cursor_disable(void);
 

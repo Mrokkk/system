@@ -9,7 +9,6 @@
 #include <kernel/framebuffer.h>
 
 static int framebuffer_open(file_t* file);
-static int framebuffer_write(file_t* file, const char* data, size_t size);
 static int framebuffer_mmap(file_t* file, vm_area_t* vma);
 static int framebuffer_ioctl(file_t* file, unsigned long request, void* arg);
 static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t size, page_t** page);
@@ -27,7 +26,6 @@ framebuffer_t framebuffer;
 
 static file_operations_t fops = {
     .open = &framebuffer_open,
-    .write = &framebuffer_write,
     .mmap = &framebuffer_mmap,
     .ioctl = &framebuffer_ioctl,
 };
@@ -74,12 +72,6 @@ static int framebuffer_open(file_t*)
     return 0;
 }
 
-static int framebuffer_write(file_t*, const char* data, size_t size)
-{
-    memcpy(framebuffer.vaddr, data, size);
-    return size;
-}
-
 static int framebuffer_mmap(file_t*, vm_area_t* vma)
 {
     vma->vm_flags |= VM_IO;
@@ -111,7 +103,10 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
                 return errno;
             }
 
-            strlcpy(finfo->id, framebuffer.id, sizeof(finfo->id));
+            if (framebuffer.id)
+            {
+                strlcpy(finfo->id, framebuffer.id, sizeof(finfo->id));
+            }
             finfo->smem_start  = framebuffer.paddr;
             finfo->smem_len    = framebuffer.size;
             finfo->type        = framebuffer.type;
@@ -140,19 +135,12 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
                 return errno;
             }
 
-            if (unlikely(!framebuffer.ops || !framebuffer.ops->mode_get || !framebuffer.ops->mode_set))
+            if (unlikely(!framebuffer.ops || !framebuffer.ops->mode_set))
             {
                 return -ENOSYS;
             }
 
-            int mode = framebuffer.ops->mode_get(vinfo->xres, vinfo->yres, vinfo->bits_per_pixel);
-
-            if (unlikely(mode < 0))
-            {
-                return mode;
-            }
-
-            if (unlikely(errno = framebuffer.ops->mode_set(mode)))
+            if (unlikely(errno = framebuffer.ops->mode_set(vinfo->xres, vinfo->yres, vinfo->bits_per_pixel)))
             {
                 return errno;
             }

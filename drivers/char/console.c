@@ -390,6 +390,9 @@ static void sgr(console_t* console, int* params, size_t params_count)
                         break;
                 }
                 return;
+            case 39: // Set foreground color to default
+                console->current_fgcolor = console->default_fgcolor;
+                break;
             case 40 ... 47: // Set background color
                 if (drv->ops->sgr_8)
                 {
@@ -407,6 +410,9 @@ static void sgr(console_t* console, int* params, size_t params_count)
                         break;
                 }
                 return;
+            case 49: // Set background color to default
+                console->current_bgcolor = console->default_bgcolor;
+                break;
             case 90 ... 97: // Set bright foreground color
                 if (drv->ops->sgr_16)
                 {
@@ -420,7 +426,7 @@ static void sgr(console_t* console, int* params, size_t params_count)
                 }
                 break;
             default:
-                log_info("unsupported SGR: %u: %u", params[i]);
+                log_info("unsupported SGR: %u", params[i]);
         }
     }
 }
@@ -1257,6 +1263,7 @@ static void console_putch(tty_t* tty, int c)
 static int console_driver_select(console_driver_t* driver)
 {
     console_driver_ops_t* ops;
+
     list_for_each_entry(ops, &driver_ops, list_entry)
     {
         if (!ops->probe(&framebuffer))

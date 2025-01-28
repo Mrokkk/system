@@ -72,7 +72,7 @@ failure:
 
 static int textcon_probe(framebuffer_t* fb)
 {
-    if (fb->type == FB_TYPE_TEXT)
+    if (fb->type == FB_TYPE_TEXT && fb->vaddr)
     {
         return 0;
     }
