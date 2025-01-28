@@ -307,6 +307,7 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.paddr    = mode->fb_paddr;
     framebuffer.accel    = FB_ACCEL_NONE;
     framebuffer.ops      = &vesafb_ops;
+    framebuffer.flags    = 0;
 
     if (prev_paddr != framebuffer.paddr)
     {

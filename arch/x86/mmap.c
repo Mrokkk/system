@@ -112,7 +112,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
         return ptr(-ENOMEM);
     }
 
-    if (unlikely(!(vma = vm_create(vaddr, size, vm_flags_get(prot)))))
+    if (unlikely(!(vma = vm_create(vaddr, size, vm_flags_get(prot), process_current->mm))))
     {
         return ptr(-ENOMEM);
     }
@@ -152,6 +152,7 @@ void* do_mmap(void* addr, size_t len, int prot, int flags, file_t* file, size_t 
 
         vma->dentry = file->dentry;
         vma->offset = offset;
+        list_add(&vma->mapping_entry, &vma->dentry->inode->mappings);
     }
 
     if (unlikely(errno = vm_add(&process_current->mm->vm_areas, vma)))
@@ -398,12 +399,12 @@ int sys_mprotect(void* addr, size_t len, int prot)
         {
             if (start > vma->start)
             {
-                new_vma = safe_vm_create(vma->start, start - vma->start, vma->vm_flags);
+                new_vma = safe_vm_create(vma->start, start - vma->start, vma->vm_flags, process_current->mm);
                 vm_copy_details(new_vma, vma);
                 vm_add(&new_vmas, new_vma);
             }
 
-            new_vma = safe_vm_create(start, min(vma->end - start, end - start), vm_flags);
+            new_vma = safe_vm_create(start, min(vma->end - start, end - start), vm_flags, process_current->mm);
             vm_copy_details(new_vma, vma);
 
             if (prev_vma && vmas_can_be_merged(prev_vma, new_vma))
@@ -421,7 +422,7 @@ int sys_mprotect(void* addr, size_t len, int prot)
 
             if (end < vma->end)
             {
-                new_vma = vm_create(end, vma->end - end, vma->vm_flags);
+                new_vma = vm_create(end, vma->end - end, vma->vm_flags, process_current->mm);
                 vm_copy_details(new_vma, vma);
                 vm_add(&new_vmas, new_vma);
             }
@@ -545,7 +546,7 @@ int sys_brk(void* addr)
 
     if (!new_brk_vma)
     {
-        new_brk_vma = vm_create(addr(addr), 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
+        new_brk_vma = vm_create(addr(addr), 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP), process_current->mm);
 
         if (unlikely(!new_brk_vma))
         {

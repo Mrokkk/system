@@ -49,6 +49,7 @@ struct inode
     void*               fs_data;
     dentry_t*           dentry;
     super_block_t*      sb;
+    list_head_t         mappings;
 };
 
 struct inode_operations

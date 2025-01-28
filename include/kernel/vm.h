@@ -38,11 +38,13 @@ struct vm_area
     struct dentry*   dentry;
     off_t            offset; // offset within inode
     vm_operations_t* ops;
+    list_head_t      mapping_entry;
+    struct mm*       mm;
     vm_area_t*       next;
     vm_area_t*       prev;
 };
 
-vm_area_t* vm_create(uintptr_t virt_address, size_t size, int vm_flags);
+vm_area_t* vm_create(uintptr_t virt_address, size_t size, int vm_flags, struct mm* mm);
 vm_area_t* vm_find(uintptr_t virt_address, vm_area_t* areas);
 
 int vm_add(vm_area_t** head, vm_area_t* new_vma);
@@ -53,7 +55,7 @@ void vm_areas_del(vm_area_t* vmas);
 int vm_unmap(vm_area_t* vma, pgd_t* pgd);
 int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd);
 int vm_free(vm_area_t* vma_list, pgd_t* pgd);
-int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd);
+int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd, struct mm* dest_mm);
 int vm_nopage(pgd_t* pgd, uintptr_t address, bool write, bool exec);
 
 uintptr_t vm_paddr(uintptr_t vaddr, const pgd_t* pgd);

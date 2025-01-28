@@ -387,6 +387,9 @@ static int binary_image_load(const char* pathname, binary_t* bin, argvecs_t argv
     return errno;
 }
 
+#define VM_HEAP_FLAGS VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP)
+#define VM_STACK_FLAGS VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK)
+
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[])
 {
     char copied_path[PATH_MAX];
@@ -447,8 +450,8 @@ int do_exec(const char* pathname, const char* const argv[], const char* const en
     strlcpy(p->name, argv0->arg, PROCESS_NAME_LEN);
     //process_ktimers_exit(p);
 
-    brk_vma = vm_create(bin.brk, 0, VM_READ | VM_WRITE | VM_TYPE(VM_TYPE_HEAP));
-    stack_vma = vm_create(USER_STACK_VIRT_ADDRESS, USER_STACK_SIZE, VM_WRITE | VM_READ | VM_TYPE(VM_TYPE_STACK));
+    brk_vma = vm_create(bin.brk, 0, VM_HEAP_FLAGS, process_current->mm);
+    stack_vma = vm_create(USER_STACK_VIRT_ADDRESS, USER_STACK_SIZE, VM_STACK_FLAGS, process_current->mm);
 
     if (unlikely(!brk_vma || !stack_vma))
     {

@@ -261,7 +261,6 @@ static inline void fbcon_glyph_draw_var_loop(console_driver_t* drv, size_t x, si
 
     uint8_t* font_glyph = shift_as(uint8_t*, font->glyphs, c * font->bytes_per_glyph);
     uint32_t offset = data->font_height_offset * y + data->font_width_offset * x;
-    size_t orig_x = x, orig_y = y;
 
     for (size_t y = 0; y < font->height; y++, font_glyph += data->font_bytes_per_line, offset += data->pitch)
     {
@@ -277,7 +276,7 @@ static inline void fbcon_glyph_draw_var_loop(console_driver_t* drv, size_t x, si
 
     if (framebuffer.ops && framebuffer.ops->dirty_set)
     {
-        framebuffer.ops->dirty_set(orig_x * data->width, orig_y * font->height, data->width, font->height);
+        framebuffer.ops->dirty_set();
     }
 }
 

@@ -102,11 +102,12 @@ static void vgafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.size     = framebuffer.pitch * framebuffer.height;
     framebuffer.accel    = FB_ACCEL_NONE;
     framebuffer.paddr    = 0xb8000;
+    framebuffer.flags    = 0;
+    framebuffer.ops = &vgafb_ops;
     if (!framebuffer.vaddr)
     {
         framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, 64 * KiB, "fb");
     }
-    framebuffer.ops = &vgafb_ops;
 }
 
 static int vgafb_fb_mode_set(int resx, int resy, int bpp)

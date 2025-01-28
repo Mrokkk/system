@@ -35,6 +35,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
     if (clone_flags & CLONE_VM)
     {
         scoped_mutex_lock(&src->mm->lock);
+
         dest->mm = src->mm;
         dest->mm->refcount++;
 
@@ -125,7 +126,7 @@ static int process_space_copy(process_t* dest, process_t* src, int clone_flags)
             dest->mm->brk_vma = new_vma;
         }
 
-        errno = vm_copy(new_vma, src_vma, dest->mm->pgd, src->mm->pgd);
+        errno = vm_copy(new_vma, src_vma, dest->mm->pgd, src->mm->pgd, dest->mm);
 
         if (unlikely(errno))
         {

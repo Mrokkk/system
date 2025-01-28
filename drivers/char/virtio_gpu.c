@@ -19,7 +19,7 @@ static int error;
 static size_t fb_resx, fb_resy;
 static page_t* fb_pages;
 
-static void virtio_gpu_fb_dirty_set(size_t x, size_t y, size_t w, size_t h);
+static void virtio_gpu_fb_dirty_set(void);
 static int virtio_gpu_fb_mode_set(int resx, int resy, int bpp);
 
 static fb_ops_t fb_ops = {
@@ -235,10 +235,12 @@ static void virtio_gpu_fb_setup(void)
     framebuffer.visual = FB_VISUAL_TRUECOLOR;
     framebuffer.pitch = fb_resx * 4;
     framebuffer.flags = FB_VIRTFB;
+    framebuffer.delay.tv_sec = 0;
+    framebuffer.delay.tv_usec = 3000;
     framebuffer.ops = &fb_ops;
 }
 
-static void virtio_gpu_fb_dirty_set(size_t, size_t, size_t, size_t)
+static void virtio_gpu_fb_dirty_set(void)
 {
     dirty = true;
 }

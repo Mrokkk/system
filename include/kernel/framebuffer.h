@@ -2,13 +2,16 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <kernel/time.h>
+#include <kernel/mutex.h>
 #include <kernel/api/ioctl.h>
+#include <kernel/api/types.h>
 
 #define FB_VIRTFB 1
 
 struct fb_ops
 {
-    void (*dirty_set)(size_t x, size_t y, size_t w, size_t h);
+    void (*dirty_set)(void);
     int (*mode_set)(int resx, int resy, int bpp);
 };
 
@@ -29,6 +32,9 @@ struct framebuffer
     uint8_t     visual;
     int         accel;
     int         flags;
+    timeval_t   delay;
+    timer_t     timer;
+    mutex_t     lock;
 
     fb_ops_t*   ops;
 };

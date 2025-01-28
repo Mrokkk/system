@@ -3,6 +3,9 @@
 #include <kernel/vm.h>
 #include <kernel/list.h>
 #include <kernel/devfs.h>
+#include <kernel/mutex.h>
+#include <kernel/timer.h>
+#include <kernel/minmax.h>
 #include <kernel/module.h>
 #include <kernel/process.h>
 #include <kernel/api/ioctl.h>
@@ -58,6 +61,8 @@ UNMAP_AFTER_INIT static int framebuffer_init(void)
         log_error("failed to register device: %d", errno);
         return errno;
     }
+
+    mutex_init(&framebuffer.lock);
 
     return 0;
 }
@@ -154,9 +159,28 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
     }
 }
 
+static void framebuffer_callback(ktimer_t* timer)
+{
+    vm_area_t* vma;
+    inode_t* inode = timer->data;
+
+    scoped_mutex_lock(&framebuffer.lock);
+
+    list_for_each_entry(vma, &inode->mappings, mapping_entry)
+    {
+        vm_unmap_range(vma, vma->start, vma->end, vma->mm->pgd);
+    }
+
+    framebuffer.timer = 0;
+
+    framebuffer.ops->dirty_set();
+}
+
 static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t, page_t** page)
 {
-    uintptr_t paddr = (address - vma->start) + framebuffer.paddr;
+    int errno;
+    uintptr_t offset = address - vma->start;
+    uintptr_t paddr = offset + framebuffer.paddr;
 
     if (unlikely(paddr >= framebuffer.paddr + framebuffer.size))
     {
@@ -164,6 +188,27 @@ static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t, page_t*
     }
 
     *page = page(paddr);
+
+    if (framebuffer.flags & FB_VIRTFB)
+    {
+        scoped_mutex_lock(&framebuffer.lock);
+
+        if (!framebuffer.timer)
+        {
+            framebuffer.timer = ktimer_create_and_start(
+                KTIMER_ONESHOT,
+                framebuffer.delay,
+                &framebuffer_callback,
+                vma->dentry->inode);
+
+            if (unlikely(errno = errno_get(framebuffer.timer)))
+            {
+                log_error("cannot start timer: %d", errno);
+                framebuffer.timer = 0;
+            }
+        }
+    }
+
     return PAGE_SIZE;
 }
 

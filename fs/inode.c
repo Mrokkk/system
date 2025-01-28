@@ -22,6 +22,7 @@ int inode_alloc(inode_t** inode)
 
     memset(*inode, 0, sizeof(**inode));
     (*inode)->refcount = 1;
+    list_init(&(*inode)->mappings);
 
     list_init(&(*inode)->list);
 

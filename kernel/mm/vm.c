@@ -11,7 +11,7 @@
 
 #define DEBUG_NOPAGE 0
 
-vm_area_t* vm_create(uintptr_t vaddr, size_t size, int vm_flags)
+vm_area_t* vm_create(uintptr_t vaddr, size_t size, int vm_flags, struct mm* mm)
 {
     vm_area_t* vma = alloc(vm_area_t);
 
@@ -28,6 +28,8 @@ vm_area_t* vm_create(uintptr_t vaddr, size_t size, int vm_flags)
     vma->next = NULL;
     vma->prev = NULL;
     vma->offset = 0;
+    vma->mm = mm;
+    list_init(&vma->mapping_entry);
 
     return vma;
 }
@@ -296,13 +298,14 @@ static int vm_copy_impl(vm_area_t* dest_vma, pgd_t* dest_pgd, pgd_t* src_pgd, ui
     return errno;
 }
 
-int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd)
+int vm_copy(vm_area_t* dest_vma, const vm_area_t* src_vma, pgd_t* dest_pgd, pgd_t* src_pgd, struct mm* dest_mm)
 {
     // Copy vm_area except for next and prev
     memcpy(dest_vma, src_vma, sizeof(vm_area_t) - 2 * sizeof(vm_area_t*));
 
     dest_vma->next = NULL;
     dest_vma->prev = NULL;
+    dest_vma->mm = dest_mm;
 
     return vm_copy_impl(dest_vma, dest_pgd, src_pgd, src_vma->start, src_vma->end);
 }
@@ -752,6 +755,7 @@ int vm_unmap_range(vm_area_t* vma, uintptr_t start, uintptr_t end, pgd_t* pgd)
 
 int vm_unmap(vm_area_t* vma, pgd_t* pgd)
 {
+    list_del(&vma->mapping_entry);
     vm_unmap_range_impl(vma, vma->start, vma->end, pgd);
     return 0;
 }
@@ -808,6 +812,8 @@ int vm_free(vm_area_t* vma_list, pgd_t* pgd)
         {
             free_pages = false;
         }
+
+        list_del(&vma->mapping_entry);
 
         start = vma->start;
         end = vma->end;
