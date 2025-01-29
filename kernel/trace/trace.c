@@ -1,9 +1,10 @@
 #include <stdarg.h>
 #include <kernel/ctype.h>
 #include <kernel/trace.h>
-#include <kernel/signal.h>
+#include <kernel/bitset.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
+#include <kernel/signal.h>
 #include <kernel/process.h>
 #include <kernel/process.h>
 #include <kernel/api/mman.h>
@@ -13,142 +14,6 @@
 #include <kernel/api/syscall.h>
 
 extern syscall_t trace_syscalls[];
-
-#define ERRNO(x) [x] = #x
-
-static const char* errors[] = {
-    ERRNO(EPERM),
-    ERRNO(ENOENT),
-    ERRNO(ESRCH),
-    ERRNO(EINTR),
-    ERRNO(EIO),
-    ERRNO(ENXIO),
-    ERRNO(E2BIG),
-    ERRNO(ENOEXEC),
-    ERRNO(EBADF),
-    ERRNO(ECHILD),
-    ERRNO(EAGAIN),
-    ERRNO(ENOMEM),
-    ERRNO(EACCES),
-    ERRNO(EFAULT),
-    ERRNO(ENOTBLK),
-    ERRNO(EBUSY),
-    ERRNO(EEXIST),
-    ERRNO(EXDEV),
-    ERRNO(ENODEV),
-    ERRNO(ENOTDIR),
-    ERRNO(EISDIR),
-    ERRNO(EINVAL),
-    ERRNO(ENFILE),
-    ERRNO(EMFILE),
-    ERRNO(ENOTTY),
-    ERRNO(ETXTBSY),
-    ERRNO(EFBIG),
-    ERRNO(ENOSPC),
-    ERRNO(ESPIPE),
-    ERRNO(EROFS),
-    ERRNO(EMLINK),
-    ERRNO(EPIPE),
-    ERRNO(EDOM),
-    ERRNO(ERANGE),
-    ERRNO(EDEADLK),
-    ERRNO(ENAMETOOLONG),
-    ERRNO(ENOLCK),
-    ERRNO(ENOSYS),
-    ERRNO(ENOTEMPTY),
-    ERRNO(ELOOP),
-    ERRNO(ENOMSG),
-    ERRNO(EIDRM),
-    ERRNO(ECHRNG),
-    ERRNO(EL2NSYNC),
-    ERRNO(EL3HLT),
-    ERRNO(EL3RST),
-    ERRNO(ELNRNG),
-    ERRNO(EUNATCH),
-    ERRNO(ENOCSI),
-    ERRNO(EL2HLT),
-    ERRNO(EBADE),
-    ERRNO(EBADR),
-    ERRNO(EXFULL),
-    ERRNO(ENOANO),
-    ERRNO(EBADRQC),
-    ERRNO(EBADSLT),
-    ERRNO(EBFONT),
-    ERRNO(ENOSTR),
-    ERRNO(ENODATA),
-    ERRNO(ETIME),
-    ERRNO(ENOSR),
-    ERRNO(ENONET),
-    ERRNO(ENOPKG),
-    ERRNO(EREMOTE),
-    ERRNO(ENOLINK),
-    ERRNO(EADV),
-    ERRNO(ESRMNT),
-    ERRNO(ECOMM),
-    ERRNO(EPROTO),
-    ERRNO(EMULTIHOP),
-    ERRNO(EDOTDOT),
-    ERRNO(EBADMSG),
-    ERRNO(EOVERFLOW),
-    ERRNO(ENOTUNIQ),
-    ERRNO(EBADFD),
-    ERRNO(EREMCHG),
-    ERRNO(ELIBACC),
-    ERRNO(ELIBBAD),
-    ERRNO(ELIBSCN),
-    ERRNO(ELIBMAX),
-    ERRNO(ELIBEXEC),
-    ERRNO(EILSEQ),
-    ERRNO(ERESTART),
-    ERRNO(ESTRPIPE),
-    ERRNO(EUSERS),
-    ERRNO(ENOTSOCK),
-    ERRNO(EDESTADDRREQ),
-    ERRNO(EMSGSIZE),
-    ERRNO(EPROTOTYPE),
-    ERRNO(ENOPROTOOPT),
-    ERRNO(EPROTONOSUPPORT),
-    ERRNO(ESOCKTNOSUPPORT),
-    ERRNO(EOPNOTSUPP),
-    ERRNO(EPFNOSUPPORT),
-    ERRNO(EAFNOSUPPORT),
-    ERRNO(EADDRINUSE),
-    ERRNO(EADDRNOTAVAIL),
-    ERRNO(ENETDOWN),
-    ERRNO(ENETUNREACH),
-    ERRNO(ENETRESET),
-    ERRNO(ECONNABORTED),
-    ERRNO(ECONNRESET),
-    ERRNO(ENOBUFS),
-    ERRNO(EISCONN),
-    ERRNO(ENOTCONN),
-    ERRNO(ESHUTDOWN),
-    ERRNO(ETOOMANYREFS),
-    ERRNO(ETIMEDOUT),
-    ERRNO(ECONNREFUSED),
-    ERRNO(EHOSTDOWN),
-    ERRNO(EHOSTUNREACH),
-    ERRNO(EALREADY),
-    ERRNO(EINPROGRESS),
-    ERRNO(ESTALE),
-    ERRNO(EUCLEAN),
-    ERRNO(ENOTNAM),
-    ERRNO(ENAVAIL),
-    ERRNO(EISNAM),
-    ERRNO(EREMOTEIO),
-    ERRNO(EDQUOT),
-    ERRNO(ENOMEDIUM),
-    ERRNO(EMEDIUMTYPE),
-    ERRNO(ECANCELED),
-    ERRNO(ENOKEY),
-    ERRNO(EKEYEXPIRED),
-    ERRNO(EKEYREVOKED),
-    ERRNO(EKEYREJECTED),
-    ERRNO(EOWNERDEAD),
-    ERRNO(ENOTRECOVERABLE),
-    ERRNO(ERFKILL),
-    ERRNO(EHWPOISON),
-};
 
 static int string_print(const char* string, int limit, char* buffer, const char* end)
 {
@@ -206,11 +71,11 @@ static void* ptr_get(uintptr_t i)
     return ptr(i + sizeof(uintptr_t));
 }
 
-static int* parameters_get(int* buf, va_list args, size_t count)
+static long* parameters_get(long* buf, va_list args, size_t count)
 {
     if (count > 5)
     {
-        return va_arg(args, int*);
+        return va_arg(args, long*);
     }
     for (size_t i = 0; i < count; ++i)
     {
@@ -219,13 +84,64 @@ static int* parameters_get(int* buf, va_list args, size_t count)
     return buf;
 }
 
+#define PRINT(fmt, ...) \
+    *it = csnprintf(*it, end, fmt, ##__VA_ARGS__)
+
+static void signal_name(int signum, char** it, const char* end)
+{
+    PRINT("%s", signame(signum));
+}
+
+static void select_fds_print(int nfds, const fd_set_t* fds, char** it, const char* end)
+{
+    if (unlikely(current_vm_verify(VM_READ, fds)))
+    {
+        PRINT("%p", fds);
+        return;
+    }
+
+    PRINT("[");
+
+    for (int i = 0; i < nfds; ++i)
+    {
+        if (bitset_test((uint32_t*)fds->fd_bits, i))
+        {
+            PRINT("%s%u", i == 0 ? "" : ", ", i);
+        }
+    }
+
+    PRINT("]");
+}
+
+static void timeval_print(timeval_t* timeval, char** it, const char* end)
+{
+    if (unlikely(current_vm_verify(VM_READ, timeval)))
+    {
+        PRINT("%p", timeval);
+        return;
+    }
+
+    PRINT("{tv_sec = %u, tv_usec = %u}", timeval->tv_sec, timeval->tv_usec);
+}
+
+static void timespec_print(timespec_t* timespec, char** it, const char* end)
+{
+    if (unlikely(current_vm_verify(VM_READ, timespec)))
+    {
+        PRINT("%p", timespec);
+        return;
+    }
+
+    PRINT("{tv_sec = %u, tv_nsec = %lu}", timespec->tv_sec, timespec->tv_nsec);
+}
+
 #define FLAG(f) \
-    case f: *it = csnprintf(*it, end, #f); return 1
+    case f: PRINT(#f); return 1
 
 #define BITFLAG_EMPTY(v, c) \
     if (!(v)) \
     { \
-        *it = csnprintf(*it, end, "%s", #c); \
+        PRINT("%s", #c); \
         continuation = 1; \
     }
 
@@ -234,9 +150,9 @@ static int* parameters_get(int* buf, va_list args, size_t count)
     { \
         if (continuation) \
         { \
-            *it = csnprintf(*it, end, "|"); \
+            PRINT("|"); \
         } \
-        *it = csnprintf(*it, end, #f); \
+        PRINT(#f); \
         value ^= f; \
         continuation = 1; \
     }
@@ -244,7 +160,7 @@ static int* parameters_get(int* buf, va_list args, size_t count)
 #define BITFLAG_LEFT() \
     if (value) \
     { \
-        *it = csnprintf(*it, end, "%s%#x", continuation ? "|" : "", value); \
+        PRINT("%s%#x", continuation ? "|" : "", value); \
     }
 
 #define FOR_ARGUMENT(nr, ...) \
@@ -254,21 +170,18 @@ static int* parameters_get(int* buf, va_list args, size_t count)
     } \
     while (0)
 
-static int special_parameter(int nr, size_t id, int value, char** it, const char* end)
+static int special_parameter(int nr, size_t id, int value, long* params, char** it, const char* end)
 {
     int continuation = 0;
+
     switch (nr)
     {
         case __NR_sigaction:
-            FOR_ARGUMENT(0,
-                *it = csnprintf(*it, end, "%s", signame(value));
-                return 1);
+            FOR_ARGUMENT(0, signal_name(value, it, end); return 1);
             break;
 
         case __NR_kill:
-            FOR_ARGUMENT(1,
-                *it = csnprintf(*it, end, "%s", signame(value));
-                return 1);
+            FOR_ARGUMENT(1, signal_name(value, it, end); return 1);
             break;
 
         case __NR_ioctl:
@@ -303,6 +216,23 @@ static int special_parameter(int nr, size_t id, int value, char** it, const char
                 BITFLAG(O_CLOEXEC);
                 BITFLAG(O_DIRECTORY);
                 BITFLAG_LEFT();
+                return 1);
+            FOR_ARGUMENT(2,
+                if (!(params[1] & O_CREAT))
+                {
+                    PRINT("0");
+                    return 1;
+                }
+                BITFLAG_EMPTY(value, 0);
+                BITFLAG(S_IRUSR);
+                BITFLAG(S_IWUSR);
+                BITFLAG(S_IXUSR);
+                BITFLAG(S_IRGRP);
+                BITFLAG(S_IWGRP);
+                BITFLAG(S_IXGRP);
+                BITFLAG(S_IROTH);
+                BITFLAG(S_IWOTH);
+                BITFLAG(S_IXOTH);
                 return 1);
             break;
 
@@ -356,6 +286,54 @@ static int special_parameter(int nr, size_t id, int value, char** it, const char
                 BITFLAG(PROT_WRITE);
                 BITFLAG(PROT_EXEC);
                 return 1);
+            break;
+
+        case __NR_select:
+            FOR_ARGUMENT(1, select_fds_print(params[0], ptr(value), it, end); return 1);
+            FOR_ARGUMENT(2, select_fds_print(params[0], ptr(value), it, end); return 1);
+            FOR_ARGUMENT(3, select_fds_print(params[0], ptr(value), it, end); return 1);
+            FOR_ARGUMENT(4, timeval_print(ptr(value), it, end); return 1);
+            break;
+
+        case __NR_pselect:
+            FOR_ARGUMENT(1, select_fds_print(params[0], ptr(value), it, end); return 1);
+            FOR_ARGUMENT(2, select_fds_print(params[0], ptr(value), it, end); return 1);
+            FOR_ARGUMENT(3, select_fds_print(params[0], ptr(value), it, end); return 1);
+            FOR_ARGUMENT(4, timespec_print(ptr(value), it, end); return 1);
+            break;
+
+        case __NR_clock_gettime:
+            FOR_ARGUMENT(0,
+                switch (value)
+                {
+                    FLAG(CLOCK_REALTIME);
+                    FLAG(CLOCK_MONOTONIC);
+                    FLAG(CLOCK_MONOTONIC_COARSE);
+                    FLAG(CLOCK_REALTIME_COARSE);
+                });
+            break;
+
+        case __NR_clock_settime:
+            FOR_ARGUMENT(0,
+                switch (value)
+                {
+                    FLAG(CLOCK_REALTIME);
+                    FLAG(CLOCK_MONOTONIC);
+                    FLAG(CLOCK_MONOTONIC_COARSE);
+                    FLAG(CLOCK_REALTIME_COARSE);
+                });
+            break;
+
+        case __NR_timer_create:
+            FOR_ARGUMENT(0,
+                switch (value)
+                {
+                    FLAG(CLOCK_REALTIME);
+                    FLAG(CLOCK_MONOTONIC);
+                    FLAG(CLOCK_MONOTONIC_COARSE);
+                    FLAG(CLOCK_REALTIME_COARSE);
+                });
+            break;
     }
 
     return 0;
@@ -374,8 +352,8 @@ int trace_syscall(unsigned long nr, ...)
     char* it = buf;
     const char* end = buf + sizeof(buf);
     *it = 0;
-    int* params;
-    int params_buf[8];
+    long* params;
+    long params_buf[8];
 
     va_start(args, nr);
     params = parameters_get(params_buf, args, call->nargs);
@@ -388,7 +366,7 @@ int trace_syscall(unsigned long nr, ...)
         type_t arg = call->args[i];
         long value = params[i];
 
-        if (special_parameter(nr, i, value, &it, end))
+        if (special_parameter(nr, i, value, params, &it, end))
         {
             continue;
         }
@@ -454,7 +432,7 @@ __attribute__((regparm(1))) void trace_syscall_end(int retval, unsigned long nr)
 
     if ((errno = errno_get(retval)))
     {
-        it = csnprintf(it, end, "%d %s", retval, errors[-errno]);
+        it = csnprintf(it, end, "%d %s", retval, errno_name(errno));
     }
     else
     {

@@ -12,3 +12,5 @@
         } \
         __errno; \
     })
+
+const char* errno_name(int errno);
