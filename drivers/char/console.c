@@ -1023,6 +1023,14 @@ static void csi(console_t* console, int c, int* movecsr)
                 console->y);
             *movecsr = 1;
             break;
+        case 'G': // Cursor Character Absolute  [column] (default = [row,1]) (CHA)
+            DEFAULT_VALUE(params[0], 1);
+            cursor_set_position(
+                console,
+                params[0] - 1,
+                console->y);
+            *movecsr = 1;
+            break;
         case 'H': // Cursor Position [row;column] (default = [1,1]) (CUP)
             DEFAULT_VALUE(params[0], 1);
             DEFAULT_VALUE(params[1], 1);
@@ -1064,6 +1072,14 @@ static void csi(console_t* console, int c, int* movecsr)
         case 'P': // Delete Ps Character(s) (default = 1) (DCH)
             DEFAULT_VALUE(params[0], 1);
             char_delete(console, params[0]);
+            break;
+        case 'd': // Line Position Absolute  [row] (default = [1,column]) (VPA)
+            DEFAULT_VALUE(params[0], 1);
+            cursor_set_position(
+                console,
+                console->x,
+                params[0] - 1);
+            *movecsr = 1;
             break;
         case 'h':
             if (console->csi.prefix != '?')
