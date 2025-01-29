@@ -21,7 +21,7 @@ function build()
         --without-cxx-binding \
         --without-tests \
         --without-manpages \
-        --disable-stripping | exit 1
+        --disable-stripping || exit 1
 
     sed -i 's/^.* TERMINFO_DIRS .*/#define TERMINFO_DIRS \"\/usr\/share\/terminfo\"/g;
             s/^.* TERMINFO .*/#define TERMINFO_DIRS \"\/usr\/share\/terminfo\"/g' \
