@@ -4,6 +4,7 @@
 #include <arch/pci.h>
 #include <kernel/timer.h>
 #include <kernel/kernel.h>
+#include <kernel/minmax.h>
 #include <kernel/string.h>
 #include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
@@ -14,17 +15,21 @@
 #define VIRTIO_GPU_FB_SIZE (16 * MiB)
 
 static virtio_device_t* gpu;
-static volatile bool dirty;
 static int error;
 static size_t fb_resx, fb_resy;
 static page_t* fb_pages;
+static timer_t timer;
+static volatile bool dirty;
+static volatile fb_rect_t dirty_rect;
 
-static void virtio_gpu_fb_dirty_set(void);
+static void virtio_gpu_fb_dirty_set(const fb_rect_t* rect);
+static void virtio_gpu_fb_refresh(void);
 static int virtio_gpu_fb_mode_set(int resx, int resy, int bpp);
 
-static fb_ops_t fb_ops = {
+READONLY static fb_ops_t fb_ops = {
     .dirty_set = &virtio_gpu_fb_dirty_set,
     .mode_set = &virtio_gpu_fb_mode_set,
+    .refresh = &virtio_gpu_fb_refresh,
 };
 
 static const char* virtio_gpu_response_string(int type)
@@ -175,7 +180,7 @@ static int virtio_gpu_transfer_to_host_2d(size_t x, size_t y, size_t w, size_t h
 {
     virtio_gpu_transfer_to_host_2d_t req = {
         .hdr = {.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D},
-        .offset = x * 4 + y * 1080 * 4,
+        .offset = x * 4 + y * fb_resx * 4,
         .resource_id = 1,
         .r = {
             .x = x,
@@ -197,14 +202,16 @@ static int virtio_gpu_transfer_to_host_2d(size_t x, size_t y, size_t w, size_t h
     return 0;
 }
 
-static int virtio_gpu_resource_flush(void)
+static int virtio_gpu_resource_flush(size_t x, size_t y, size_t w, size_t h)
 {
     virtio_gpu_resource_flush_t req = {
         .hdr = {.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH},
         .resource_id = 1,
         .r = {
-            .width = fb_resx,
-            .height = fb_resy,
+            .x = x,
+            .y = y,
+            .width = w,
+            .height = h,
         }
     };
     virtio_gpu_ctrl_hdr_t* resp;
@@ -234,15 +241,24 @@ static void virtio_gpu_fb_setup(void)
     framebuffer.type_aux = 0;
     framebuffer.visual = FB_VISUAL_TRUECOLOR;
     framebuffer.pitch = fb_resx * 4;
-    framebuffer.flags = FB_VIRTFB;
+    framebuffer.flags = FB_FLAGS_VIRTFB;
     framebuffer.delay.tv_sec = 0;
-    framebuffer.delay.tv_usec = 3000;
+    framebuffer.delay.tv_usec = 6000;
     framebuffer.ops = &fb_ops;
 }
 
-static void virtio_gpu_fb_dirty_set(void)
+static void virtio_gpu_fb_dirty_set(const fb_rect_t* rect)
 {
+    fb_rect_enlarge(ptr(&dirty_rect), rect);
     dirty = true;
+}
+
+static void virtio_gpu_fb_refresh(void)
+{
+    virtio_gpu_transfer_to_host_2d(0, 0, fb_resx, fb_resy);
+    virtio_gpu_resource_flush(0, 0, fb_resx, fb_resy);
+    fb_rect_clear(ptr(&dirty_rect));
+    dirty = false;
 }
 
 static int virtio_gpu_fb_mode_set(int resx, int resy, int bpp)
@@ -280,8 +296,9 @@ static void refresh_callback(ktimer_t*)
     {
         return;
     }
-    virtio_gpu_transfer_to_host_2d(0, 0, fb_resx, fb_resy);
-    virtio_gpu_resource_flush();
+    virtio_gpu_transfer_to_host_2d(dirty_rect.x, dirty_rect.y, dirty_rect.w, dirty_rect.h);
+    virtio_gpu_resource_flush(dirty_rect.x, dirty_rect.y, dirty_rect.w, dirty_rect.h);
+    memset(ptr(&dirty_rect), 0, sizeof(dirty_rect));
     dirty = false;
 }
 
@@ -334,13 +351,25 @@ UNMAP_AFTER_INIT int virtio_gpu_init(void)
         virtio_gpu_set_scanout(fb_resx, fb_resy))
     {
         log_warning("failed with %s (%#x)", virtio_gpu_response_string(error), error);
+        return -EIO;
     }
 
-    dirty = true;
+    timer = ktimer_create_and_start(
+        KTIMER_REPEATING,
+        (timeval_t){.tv_sec = 0, .tv_usec = 10000},
+        &refresh_callback,
+        NULL);
+
+    if (unlikely(errno = errno_get(timer)))
+    {
+        log_warning("cannot start refresh timer: %s", errno_name(errno));
+        timer = 0;
+        return errno;
+    }
 
     virtio_gpu_fb_setup();
 
-    ktimer_create_and_start(KTIMER_REPEATING, (timeval_t){.tv_sec = 0, .tv_usec = 16666}, &refresh_callback, NULL);
+    dirty = true;
 
     return 0;
 }

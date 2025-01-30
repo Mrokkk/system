@@ -27,13 +27,13 @@ typedef struct fb_client fb_client_t;
 
 framebuffer_t framebuffer;
 
-static file_operations_t fops = {
+READONLY static file_operations_t fops = {
     .open = &framebuffer_open,
     .mmap = &framebuffer_mmap,
     .ioctl = &framebuffer_ioctl,
 };
 
-static vm_operations_t vmops = {
+READONLY static vm_operations_t vmops = {
     .nopage = &framebuffer_nopage,
 };
 
@@ -164,21 +164,81 @@ static void framebuffer_callback(ktimer_t* timer)
     vm_area_t* vma;
     inode_t* inode = timer->data;
 
-    scoped_mutex_lock(&framebuffer.lock);
-
     list_for_each_entry(vma, &inode->mappings, mapping_entry)
     {
         vm_unmap_range(vma, vma->start, vma->end, vma->mm->pgd);
     }
 
+    scoped_mutex_lock(&framebuffer.lock);
+
     framebuffer.timer = 0;
 
-    framebuffer.ops->dirty_set();
+    framebuffer.ops->dirty_set(&framebuffer.dirty);
+
+    fb_rect_clear(&framebuffer.dirty);
+}
+
+static fb_rect_t framebuffer_page_to_rect(uintptr_t paddr)
+{
+    fb_rect_t rect;
+
+    size_t y0 = paddr / framebuffer.pitch;
+    size_t rem = paddr % framebuffer.pitch;
+    size_t x0 = rem / (framebuffer.bpp / 8);
+
+    paddr += PAGE_SIZE;
+    size_t y1 = align(paddr, framebuffer.pitch) / framebuffer.pitch;
+    rem = paddr % framebuffer.pitch;
+    size_t x1 = rem / (framebuffer.bpp / 8);
+
+    if (x0 > x1)
+    {
+        rect.x = 0;
+        rect.w = framebuffer.width;
+    }
+    else
+    {
+        rect.x = x0;
+        rect.w = x1 - x0;
+    }
+
+    rect.y = y0;
+    rect.h = y1 - y0;
+
+    return rect;
+}
+
+static void framebuffer_dirty_rect_update(uintptr_t paddr)
+{
+    fb_rect_t rect = framebuffer_page_to_rect(paddr);
+    fb_rect_enlarge(&framebuffer.dirty, &rect);
+}
+
+static void framebuffer_nopage_virt(vm_area_t* vma, uintptr_t offset)
+{
+    int errno;
+
+    scoped_mutex_lock(&framebuffer.lock);
+    framebuffer_dirty_rect_update(offset & ~PAGE_MASK);
+
+    if (!framebuffer.timer)
+    {
+        framebuffer.timer = ktimer_create_and_start(
+            KTIMER_ONESHOT,
+            framebuffer.delay,
+            &framebuffer_callback,
+            vma->dentry->inode);
+
+        if (unlikely(errno = errno_get(framebuffer.timer)))
+        {
+            log_error("cannot start timer: %d", errno);
+            framebuffer.timer = 0;
+        }
+    }
 }
 
 static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t, page_t** page)
 {
-    int errno;
     uintptr_t offset = address - vma->start;
     uintptr_t paddr = offset + framebuffer.paddr;
 
@@ -189,24 +249,9 @@ static int framebuffer_nopage(vm_area_t* vma, uintptr_t address, size_t, page_t*
 
     *page = page(paddr);
 
-    if (framebuffer.flags & FB_VIRTFB)
+    if (framebuffer.flags & FB_FLAGS_VIRTFB)
     {
-        scoped_mutex_lock(&framebuffer.lock);
-
-        if (!framebuffer.timer)
-        {
-            framebuffer.timer = ktimer_create_and_start(
-                KTIMER_ONESHOT,
-                framebuffer.delay,
-                &framebuffer_callback,
-                vma->dentry->inode);
-
-            if (unlikely(errno = errno_get(framebuffer.timer)))
-            {
-                log_error("cannot start timer: %d", errno);
-                framebuffer.timer = 0;
-            }
-        }
+        framebuffer_nopage_virt(vma, offset & ~PAGE_MASK);
     }
 
     return PAGE_SIZE;
@@ -228,4 +273,12 @@ int framebuffer_client_register(void (*callback)(void* data), void* data)
     list_add(&c->list_entry, &fb_clients);
 
     return 0;
+}
+
+void framebuffer_refresh(void)
+{
+    if (framebuffer.ops->refresh)
+    {
+        framebuffer.ops->refresh();
+    }
 }

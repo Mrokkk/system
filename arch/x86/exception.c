@@ -12,6 +12,7 @@
 #include <kernel/page_alloc.h>
 #include <kernel/page_debug.h>
 #include <kernel/page_table.h>
+#include <kernel/framebuffer.h>
 
 #include <arch/io.h>
 #include <arch/irq.h>
@@ -310,6 +311,7 @@ static void NORETURN(kernel_fault(const exception_t* exception, const pt_regs_t*
     vm_areas_log(KERN_CRIT, process_current->mm->vm_areas, "process");
 #endif
 
+    framebuffer_refresh();
     panic_mode_die();
 
     for (;; halt());

@@ -256,6 +256,12 @@ static inline void fbcon_glyph_draw_var_loop(console_driver_t* drv, size_t x, si
     font_t* font = data->font;
     uint32_t fgcolor, bgcolor;
     uint32_t def_mask = data->mask;
+    fb_rect_t rect = {
+        .x = x * data->width,
+        .y = y * font->height,
+        .w = data->width,
+        .h = font->height,
+    };
 
     glyph_colors_get(glyph, &fgcolor, &bgcolor);
 
@@ -274,9 +280,9 @@ static inline void fbcon_glyph_draw_var_loop(console_driver_t* drv, size_t x, si
         }
     }
 
-    if (framebuffer.ops && framebuffer.ops->dirty_set)
+    if (framebuffer.ops->dirty_set)
     {
-        framebuffer.ops->dirty_set();
+        framebuffer.ops->dirty_set(&rect);
     }
 }
 
@@ -307,9 +313,21 @@ static void fbcon_screen_clear(console_driver_t*, uint32_t color)
 {
     uint8_t bytes = align(framebuffer.bpp, 8) / 8;
 
+    fb_rect_t rect = {
+        .x = 0,
+        .y = 0,
+        .w = framebuffer.width,
+        .h = framebuffer.height,
+    };
+
     for (size_t off = 0; off < framebuffer.pitch * framebuffer.height; off += bytes)
     {
         fbcon_fb_write(color, framebuffer.vaddr + off, bytes);
+    }
+
+    if (framebuffer.ops->dirty_set)
+    {
+        framebuffer.ops->dirty_set(&rect);
     }
 }
 
