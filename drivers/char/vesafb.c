@@ -376,6 +376,8 @@ int vesafb_initialize(void)
 
     uint16_t current_vesafb_mode = vesafb_mode_read();
 
+    log_continue("; current mode: %#x", current_vesafb_mode);
+
     for (uint16_t* mode_ptr = farptr(vbe->video_mode); *mode_ptr != VBE_MODE_END; ++mode_ptr)
     {
         mode_info_t* mode;
@@ -386,6 +388,7 @@ int vesafb_initialize(void)
 
         if (regs.ax != VBE_SUPPORTED || !mode_info->mode_attr.supported)
         {
+            log_info("%#x: unsupported", *mode_ptr);
             continue;
         }
 
@@ -439,6 +442,7 @@ int vesafb_initialize(void)
 
         if (unlikely(!current_mode))
         {
+            log_info("current mode not supported by VESA");
             return -ENODEV;
         }
 

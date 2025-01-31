@@ -20,6 +20,7 @@
 struct mtrr_context
 {
     flags_t   flags;
+    uintptr_t cr0;
     uintptr_t cr4;
     uint64_t  deftype;
 };
@@ -70,11 +71,12 @@ static void mtrr_change_enter(mtrr_context_t* ctx)
 
     asm volatile(
         "movl %%cr0, %0;"
-        "orl $0x40000000, %0;"
+        "mov %0, %1;"
+        "orl "ASM_VALUE(CR0_CD)", %1;"
         "wbinvd;"
-        "movl  %0, %%cr0;"
+        "movl %1, %%cr0;"
         "wbinvd;"
-        : "=r" (tmp) :: "memory");
+        : "=r" (ctx->cr0), "=r" (tmp) :: "memory");
 
     rdmsrll(IA32_MSR_MTRR_DEFTYPE, deftype);
     ctx->deftype = deftype;
@@ -90,7 +92,7 @@ static void mtrr_change_exit(mtrr_context_t* ctx)
 
     asm volatile(
         "movl %%cr0, %0;"
-        "andl $0xbfffffff, %0;"
+        "andl "ASM_VALUE(~CR0_CD)", %0;"
         "movl %0, %%cr0;"
         : "=r" (tmp) :: "memory");
 

@@ -116,9 +116,10 @@ paging_setup:
     mov $pgt4, %eax
     movl %eax, %cr3
 
-    // Enable paging
+    // Enable paging and enable caching
     mov %cr0, %eax
     or $CR0_PE | CR0_PG | CR0_WP, %eax
+    and $~(CR0_NW | CR0_CD), %eax
     mov %eax, %cr0
     pop %eax
     jmp *%eax
