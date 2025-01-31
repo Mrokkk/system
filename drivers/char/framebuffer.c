@@ -277,7 +277,7 @@ int framebuffer_client_register(void (*callback)(void* data), void* data)
 
 void framebuffer_refresh(void)
 {
-    if (framebuffer.ops->refresh)
+    if (framebuffer.ops && framebuffer.ops->refresh)
     {
         framebuffer.ops->refresh();
     }

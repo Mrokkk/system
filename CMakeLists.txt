@@ -164,6 +164,6 @@ add_custom_target(
     runbochs
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/runbochs.sh ${CMAKE_BINARY_DIR}/runbochs
     COMMAND ./runbochs
-    DEPENDS iso
+    DEPENDS rootfs
     COMMENT "Running bochs"
 )

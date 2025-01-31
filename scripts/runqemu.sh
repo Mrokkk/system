@@ -9,7 +9,7 @@ use_kvm=
 use_cdrom=
 use_nographic=
 use_isa_debugcon=
-use_virtio_vga=
+gpu="-device virtio-gpu,edid=on,xres=1920,yres=1124 -vga none"
 args="\
 -boot once=c \
 -no-reboot \
@@ -34,7 +34,7 @@ supported_kernel_params_value=(
 supported_kernel_params_bool=(
     "earlycon"
     "pciprint"
-    "vbeprint"
+    "vesaprint"
     "nomodeset"
 )
 
@@ -70,7 +70,28 @@ while [[ $# -gt 0 ]]; do
             use_isa_debugcon=1
             ;;
         --virtio-vga)
-            use_virtio_vga=1
+            gpu="-device virtio-vga"
+            ;;
+        --isa-vga)
+            gpu="-device isa-vga"
+            ;;
+        --pci-vga)
+            gpu="-device VGA"
+            ;;
+        --bochs-vga)
+            gpu="-device bochs-display"
+            ;;
+        --cirrus-vga)
+            gpu="-device cirrus-vga"
+            ;;
+        --ati-vga)
+            gpu="-device ati-vga"
+            ;;
+        --vmware-svga)
+            gpu="-device vmware-svga"
+            ;;
+        --qxl-vga)
+            gpu="-device qxl-vga"
             ;;
         *)
             param="${1#--}"
@@ -120,7 +141,7 @@ fi
 
 if [[ -z ${use_nographic} ]]
 then
-    args="${args} -display gtk,zoom-to-fit=off"
+    args="${args} -display gtk,zoom-to-fit=off ${gpu}"
 else
     args="${args} -display none"
 fi
@@ -130,15 +151,6 @@ then
     args="-cpu qemu64 ${args}"
 else
     args="-enable-kvm -cpu host ${args}"
-    if [[ -z ${use_nographic} ]]
-    then
-        if [[ -n "${use_virtio_vga}" ]]
-        then
-            args="${args} -device virtio-vga"
-        else
-            args="${args} -device virtio-gpu,edid=on,xres=1920,yres=1124 -vga none"
-        fi
-    fi
 fi
 
 if [[ -f "dmi.bin" ]]

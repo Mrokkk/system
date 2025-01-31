@@ -307,7 +307,8 @@ UNMAP_AFTER_INIT int virtio_gpu_init(void)
     int errno;
     pci_device_t* pci_device;
 
-    if (unlikely(!(pci_device = pci_device_get(PCI_DISPLAY, PCI_DISPLAY_CONTROLLER))))
+    if (unlikely(!(pci_device = pci_device_get(PCI_DISPLAY, PCI_DISPLAY_CONTROLLER)) ||
+        pci_device->vendor_id != 0x1af4 || pci_device->device_id != 0x1050))
     {
         log_info("no device");
         return -ENODEV;

@@ -53,6 +53,10 @@ static struct
     {1280, 800, 32},
     {1024, 768, 32},
     {800, 600, 32},
+    {1280, 1024, 16},
+    {1280, 1024, 15},
+    {1024, 768, 16},
+    {1024, 768, 15},
 };
 
 static fb_ops_t vesafb_ops = {
@@ -241,23 +245,11 @@ static mode_info_t* vesafb_mode_find(void)
     return desired;
 }
 
-static int vesafb_fb_mode_set(int resx, int resy, int bpp)
-{
-    for (mode_info_t* m = modes; m->is_valid; ++m)
-    {
-        if (m->resx == resx && m->resy == resy && m->bits == bpp)
-        {
-            return vesafb_mode_set(m);
-        }
-    }
-
-    return -EINVAL;
-}
-
 static bool vesafb_is_mode_supported(mode_info_t* mode)
 {
     if (mode->memory_model == VBE_MODE_MEMORY_MODEL_TEXT ||
-        mode->memory_model == VBE_MODE_MEMORY_MODEL_DIRECT)
+        mode->memory_model == VBE_MODE_MEMORY_MODEL_DIRECT ||
+        mode->memory_model == VBE_MODE_MEMORY_MODEL_PACKED)
     {
         if (mode->type == VBE_MODE_GRAPHICS && mode->has_lfb)
         {
@@ -270,6 +262,23 @@ static bool vesafb_is_mode_supported(mode_info_t* mode)
     }
 
     return false;
+}
+
+static int vesafb_fb_mode_set(int resx, int resy, int bpp)
+{
+    for (mode_info_t* m = modes; m->is_valid; ++m)
+    {
+        if (m->resx == resx && m->resy == resy && m->bits == bpp)
+        {
+            if (unlikely(!vesafb_is_mode_supported(m)))
+            {
+                return -EINVAL;
+            }
+            return vesafb_mode_set(m);
+        }
+    }
+
+    return -EINVAL;
 }
 
 static int vesafb_framebuffer_setup(mode_info_t* mode)
@@ -298,16 +307,16 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
             break;
     }
 
-    framebuffer.id       = "VESA FB";
-    framebuffer.pitch    = mode->pitch;
-    framebuffer.width    = mode->resx;
-    framebuffer.height   = mode->resy;
-    framebuffer.bpp      = mode->bits;
-    framebuffer.size     = framebuffer.pitch * framebuffer.height;
-    framebuffer.paddr    = mode->fb_paddr;
-    framebuffer.accel    = FB_ACCEL_NONE;
-    framebuffer.ops      = &vesafb_ops;
-    framebuffer.flags    = 0;
+    framebuffer.id     = "VESA FB";
+    framebuffer.pitch  = mode->pitch;
+    framebuffer.width  = mode->resx;
+    framebuffer.height = mode->resy;
+    framebuffer.bpp    = mode->bits;
+    framebuffer.size   = framebuffer.pitch * framebuffer.height;
+    framebuffer.paddr  = mode->fb_paddr;
+    framebuffer.accel  = FB_ACCEL_NONE;
+    framebuffer.ops    = &vesafb_ops;
+    framebuffer.flags  = 0;
 
     if (prev_paddr != framebuffer.paddr)
     {
@@ -315,10 +324,13 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
         {
             mmio_unmap(framebuffer.vaddr);
         }
+
         framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, size, "fb");
+
         if (unlikely(!framebuffer.vaddr))
         {
             log_error("cannot map framebuffer");
+            memset(&framebuffer, 0, sizeof(framebuffer));
             return -ENOMEM;
         }
     }
@@ -421,10 +433,19 @@ int vesafb_initialize(void)
                 desired_mode->fb_paddr);
         }
     }
-
-    if (unlikely(!current_mode))
+    else
     {
-        return -ENODEV;
+        int errno;
+
+        if (unlikely(!current_mode))
+        {
+            return -ENODEV;
+        }
+
+        if (unlikely(errno = vesafb_framebuffer_setup(current_mode)))
+        {
+            return errno;
+        }
     }
 
     return 0;

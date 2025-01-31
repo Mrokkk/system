@@ -14,8 +14,7 @@ romimage: file=${bios}, options=fastboot
 vgaromimage: file=${vgabios}
 vga: extension=vbe
 ata0-master: type=disk, path="disk.img", mode=flat, cylinders=16, heads=16, spt=16, translation=lba
-ata0-slave: type=cdrom, path="system.iso", status=inserted
-boot: cdrom
+boot: disk
 mouse: enabled=0
 port_e9_hack: enabled=1
 log: bochs.log

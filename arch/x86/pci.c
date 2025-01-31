@@ -172,6 +172,20 @@ skip_pci_bios:
     param_call_if_set(KERNEL_PARAM("pciprint"), &pci_devices_list);
 }
 
+#define DEVICE_ID(id, name) \
+    case id: it = csnprintf(it, end, name); break
+
+#define UNKNOWN_DEVICE_ID() \
+    default: it = csnprintf(it, end, "<unknown>"); break
+
+#define VENDOR_ID(id, name) \
+    case id: \
+        it = csnprintf(it, end, name " "); \
+        switch (device->device_id)
+
+#define UNKNOWN_VENDOR_ID() \
+    default: it = csnprintf(it, end, "Device")
+
 static inline char* pci_device_description(pci_device_t* device, char* buf, size_t size)
 {
     char* it = buf;
@@ -207,202 +221,110 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
     it = csnprintf(it, end, " [%02x%02x]: ", device->class, device->subclass);
     switch (device->vendor_id)
     {
-        case PCI_AMD:
-            it = csnprintf(it, end, "Advanced Micro Devices, Inc. [AMD/ATI] ");
-            switch (device->device_id)
-            {
-                case 0x4e50:
-                    it = csnprintf(it, end, "RV350/M10 / RV360/M11 [Mobility Radeon 9600 (PRO) / 9700]");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        case PCI_TI:
-            it = csnprintf(it, end, "Texas Instruments ");
-            switch (device->device_id)
-            {
-                case 0xac46:
-                    it = csnprintf(it, end, "PCI4520 PC card Cardbus Controller");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        case PCI_VIRTIO:
-            it = csnprintf(it, end, "Red Hat, Inc. ");
-            switch (device->device_id)
-            {
-                case 0x1001:
-                    it = csnprintf(it, end, "VirtIO block device");
-                    break;
-                case 0x1003:
-                    it = csnprintf(it, end, "VirtIO console");
-                    break;
-                case 0x1050:
-                    it = csnprintf(it, end, "Virtio 1.0 GPU");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        case PCI_INTEL:
-            it = csnprintf(it, end, "Intel ");
-            switch (device->device_id)
-            {
-                case 0x0154:
-                    it = csnprintf(it, end, "3rd Gen Core processor DRAM Controller");
-                    break;
-                case 0x0166:
-                    it = csnprintf(it, end, "3rd Gen Core processor Graphics Controller");
-                    break;
-                case 0x100e:
-                    it = csnprintf(it, end, "82540EM Gigabit Ethernet Controller");
-                    break;
-                case 0x101e:
-                    it = csnprintf(it, end, "82540EP Gigabit Ethernet Controller (Mobile)");
-                    break;
-                case 0x1503:
-                    it = csnprintf(it, end, "82579V Gigabit Network Connection");
-                    break;
-                case 0x1e03:
-                    it = csnprintf(it, end, "7 Series Chipset Family 6-port SATA Controller [AHCI mode]");
-                    break;
-                case 0x1e10:
-                    it = csnprintf(it, end, "7 Series/C216 Chipset Family PCI Express Root Port 1");
-                    break;
-                case 0x1e12:
-                    it = csnprintf(it, end, "7 Series/C210 Series Chipset Family PCI Express Root Port 2");
-                    break;
-                case 0x1e14:
-                    it = csnprintf(it, end, "7 Series/C210 Series Chipset Family PCI Express Root Port 3");
-                    break;
-                case 0x1e16:
-                    it = csnprintf(it, end, "7 Series/C216 Chipset Family PCI Express Root Port 4");
-                    break;
-                case 0x1e20:
-                    it = csnprintf(it, end, "7 Series/C216 Chipset Family High Definition Audio Controller");
-                    break;
-                case 0x1e26:
-                    it = csnprintf(it, end, "7 Series/C216 Chipset Family USB Enhanced Host Controller #1");
-                    break;
-                case 0x1e2d:
-                    it = csnprintf(it, end, "7 Series/C216 Chipset Family USB Enhanced Host Controller #2");
-                    break;
-                case 0x1e31:
-                    it = csnprintf(it, end, "7 Series/C210 Series Chipset Family USB xHCI Host Controller");
-                    break;
-                case 0x1e3a:
-                    it = csnprintf(it, end, "7 Series/C216 Chipset Family MEI Controller #1");
-                    break;
-                case 0x1e59:
-                    it = csnprintf(it, end, "HM76 Express Chipset LPC Controller");
-                    break;
-                case 0x1237:
-                    it = csnprintf(it, end, "440FX - 82441FX PMC [Natoma]");
-                    break;
-                case 0x2448:
-                    it = csnprintf(it, end, "82801 Mobile PCI Bridge");
-                    break;
-                case 0x24c2:
-                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
-                    break;
-                case 0x24c3:
-                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
-                    break;
-                case 0x24c4:
-                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2");
-                    break;
-                case 0x24c5:
-                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Audio Controller");
-                    break;
-                case 0x24c6:
-                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Modem Controller");
-                    break;
-                case 0x24c7:
-                    it = csnprintf(it, end, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #3");
-                    break;
-                case 0x24ca:
-                    it = csnprintf(it, end, "82801DBM (ICH4-M) IDE Controller");
-                    break;
-                case 0x24cc:
-                    it = csnprintf(it, end, "82801DBM (ICH4-M) LPC Interface Bridge");
-                    break;
-                case 0x24cd:
-                    it = csnprintf(it, end, "82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller");
-                    break;
-                case 0x2922:
-                    it = csnprintf(it, end, "82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]");
-                    break;
-                case 0x3340:
-                    it = csnprintf(it, end, "82855PM Processor to I/O Controller");
-                    break;
-                case 0x3341:
-                    it = csnprintf(it, end, "82855PM Processor to AGP Controller");
-                    break;
-                case 0x7000:
-                    it = csnprintf(it, end, "82371SB PIIX3 ISA [Natoma/Triton II]");
-                    break;
-                case 0x7010:
-                    it = csnprintf(it, end, "82371SB PIIX3 IDE [Natoma/Triton II]");
-                    break;
-                case 0x7113:
-                    it = csnprintf(it, end, "82371AB/EB/MB PIIX4 ACPI");
-                    break;
-                case 0x7020:
-                    it = csnprintf(it, end, "82371SB PIIX3 USB [Natoma/Triton II]");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        case PCI_QEMU:
-            it = csnprintf(it, end, "QEMU ");
-            switch (device->device_id)
-            {
-                case 0x1111:
-                    it = csnprintf(it, end, "Virtual Video Controller");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        case PCI_QUALCOMM:
-            it = csnprintf(it, end, "Qualcomm Atheros ");
-            switch (device->device_id)
-            {
-                case 0x0013:
-                    it = csnprintf(it, end, "AR5212/5213/2414 Wireless Network Adapter");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        case PCI_VMWARE:
-            it = csnprintf(it, end, "VMware ");
-            switch (device->device_id)
-            {
-                case 0x0405:
-                    it = csnprintf(it, end, "SVGA II Adapter");
-                    break;
-                default:
-                    it = csnprintf(it, end, "<unknown>");
-                    break;
-            }
-            break;
-        default:
-            it = csnprintf(it, end, "Device");
+        VENDOR_ID(PCI_AMD, "Advanced Micro Devices, Inc. [AMD/ATI]")
+        {
+            DEVICE_ID(0x4e50, "RV350/M10 / RV360/M11 [Mobility Radeon 9600 (PRO) / 9700]");
+            DEVICE_ID(0x5046, "Rage 4 [Rage 128 PRO AGP 4X]");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_TI, "Texas Instruments")
+        {
+            DEVICE_ID(0xac46, "PCI4520 PC card Cardbus Controller");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_VIRTIO, "Red Hat, Inc.")
+        {
+            DEVICE_ID(0x1001, "VirtIO block device");
+            DEVICE_ID(0x1003, "VirtIO console");
+            DEVICE_ID(0x1050, "Virtio 1.0 GPU");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_INTEL, "Intel")
+        {
+            DEVICE_ID(0x0154, "3rd Gen Core processor DRAM Controller");
+            DEVICE_ID(0x0166, "3rd Gen Core processor Graphics Controller");
+            DEVICE_ID(0x100e, "82540EM Gigabit Ethernet Controller");
+            DEVICE_ID(0x101e, "82540EP Gigabit Ethernet Controller (Mobile)");
+            DEVICE_ID(0x1503, "82579V Gigabit Network Connection");
+            DEVICE_ID(0x1e03, "7 Series Chipset Family 6-port SATA Controller [AHCI mode]");
+            DEVICE_ID(0x1e10, "7 Series/C216 Chipset Family PCI Express Root Port 1");
+            DEVICE_ID(0x1e12, "7 Series/C210 Series Chipset Family PCI Express Root Port 2");
+            DEVICE_ID(0x1e14, "7 Series/C210 Series Chipset Family PCI Express Root Port 3");
+            DEVICE_ID(0x1e16, "7 Series/C216 Chipset Family PCI Express Root Port 4");
+            DEVICE_ID(0x1e20, "7 Series/C216 Chipset Family High Definition Audio Controller");
+            DEVICE_ID(0x1e26, "7 Series/C216 Chipset Family USB Enhanced Host Controller #1");
+            DEVICE_ID(0x1e2d, "7 Series/C216 Chipset Family USB Enhanced Host Controller #2");
+            DEVICE_ID(0x1e31, "7 Series/C210 Series Chipset Family USB xHCI Host Controller");
+            DEVICE_ID(0x1e3a, "7 Series/C216 Chipset Family MEI Controller #1");
+            DEVICE_ID(0x1e59, "HM76 Express Chipset LPC Controller");
+            DEVICE_ID(0x1237, "440FX - 82441FX PMC [Natoma]");
+            DEVICE_ID(0x2448, "82801 Mobile PCI Bridge");
+            DEVICE_ID(0x24c2, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
+            DEVICE_ID(0x24c3, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
+            DEVICE_ID(0x24c4, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2");
+            DEVICE_ID(0x24c5, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Audio Controller");
+            DEVICE_ID(0x24c6, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Modem Controller");
+            DEVICE_ID(0x24c7, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #3");
+            DEVICE_ID(0x24ca, "82801DBM (ICH4-M) IDE Controller");
+            DEVICE_ID(0x24cc, "82801DBM (ICH4-M) LPC Interface Bridge");
+            DEVICE_ID(0x24cd, "82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller");
+            DEVICE_ID(0x2922, "82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]");
+            DEVICE_ID(0x3340, "82855PM Processor to I/O Controller");
+            DEVICE_ID(0x3341, "82855PM Processor to AGP Controller");
+            DEVICE_ID(0x7000, "82371SB PIIX3 ISA [Natoma/Triton II]");
+            DEVICE_ID(0x7010, "82371SB PIIX3 IDE [Natoma/Triton II]");
+            DEVICE_ID(0x7113, "82371AB/EB/MB PIIX4 ACPI");
+            DEVICE_ID(0x7020, "82371SB PIIX3 USB [Natoma/Triton II]");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_QEMU, "QEMU")
+        {
+            DEVICE_ID(0x1111, "Virtual Video Controller");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_QUALCOMM, "Qualcomm Atheros")
+        {
+            DEVICE_ID(0x0013, "AR5212/5213/2414 Wireless Network Adapter");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_VMWARE, "VMware")
+        {
+            DEVICE_ID(0x0405, "SVGA II Adapter");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_CIRRUS, "Cirrus Logic")
+        {
+            DEVICE_ID(0x00b8, "GD 5446");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        UNKNOWN_VENDOR_ID();
     }
     it = csnprintf(it, end, " [%04x:%04x]", device->vendor_id, device->device_id);
 
     return buf;
 }
+
+#define SUBSYSTEM_VENDOR_ID(id, name) \
+    case id: it = csnprintf(it, end, name); break
+
+#define UNKNOWN_SUBSYSTEM_VENDOR_ID() \
+    default: it = csnprintf(it, end, "Unknown"); break
 
 static inline char* pci_device_subsystem_description(pci_device_t* device, char* buf, size_t size)
 {
@@ -411,18 +333,10 @@ static inline char* pci_device_subsystem_description(pci_device_t* device, char*
 
     switch (device->subsystem_vendor_id)
     {
-        case 0x1014:
-            it = csnprintf(it, end, "IBM");
-            break;
-        case 0x103c:
-            it = csnprintf(it, end, "Hewlett-Packard Company");
-            break;
-        case 0x1af4:
-            it = csnprintf(it, end, "QEMU Virtual Machine");
-            break;
-        default:
-            it = csnprintf(it, end, "Unknown");
-            break;
+        SUBSYSTEM_VENDOR_ID(0x1014, "IBM");
+        SUBSYSTEM_VENDOR_ID(0x103c, "Hewlett-Packard Company");
+        SUBSYSTEM_VENDOR_ID(0x1af4, "QEMU Virtual Machine");
+        UNKNOWN_SUBSYSTEM_VENDOR_ID();
     }
     it = csnprintf(it, end, " [%04x:%04x]", device->subsystem_vendor_id, device->subsystem_id);
     return buf;
