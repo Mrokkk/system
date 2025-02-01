@@ -38,6 +38,13 @@
 #define VBE_MODE_MEMORY_MODEL_DIRECT    0x06
 #define VBE_MODE_MEMORY_MODEL_YUV       0x07
 
+#define VBE_PMI_GET(regs) \
+    ({ \
+        memset(&regs, 0, sizeof(regs)); \
+        regs.ax = 0x4f0a; \
+        &regs; \
+    })
+
 #define VBE_MODE_GET(regs) \
     ({ \
         memset(&regs, 0, sizeof(regs)); \

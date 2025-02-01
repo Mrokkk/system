@@ -126,15 +126,25 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     clock_sources_setup();
     time_setup();
 
-    int virtio_gpu_init();
-    if (VIRTIO_GPU_DISABLED || virtio_gpu_init())
+    int virtio_gpu_init(void);
+    int vmwarefb_init(void);
+
+    if (!vmwarefb_init())
     {
-        log_info("cannot initialize VirtIO GPU; trying VESA");
-        if (vesafb_initialize())
-        {
-            log_info("cannot initialize VESA; using VGA");
-            vgafb_initialize();
-        }
+        log_info("initialized vmwarefb");
+    }
+    else if (!VIRTIO_GPU_DISABLED && !virtio_gpu_init())
+    {
+        log_info("initialized virtio_gpu");
+    }
+    else if (!vesafb_initialize())
+    {
+        log_info("initialized vesafb");
+    }
+    else
+    {
+        log_info("fallback to VGA");
+        vgafb_initialize();
     }
 
     earlycon_disable();

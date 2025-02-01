@@ -9,7 +9,10 @@ use_kvm=
 use_cdrom=
 use_nographic=
 use_isa_debugcon=
-gpu="-device virtio-gpu,edid=on,xres=1920,yres=1124 -vga none"
+xres=1920
+yres=1124
+default_gpu="-device virtio-gpu,edid=on,xres=${xres},yres=${yres} -vga none"
+gpu="${default_gpu}"
 args="\
 -boot once=c \
 -no-reboot \
@@ -92,6 +95,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --qxl-vga)
             gpu="-device qxl-vga"
+            ;;
+        --virtio-gpu)
+            gpu="${default_gpu}"
             ;;
         *)
             param="${1#--}"

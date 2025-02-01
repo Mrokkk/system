@@ -362,6 +362,19 @@ int vesafb_initialize(void)
 
     log_notice("product name: %s; version: %#x", farptr(vbe->oem_product_name), vbe->version);
 
+    if (vbe_call(VBE_PMI_GET(regs)))
+    {
+        log_info("VBE PMI not available");
+    }
+    else
+    {
+        uint16_t* table = ptr(regs.es * 0x10 + regs.di);
+        log_info("VBE PMI: %#x:%#x", regs.es, regs.di);
+        log_info("pmi[0] = %#x", addr(table) + table[0]);
+        log_info("pmi[1] = %#x", addr(table) + table[1]);
+        log_info("pmi[2] = %#x", addr(table) + table[2]);
+    }
+
     page = page_alloc(1, PAGE_ALLOC_ZEROED);
 
     if (unlikely(!page))
@@ -374,9 +387,7 @@ int vesafb_initialize(void)
 
     vesafb_edid_read(vbe, &resx, &resy);
 
-    uint16_t current_vesafb_mode = vesafb_mode_read();
-
-    log_continue("; current mode: %#x", current_vesafb_mode);
+    uint16_t current_vesa_mode = vesafb_mode_read();
 
     for (uint16_t* mode_ptr = farptr(vbe->video_mode); *mode_ptr != VBE_MODE_END; ++mode_ptr)
     {
@@ -395,7 +406,7 @@ int vesafb_initialize(void)
         mode = &modes[index++];
         vesafb_mode_fill(mode, *mode_ptr, mode_info);
 
-        if (mode->mode == current_vesafb_mode)
+        if (mode->mode == current_vesa_mode)
         {
             current_mode = mode;
         }
@@ -442,7 +453,7 @@ int vesafb_initialize(void)
 
         if (unlikely(!current_mode))
         {
-            log_info("current mode not supported by VESA");
+            log_info("current mode %#x not supported by VESA", current_vesa_mode);
             return -ENODEV;
         }
 

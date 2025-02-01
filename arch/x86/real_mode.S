@@ -123,6 +123,8 @@ return:
     pushf
     pop %eax
     mov %eax, 24(%ebp)
+    mov %es, %eax
+    mov %eax, 28(%ebp)
     pop %eax
     add $4, %sp
 

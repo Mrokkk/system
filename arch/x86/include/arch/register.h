@@ -82,6 +82,7 @@ struct regs
     union index_reg_union(s);
     union index_reg_union(d);
     uint32_t eflags;
+    uint16_t es;
 } PACKED;
 
 typedef struct regs regs_t;
