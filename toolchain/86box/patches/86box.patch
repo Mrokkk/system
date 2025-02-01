@@ -1,0 +1,44 @@
+commit f7b4c75e440eb6828102e957b2f739bb26a448f6
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Sat Feb 1 17:39:28 2025 +0100
+
+    Add support for 0xe9 debug console and add QT_NO_DEBUG_OUTPUT flag
+
+diff --git a/src/86box.c b/src/86box.c
+index 97c211b..67b2e49 100644
+--- a/src/86box.c
++++ b/src/86box.c
+@@ -943,6 +943,11 @@ pc_full_speed(void)
+     atfullspeed = 1;
+ }
+ 
++static void debug_outb(uint16_t, uint8_t val, void *)
++{
++    putc(val, stderr);
++}
++
+ /* Initialize modules, ran once, after pc_init. */
+ int
+ pc_init_modules(void)
+@@ -1183,6 +1188,8 @@ pc_reset_hard_init(void)
+     /* Reset the general machine support modules. */
+     io_init();
+ 
++    io_sethandler(0xe9, 1, NULL, NULL, NULL, &debug_outb, NULL, NULL, NULL);
++
+     /* Turn on and (re)initialize timer processing. */
+     timer_init();
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 7d6daff..2a07b6f 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -52,6 +52,8 @@ add_executable(86Box
+     cJSON.c
+ )
+ 
++add_compile_definitions("QT_NO_DEBUG_OUTPUT")
++
+ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+     add_compile_definitions(_FILE_OFFSET_BITS=64 _LARGEFILE_SOURCE=1 _LARGEFILE64_SOURCE=1)
+ endif()

@@ -240,6 +240,9 @@ enum pci_vendor
     PCI_VMWARE      = 0x15ad,
     PCI_QUALCOMM    = 0x168c,
     PCI_CIRRUS      = 0x1013,
+    PCI_VIA         = 0x1106,
+    PCI_3DFX        = 0x121a,
+    PCI_S3          = 0x5333,
 };
 
 void pci_scan(void);

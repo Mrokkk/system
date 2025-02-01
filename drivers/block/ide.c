@@ -285,7 +285,7 @@ static void ide_device_detect(int drive, bool use_dma)
         }
     }
 
-    memset(ide_buf, 0, ATA_IDENT_SIZE);
+    memset(ide_buf, 0, ATA_IDENT_SIZE * 4);
 
     ide_read_buffer(channel, ATA_REG_DATA, ide_buf, ATA_IDENT_SIZE);
 

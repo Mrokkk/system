@@ -39,6 +39,7 @@ supported_kernel_params_bool=(
     "pciprint"
     "vesaprint"
     "nomodeset"
+    "noapm"
 )
 
 declare -A kernel_params_dict
@@ -198,6 +199,6 @@ sync "${grub_cfg}"
 echo "Command: ${qemu_path} ${args}"
 echo "Kernel params:${kernel_params}"
 
-${base_dir}/runqemu_wrapper.py "${qemu_path}" ${args}
+${base_dir}/emulator_wrapper.py "${qemu_path}" ${args}
 
 cleanup

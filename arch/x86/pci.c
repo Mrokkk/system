@@ -279,7 +279,12 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
             DEVICE_ID(0x3341, "82855PM Processor to AGP Controller");
             DEVICE_ID(0x7000, "82371SB PIIX3 ISA [Natoma/Triton II]");
             DEVICE_ID(0x7010, "82371SB PIIX3 IDE [Natoma/Triton II]");
+            DEVICE_ID(0x7110, "82371AB/EB/MB PIIX4 ISA");
+            DEVICE_ID(0x7111, "82371AB/EB/MB PIIX4 IDE");
+            DEVICE_ID(0x7112, "82371AB/EB/MB PIIX4 USB");
             DEVICE_ID(0x7113, "82371AB/EB/MB PIIX4 ACPI");
+            DEVICE_ID(0x7180, "440LX/EX - 82443LX/EX Host bridge");
+            DEVICE_ID(0x7181, "440LX/EX - 82443LX/EX AGP bridge");
             DEVICE_ID(0x7020, "82371SB PIIX3 USB [Natoma/Triton II]");
             UNKNOWN_DEVICE_ID();
         }
@@ -310,6 +315,35 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
         {
             DEVICE_ID(0x00b8, "GD 5446");
             UNKNOWN_DEVICE_ID();
+        }
+        break;
+
+        VENDOR_ID(PCI_VIA, "VIA Technologies, Inc.")
+        {
+            DEVICE_ID(0x0571, "VT82C586A/B/VT82C686/A/B/VT823x/A/C PIPC Bus Master IDE");
+            DEVICE_ID(0x0596, "VT82C596 ISA [Mobile South]");
+            DEVICE_ID(0x3038, "VT82xx/62xx/VX700/8x0/900 UHCI USB 1.1 Controller");
+            DEVICE_ID(0x3050, "VT82C596 Power Management");
+            DEVICE_ID(0x0691, "VT82C693A/694x [Apollo PRO133x]");
+            DEVICE_ID(0x8598, "VT82C598/694x [Apollo MVP3/Pro133x AGP]");
+            DEVICE_ID(0x3057, "VT82C686 [Apollo Super ACPI]");
+            DEVICE_ID(0x0686, "VT82C686 [Apollo Super South]");
+        }
+        break;
+
+        VENDOR_ID(PCI_3DFX, "3Dfx Interactive, Inc.")
+        {
+            DEVICE_ID(0x0001, "Voodoo");
+            DEVICE_ID(0x0002, "Voodoo 2");
+            DEVICE_ID(0x0003, "Voodoo Banshee");
+            DEVICE_ID(0x0004, "Voodoo Banshee [Velocity 100]");
+            DEVICE_ID(0x0005, "Voodoo 3");
+        }
+        break;
+
+        VENDOR_ID(PCI_S3, "S3 Graphics Ltd.")
+        {
+            DEVICE_ID(0x5631, "86c325 [ViRGE]");
         }
         break;
 

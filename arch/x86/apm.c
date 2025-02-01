@@ -6,8 +6,10 @@
 #include <arch/segment.h>
 #include <arch/earlycon.h>
 
+#include <kernel/init.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
+#include <kernel/byteorder.h>
 #include <kernel/page_alloc.h>
 
 #ifdef __i386__
@@ -149,7 +151,7 @@ static int apm_bios_call(regs_t* regs, const char* name)
 
     if (unlikely(regs->eflags & EFL_CF))
     {
-        log_info("%s: %s (%#x)", name, apm_error(regs->ah), regs->ah);
+        log_notice("%s: %s (%#x)", name, apm_error(regs->ah), regs->ah);
         return -1;
     }
 
@@ -198,14 +200,24 @@ void apm_initialize(void)
 
     static_assert(APM_MODE == APM_REALMODE || APM_MODE == APM_32BIT_PROTECTED);
 
-    bios_call(BIOS_SYSTEM, APM_INSTALLATION_CHECK(regs));
+    if (param_bool_get(KERNEL_PARAM("noapm")))
+    {
+        log_notice("APM disabled through kernel parameter");
+        return;
+    }
 
     if (apm_bios_call(APM_INSTALLATION_CHECK(regs), "installation check"))
     {
         return;
     }
 
-    log_info("ver: %#x", regs.ax);
+    if (regs.bx != U16('M', 'P'))
+    {
+        log_notice("installation check: incorrect signature");
+        return;
+    }
+
+    log_notice("ver: %#x", regs.ax);
 
 disconnect:
     bios_call(BIOS_SYSTEM, APM_INTERFACE_DISCONNECT(regs));
@@ -215,7 +227,7 @@ disconnect:
         return;
     }
 
-    if (apm_bios_call(APM_INTERFACE_CONNECT(regs, APM_MODE), "connect interface"))
+    if (apm_bios_call(APM_INTERFACE_CONNECT(regs, apm_mode), "connect interface"))
     {
         return;
     }

@@ -37,4 +37,5 @@ display_library: sdl2"""
 write_to "${bochsrc_content}" ".bochsrc"
 
 ${bochs} -f .bochsrc -q
-exit 0
+
+cleanup

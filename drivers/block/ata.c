@@ -29,6 +29,11 @@ void ata_device_initialize(ata_device_t* device, uint8_t* buf, uint8_t id, void*
             // Device uses CHS or 28-bit Addressing:
             device->size = identl(ATA_IDENT_MAX_LBA);
         }
+
+        if (device->size == 0)
+        {
+            device->size = identw(ATA_IDENT_CYLINDERS) * identw(ATA_IDENT_HEADS) * identw(ATA_IDENT_SECTORS);
+        }
     }
     else
     {

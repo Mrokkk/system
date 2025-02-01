@@ -84,7 +84,7 @@ static inline void ata_device_print(ata_device_t* device)
 
     human_size(size, unit);
 
-    log_info("%u: %s drive %u %s: %s; signature: %x",
+    log_info("%u: %s drive %u %s: %s; signature: %#x",
         device->id,
         device->type ? "ATAPI" : "ATA",
         (uint32_t)size,
@@ -92,7 +92,7 @@ static inline void ata_device_print(ata_device_t* device)
         device->model,
         device->signature);
 
-    log_continue("; cap: %x", device->capabilities);
+    log_continue("; cap: %#x", device->capabilities);
     if (device->dma)
     {
         log_continue("; DMA");

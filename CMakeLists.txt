@@ -167,3 +167,11 @@ add_custom_target(
     DEPENDS rootfs
     COMMENT "Running bochs"
 )
+
+add_custom_target(
+    run86box
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/scripts/run86box.sh ${CMAKE_BINARY_DIR}/run86box
+    COMMAND ./run86box
+    DEPENDS rootfs
+    COMMENT "Running 86box"
+)

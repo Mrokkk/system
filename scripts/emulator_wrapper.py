@@ -232,6 +232,33 @@ class Qemu(subprocess.Popen):
         self.qemu_mon.terminate()
 
 
+class Box86(subprocess.Popen):
+    def __init__(self, box86_args : List[str], args : argparse.Namespace) -> None:
+        bufsize      : int
+        box86_stderr : int = None
+
+        if args.raw:
+            bufsize = -1
+        else:
+            bufsize = 1
+            box86_stderr = subprocess.PIPE
+
+        super().__init__(
+            box86_args,
+            errors='ignore',
+            stderr=box86_stderr,
+            stdin=subprocess.DEVNULL,
+            bufsize=bufsize,
+            shell=False,
+            universal_newlines=True)
+
+    def readline(self) -> str:
+        return self.stderr.readline().rstrip('\n')
+
+    def stop(self) -> None:
+        self.communicate()
+
+
 FuncFileLine : TypeAlias = Tuple[str, str, str]
 
 
@@ -484,9 +511,15 @@ def args_parse() -> Tuple[argparse.Namespace, List[str]]:
 
 def main() -> None:
 
-    args, qemu_args = args_parse()
+    args, emu_args = args_parse()
 
-    qemu = Qemu(qemu_args, args)
+    emu = None
+
+    if 'qemu' in emu_args[0]:
+        emu = Qemu(emu_args, args)
+    elif '86Box' in emu_args[0]:
+        emu = Box86(emu_args, args)
+
     context = Context(args)
 
     sys.stdin.close()
@@ -494,14 +527,14 @@ def main() -> None:
 
     if not args.raw:
         while True:
-            line = qemu.readline()
+            line = emu.readline()
 
             if not line:
                 break
 
             line_process(line, context)
 
-    qemu.stop()
+    emu.stop()
     print()
 
     exceptions_print(context)
