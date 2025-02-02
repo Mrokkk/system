@@ -60,6 +60,11 @@ extern framebuffer_t framebuffer;
 int framebuffer_client_register(void (*callback)(void* data), void* data);
 void framebuffer_refresh(void);
 
+static inline size_t fb_bpp_to_bytes(int bpp)
+{
+    return (bpp + 7) / 8;
+}
+
 static inline void fb_rect_enlarge(fb_rect_t* rect, const fb_rect_t* new_rect)
 {
     if (rect->w == 0 && rect->h == 0)

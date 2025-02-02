@@ -25,6 +25,6 @@ then
     cp ../scripts/86box.cfg .
 fi
 
-${base_dir}/emulator_wrapper.py "${box86}" --logfile 86box.log
+${base_dir}/emulator_wrapper.py "${box86}" --logfile 86box.log ${@}
 
 cleanup

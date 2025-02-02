@@ -55,7 +55,8 @@
 #define VGA_CRTC_CURSOR_HI     0x0e
 #define VGA_CRTC_CURSOR_LO     0x0f
 #define VGA_CRTC_V_SYNC_START  0x10
-#define VGA_CRTC_V_SYNC_END    0x11
+#define VGA_CRTC_CR11          0x11
+#define VGA_CRTC_V_SYNC_END    VGA_CRTC_CR11
 #define VGA_CRTC_V_DISP_END    0x12
 #define VGA_CRTC_OFFSET        0x13
 #define VGA_CRTC_UNDERLINE     0x14
@@ -65,7 +66,32 @@
 #define VGA_CRTC_LINE_COMPARE  0x18
 #define VGA_CRTC_REGS          VGA_CRT_C
 
+// VGA CRT controller bit masks
+#define VGA_CR11_LOCK_CR0_CR7   0x80
 #define VGA_CRTC_CURSOR_DISABLE (1 << 5)
+
+/* VGA attribute controller register indices */
+#define VGA_ATC_PALETTE0        0x00
+#define VGA_ATC_PALETTE1        0x01
+#define VGA_ATC_PALETTE2        0x02
+#define VGA_ATC_PALETTE3        0x03
+#define VGA_ATC_PALETTE4        0x04
+#define VGA_ATC_PALETTE5        0x05
+#define VGA_ATC_PALETTE6        0x06
+#define VGA_ATC_PALETTE7        0x07
+#define VGA_ATC_PALETTE8        0x08
+#define VGA_ATC_PALETTE9        0x09
+#define VGA_ATC_PALETTEA        0x0A
+#define VGA_ATC_PALETTEB        0x0B
+#define VGA_ATC_PALETTEC        0x0C
+#define VGA_ATC_PALETTED        0x0D
+#define VGA_ATC_PALETTEE        0x0E
+#define VGA_ATC_PALETTEF        0x0F
+#define VGA_ATC_MODE            0x10
+#define VGA_ATC_OVERSCAN        0x11
+#define VGA_ATC_PLANE_ENABLE    0x12
+#define VGA_ATC_PEL             0x13
+#define VGA_ATC_COLOR_PAGE      0x14
 
 // VGA graphics controller register indices
 #define VGA_GFX_SR_VALUE      0x00
@@ -137,6 +163,22 @@ static inline void vga_gfx_write(uint8_t reg, uint8_t value)
 static inline void vga_seq_write(uint8_t reg, uint8_t value)
 {
     vga_write(VGA_SEQ_I, reg, value);
+}
+
+static inline void vga_misc_write(uint8_t value)
+{
+    outb(value, VGA_MIS_W);
+}
+
+static inline void vga_att_write(uint8_t reg, uint8_t value)
+{
+    outb(reg, VGA_ATT_IW);
+    outb(value, VGA_ATT_W);
+}
+
+static inline uint8_t vga_is1_read(void)
+{
+    return inb(VGA_IS1_RC);
 }
 
 int vga_probe(void);
