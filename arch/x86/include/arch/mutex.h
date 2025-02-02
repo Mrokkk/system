@@ -4,6 +4,7 @@
 
 static inline int mutex_try_lock(mutex_t* mutex)
 {
+#if CONFIG_X86 > 3
     int ret = 1;
 
     asm volatile(
@@ -15,4 +16,15 @@ static inline int mutex_try_lock(mutex_t* mutex)
         : "memory");
 
     return !ret;
+#else
+    scoped_irq_lock();
+
+    if (unlikely(!mutex->count))
+    {
+        return 1;
+    }
+
+    mutex->count = 0;
+    return 0;
+#endif
 }

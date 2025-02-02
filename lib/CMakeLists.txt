@@ -6,8 +6,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_DEBUG} \
     ${C_FLAGS_FRAME_POINTER} \
     ${C_FLAGS_ADDITIONAL} \
-    -m${BITS} \
-    -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx \
+    ${C_FLAGS_ARCH} \
     -nostdlib \
     -nostartfiles \
     -fno-builtin \

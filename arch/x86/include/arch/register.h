@@ -155,12 +155,16 @@ static inline uintptr_t dr3_get(void)
         rv; \
     })
 
+#if CONFIG_X86 > 4
 #define cr4_get() \
     ({ \
         uintptr_t rv; \
         asm volatile("mov %%cr4, %0" : "=r" (rv)); \
         rv; \
     })
+#else
+#define cr4_get() ({ 0; })
+#endif
 
 #define cs_get() \
     ({ \

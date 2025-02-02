@@ -19,5 +19,5 @@ static inline void semaphore_down(semaphore_t* sem)
         "js __semaphore_sleep;"
         "2:"
         :: "c" (sem)
-        : "memory");
+        : "memory", "ax");
 }

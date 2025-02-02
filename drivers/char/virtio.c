@@ -139,7 +139,8 @@ static int virtio_cap_read(virtio_device_t* device, void** notify_bar_ptr, uint3
 
             int bar = virtio_cap[index].bar;
 
-            if (device->pci_device->bar[bar].region == PCI_IO)
+            if (device->pci_device->bar[bar].region == PCI_IO ||
+                !device->pci_device->bar[bar].addr)
             {
                 continue;
             }
@@ -172,7 +173,7 @@ static int virtio_cap_read(virtio_device_t* device, void** notify_bar_ptr, uint3
         }
     }
 
-    if (unlikely(!notify_bar))
+    if (unlikely(!notify_bar || !device->common_cfg))
     {
         return -1;
     }

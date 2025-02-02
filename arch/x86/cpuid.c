@@ -48,6 +48,8 @@ READONLY static const char* feature_strings[NR_FEATURES * 32] = {
 };
 
 static struct cpuid_cache cache[6];
+int cpuid_available;
+int family;
 
 static inline const char* cache_type_string(cache_type_t t)
 {
@@ -60,12 +62,13 @@ static inline const char* cache_type_string(cache_type_t t)
     }
 }
 
+#define NAME_APPEND(str) \
+    it = csnprintf(it, end, str)
+
 UNMAP_AFTER_INIT static void extended_functions_read(void)
 {
     cpuid_regs_t cpuid_regs = {};
     uint32_t max_function;
-
-    snprintf(cpu_info.producer, sizeof(cpu_info.producer), "Intel");
 
     // Check how many extended functions we have
     cpuid_read(0x80000000, &cpuid_regs);
@@ -103,7 +106,92 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     }
     else
     {
-        strlcpy(cpu_info.name, "unknown", sizeof(cpu_info.name));
+        char* it = cpu_info.name;
+        const char* end = cpu_info.name + sizeof(cpu_info.name);
+        switch (cpu_info.vendor_id)
+        {
+            case INTEL:
+                NAME_APPEND("Intel ");
+                switch (cpu_info.family)
+                {
+                    case 4:
+                        switch (cpu_info.model)
+                        {
+                            case 0:
+                            case 1:
+                                NAME_APPEND("i486DX");
+                                break;
+                            case 2:
+                                NAME_APPEND("i486SX");
+                                break;
+                            case 3:
+                                NAME_APPEND("iDX2");
+                                break;
+                            case 4:
+                                NAME_APPEND("i486 SL");
+                                break;
+                            case 5:
+                                NAME_APPEND("iSX2");
+                                break;
+                            case 7:
+                                NAME_APPEND("iDX2 WB");
+                                break;
+                            case 8:
+                                NAME_APPEND("iDX4");
+                                break;
+                            default:
+                                goto unknown;
+                        }
+                        break;
+                    case 5:
+                        switch (cpu_info.model)
+                        {
+                            case 1:
+                                NAME_APPEND("Pentium");
+                                break;
+                            case 3:
+                                NAME_APPEND("Pentium OverDrive");
+                                break;
+                            case 4:
+                                NAME_APPEND("Pentium MMX");
+                                break;
+                            default:
+                                goto unknown;
+                        }
+                        break;
+                    case 6:
+                        switch (cpu_info.model)
+                        {
+                            case 1:
+                                NAME_APPEND("Pentium Pro");
+                                break;
+                            case 3:
+                            case 5:
+                                NAME_APPEND("Pentium II");
+                                break;
+                            case 6:
+                                NAME_APPEND("Celeron");
+                                break;
+                            case 7:
+                                NAME_APPEND("Pentium III");
+                                break;
+                            default:
+                                goto unknown;
+                        }
+                        break;
+                    default:
+                        goto unknown;
+                }
+                if (cpu_info.type == 1)
+                {
+                    NAME_APPEND(" OverDrive");
+                }
+                break;
+            unknown:
+            default:
+                strlcpy(cpu_info.name, "unrecognized", sizeof(cpu_info.name));
+                break;
+        }
     }
 
     if (max_function >= 0x80000006)
@@ -130,6 +218,17 @@ UNMAP_AFTER_INIT int cpu_detect(void)
     uint32_t max_function, vendor;
     cpuid_regs_t cpuid_regs = {};
 
+    if (unlikely(!cpuid_available))
+    {
+        log_notice("CPUID not available");
+        cpu_info.family = family;
+        strcpy(cpu_info.vendor, "unknown");
+        strcpy(cpu_info.producer, "unknown");
+        strcpy(cpu_info.name, family == 4 ? "486" : "386");
+
+        goto print;
+    }
+
     cpuid_read(0, &cpuid_regs);
 
     // Vendor is found in EBX, EDX, ECX in extact order
@@ -147,6 +246,7 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         cpu_info.stepping = (cpuid_regs.eax) & 0xf;
         cpu_info.model = cpu_model(cpuid_regs.eax);
         cpu_info.family = cpu_family(cpuid_regs.eax);
+        cpu_info.type = cpu_type(cpuid_regs.eax);
         cpu_info.lapic_id = cpuid_regs.ebx >> 24;
         cpu_features_save(CPUID_1_ECX, cpuid_regs.ecx);
         cpu_features_save(CPUID_1_EDX, cpuid_regs.edx);
@@ -183,12 +283,20 @@ UNMAP_AFTER_INIT int cpu_detect(void)
     switch (cpu_info.vendor_id)
     {
         case INTEL:
+            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "Intel");
+            break;
         case AMD:
-            extended_functions_read();
+            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "AMD");
+            break;
+        case CYRIX:
+            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "Cyrix");
             break;
         default:
-            log_warning("unsupported CPU");
+            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "unknown");
+            break;
     }
+
+    extended_functions_read();
 
     if ((cpu_info.family == 0xf && cpu_info.model >= 0x03) ||
         (cpu_info.family == 0x6 && cpu_info.model >= 0x0e))
@@ -196,14 +304,16 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         cpu_feature_set(X86_FEATURE_INVTSC);
     }
 
+print:
     log_notice("producer: %s (%s), name: %s",
         cpu_info.producer,
         cpu_info.vendor,
         cpu_info.name);
 
-    log_notice("family: %#x, model: %#x, stepping: %#x",
+    log_notice("family: %#x, model: %#x, type: %#x, stepping: %#x",
         cpu_info.family,
         cpu_info.model,
+        cpu_info.type,
         cpu_info.stepping);
 
     for (uint32_t i = 0; i < 6; ++i)

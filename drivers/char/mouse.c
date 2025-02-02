@@ -43,8 +43,8 @@ UNMAP_AFTER_INIT static int mouse_init()
 
     if (!i8042_is_detected(MOUSE))
     {
-        log_warning("no mouse detected");
-        return -ENODEV;
+        log_notice("no mouse detected");
+        return 0;
     }
 
     if (i8042_config_set(AUX_EKI))

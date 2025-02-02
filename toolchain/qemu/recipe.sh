@@ -5,6 +5,9 @@ OPTIONAL=true
 
 function build()
 {
+    export CFLAGS="-Wno-error"
+    export CXXFLAGS="-Wno-error"
+
     if [[ ! -f ".ninja_deps" ]]
     then
         "${SRC_DIR}"/configure \

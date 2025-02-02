@@ -26,6 +26,7 @@ struct mode_info
     uint8_t  bits;
     uint8_t  type;
     uint8_t  color;
+    uint32_t fb_paddr;
 };
 
 typedef struct mode_info mode_info_t;
@@ -39,6 +40,7 @@ static mode_info_t standard_modes[] = {
         .bits = 4,
         .type = VGA_MODE_TEXT,
         .color = false,
+        .fb_paddr = 0xb8000,
     },
     {
         .mode = 0x1,
@@ -47,6 +49,7 @@ static mode_info_t standard_modes[] = {
         .bits = 4,
         .type = VGA_MODE_TEXT,
         .color = true,
+        .fb_paddr = 0xb8000,
     },
     {
         .mode = 0x2,
@@ -55,6 +58,7 @@ static mode_info_t standard_modes[] = {
         .bits = 4,
         .type = VGA_MODE_TEXT,
         .color = true,
+        .fb_paddr = 0xb8000,
     },
     {
         .mode = 0x3,
@@ -63,10 +67,11 @@ static mode_info_t standard_modes[] = {
         .bits = 4,
         .type = VGA_MODE_TEXT,
         .color = true,
+        .fb_paddr = 0xb8000,
     },
 };
 
-static mode_info_t* current_mode;
+static bool mda;
 
 static fb_ops_t vgafb_ops = {
     .mode_set = &vgafb_fb_mode_set,
@@ -91,6 +96,8 @@ static fb_ops_t vgafb_ops = {
 
 static void vgafb_framebuffer_setup(mode_info_t* mode)
 {
+    uintptr_t prev_fb_paddr = framebuffer.paddr;
+
     framebuffer.id       = "VGA FB";
     framebuffer.type     = FB_TYPE_TEXT;
     framebuffer.visual   = FB_VISUAL_PSEUDOCOLOR;
@@ -101,17 +108,27 @@ static void vgafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.bpp      = mode->bits;
     framebuffer.size     = framebuffer.pitch * framebuffer.height;
     framebuffer.accel    = FB_ACCEL_NONE;
-    framebuffer.paddr    = 0xb8000;
+    framebuffer.paddr    = mode->fb_paddr;
     framebuffer.flags    = 0;
     framebuffer.ops = &vgafb_ops;
-    if (!framebuffer.vaddr)
+
+    if (prev_fb_paddr != framebuffer.paddr)
     {
+        if (framebuffer.vaddr)
+        {
+            mmio_unmap(framebuffer.vaddr);
+        }
         framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, 64 * KiB, "fb");
     }
 }
 
 static int vgafb_fb_mode_set(int resx, int resy, int bpp)
 {
+    if (mda)
+    {
+        return -EINVAL;
+    }
+
     for (size_t i = 0; i < array_size(standard_modes); ++i)
     {
         mode_info_t* m = &standard_modes[i];
@@ -121,9 +138,7 @@ static int vgafb_fb_mode_set(int resx, int resy, int bpp)
 
             bios_call(BIOS_VIDEO, BIOS_VIDEO_MODE_SET(regs, m->mode));
 
-            current_mode = m;
-
-            vgafb_framebuffer_setup(current_mode);
+            vgafb_framebuffer_setup(m);
 
             return 0;
         }
@@ -135,33 +150,48 @@ static int vgafb_fb_mode_set(int resx, int resy, int bpp)
 int vgafb_initialize(void)
 {
     regs_t regs;
-
-    if (vga_probe())
-    {
-        log_info("not available");
-        return -ENODEV;
-    }
-
-    log_notice("calling INT %#x AH=0xf", BIOS_VIDEO);
+    mode_info_t current_mode;
 
     bios_call(BIOS_VIDEO, BIOS_VIDEO_STATE_GET(regs));
 
     log_info("curent mode: %#x, columns: %u; current display page: %#x",
         regs.al, regs.ah, regs.bh);
 
-    if (regs.al < array_size(standard_modes))
+    if (regs.al == 7 && regs.ah == 80)
     {
-        current_mode = &standard_modes[regs.al];
+        current_mode = (mode_info_t){
+            .mode = 0x7,
+            .resx = 80,
+            .resy = 25,
+            .bits = 4,
+            .type = VGA_MODE_TEXT,
+            .color = false,
+            .fb_paddr = 0xb0000,
+        };
+        mda = true;
+        log_continue("MDA available");
     }
-    else
+    else if (vga_probe())
     {
-        log_notice("unknown mode: %#x, setting default text mode", regs.al);
-        bios_call(BIOS_VIDEO, BIOS_VIDEO_MODE_SET(regs, DEFAULT_TEXT_MODE));
-        current_mode = &standard_modes[DEFAULT_TEXT_MODE];
+        log_notice("VGA not available");
+        return -ENODEV;
     }
 
-    earlycon_disable();
-    vgafb_framebuffer_setup(current_mode);
+    if (!mda)
+    {
+        if (regs.al < array_size(standard_modes))
+        {
+            current_mode = standard_modes[regs.al];
+        }
+        else
+        {
+            log_notice("unknown mode: %#x, setting default text mode", regs.al);
+            bios_call(BIOS_VIDEO, BIOS_VIDEO_MODE_SET(regs, DEFAULT_TEXT_MODE));
+            current_mode = standard_modes[DEFAULT_TEXT_MODE];
+        }
+    }
+
+    vgafb_framebuffer_setup(&current_mode);
 
     return 0;
 }

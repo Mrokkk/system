@@ -8,7 +8,7 @@ set(CMAKE_C_FLAGS
     ${C_FLAGS_OPTIMIZATION} \
     ${C_FLAGS_WARNINGS} \
     ${C_FLAGS_DEBUG} \
-    -m${BITS} -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx")
+    ${C_FLAGS_ARCH}")
 
 function(add_application)
 

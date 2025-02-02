@@ -63,8 +63,6 @@ static int page_mmio_map(uintptr_t paddr_start, uintptr_t vaddr_start, size_t si
         pte_entry_set(pte, paddr, pgprot);
     }
 
-    tlb_flush();
-
     return 0;
 }
 

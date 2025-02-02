@@ -89,7 +89,7 @@ int i8042_initialize(void)
     i8042_send_cmd(I8042_KBD_PORT_TEST);
     if ((data = i8042_receive() != 0x00))
     {
-        log_error("port0: test failed: %#x", data);
+        log_warning("port0: test failed: %#x", data);
         goto second_port;
     }
 
@@ -107,7 +107,7 @@ second_port:
     i8042_send_cmd(I8042_AUX_PORT_TEST);
     if ((data = i8042_receive() != 0x00))
     {
-        log_error("port1: test failed: %#x", data);
+        log_warning("port1: test failed: %#x", data);
         goto finish;
     }
 
@@ -203,6 +203,7 @@ uint8_t i8042_receive(void)
 
 uint8_t i8042_send_and_receive(uint8_t byte, uint8_t port)
 {
+    int timeout = 256;
     uint8_t resp;
 
     i8042_send_data(byte, port);
@@ -211,7 +212,7 @@ uint8_t i8042_send_and_receive(uint8_t byte, uint8_t port)
     {
         resp = i8042_receive();
     }
-    while (resp == I8042_RESP_RESEND);
+    while (resp == I8042_RESP_RESEND && timeout--);
 
     return resp;
 }

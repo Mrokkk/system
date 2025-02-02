@@ -11,6 +11,7 @@ use_nographic=
 use_isa_debugcon=
 xres=1920
 yres=1124
+cpu="qemu64"
 default_gpu="-device virtio-gpu,edid=on,xres=${xres},yres=${yres} -vga none"
 gpu="${default_gpu}"
 args="\
@@ -100,6 +101,10 @@ while [[ $# -gt 0 ]]; do
         --virtio-gpu)
             gpu="${default_gpu}"
             ;;
+        --cpu)
+            cpu="${2}"
+            shift
+            ;;
         *)
             param="${1#--}"
             if [[ ${supported_kernel_params_value[@]} =~ ${param} ]]
@@ -117,10 +122,13 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-if file system | grep -q 32; then
-    qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
-else
-    qemu_path=$(binary_from_native_sysroot "qemu-system-x86_64")
+if [[ -z "${qemu_path}" ]]
+then
+    if file system | grep -q 32; then
+        qemu_path=$(binary_from_native_sysroot "qemu-system-i386")
+    else
+        qemu_path=$(binary_from_native_sysroot "qemu-system-x86_64")
+    fi
 fi
 
 if [[ -z "${qemu_path}" ]]
@@ -155,7 +163,7 @@ fi
 
 if [[ -z ${use_kvm} ]]
 then
-    args="-cpu qemu64 ${args}"
+    args="-cpu ${cpu} ${args}"
 else
     args="-enable-kvm -cpu host ${args}"
 fi

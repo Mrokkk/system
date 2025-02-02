@@ -23,6 +23,7 @@ ENTRY(_start)
     call paging_setup
     call gdt_setup
     call stack_setup
+    call cpuid_check
 
     // Push multiboot data on stack
     push %edx
@@ -78,6 +79,49 @@ stack_setup:
     movl $SYMBOL_NAME(init_process_stack), %esp
     addl $INIT_PROCESS_STACK_SIZE * 4, %esp
     jmp *%eax
+
+cpuid_check:
+    movl $3, family
+    call get_flags
+    mov %eax, %ecx
+    xor $EFL_AC, %eax
+    call set_flags
+    call get_flags
+    xor %ecx, %eax
+    jz no_cpuid
+
+    call restore_flags
+
+    movl $4, family
+    call get_flags
+    mov %eax, %ecx
+    xor $EFL_ID, %eax
+    call set_flags
+    call get_flags
+    xor %ecx, %eax
+    jz no_cpuid
+
+has_cpuid:
+    movl $1, cpuid_available
+
+no_cpuid:
+    call restore_flags
+    ret
+
+get_flags:
+    pushfl
+    pop %eax
+    ret
+
+set_flags:
+    push %eax
+    popfl
+    ret
+
+restore_flags:
+    push %ecx
+    popfl
+    ret
 
 ENDPROC(_start)
 

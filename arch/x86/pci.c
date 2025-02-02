@@ -8,6 +8,8 @@ static void pci_device_add(uint32_t vendor, uint8_t bus, uint8_t slot, uint8_t f
 
 static LIST_DECLARE(pci_devices);
 
+#define PCI_BIOS_DISABLED 1
+
 #define PCI_BIOS_SIGNATURE U32('$', 'P', 'C', 'I')
 
 #define PCI_BIOS_SUCCESSFUL             0x00
@@ -57,6 +59,12 @@ static uint32_t pci_config_read_u32(uint8_t bus, uint8_t slot, uint8_t func, uin
     return inl(PCI_CONFIG_DATA);
 }
 
+static void pci_config_write_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t val)
+{
+    outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
+    outw(val, PCI_CONFIG_DATA);
+}
+
 static void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val)
 {
     outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
@@ -65,12 +73,12 @@ static void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_
 
 int pci_device_initialize(pci_device_t* device)
 {
-    device->command |= (1 << 2) | (1 << 1) | 1;
-    ASSERT(device->command & (1 << 2));
-    ASSERT(device->command & (1 << 1));
-    ASSERT(device->command & 1);
+    device->command |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_BM;
 
-    return !(device->command & 1);
+    pci_config_write_u16(device->bus, device->slot, device->func, PCI_REG_COMMAND, device->command);
+    device->command = pci_config_read_u16(device->bus, device->slot, device->func, PCI_REG_COMMAND);
+
+    return !(device->command & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_BM));
 }
 
 int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size)
@@ -118,7 +126,7 @@ UNMAP_AFTER_INIT void pci_scan(void)
     scoped_irq_lock();
 
 #ifdef __i386__
-    if (!bios32_find(PCI_BIOS_SIGNATURE, &pci_bios_entry))
+    if (!PCI_BIOS_DISABLED && !bios32_find(PCI_BIOS_SIGNATURE, &pci_bios_entry))
     {
         log_info("PCI BIOS entry: %#06x:%#010x", pci_bios_entry.seg, pci_bios_entry.addr);
 
@@ -146,20 +154,20 @@ skip_pci_bios:
     {
         for (slot = 0; slot < 32; ++slot)
         {
-            vendor_id = pci_config_read_u16(bus, slot, 0, VENDOR_DEVICE_ID);
+            vendor_id = pci_config_read_u16(bus, slot, 0, PCI_REG_VENDOR_DEVICE_ID);
             if (vendor_id == 0xffff)
             {
                 continue;
             }
 
-            header_type = pci_config_read_u16(bus, slot, 0, HEADER_TYPE) & 0xff;
+            header_type = pci_config_read_u16(bus, slot, 0, PCI_REG_HEADER_TYPE) & 0xff;
             pci_device_add(vendor_id, bus, slot, 0);
 
             if (header_type & 0x80)
             {
                 for (func = 1; func < 8; ++func)
                 {
-                    vendor_id = pci_config_read_u16(bus, slot, func, VENDOR_DEVICE_ID);
+                    vendor_id = pci_config_read_u16(bus, slot, func, PCI_REG_VENDOR_DEVICE_ID);
                     if (vendor_id != 0xffff)
                     {
                         pci_device_add(vendor_id, bus, slot, func);
@@ -408,19 +416,26 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
 
     uint32_t* buf = ptr(device);
 
-    for (uint8_t addr = 0; addr < BAR0; addr += 4)
+    for (uint8_t addr = 0; addr < PCI_REG_BAR0; addr += 4)
     {
         *buf++ = pci_config_read_u32(bus, slot, func, addr);
     }
 
     if ((device->header_type & 0x7f) == 0)
     {
-        for (uint32_t addr = BAR0; addr < BAR_END; addr += 4)
+        uint16_t command = pci_config_read_u16(bus, slot, func, 0x4);
+        pci_config_write_u16(bus, slot, func, 0x4, command & ~(3));
+
+        for (uint32_t addr = PCI_REG_BAR0; addr < PCI_REG_BAR_END; addr += 4)
         {
             bar_t* bar = ptr(buf);
             uint32_t raw_bar = pci_config_read_u32(bus, slot, func, addr);
             if (raw_bar)
             {
+                pci_config_write_u32(bus, slot, func, addr, ~(uint32_t)0);
+                bar->size = ~(pci_config_read_u32(bus, slot, func, addr) & ~0xf) + 1;
+                pci_config_write_u32(bus, slot, func, addr, raw_bar);
+
                 bar->region = raw_bar & 0x1;
                 if (bar->region == PCI_MEMORY)
                 {
@@ -431,21 +446,22 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
                 {
                     bar->space = 0;
                     bar->addr = raw_bar & ~0x1;
+                    bar->size &= 0xffff;
                 }
-                pci_config_write_u32(bus, slot, func, addr, ~(uint32_t)0);
-                bar->size = ~(pci_config_read_u32(bus, slot, func, addr) & ~0xf) + 1;
-                pci_config_write_u32(bus, slot, func, addr, raw_bar);
             }
             buf = ptr(addr(buf) + sizeof(bar_t));
         }
-        for (uint32_t addr = BAR_END; addr < HEADER0_END; addr += 4)
+
+        pci_config_write_u16(bus, slot, func, 0x4, command);
+
+        for (uint32_t addr = PCI_REG_BAR_END; addr < PCI_REG_HEADER0_END; addr += 4)
         {
             *buf++ = pci_config_read_u32(bus, slot, func, addr);
         }
     }
     else
     {
-        for (uint32_t addr = BAR0; addr < HEADER0_END; addr += 4)
+        for (uint32_t addr = PCI_REG_BAR0; addr < PCI_REG_HEADER0_END; addr += 4)
         {
             *buf++ = pci_config_read_u32(bus, slot, func, addr);
         }

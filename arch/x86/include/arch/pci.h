@@ -5,43 +5,50 @@
 
 // Reference for PCI BIOS: http://www.o3one.org/hwdocs/bios_doc/pci_bios_21.pdf
 
-struct pci_device;
 typedef struct pci_device pci_device_t;
 
 #define PCI_CONFIG_ADDRESS  0xcf8
 #define PCI_CONFIG_DATA     0xcfc
 
-typedef enum
+enum header_type
 {
-    DEVICE = 0,
-    BRIDGE = 1,
-} header_type_t;
+    PCI_HEADER_DEVICE = 0,
+    PCI_HEADER_BRIDGE = 1,
+};
 
 enum register_offset
 {
-    VENDOR_DEVICE_ID    = 0x00,
-    HEADER_TYPE         = 0x0e,
-    BAR0                = 0x10,
-    BAR1                = 0x14,
-    BAR2                = 0x18,
-    BAR3                = 0x1C,
-    BAR4                = 0x20,
-    BAR5                = 0x24,
-    BAR_END             = 0x28,
-    HEADER0_END         = 0x40,
+    PCI_REG_VENDOR_DEVICE_ID = 0x00,
+    PCI_REG_COMMAND          = 0x04,
+    PCI_REG_HEADER_TYPE      = 0x0e,
+    PCI_REG_BAR0             = 0x10,
+    PCI_REG_BAR1             = 0x14,
+    PCI_REG_BAR2             = 0x18,
+    PCI_REG_BAR3             = 0x1c,
+    PCI_REG_BAR4             = 0x20,
+    PCI_REG_BAR5             = 0x24,
+    PCI_REG_BAR_END          = 0x28,
+    PCI_REG_HEADER0_END      = 0x40,
+};
+
+enum command
+{
+    PCI_COMMAND_IO     = 1 << 0,
+    PCI_COMMAND_MEMORY = 1 << 1,
+    PCI_COMMAND_BM     = 1 << 2,
 };
 
 enum pci_space
 {
-    PCI_32BIT   = 0,
-    PCI_1MIB    = 1,
-    PCI_64BIT   = 2,
+    PCI_32BIT = 0,
+    PCI_1MIB  = 1,
+    PCI_64BIT = 2,
 };
 
 enum pci_region
 {
-    PCI_MEMORY  = 0,
-    PCI_IO      = 1,
+    PCI_MEMORY = 0,
+    PCI_IO     = 1,
 };
 
 struct base_address_register
@@ -56,11 +63,11 @@ typedef struct base_address_register bar_t;
 
 enum pci_cap_id
 {
-    PCI_CAP_ID_VNDR = 0x9,
-    PCI_CAP_ID_MSI = 0x5,
-    PCI_CAP_ID_MSIX = 0xb,
-    PCI_CAP_MSG_CTRL_ENABLE = 0x1,
-    PCI_CAP_MSG_CTRL_64BIT = 0x80,
+    PCI_CAP_ID_VNDR         = 0x09,
+    PCI_CAP_ID_MSI          = 0x05,
+    PCI_CAP_ID_MSIX         = 0x0b,
+    PCI_CAP_MSG_CTRL_ENABLE = 0x01,
+    PCI_CAP_MSG_CTRL_64BIT  = 0x80,
 };
 
 struct pci_cap
@@ -95,50 +102,50 @@ typedef struct pci_msi_cap pci_msi_cap_t;
 
 struct pci_device
 {
-    uint16_t vendor_id;
-    uint16_t device_id;
-    uint16_t command;
-    uint16_t status;
-    uint8_t revision_id;
-    uint8_t prog_if;
-    uint8_t subclass;
-    uint8_t class;
-    uint8_t cacheline_size;
-    uint8_t latency_timer;
-    uint8_t header_type;
-    uint8_t bist;
-    bar_t bar[6];
-    uint32_t cis;
-    uint16_t subsystem_vendor_id;
-    uint16_t subsystem_id;
-    uint32_t rom_base;
-    uint8_t capabilities;
-    uint8_t reserved[7];
-    uint8_t interrupt_line;
-    uint8_t interrupt_pin;
-    uint8_t min_grant;
-    uint8_t max_latency;
-    uint8_t bus, slot, func, padding;
+    uint16_t    vendor_id;
+    uint16_t    device_id;
+    uint16_t    command;
+    uint16_t    status;
+    uint8_t     revision_id;
+    uint8_t     prog_if;
+    uint8_t     subclass;
+    uint8_t     class;
+    uint8_t     cacheline_size;
+    uint8_t     latency_timer;
+    uint8_t     header_type;
+    uint8_t     bist;
+    bar_t       bar[6];
+    uint32_t    cis;
+    uint16_t    subsystem_vendor_id;
+    uint16_t    subsystem_id;
+    uint32_t    rom_base;
+    uint8_t     capabilities;
+    uint8_t     reserved[7];
+    uint8_t     interrupt_line;
+    uint8_t     interrupt_pin;
+    uint8_t     min_grant;
+    uint8_t     max_latency;
+    uint8_t     bus, slot, func, padding;
     list_head_t list_entry;
 };
 
 enum class
 {
-    PCI_UNCLASSIFIED    = 0x0,
-    PCI_STORAGE         = 0x1,
-    PCI_NETWORK         = 0x2,
-    PCI_DISPLAY         = 0x3,
-    PCI_MULTIMEDIA      = 0x4,
-    PCI_BRIDGE          = 0x6,
-    PCI_COMCONTROLLER   = 0x7,
-    PCI_SERIAL_BUS      = 0xc,
+    PCI_UNCLASSIFIED  = 0x0,
+    PCI_STORAGE       = 0x1,
+    PCI_NETWORK       = 0x2,
+    PCI_DISPLAY       = 0x3,
+    PCI_MULTIMEDIA    = 0x4,
+    PCI_BRIDGE        = 0x6,
+    PCI_COMCONTROLLER = 0x7,
+    PCI_SERIAL_BUS    = 0xc,
 };
 
 enum storage_subclass
 {
-    PCI_STORAGE_SCSI    = 0,
-    PCI_STORAGE_IDE     = 1,
-    PCI_STORAGE_SATA    = 6,
+    PCI_STORAGE_SCSI = 0,
+    PCI_STORAGE_IDE  = 1,
+    PCI_STORAGE_SATA = 6,
 };
 
 static inline const char* storage_subclass_string(int c)
@@ -154,9 +161,9 @@ static inline const char* storage_subclass_string(int c)
 
 enum display_subclass
 {
-    PCI_DISPLAY_VGA     = 0,
-    PCI_DISPLAY_XGA     = 1,
-    PCI_DISPLAY_3D      = 2,
+    PCI_DISPLAY_VGA        = 0,
+    PCI_DISPLAY_XGA        = 1,
+    PCI_DISPLAY_3D         = 2,
     PCI_DISPLAY_CONTROLLER = 0x80,
 };
 
@@ -174,9 +181,9 @@ static inline const char* display_subclass_string(int c)
 
 enum multimedia_subclass
 {
-    PCI_MULTIMEDIA_VIDEO_CONTROLLER     = 0,
-    PCI_MULTIMEDIA_AUDIO_CONTROLLER     = 1,
-    PCI_MULTIMEDIA_AUTIO_DEVICE         = 3,
+    PCI_MULTIMEDIA_VIDEO_CONTROLLER = 0,
+    PCI_MULTIMEDIA_AUDIO_CONTROLLER = 1,
+    PCI_MULTIMEDIA_AUTIO_DEVICE     = 3,
 };
 
 static inline const char* multimedia_subclass_string(int c)
@@ -192,13 +199,13 @@ static inline const char* multimedia_subclass_string(int c)
 
 enum bridge_subclass
 {
-    PCI_BRIDGE_HOST     = 0,
-    PCI_BRIDGE_ISA      = 1,
-    PCI_BRIDGE_EISA     = 2,
-    PCI_BRIDGE_MCA      = 3,
-    PCI_BRIDGE_PCI      = 4,
-    PCI_BRIDGE_CARDBUS  = 7,
-    PCI_BRIDGE_OTHER    = 0x80,
+    PCI_BRIDGE_HOST    = 0,
+    PCI_BRIDGE_ISA     = 1,
+    PCI_BRIDGE_EISA    = 2,
+    PCI_BRIDGE_MCA     = 3,
+    PCI_BRIDGE_PCI     = 4,
+    PCI_BRIDGE_CARDBUS = 7,
+    PCI_BRIDGE_OTHER   = 0x80,
 };
 
 static inline const char* bridge_subclass_string(int c)

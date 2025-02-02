@@ -10,6 +10,7 @@ struct cpu_info
     char         producer[16];
     int          family;
     int          model;
+    int          type;
     char         name[49];
     int          stepping;
     unsigned int phys_bits;

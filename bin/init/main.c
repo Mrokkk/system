@@ -66,9 +66,9 @@ static const char* shell_find(void)
     return NULL;
 }
 
-static int shell_run(const char* pathname, const char* console_device)
+static int spawn_and_run(const char* pathname, const char* console_device)
 {
-    int child_pid;
+    int child_pid, status;
     char* const argv[] = {(char*)pathname, NULL};
 
     setenv("PATH", "/bin", 0);
@@ -97,7 +97,7 @@ static int shell_run(const char* pathname, const char* console_device)
             (open(console_device, O_WRONLY, 0) != STDOUT_FILENO) ||
             (open(console_device, O_WRONLY, 0) != STDERR_FILENO))
         {
-            syslog(LOG_ERR, "cannot open console for shell");
+            syslog(LOG_ERR, "cannot open console");
             exit(EXIT_FAILURE);
         }
 
@@ -110,7 +110,21 @@ static int shell_run(const char* pathname, const char* console_device)
         while (1);
     }
 
-    return child_pid;
+    waitpid(child_pid, &status, 0);
+
+    return status;
+}
+
+void status_describe(const char* pathname, int status)
+{
+    if (WIFSIGNALED(status))
+    {
+        printf("%s killed by %u", pathname, WTERMSIG(status));
+    }
+    else
+    {
+        printf("%s exited with %d", pathname, WEXITSTATUS(status));
+    }
 }
 
 #define RED         "\e[31m"
@@ -167,24 +181,15 @@ static int shell_run(const char* pathname, const char* console_device)
         exit(EXIT_FAILURE);
     }
 
-    int child_pid, status, rerun;
+    int status, rerun;
 
     while (1)
     {
         rerun = 0;
 
-        child_pid = shell_run(shell, options.console_device);
+        status = spawn_and_run(shell, options.console_device);
 
-        waitpid(child_pid, &status, 0);
-
-        if (WIFSIGNALED(status))
-        {
-            printf("shell killed by %u", WTERMSIG(status));
-        }
-        else
-        {
-            printf("shell exited with %d", WEXITSTATUS(status));
-        }
+        status_describe(shell, status);
 
         int count;
         char tmp[128] = {0, };
@@ -199,7 +204,14 @@ static int shell_run(const char* pathname, const char* console_device)
             {
                 tmp[count - 1] = 0;
             }
-            if (!strcmp(tmp, "sh"))
+            if (!strcmp(tmp, "test"))
+            {
+                const char* test = "/bin/test";
+                spawn_and_run(test, options.console_device);
+                status_describe(test, status);
+                putchar('\n');
+            }
+            else if (!strcmp(tmp, "sh"))
             {
                 rerun = 1;
                 break;

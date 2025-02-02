@@ -1,4 +1,3 @@
-#include "vmwarefb.h"
 #define log_fmt(fmt) "voodoofb: " fmt
 #include <arch/io.h>
 #include <arch/pci.h>
@@ -55,7 +54,57 @@ struct mode_setting
     //uint8_t att[20];
     uint8_t att10h;
     uint8_t gfx[9];
-} mode_settings[] = {
+};
+
+typedef struct mode_setting mode_setting_t;
+
+struct voodoo
+{
+    mutex_t       lock;
+    pci_device_t* pci;
+    uintptr_t     fb_paddr;
+    void*         fb_vaddr;
+    uintptr_t     io_paddr;
+    io_t*         io;
+    fb_ops_t      ops;
+};
+
+typedef struct voodoo voodoo_t;
+
+enum dac_mode
+{
+    DAC_MODE_2X = 1 << 0,
+};
+
+enum vga_init0
+{
+    VGA_INIT0_8BIT_CLUT          = 1 << 2,
+    VGA_INIT0_VGA_EXT            = 1 << 6,
+    VGA_INIT0_WAKEUP_SELECT_3C3  = 1 << 8,
+    VGA_INIT0_ALT_READBACK       = 1 << 10,
+    VGA_INIT0_EXTENDED_SHIFT_OUT = 1 << 12,
+};
+
+enum vid_proc_cfg
+{
+    VID_PROC_CFG_PROC_ON             = 1 << 0,
+    VID_PROC_CFG_DESKTOP_SURFACE     = 1 << 7,
+    VID_PROC_CFG_DESKTOP_CLUT_BYPASS = 1 << 10,
+    VID_PROC_CFG_PIXEL_FORMAT_16BIT  = 1 << 18,
+    VID_PROC_CFG_PIXEL_FORMAT_24BIT  = 2 << 18,
+    VID_PROC_CFG_PIXEL_FORMAT_32BIT  = 3 << 18,
+};
+
+#define VGA_INIT0_FLAGS \
+    (VGA_INIT0_VGA_EXT | VGA_INIT0_WAKEUP_SELECT_3C3 | VGA_INIT0_ALT_READBACK | \
+     VGA_INIT0_8BIT_CLUT | VGA_INIT0_EXTENDED_SHIFT_OUT)
+
+#define VID_PROC_CFG_FLAGS \
+    (VID_PROC_CFG_PROC_ON | VID_PROC_CFG_DESKTOP_SURFACE | VID_PROC_CFG_DESKTOP_CLUT_BYPASS)
+
+static voodoo_t* device;
+
+static mode_setting_t mode_settings[] = {
     {   // FIXME: doesn't work
         // Mode 6B / VESA Mode 107 / *Internal Mode 0Ch*
         // Mode 74 / VESA Mode 11A / Internal Mode 35h
@@ -178,57 +227,6 @@ struct mode_setting
     }
 };
 
-typedef struct mode_setting mode_setting_t;
-
-struct voodoo
-{
-    mutex_t       lock;
-    pci_device_t* pci;
-    uintptr_t     fb_paddr;
-    void*         fb_vaddr;
-    uintptr_t     io_paddr;
-    io_t*         io;
-    uint16_t      fb_resx;
-    uint16_t      fb_resy;
-    uint16_t      fb_bpp;
-    fb_ops_t      ops;
-};
-
-typedef struct voodoo voodoo_t;
-
-enum dac_mode
-{
-    DAC_MODE_2X = 1 << 0,
-};
-
-enum vga_init0
-{
-    VGA_INIT0_8BIT_CLUT          = 1 << 2,
-    VGA_INIT0_VGA_EXT            = 1 << 6,
-    VGA_INIT0_WAKEUP_SELECT_3C3  = 1 << 8,
-    VGA_INIT0_ALT_READBACK       = 1 << 10,
-    VGA_INIT0_EXTENDED_SHIFT_OUT = 1 << 12,
-};
-
-enum vid_proc_cfg
-{
-    VID_PROC_CFG_PROC_ON             = 1 << 0,
-    VID_PROC_CFG_DESKTOP_SURFACE     = 1 << 7,
-    VID_PROC_CFG_DESKTOP_CLUT_BYPASS = 1 << 10,
-    VID_PROC_CFG_PIXEL_FORMAT_16BIT  = 1 << 18,
-    VID_PROC_CFG_PIXEL_FORMAT_24BIT  = 2 << 18,
-    VID_PROC_CFG_PIXEL_FORMAT_32BIT  = 3 << 18,
-};
-
-#define VGA_INIT0_FLAGS \
-    (VGA_INIT0_VGA_EXT | VGA_INIT0_WAKEUP_SELECT_3C3 | VGA_INIT0_ALT_READBACK | \
-     VGA_INIT0_8BIT_CLUT | VGA_INIT0_EXTENDED_SHIFT_OUT)
-
-#define VID_PROC_CFG_FLAGS \
-    (VID_PROC_CFG_PROC_ON | VID_PROC_CFG_DESKTOP_SURFACE | VID_PROC_CFG_DESKTOP_CLUT_BYPASS)
-
-voodoo_t* device;
-
 static int voodoofb_device_id_check(int id)
 {
     switch (id)
@@ -241,20 +239,17 @@ static int voodoofb_device_id_check(int id)
     }
 }
 
-static void voodoofb_fb_setup(void)
+static void voodoofb_fb_setup(uint16_t resx, uint16_t resy, uint16_t bpp)
 {
-    uint16_t fb_resx = device->fb_resx;
-    uint16_t fb_resy = device->fb_resy;
-    uint16_t fb_bpp = device->fb_bpp;
-    size_t bytes = fb_bpp_to_bytes(fb_bpp);
+    size_t bytes = fb_bpp_to_bytes(bpp);
     framebuffer.id = "Voodoo FB";
-    framebuffer.bpp = fb_bpp;
+    framebuffer.bpp = bpp;
     framebuffer.paddr = device->fb_paddr;
     framebuffer.vaddr = device->fb_vaddr;
-    framebuffer.width = fb_resx;
-    framebuffer.height = fb_resy;
-    framebuffer.pitch = fb_resx * bytes;
-    framebuffer.size = fb_resx * fb_resy * bytes;
+    framebuffer.width = resx;
+    framebuffer.height = resy;
+    framebuffer.pitch = resx * bytes;
+    framebuffer.size = resx * resy * bytes;
     framebuffer.type = FB_TYPE_PACKED_PIXELS;
     framebuffer.type_aux = 0;
     framebuffer.visual = FB_VISUAL_TRUECOLOR;
@@ -404,11 +399,7 @@ static int voodoofb_fb_mode_set(int resx, int resy, int bpp)
     device->io->vid_desktop_start_addr = 0;
     device->io->vid_proc_cfg = VID_PROC_CFG_FLAGS | pixel_format;
 
-    device->fb_resx = resx;
-    device->fb_resy = resy;
-    device->fb_bpp = bpp;
-
-    voodoofb_fb_setup();
+    voodoofb_fb_setup(resx, resy, bpp);
 
     return 0;
 }

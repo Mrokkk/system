@@ -227,7 +227,7 @@ UNMAP_AFTER_INIT void dmi_read(void)
 
     if (!smbios_entry)
     {
-        log_warning("no SMBIOS");
+        log_notice("no SMBIOS");
         return;
     }
 

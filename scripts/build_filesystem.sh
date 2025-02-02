@@ -268,7 +268,7 @@ fi
 
 if [[ ! -d "${boot_dir}/grub/i386-pc" ]]
 then
-    sudo ${grub} --boot-directory=${boot_dir} --target=i386-pc --modules="ext2 part_msdos" "${dev}"
+    sudo ${grub} --boot-directory=${boot_dir} --target=i386-pc --modules="ext2" "${dev}"
 fi
 
 sync -f ${mountpoint}

@@ -87,10 +87,7 @@ static const char* vesafb_mode_string(mode_info_t* m, char* buf, size_t size)
         m->type == VBE_MODE_GRAPHICS ? "graphics" : "text",
         m->color ? "color" : "mono");
 
-    if (m->has_lfb)
-    {
-        i += snprintf(buf + i, size - i, " fb=%#x", m->fb_paddr);
-    }
+    i += snprintf(buf + i, size - i, " fb=%#x", m->fb_paddr);
 
     snprintf(buf + i, size - i, " %s", vesafb_memory_model_string(m->memory_model));
 
@@ -356,7 +353,7 @@ int vesafb_initialize(void)
 
     if (vbe->version < 0x200)
     {
-        log_warning("too old version: %#x", vbe->version);
+        log_notice("too old version: %#x", vbe->version);
         return -ENOSYS;
     }
 

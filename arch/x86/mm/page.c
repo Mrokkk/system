@@ -220,8 +220,14 @@ UNMAP_AFTER_INIT void page_tables_init(uintptr_t virt_end)
 
     pat_initialize();
 
-    if (cpu_has(X86_FEATURE_PGE))
+    // If kernel is built for older CPU than i486 then
+    // invlpg is not available and is replaced with full
+    // TLB flush. Setting PGE is unsafe when running on
+    // newer CPU, as kernel pages are set with PAGE_GLOBAL
+    // and so will no longer be flushed on invlpg
+    if (CONFIG_X86 > 3 && cpu_has(X86_FEATURE_PGE))
     {
+        log_info("enabling PGE");
         register uintptr_t dummy = 0;
         asm volatile(
             "mov %%cr4, %0;"

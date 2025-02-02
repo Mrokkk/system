@@ -112,7 +112,7 @@ static void ide_channel_fill(int channel, pci_device_t* ide_pci)
     channels[channel].select_reg = port++;
     channels[channel].status_reg = port++;
     channels[channel].ctrl = base + 0x206;
-    channels[channel].bmide = ide_pci->bar[4].addr & ~1;
+    channels[channel].bmide = ide_pci ? ide_pci->bar[4].addr & ~1 : 0;
     wait_queue_head_init(&channels[channel].queue);
 }
 
@@ -366,14 +366,36 @@ static void ide_devices_detect(bool use_dma)
     }
 }
 
-int ide_initialize(void)
+static int isa_ide_controller_detect(void)
+{
+    outb(0xa0, 0x1f6);
+    ide_wait();
+    uint8_t status = inb(0x1f7);
+
+    if (!(status & ATA_SR_DRDY) || status == 0xff)
+    {
+        return -ENODEV;
+    }
+
+    return 0;
+}
+
+UNMAP_AFTER_INIT int ide_initialize(void)
 {
     bool use_dma = true;
 
     if (!(ide_pci = pci_device_get(0x01, 0x01)))
     {
-        log_notice("no IDE controller");
-        return 0;
+        log_notice("no PCI IDE controller");
+        if (isa_ide_controller_detect())
+        {
+            log_notice("no ISA IDE controller");
+            return 0;
+        }
+        else
+        {
+            log_notice("ISA IDE controller available");
+        }
     }
 
     if (unlikely(!(ide_devices = single_page())))
@@ -384,16 +406,25 @@ int ide_initialize(void)
     ide_buf = shift_as(void*, ide_devices, PAGE_SIZE - ATA_SECTOR_SIZE);
     memset(ide_devices, 0, PAGE_SIZE);
 
-    pci_device_print(ide_pci);
-
-    if (execute(ide_pci_interface_check(), "checking prog if") ||
-        execute(pci_device_initialize(ide_pci), "initializing PCI") ||
-        execute_no_ret(ide_pci_bm_initialize(&use_dma)) ||
-        execute_no_ret(ide_channels_initialize()) ||
-        execute_no_ret(ide_devices_detect(use_dma)))
+    if (ide_pci)
     {
-        log_warning("cannot initialize IDE controller");
-        return -EIO;
+        pci_device_print(ide_pci);
+
+        if (execute(ide_pci_interface_check(), "checking prog if") ||
+            execute(pci_device_initialize(ide_pci), "initializing PCI") ||
+            execute_no_ret(ide_pci_bm_initialize(&use_dma)) ||
+            execute_no_ret(ide_channels_initialize()) ||
+            execute_no_ret(ide_devices_detect(use_dma)))
+        {
+            log_warning("cannot initialize IDE controller");
+            return -EIO;
+        }
+    }
+    else
+    {
+        use_dma = false;
+        ide_channels_initialize();
+        ide_devices_detect(use_dma);
     }
 
     irq_register(14, &ide_irq, "ata1", IRQ_DEFAULT);

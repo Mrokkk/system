@@ -43,19 +43,21 @@ static inline void pgd_load(pgd_t* pgd)
 
 static inline void pgd_reload(void)
 {
-    register long dummy = 0;
+    register long dummy;
     asm volatile(
         "mov %%cr3, %0;"
         "mov %0, %%cr3;"
         : "=r" (dummy)
-        : "r" (dummy)
-        : "memory"
+        :: "memory"
     );
 }
 
+#if CONFIG_X86 > 3
 #define invlpg(address) \
     asm volatile("invlpg (%0);" :: "r" (address) : "memory")
-
+#else
+#define invlpg(address) ({ (void)(address); tlb_flush(); })
+#endif
 #define tlb_flush()            pgd_reload()
 #define tlb_flush_single(addr) invlpg(addr)
 

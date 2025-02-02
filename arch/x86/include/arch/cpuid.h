@@ -33,6 +33,7 @@ typedef enum
 {
     INTEL   = 0x756e6547,
     AMD     = 0x68747541,
+    CYRIX   = 0x69727943
 } vendor_t;
 
 typedef struct cpuid_regs cpuid_regs_t;
@@ -103,10 +104,10 @@ typedef struct cpuid_regs cpuid_regs_t;
 
 #define cpu_family(eax) \
     ({ \
-        uint32_t model = (eax >> 8) & 0xf; \
+        uint32_t model = ((eax) >> 8) & 0xf; \
         if (model == 0xf) \
         { \
-            model += (eax >> 20) & 0xff; \
+            model += ((eax) >> 20) & 0xff; \
         } \
         model; \
     })
@@ -114,13 +115,18 @@ typedef struct cpuid_regs cpuid_regs_t;
 #define cpu_model(eax) \
     ({ \
         uint32_t model, family; \
-        model = (eax >> 4) & 0xf; \
+        model = ((eax) >> 4) & 0xf; \
         family = cpu_family(eax); \
         if (family >= 0x6) \
         { \
-            model += ((eax >> 16) & 0xf) << 4; \
+            model += (((eax) >> 16) & 0xf) << 4; \
         } \
         model; \
+    })
+
+#define cpu_type(eax) \
+    ({ \
+        ((eax) >> 12) & 3; \
     })
 
 static inline void cpuid_read(uint32_t function, cpuid_regs_t* regs)

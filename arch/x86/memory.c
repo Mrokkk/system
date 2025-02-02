@@ -1,4 +1,5 @@
 #define log_fmt(fmt) "e820: " fmt
+#include <arch/register.h>
 #include <kernel/memory.h>
 #include <kernel/kernel.h>
 #include <kernel/page_types.h>
@@ -50,7 +51,7 @@ static void e820_entries_sort(int* sorted, e820_data_t* map, size_t count)
 int e820_entries_read(e820_data_t* map, int sorted[])
 {
     int count;
-    regs_t regs = {.ebx = 0};
+    regs_t regs = {0};
     e820_data_t* data = map;
 
     for (count = 0; count < E820_ENTRIES_COUNT; ++data, ++count)
@@ -63,6 +64,12 @@ int e820_entries_read(e820_data_t* map, int sorted[])
         regs.di = addr(data);
         bios_call(BIOS_SYSTEM, &regs);
 
+        if (regs.eax != E820_MAGIC || (regs.eflags & EFL_CF))
+        {
+            log_warning("E820 call failed");
+            return 0;
+        }
+
 #if E820_PRINT
         e820_data_t* e = map + count;
         log_notice("[mem %#018llx - %#018llx] %s(%#x)",
@@ -72,7 +79,13 @@ int e820_entries_read(e820_data_t* map, int sorted[])
             e->type);
 #endif
 
-        if (regs.eax != E820_MAGIC || !regs.ebx)
+        if (unlikely(count > 1 && map[count - 1].base == e->base && map[count - 1].len == e->len))
+        {
+            log_warning("E820 broken");
+            return 0;
+        }
+
+        if (!regs.ebx)
         {
             break;
         }
@@ -85,10 +98,25 @@ static int memory_mm_type(int type)
 {
     switch (type)
     {
-        case E820_USABLE: return MMAP_TYPE_AVL;
+        case E820_USABLE:   return MMAP_TYPE_AVL;
         case E820_RESERVED: return MMAP_TYPE_RES;
-        default: return MMAP_TYPE_RES;
+        default:            return MMAP_TYPE_RES;
     }
+}
+
+static void memory_detect_legacy(void)
+{
+    regs_t regs = {.ah = 0x88};
+    bios_call(BIOS_SYSTEM, &regs);
+
+    if (regs.eflags & EFL_CF)
+    {
+        panic("failed to determine memory map");
+    }
+
+    memory_area_add(0, MiB, MMAP_TYPE_LOW);
+    memory_area_add(MiB, regs.ax * KiB, MMAP_TYPE_AVL);
+    memory_area_add(regs.ax * KiB, 0x100000000ULL, MMAP_TYPE_RES);
 }
 
 void memory_detect(void)
@@ -97,7 +125,13 @@ void memory_detect(void)
     int sorted[E820_ENTRIES_COUNT];
     e820_data_t* map = ptr(E820_DATA_START);
 
-    count = e820_entries_read(map, sorted);
+    if (unlikely(!(count = e820_entries_read(map, sorted))))
+    {
+        log_warning("fallback to legacy INT 0x10 AH=0x88");
+        memory_detect_legacy();
+        return;
+    }
+
     e820_entries_sort(sorted, map, count);
 
     for (int i = 0; i < count; ++i)
