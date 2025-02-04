@@ -129,8 +129,13 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     int virtio_gpu_init(void);
     int vmwarefb_init(void);
     int voodoofb_init(void);
+    int bochsfb_init(void);
 
-    if (!voodoofb_init())
+    if (!bochsfb_init())
+    {
+        log_info("initialized bochsfb");
+    }
+    else if (!voodoofb_init())
     {
         log_info("initialized voodoofb");
     }
