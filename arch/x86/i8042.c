@@ -3,6 +3,8 @@
 #include <arch/i8042.h>
 #include <kernel/kernel.h>
 
+#define DEBUG_I8042 0
+
 static int devices[2] = {NO_DEVICE, NO_DEVICE};
 
 static inline const char* i8042_device_string(int d)
@@ -49,13 +51,13 @@ static uint16_t i8042_device_detect(uint8_t port)
 
     if ((byte = i8042_send_and_receive(I8042_SCAN_DISABLE, port)) != I8042_RESP_ACK)
     {
-        log_warning("disable scan failed; %#x", byte);
+        log_debug(DEBUG_I8042, "port%u: disable scan failed; %#x", port, byte);
         return 0xffff;
     }
 
     if ((byte = i8042_send_and_receive(I8042_IDENTIFY, port)) != I8042_RESP_ACK)
     {
-        log_warning("identify failed; %#x", byte);
+        log_debug(DEBUG_I8042, "port%u: identify failed; %#x", port, byte);
         return 0xffff;
     }
 
@@ -65,13 +67,13 @@ static uint16_t i8042_device_detect(uint8_t port)
     i8042_send_data(I8042_SCAN_ENABLE, port);
     if ((byte = i8042_receive()) != I8042_RESP_ACK)
     {
-        log_warning("enable scan failed; %#x", byte);
+        log_warning("port%u: enable scan failed; %#x", port, byte);
     }
 
     return res;
 }
 
-int i8042_initialize(void)
+UNMAP_AFTER_INIT int i8042_initialize(void)
 {
     uint8_t data;
     uint16_t port0_device = 0xffff, port1_device = 0xffff;
@@ -89,7 +91,7 @@ int i8042_initialize(void)
     i8042_send_cmd(I8042_KBD_PORT_TEST);
     if ((data = i8042_receive() != 0x00))
     {
-        log_warning("port0: test failed: %#x", data);
+        log_debug(DEBUG_I8042, "port0: test failed: %#x", data);
         goto second_port;
     }
 
@@ -99,7 +101,7 @@ int i8042_initialize(void)
 
     if ((data = i8042_device_reset(I8042_KBD_PORT)) != I8042_RESP_SUCCESS)
     {
-        log_warning("port0: reset failed: %#x", data);
+        log_debug(DEBUG_I8042, "port0: reset failed: %#x", data);
     }
 
 second_port:
@@ -107,7 +109,7 @@ second_port:
     i8042_send_cmd(I8042_AUX_PORT_TEST);
     if ((data = i8042_receive() != 0x00))
     {
-        log_warning("port1: test failed: %#x", data);
+        log_debug(DEBUG_I8042, "port1: test failed: %#x", data);
         goto finish;
     }
 
@@ -115,9 +117,12 @@ second_port:
 
     port1_device = i8042_device_detect(I8042_AUX_PORT);
 
-    if ((data = i8042_device_reset(I8042_AUX_PORT)) != I8042_RESP_SUCCESS)
+    if (port1_device != 0xffff)
     {
-        log_warning("port1: reset failed: %#x", data);
+        if ((data = i8042_device_reset(I8042_AUX_PORT)) != I8042_RESP_SUCCESS)
+        {
+            log_debug(DEBUG_I8042, "port1: reset failed: %#x", data);
+        }
     }
 
     i8042_send_cmd(I8042_AUX_PORT_DISABLE);
@@ -140,64 +145,71 @@ void i8042_flush(void)
             continue;
         }
 
-        if (inb(I8042_DATA_PORT) & (0x40 | 0x80))
-        {
-            continue;
-        }
+        inb(I8042_DATA_PORT);
     }
 }
 
-void i8042_wait(void)
+uint8_t i8042_status_read(void)
 {
-    for (int i = 0; i < 1000; i++)
+    return inb(I8042_STATUS_PORT);
+}
+
+int i8042_wait_read(void)
+{
+    unsigned timeout = I8042_TIMEOUT;
+
+    while (~i8042_status_read() & I8042_OUTPUT_BUFFER && (--timeout))
     {
-        if (!(inb(I8042_STATUS_PORT) & I8042_INPUT_BUFFER))
-        {
-            io_delay(10);
-            return;
-        }
         io_delay(10);
     }
 
-    log_warning("waiting timeout");
+    if (unlikely(!timeout))
+    {
+        return -ETIMEDOUT;
+    }
+
+    return 0;
+}
+
+int i8042_wait_write(void)
+{
+    unsigned timeout = I8042_TIMEOUT;
+
+    while (i8042_status_read() & I8042_INPUT_BUFFER && (--timeout))
+    {
+        io_delay(10);
+    }
+
+    if (unlikely(!timeout))
+    {
+        return -ETIMEDOUT;
+    }
+
+    return 0;
 }
 
 void i8042_send_cmd(uint8_t byte)
 {
-    i8042_wait();
+    i8042_wait_write();
     outb(byte, I8042_CMD_PORT);
-    io_delay(10);
 }
 
 void i8042_send_data(uint8_t byte, uint8_t port)
 {
     if (port == I8042_AUX_PORT)
     {
-        i8042_wait();
+        i8042_wait_write();
         outb(I8042_AUX_WRITE, I8042_CMD_PORT);
     }
 
-    i8042_wait();
+    i8042_wait_write();
     outb(byte, I8042_DATA_PORT);
-    io_delay(10);
 }
 
 uint8_t i8042_receive(void)
 {
-    uint8_t data;
-
-    for (int i = 0; i < 1000; ++i)
-    {
-        if (inb(I8042_STATUS_PORT) & I8042_OUTPUT_BUFFER)
-        {
-            io_delay(10);
-            break;
-        }
-        io_delay(10);
-    }
-
-    data = inb(I8042_DATA_PORT);
-    io_delay(10);
+    i8042_wait_read();
+    uint8_t data = inb(I8042_DATA_PORT);
     return data;
 }
 
@@ -247,8 +259,8 @@ uint8_t i8042_device_reset(uint8_t port)
 
     while (!(inb(I8042_STATUS_PORT) & I8042_OUTPUT_BUFFER));
 
-    data = inb(I8042_DATA_PORT);
-    io_delay(10);
+    data = i8042_receive();
+    i8042_receive();
 
     return data;
 }

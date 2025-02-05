@@ -38,6 +38,8 @@
 #define I8042_RESP_RESEND       0xfe
 #define I8042_RESP_SUCCESS      0xaa
 
+#define I8042_TIMEOUT           1000
+
 #define KBD_EKI     0x01
 #define AUX_EKI     0x02
 #define KBD_SYS     0x04
@@ -53,7 +55,8 @@ enum i8042_device
 };
 
 int i8042_initialize(void);
-void i8042_wait(void);
+int i8042_wait_read(void);
+int i8042_wait_write(void);
 void i8042_flush(void);
 void i8042_send_cmd(uint8_t byte);
 void i8042_send_data(uint8_t byte, uint8_t port);
