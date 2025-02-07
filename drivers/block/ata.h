@@ -28,7 +28,7 @@ typedef struct ata_device ata_device_t;
 #define ATA_ER_TK0NF            0x02    // Track 0 not found
 #define ATA_ER_AMNF             0x01    // No address mark
 
-#define ATA_IDENT_SIZE          128
+#define ATA_IDENT_SIZE          512
 #define ATA_IDENT_DEVICETYPE    0
 #define ATA_IDENT_CYLINDERS     2
 #define ATA_IDENT_HEADS         6

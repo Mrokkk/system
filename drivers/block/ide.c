@@ -66,9 +66,9 @@ static void ide_write(uint8_t channel, uint8_t reg, uint8_t data)
     outb(data, channels[channel].base + reg);
 }
 
-static void ide_read_buffer(uint8_t channel, uint8_t reg, void* buffer, uint32_t count)
+static void ide_read_buffer(uint8_t channel, uint8_t reg, void* buffer, uint32_t size)
 {
-    insl(channels[channel].base + reg, buffer, count);
+    insw(channels[channel].base + reg, buffer, size / 2);
 }
 
 static void ide_enable_irq(uint8_t channel)
@@ -285,7 +285,7 @@ static void ide_device_detect(int drive, bool use_dma)
         }
     }
 
-    memset(ide_buf, 0, ATA_IDENT_SIZE * 4);
+    memset(ide_buf, 0, ATA_IDENT_SIZE);
 
     ide_read_buffer(channel, ATA_REG_DATA, ide_buf, ATA_IDENT_SIZE);
 
@@ -589,8 +589,8 @@ static int ide_pio_request(request_t* req)
                 log_warning("polling error: %#x", err);
                 return -EIO;
             }
-            insw(channels[channel].data_reg, buf, words);
-            buf = shift(buf, words * 2);
+            ide_read_buffer(channel, ATA_REG_DATA, buf, ATA_SECTOR_SIZE);
+            buf = shift(buf, ATA_SECTOR_SIZE);
         }
     }
     else
@@ -845,7 +845,7 @@ static int ide_atapi_read_capacity(ata_device_t* device)
     ide_write(channel, ATA_REG_LBA2, 8);
     ide_write(channel, ATA_REG_COMMAND, ATA_CMD_PACKET);
 
-    if ((ide_polling(channel)))
+    if (unlikely(ide_polling(channel)))
     {
         log_warning("channel %u: polling error");
         errno = -EIO;
@@ -867,7 +867,7 @@ static int ide_atapi_read_capacity(ata_device_t* device)
         goto cleanup_request;
     }
 
-    if ((ide_polling(channel)))
+    if (unlikely(ide_polling(channel)))
     {
         errno = -EIO;
         goto error;

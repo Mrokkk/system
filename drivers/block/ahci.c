@@ -639,7 +639,7 @@ static void ahci_port_detect(ahci_port_t* port)
     ahci_prdt_entry_t* prdt = &port->data->prdt[0];
     prdt->dba       = page_phys(page);
     prdt->dbau      = 0;
-    prdt->dbc       = 512 - 1;
+    prdt->dbc       = ATA_IDENT_SIZE - 1;
 
     fis->fis_type   = FIS_TYPE_REG_H2D;
     fis->command    = port->signature == AHCI_PxSIG_ATAPI ? ATA_CMD_IDENTIFY_PACKET : ATA_CMD_IDENTIFY;
