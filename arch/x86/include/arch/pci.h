@@ -112,19 +112,48 @@ struct pci_device
     uint8_t     class;
     uint8_t     cacheline_size;
     uint8_t     latency_timer;
-    uint8_t     header_type;
+    uint8_t     header_type:7;
+    uint8_t     mf:1;
     uint8_t     bist;
-    bar_t       bar[6];
-    uint32_t    cis;
-    uint16_t    subsystem_vendor_id;
-    uint16_t    subsystem_id;
-    uint32_t    rom_base;
-    uint8_t     capabilities;
-    uint8_t     reserved[7];
-    uint8_t     interrupt_line;
-    uint8_t     interrupt_pin;
-    uint8_t     min_grant;
-    uint8_t     max_latency;
+    union
+    {
+        struct
+        {
+            bar_t       bar[6];
+            uint32_t    cis;
+            uint16_t    subsystem_vendor_id;
+            uint16_t    subsystem_id;
+            uint32_t    rom_base;
+            uint8_t     capabilities;
+            uint8_t     reserved[7];
+            uint8_t     interrupt_line;
+            uint8_t     interrupt_pin;
+            uint8_t     min_grant;
+            uint8_t     max_latency;
+        };
+        struct
+        {
+            bar_t       bar[2];
+            uint8_t     primary_bus;
+            uint8_t     secondary_bus;
+            uint8_t     subordinate_bus;
+            uint8_t     secondary_latency_timer;
+            uint8_t     io_base;
+            uint8_t     io_limit;
+            uint16_t    secondary_status;
+            uint16_t    memory_base;
+            uint16_t    memory_limit;
+            uint32_t    reserved[3];
+            uint16_t    io_base_hi;
+            uint16_t    io_limit_hi;
+            uint8_t     capabilities;
+            uint8_t     reserved_2[3];
+            uint32_t    rom_base;
+            uint8_t     interrupt_line;
+            uint8_t     interrupt_pin;
+            uint16_t    bridge_control;
+        } bridge;
+    };
     uint8_t     bus, slot, func, padding;
     list_head_t list_entry;
 };
@@ -250,6 +279,7 @@ enum pci_vendor
     PCI_VIA         = 0x1106,
     PCI_3DFX        = 0x121a,
     PCI_S3          = 0x5333,
+    PCI_ESONIQ      = 0x1274,
 };
 
 void pci_scan(void);

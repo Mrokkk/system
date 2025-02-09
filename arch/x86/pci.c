@@ -272,6 +272,7 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
             DEVICE_ID(0x1e3a, "7 Series/C216 Chipset Family MEI Controller #1");
             DEVICE_ID(0x1e59, "HM76 Express Chipset LPC Controller");
             DEVICE_ID(0x1237, "440FX - 82441FX PMC [Natoma]");
+            DEVICE_ID(0x2415, "82801AA AC'97 Audio Controller");
             DEVICE_ID(0x2448, "82801 Mobile PCI Bridge");
             DEVICE_ID(0x24c2, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
             DEVICE_ID(0x24c3, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
@@ -293,6 +294,10 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
             DEVICE_ID(0x7113, "82371AB/EB/MB PIIX4 ACPI");
             DEVICE_ID(0x7180, "440LX/EX - 82443LX/EX Host bridge");
             DEVICE_ID(0x7181, "440LX/EX - 82443LX/EX AGP bridge");
+            DEVICE_ID(0x7190, "440BX/ZX/DX - 82443BX/ZX/DX Host bridge");
+            DEVICE_ID(0x7191, "440BX/ZX/DX - 82443BX/ZX/DX AGP bridge");
+            DEVICE_ID(0x71a0, "440GX - 82443GX Host bridge");
+            DEVICE_ID(0x71a1, "440GX - 82443GX AGP bridge");
             DEVICE_ID(0x7020, "82371SB PIIX3 USB [Natoma/Triton II]");
             UNKNOWN_DEVICE_ID();
         }
@@ -355,6 +360,12 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
         }
         break;
 
+        VENDOR_ID(PCI_ESONIQ, "Ensoniq")
+        {
+            DEVICE_ID(0x1371, "ES1371/ES1373 / Creative Labs CT2518");
+        }
+        break;
+
         UNKNOWN_VENDOR_ID();
     }
     it = csnprintf(it, end, " [%04x:%04x]", device->vendor_id, device->device_id);
@@ -378,6 +389,7 @@ static inline char* pci_device_subsystem_description(pci_device_t* device, char*
         SUBSYSTEM_VENDOR_ID(0x1014, "IBM");
         SUBSYSTEM_VENDOR_ID(0x103c, "Hewlett-Packard Company");
         SUBSYSTEM_VENDOR_ID(0x1af4, "QEMU Virtual Machine");
+        SUBSYSTEM_VENDOR_ID(0x121a, "3Dfx Interactive, Inc.");
         UNKNOWN_SUBSYSTEM_VENDOR_ID();
     }
     it = csnprintf(it, end, " [%04x:%04x]", device->subsystem_vendor_id, device->subsystem_id);
@@ -404,15 +416,13 @@ static inline char* pci_bar_description(bar_t* bar, char* buf, size_t size)
 
 static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
 {
-    pci_device_t* device = alloc(pci_device_t);
+    pci_device_t* device = zalloc(pci_device_t);
 
     if (unlikely(!device))
     {
         log_error("cannot allocate pci_device");
         return;
     }
-
-    memset(device, 0, sizeof(pci_device_t));
 
     uint32_t* buf = ptr(device);
 
@@ -421,12 +431,13 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
         *buf++ = pci_config_read_u32(bus, slot, func, addr);
     }
 
-    if ((device->header_type & 0x7f) == 0)
+    if (device->header_type == 0 || device->header_type == 1)
     {
+        uint32_t last_bar = device->header_type == 0 ? PCI_REG_BAR_END : 0x18;
         uint16_t command = pci_config_read_u16(bus, slot, func, 0x4);
         pci_config_write_u16(bus, slot, func, 0x4, command & ~(3));
 
-        for (uint32_t addr = PCI_REG_BAR0; addr < PCI_REG_BAR_END; addr += 4)
+        for (uint32_t addr = PCI_REG_BAR0; addr < last_bar; addr += 4)
         {
             bar_t* bar = ptr(buf);
             uint32_t raw_bar = pci_config_read_u32(bus, slot, func, addr);
@@ -454,7 +465,7 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
 
         pci_config_write_u16(bus, slot, func, 0x4, command);
 
-        for (uint32_t addr = PCI_REG_BAR_END; addr < PCI_REG_HEADER0_END; addr += 4)
+        for (uint32_t addr = last_bar; addr < PCI_REG_HEADER0_END; addr += 4)
         {
             *buf++ = pci_config_read_u32(bus, slot, func, addr);
         }
@@ -473,39 +484,92 @@ static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
     device->bus = bus;
     device->slot = slot;
     device->func = func;
-    device->capabilities &= ~3;
+
+    if (device->header_type == 0)
+    {
+        device->capabilities &= ~3;
+    }
+
     list_add_tail(&device->list_entry, &pci_devices);
+}
+
+static uint32_t pci_bridge_io(uint16_t low, uint16_t hi)
+{
+    return ((low & ~(0xf)) << 8) | (hi << 16);
 }
 
 void pci_device_print(pci_device_t* device)
 {
     char description[256] = {0, };
 
-    log_notice("%x:%x.%x %s",
+    log_notice("%02x:%02x.%x %s",
         device->bus, device->slot, device->func,
         pci_device_description(device, description, sizeof(description)));
 
-    description[0] = 0;
-    log_notice("  Subsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
+    if (device->header_type == 0)
+    {
+        log_notice("  Subsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
+    }
+
+    log_notice("  Header: %#x", device->header_type);
     log_notice("  Status: %#06x", device->status);
     log_notice("  Command: %#06x", device->command);
     log_notice("  Prog IF: %#04x", device->prog_if);
-    if (device->interrupt_line)
-    {
-        log_notice("  Interrupt: pin %u IRQ %u", device->interrupt_pin, device->interrupt_line);
-    }
 
-    if ((device->header_type & 0x7f) == 0)
+    switch (device->header_type)
     {
-        for (int i = 0; i < 6; ++i)
-        {
-            bar_t* bar = device->bar + i;
-            if (!bar->addr)
+        case 0:
+            if (device->interrupt_pin && device->interrupt_line != 0xff)
             {
-                continue;
+                log_notice("  Interrupt: pin %u IRQ %u", device->interrupt_pin, device->interrupt_line);
             }
-            log_notice("  BAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
-        }
+            for (int i = 0; i < 6; ++i)
+            {
+                bar_t* bar = device->bar + i;
+                if (!bar->addr)
+                {
+                    continue;
+                }
+                log_notice("  BAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
+            }
+            if (device->rom_base)
+            {
+                log_notice("  Expansion ROM address: %#x", device->rom_base);
+            }
+            break;
+        case 1:
+            if (device->bridge.interrupt_pin && device->bridge.interrupt_line != 0xff)
+            {
+                log_notice("  Interrupt: pin %u IRQ %u", device->bridge.interrupt_pin, device->bridge.interrupt_line);
+            }
+            for (int i = 0; i < 2; ++i)
+            {
+                bar_t* bar = device->bridge.bar + i;
+                if (!bar->addr)
+                {
+                    continue;
+                }
+                log_notice("  BAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
+            }
+            log_notice("  Primary/secondary/subordinate bus: %02x/%02x/%02x",
+                device->bridge.primary_bus,
+                device->bridge.secondary_bus,
+                device->bridge.subordinate_bus);
+
+            log_notice("  IO range: [%#x - %#x]",
+                pci_bridge_io(device->bridge.io_base, device->bridge.io_base_hi),
+                pci_bridge_io(device->bridge.io_limit, device->bridge.io_limit_hi) | 0xfff);
+
+            if (device->bridge.memory_limit)
+            {
+                log_notice("  Memory range: [%#x - %#x]", device->bridge.memory_base << 16, device->bridge.memory_limit << 16);
+            }
+
+            if (device->bridge.rom_base)
+            {
+                log_notice("  Expansion ROM address: %#x", device->bridge.rom_base);
+            }
+            break;
     }
 }
 
