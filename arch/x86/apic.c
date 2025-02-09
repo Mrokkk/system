@@ -198,23 +198,23 @@ static uint32_t apic_timer_calibrate_by_hpet(void)
         return 0;
     }
 
-    hpet->config.enable_cnf = false;
+    hpet_disable();
 
     // QEMU requires a longer calibration, otherwise freq will be +/- 2MHz; with this it's +/- 0.05MHz
-    hpet_max = (hpet_freq_get() / FREQ_100HZ) * HPET_CALIBRATION_LOOPS + hpet->main_counter_value;
+    hpet_max = (hpet_freq_get() / FREQ_100HZ) * HPET_CALIBRATION_LOOPS + hpet_cnt_value();
 
     // Set divisor to 16
     apic->timer_div = APIC_TIMER_DIV_16;
 
     // Write counter to ~0UL
-    hpet->config.enable_cnf = true;
+    hpet_enable();
     apic->timer_init_cnt = APIC_TIMER_MAXCNT;
 
-    while (hpet->main_counter_value < hpet_max);
+    while (hpet_cnt_value() < hpet_max);
     ticks = APIC_TIMER_MAXCNT - apic->timer_current_cnt;
 
     // Disable timers
-    hpet->config.enable_cnf = false;
+    hpet_disable();
     apic->lvt_timer = APIC_LVT_INT_MASKED;
 
     apic_timer_clock.freq_khz = mhz = ticks;

@@ -1,98 +1,86 @@
 #pragma once
 
+#include <arch/io.h>
 #include <arch/acpi.h>
 #include <kernel/clock.h>
 #include <kernel/kernel.h>
 
-// Reference: https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf
+// Reference:
+// https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf
 
-struct hpet;
-struct hpet_acpi;
-struct hpet_address;
-struct hpet_capabilities;
-struct hpet_configuration;
-struct hpet_timer_register;
-
-typedef struct hpet hpet_t;
 typedef struct hpet_acpi hpet_acpi_t;
 typedef struct hpet_address hpet_address_t;
-typedef struct hpet_capabilities hpet_capabilities_t;
-typedef struct hpet_configuration hpet_configuration_t;
-typedef struct hpet_timer_register hpet_timer_register_t;
 
 struct hpet_address
 {
-    volatile uint8_t type;
-    volatile uint8_t register_bit_width;
-    volatile uint8_t register_bit_offset;
-    volatile uint8_t reserved;
-    volatile uint64_t address;
+    io8  type;
+    io8  register_bit_width;
+    io8  register_bit_offset;
+    io8  reserved;
+    io64 address;
 } PACKED;
 
 struct hpet_acpi
 {
-    sdt_header_t header;
-    uint8_t hardware_rev_id;
-    uint8_t comparator_count:5;
-    uint8_t counter_size:1;
-    uint8_t reserved:1;
-    uint8_t legacy_replacement:1;
-    uint16_t pci_vendor_id;
+    sdt_header_t   header;
+    uint8_t        hardware_rev_id;
+    uint8_t        comparator_count:5;
+    uint8_t        counter_size:1;
+    uint8_t        reserved:1;
+    uint8_t        legacy_replacement:1;
+    uint16_t       pci_vendor_id;
     hpet_address_t address;
-    uint8_t hpet_number;
-    uint16_t minimum_tick;
-    uint8_t page_protection;
+    uint8_t        hpet_number;
+    uint16_t       minimum_tick;
+    uint8_t        page_protection;
 } PACKED;
 
-struct hpet_capabilities
-{
-    volatile uint8_t rev_id;
-    volatile uint8_t num_tim_cap:5;
-    volatile uint8_t count_size_cap:1;
-    volatile uint8_t reserved_1:1;
-    volatile uint8_t leg_rt_cap:1;
-    volatile uint16_t vendor_id;
-    volatile uint32_t counter_clk_period;
-    volatile uint64_t reserved_2;
-} PACKED;
+#define HPET_VALUE(name, offset, mask, len, reg) \
+    HPET_##name##_REG              = reg, \
+    HPET_##name##_LEN    = len, \
+    HPET_##name##_OFFSET = offset, \
+    HPET_##name##_MASK   = mask,
 
-struct hpet_configuration
+enum hpet_registers
 {
-    volatile uint64_t enable_cnf:1;
-    volatile uint64_t leg_rt_cnf:1;
-    volatile uint64_t reserved:62;
-} PACKED;
+    HPET_REG_GENERAL_CAP = 0x000,
 
-struct hpet_timer_register
-{
-    volatile uint8_t reserved_1:1;
-    volatile uint8_t int_type:1;
-    volatile uint8_t int_enable:1;
-    volatile uint8_t type:1;
-    volatile uint8_t periodic_mode:1;
-    volatile uint8_t size:1;
-    volatile uint8_t value_set:1;
-    volatile uint8_t reserved_2:1;
-    volatile uint8_t mode_32:1;
-    volatile uint8_t int_routing:5;
-    volatile uint8_t fsb_enable:1;
-    volatile uint8_t fsb_del:1;
-    volatile uint16_t reserved_3;
-    volatile uint32_t routing_cap;
-    volatile uint8_t padding[24];
-} PACKED;
+    HPET_VALUE(COUNTER_CLK_PERIOD, 32, 0xffffffff, 4, HPET_REG_GENERAL_CAP)
+    HPET_VALUE(VENDOR_ID,          16, 0xffff,     2, HPET_REG_GENERAL_CAP)
+    HPET_VALUE(LEG_RT_CAP,         15, 0x1,        1, HPET_REG_GENERAL_CAP)
+    HPET_VALUE(COUNT_SIZE_CAP,     13, 0x1,        1, HPET_REG_GENERAL_CAP)
+    HPET_VALUE(NUM_TIM_CAP,        8,  0x1f,       1, HPET_REG_GENERAL_CAP)
+    HPET_VALUE(REV_ID,             0,  0xff,       1, HPET_REG_GENERAL_CAP)
 
-struct hpet
-{
-    hpet_capabilities_t cap;
-    hpet_configuration_t config;
-    uint8_t padding[216];
-    volatile uint32_t main_counter_value;
-    uint8_t padding_2[12];
-    hpet_timer_register_t timers[0];
+    HPET_REG_GENERAL_CONFIG = 0x010,
+
+    HPET_VALUE(LEG_RT_CNF, 1, 0x1, 1, HPET_REG_GENERAL_CONFIG)
+    HPET_VALUE(ENABLE_CNF, 0, 0x1, 1, HPET_REG_GENERAL_CONFIG)
+
+    HPET_REG_GENERAL_STATUS = 0x020,
+    HPET_REG_MAIN_COUNTER   = 0x0f0,
+    HPET_REG_TIMER_N_CONFIG = 0x100,
+
+    HPET_VALUE(Tn_INT_ROUTE_CAP,   32, 0xffffffff, 4, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_FSB_INT_DEL_CAP, 15, 0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_FSB_EN_CNF,      14, 0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_INT_ROUTE_CNF,   9,  0x1f,       1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_32MODE_CNF,      8,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_VAL_SET_CNF,     6,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_SIZE_CAP,        5,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_PER_INT_CAP,     4,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_TYPE_CNF,        3,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_INT_ENB_CNF,     2,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+    HPET_VALUE(Tn_INT_TYPE_CNF,    1,  0x1,        1, HPET_REG_TIMER_N_CONFIG)
+
+    HPET_REG_TIMER_N_COMPARATOR = 0x108,
+    HPET_REG_TIMER_N_FSB_ROUTE  = 0x110,
 };
 
 void hpet_initialize(void);
 uint32_t hpet_freq_get(void);
+int hpet_enable(void);
+int hpet_disable(void);
+uint32_t hpet_cnt_value(void);
 
-extern hpet_t* hpet;
+extern void* hpet;

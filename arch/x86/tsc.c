@@ -81,17 +81,17 @@ UNMAP_AFTER_INIT static void tsc_calibrate_by_hpet(void)
         return;
     }
 
-    hpet->config.enable_cnf = false;
-    hpet_max = (hpet_freq_get() / FREQ_100HZ) * TSC_HPET_CALIBRATION_LOOPS + hpet->main_counter_value;
+    hpet_disable();
+    hpet_max = (hpet_freq_get() / FREQ_100HZ) * TSC_HPET_CALIBRATION_LOOPS + hpet_cnt_value();
 
-    hpet->config.enable_cnf = true;
+    hpet_enable();
 
     // Measure counter diff during 10 ms tick
     rdtscll(tsc_start);
-    while (hpet->main_counter_value < hpet_max);
+    while (hpet_cnt_value() < hpet_max);
     rdtscll(tsc_end);
 
-    hpet->config.enable_cnf = false;
+    hpet_disable();
 
     khz = mhz = cycles = ((uint32_t)(tsc_end - tsc_start)) / TSC_HPET_CALIBRATION_LOOPS;
     mhz_remainder = do_div(mhz, MHz / FREQ_100HZ);
