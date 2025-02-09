@@ -274,6 +274,7 @@ void mmio_unmap(void* vaddr)
         {
             if (region->next) region->next->prev = region->prev;
             if (region->prev) region->prev->next = region->next;
+            if (region == regions) regions = region->next;
 
             log_debug(DEBUG_PAGE_MMIO, "unmapping %p => %p; size = %#zx, name = %s",
                 region->paddr,
