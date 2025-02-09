@@ -186,7 +186,10 @@ class QemuMon(Process):
         termios_disable_echo_icanon(stdin, self.termios.copy())
 
         # Just to flush initial QEMU's prompt
-        self._readlines()
+        try:
+            self._readlines()
+        except:
+            pass
 
         while True:
             line = stdin.read(1).decode()

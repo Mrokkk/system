@@ -15,7 +15,7 @@ mount_loopback=
 rebuild=
 install_src=
 font=/usr/share/kbd/consolefonts/Lat2-Terminus16.psfu.gz
-grub=$(command -v grub-install 2>/dev/null) || die "No grub-install"
+grub=$(binary_from_native_sysroot grub-install || command -v grub-install) || die "No grub-install"
 
 while [[ $# -gt 0 ]]; do
     arg="$1"
@@ -269,6 +269,7 @@ fi
 if [[ ! -d "${boot_dir}/grub/i386-pc" ]]
 then
     sudo ${grub} --boot-directory=${boot_dir} --target=i386-pc --modules="ext2" "${dev}"
+    sudo chown -R ${USER} ${boot_dir}/grub
 fi
 
 sync -f ${mountpoint}

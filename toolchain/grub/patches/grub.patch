@@ -1,0 +1,53 @@
+commit 52ff5a31ede94ed912397072ea069e7d4462386e
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Sun Feb 9 17:02:28 2025 +0100
+
+    Check if CR4 is available before using it
+
+diff --git a/grub-core/lib/i386/relocator32.S b/grub-core/lib/i386/relocator32.S
+index 09ce56a..2ad1455 100644
+--- a/grub-core/lib/i386/relocator32.S
++++ b/grub-core/lib/i386/relocator32.S
+@@ -49,11 +49,42 @@ VARIABLE(grub_relocator32_start)
+ 	wrmsr
+ #endif
+ 
++	pushfl
++	pop %eax
++	mov %eax, %ecx
++	xor $(1 << 21), %eax
++
++	push %eax
++	popfl
++
++	pushfl
++	pop %eax
++
++	xor %ecx, %eax
++	jz no_cr4
++
++	mov $0, %eax
++	cpuid
++
++	cmp $0, %eax
++	je no_cr4
++
++	mov $1, %eax
++	cpuid
++
++	shr $8, %eax
++	and $0xf, %eax
++
++	cmp $5, %eax
++	jl no_cr4
++
+ 	/* Turn off PAE. */
+ 	movl	%cr4, %eax
+ 	andl	$(~GRUB_MEMORY_CPU_CR4_PAE_ON), %eax
+ 	movl	%eax, %cr4
+ 
++no_cr4:
++
+ 	jmp	LOCAL(cont2)
+ LOCAL(cont2):
+ 	.code32

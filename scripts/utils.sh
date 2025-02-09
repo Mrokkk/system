@@ -55,7 +55,16 @@ function create_modification_list()
 
 function binary_from_native_sysroot()
 {
-    [[ -f "native-sysroot/bin/${1}" ]] && echo $(readlink -f "native-sysroot/bin/${1}")
+    if [[ -f "native-sysroot/bin/${1}" ]]
+    then
+        echo $(readlink -f "native-sysroot/bin/${1}")
+        return 0
+    elif [[ -f "native-sysroot/sbin/${1}" ]]
+    then
+        echo $(readlink -f "native-sysroot/sbin/${1}")
+        return 0
+    fi
+    return 1
 }
 
 function resource_from_native_sysroot()
@@ -64,7 +73,9 @@ function resource_from_native_sysroot()
     if [[ -n "${file}" ]]
     then
         echo $(readlink -f "${file}")
+        return 0
     fi
+    return 1
 }
 
 function display_file()
