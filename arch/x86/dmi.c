@@ -177,7 +177,6 @@ UNMAP_AFTER_INIT void smbios_entry_handle(smbios_header_t* header)
         if (!dmi_bit(c, 3))
         {
             log_continue("; ISA: %B; EISA: %B; PCI: %B; APM: %B; PnP: %B",
-                c,
                 dmi_bit(c, 4),
                 dmi_bit(c, 6),
                 dmi_bit(c, 7),
