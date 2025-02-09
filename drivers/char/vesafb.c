@@ -214,7 +214,7 @@ static void vesafb_mode_fill(
     else
     {
         mode->fb_paddr = vesafb_mode_info->wina_segment * 0x10;
-        mode->fb_size  = vesafb_mode_info->win_size;
+        mode->fb_size  = vesafb_mode_info->win_size * KiB;
     }
 }
 
