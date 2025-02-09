@@ -157,7 +157,6 @@ static int c_cpu()
     print_ul(cpu_info.cacheline_size);
     print_ul(cpu_info.cache_size);
     print_ul(cpu_info.bogomips);
-    print_string(cpu_info.features_string);
     return 0;
 }
 

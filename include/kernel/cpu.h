@@ -20,7 +20,6 @@ struct cpu_info
     unsigned int features[NR_FEATURES];
     unsigned int cacheline_size;
     unsigned int cache_size;
-    char         features_string[256];
     uint8_t      lapic_id;
 };
 

@@ -4,6 +4,11 @@
 #include <kernel/kernel.h>
 #include <kernel/string.h>
 
+// References:
+// https://datasheets.chipdb.org/Intel/x86/CPUID/24161821.pdf
+// https://datasheets.chipdb.org/AMD/486_5x86/19720C.pdf
+// https://www.ardent-tool.com/CPU/docs/AMD/recognition/20734R.pdf
+
 #define FEATURE(id, name) \
     [id] = name
 
@@ -187,6 +192,39 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
                     NAME_APPEND(" OverDrive");
                 }
                 break;
+            case AMD:
+                NAME_APPEND("AMD ");
+                switch (cpu_info.family)
+                {
+                    case 4:
+                        switch (cpu_info.model)
+                        {
+                            case 3:
+                                NAME_APPEND("Am486DX2-WT");
+                                break;
+                            case 7:
+                                NAME_APPEND("Am486DX2-WB");
+                                break;
+                            case 8:
+                                NAME_APPEND("Am486DX4-WT");
+                                break;
+                            case 9:
+                                NAME_APPEND("Am486DX4-WB");
+                                break;
+                            case 14:
+                                NAME_APPEND("Am5x86-WT");
+                                break;
+                            case 15:
+                                NAME_APPEND("Am5x86-WB");
+                                break;
+                            default:
+                                goto unknown;
+                        }
+                        break;
+                    default:
+                        goto unknown;
+                }
+                break;
             unknown:
             default:
                 strlcpy(cpu_info.name, "unrecognized", sizeof(cpu_info.name));
@@ -248,6 +286,16 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         cpu_info.family = cpu_family(cpuid_regs.eax);
         cpu_info.type = cpu_type(cpuid_regs.eax);
         cpu_info.lapic_id = cpuid_regs.ebx >> 24;
+
+        // The AMD-K5 processor (model 0) reserves bit 13 and implements feature bit 9 to
+        // indicate support for Global Paging Extensions instead of support for APIC
+        if (cpu_info.vendor_id == AMD && cpu_info.family == 5 && cpu_info.model == 0)
+        {
+            int pge = (cpuid_regs.edx >> 9) & 1;
+            cpuid_regs.edx &= ~((1 << 13) | (1 << 9));
+            cpuid_regs.edx |= pge << 13;
+        }
+
         cpu_features_save(CPUID_1_ECX, cpuid_regs.ecx);
         cpu_features_save(CPUID_1_EDX, cpuid_regs.edx);
     }
