@@ -6,7 +6,7 @@ base_dir="$(dirname `readlink -f ${0}`)"
 
 box86="$(binary_from_native_sysroot 86Box)"
 
-kernel_params="earlycon syslog=/dev/debug0 noapm pciprint vesaprint"
+kernel_params="earlycon syslog=/dev/debug0 pciprint vesaprint"
 
 grub_cfg_content="set timeout=0
 set default=0

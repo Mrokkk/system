@@ -60,11 +60,12 @@
 #define descriptor_set_base(gdt, num, base) \
     gdt[num].base_low = (base) & 0xffff; \
     gdt[num].base_middle = (((base) >> 16)) & 0xff; \
-    gdt[num].base_high = ((base) >> 24) & 0xff;
+    gdt[num].base_high = ((base) >> 24) & 0xff
 
 #define descriptor_set_limit(gdt, num, limit) \
     gdt[num].limit_low = (limit) & 0xffff; \
-    gdt[num].granularity = (((limit) >> 16) & 0xf);
+    gdt[num].granularity &= ~0xf; \
+    gdt[num].granularity |= (((limit) >> 16) & 0xf)
 
 #include <stdint.h>
 #include <kernel/compiler.h>

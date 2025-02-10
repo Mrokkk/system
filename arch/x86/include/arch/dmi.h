@@ -10,6 +10,8 @@ struct dmi
     const char* manufacturer;
     const char* product;
     const char* version;
+    const char* bios;
+    const char* bios_version;
     struct
     {
         uint32_t isa:1;

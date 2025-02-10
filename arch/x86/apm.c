@@ -4,7 +4,7 @@
 #include <arch/bios.h>
 #include <arch/reboot.h>
 #include <arch/segment.h>
-#include <arch/earlycon.h>
+#include <arch/descriptor.h>
 
 #include <kernel/init.h>
 #include <kernel/kernel.h>
@@ -34,8 +34,11 @@
 #define APM_CANNOT_ENTER    0x60
 #define APM_UNAVL           0x86
 
+#define APM_FLAGS_32BIT_IF  (1 << 1)
+
 #define APM_INSTALLATION_CHECK(regs) \
     ({ \
+        memset(&regs, 0, sizeof(regs)); \
         regs.ax = 0x5300; \
         regs.bx = 0x0000; \
         &regs; \
@@ -43,6 +46,7 @@
 
 #define APM_INTERFACE_CONNECT(regs, mode) \
     ({ \
+        memset(&regs, 0, sizeof(regs)); \
         regs.ax = 0x5300 | mode; \
         regs.bx = 0x0000; \
         &regs; \
@@ -50,6 +54,7 @@
 
 #define APM_INTERFACE_DISCONNECT(regs) \
     ({ \
+        memset(&regs, 0, sizeof(regs)); \
         regs.ax = 0x5304; \
         regs.bx = 0x0000; \
         &regs; \
@@ -57,6 +62,7 @@
 
 #define APM_SHUTDOWN(regs) \
     ({ \
+        memset(&regs, 0, sizeof(regs)); \
         regs.ax = 0x5307; \
         regs.bx = 0x0001; \
         regs.cx = 0x0003; \
@@ -65,21 +71,23 @@
 
 #define APM_DRIVER_VERSION(regs) \
     ({ \
+        memset(&regs, 0, sizeof(regs)); \
         regs.ax = 0x530e; \
         regs.bx = 0x0000; \
-        regs.cx = 0x0101; \
+        regs.cx = 0x0102; \
         &regs; \
     })
 
 #define APM_PM_ENABLE(regs) \
     ({ \
+        memset(&regs, 0, sizeof(regs)); \
         regs.ax = 0x5308; \
         regs.bx = 0x0001; \
         regs.cx = 0x0001; \
         &regs; \
     })
 
-static int (*apm_call)(regs_t* regs, const char* name);
+READONLY static int (*apm_call)(regs_t* regs, const char* name);
 
 READONLY struct
 {
@@ -108,6 +116,7 @@ static inline const char* apm_error(uint8_t ec)
 static inline int apm_32bit_call(regs_t* regs, const char* name)
 {
     asm volatile(
+        "push %%ebp;"
         "pushl %%ds;"
         "pushl %%es;"
         "pushl %%fs;"
@@ -131,6 +140,7 @@ static inline int apm_32bit_call(regs_t* regs, const char* name)
         "popl %%fs;"
         "popl %%es;"
         "popl %%ds;"
+        "pop %%ebp;"
         : "=a" (regs->eax), "=b" (regs->ebx), "=c" (regs->ecx), "=d" (regs->edx),
           "=D" (regs->edi), "=S" (regs->esi), "=m" (regs->eflags)
         : "a" (regs->eax), "b" (regs->ebx), "c" (regs->ecx), "d" (regs->edx)
@@ -169,33 +179,35 @@ static int apm_32bit_configure(regs_t* regs)
 {
     uint32_t code_start, code_16, data_start;
 
-    if (dmi.version && !strcmp("ThinkPad T42", dmi.version))
-    {
-        log_warning("disabling 32bit interface");
-        return -1;
-    }
-
-    log_continue("; entry: %04x:%04x", regs->ax, regs->ebx);
+    log_continue("; entry: %#06x:%#06x", regs->ax, regs->ebx);
 
     code_start = regs->ax * 16;
     data_start = regs->dx * 16;
-    code_16 = regs->cx * 16;
+    code_16    = regs->cx * 16;
 
     apm_entry.off = regs->ebx;
     apm_entry.seg = APM_CS;
 
+    uint16_t cs32_limit = ((regs->esi & 0xffff) - 1) & 0xffff;
+    uint16_t cs16_limit = ((regs->esi >> 16) - 1) & 0xffff;
+    uint16_t ds_limit = (regs->di - 1) & 0xffff;
+
     descriptor_set_base(gdt_entries, APM_CODE_ENTRY, code_start);
-    descriptor_set_base(gdt_entries, APM_CODE_ENTRY, code_16);
+    descriptor_set_base(gdt_entries, APM_CODE_16_ENTRY, code_16);
     descriptor_set_base(gdt_entries, APM_DATA_ENTRY, data_start);
+
+    descriptor_set_limit(gdt_entries, APM_CODE_ENTRY, cs32_limit);
+    descriptor_set_limit(gdt_entries, APM_CODE_16_ENTRY, cs16_limit);
+    descriptor_set_limit(gdt_entries, APM_DATA_ENTRY, ds_limit);
 
     apm_call = &apm_32bit_call;
 
     return 0;
 }
 
-void apm_initialize(void)
+UNMAP_AFTER_INIT void apm_initialize(void)
 {
-    int apm_mode = APM_32BIT_PROTECTED;
+    int apm_mode = APM_MODE;
     regs_t regs;
 
     static_assert(APM_MODE == APM_REALMODE || APM_MODE == APM_32BIT_PROTECTED);
@@ -213,19 +225,37 @@ void apm_initialize(void)
 
     if (regs.bx != U16('M', 'P'))
     {
-        log_notice("installation check: incorrect signature");
+        log_notice("installation check: incorrect signature: %#x", regs.bx);
         return;
     }
 
     log_notice("ver: %#x", regs.ax);
 
-disconnect:
-    bios_call(BIOS_SYSTEM, APM_INTERFACE_DISCONNECT(regs));
-    if (regs.eflags & EFL_CF && regs.ah != APM_NOIF)
+    if (regs.ax != 0x102)
     {
-        log_warning("disconnect failed; error code: %#x (%s)", regs.ah, apm_error(regs.ah));
+        log_continue("; unsupported version");
         return;
     }
+
+    if (!(regs.cx & APM_FLAGS_32BIT_IF))
+    {
+        apm_mode = APM_REALMODE;
+    }
+    else if (dmi.version && !strcmp("ThinkPad T42", dmi.version))
+    {
+        log_notice("[ThinkPad] disabling 32bit interface");
+        apm_mode = APM_REALMODE;
+    }
+    else if (dmi.bios && dmi.bios_version &&
+        !strcmp("Award Software International, Inc.", dmi.bios) &&
+        !strcmp("4.51 PG", dmi.bios_version))
+    {
+        log_notice("[Award 4.51 PG] disabling 32bit interface");
+        apm_mode = APM_REALMODE;
+    }
+
+disconnect:
+    apm_bios_call(APM_INTERFACE_DISCONNECT(regs), "disconnect interface");
 
     if (apm_bios_call(APM_INTERFACE_CONNECT(regs, apm_mode), "connect interface"))
     {

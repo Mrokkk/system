@@ -166,22 +166,28 @@ UNMAP_AFTER_INIT void smbios_entry_handle(smbios_header_t* header)
     {
         uint64_t c = dmi_qword(header, 0x0a);
 
-        log_info("BIOS: %s %s",
-            dmi_string(header, 0x04),
-            dmi_string(header, 0x05));
-
-        log_continue("; start: %#x; ROM size: %u KB",
-            (0x10000 - dmi_word(header, 0x06)) * 16,
-            64 * (dmi_byte(header, 0x09) + 1));
-
-        if (!dmi_bit(c, 3))
+        if (!dmi.bios)
         {
-            log_continue("; ISA: %B; EISA: %B; PCI: %B; APM: %B; PnP: %B",
-                dmi_bit(c, 4),
-                dmi_bit(c, 6),
-                dmi_bit(c, 7),
-                dmi_bit(c, 10),
-                dmi_bit(c, 9));
+            dmi.bios = dmi_string(header, 0x04);
+            dmi.bios_version = dmi_string(header, 0x05);
+
+            log_info("BIOS: %s %s",
+                dmi.bios,
+                dmi.bios_version);
+
+            log_continue("; start: %#x; ROM size: %u KB",
+                (0x10000 - dmi_word(header, 0x06)) * 16,
+                64 * (dmi_byte(header, 0x09) + 1));
+
+            if (!dmi_bit(c, 3))
+            {
+                log_continue("; ISA: %B; EISA: %B; PCI: %B; APM: %B; PnP: %B",
+                    dmi_bit(c, 4),
+                    dmi_bit(c, 6),
+                    dmi_bit(c, 7),
+                    dmi_bit(c, 10),
+                    dmi_bit(c, 9));
+            }
         }
     }
     else if (header->type == 1)
