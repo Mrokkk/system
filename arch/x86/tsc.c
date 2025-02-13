@@ -76,7 +76,7 @@ UNMAP_AFTER_INIT static void tsc_calibrate_by_hpet(void)
     uint32_t cycles, khz, mhz, mhz_remainder, hpet_max;
     uint64_t tsc_start, tsc_end;
 
-    if (!hpet)
+    if (!hpet_available())
     {
         return;
     }

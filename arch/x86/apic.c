@@ -193,7 +193,7 @@ static uint32_t apic_timer_calibrate_by_hpet(void)
 {
     uint32_t ticks, hpet_max, mhz, mhz_remainder;
 
-    if (!hpet)
+    if (!hpet_available())
     {
         return 0;
     }

@@ -13,10 +13,12 @@ typedef volatile uint64_t io64;
 #define readb(address) (*(io8*)(address))
 #define readw(address) (*(io16*)(address))
 #define readl(address) (*(io32*)(address))
+#define readq(address) (*(io64*)(address))
 
 #define writeb(data, address) ((*(io8*)(address)) = (data))
 #define writew(data, address) ((*(io16*)(address)) = (data))
 #define writel(data, address) ((*(io32*)(address)) = (data))
+#define writeq(data, address) ((*(io64*)(address)) = (data))
 
 static inline uint8_t inb(uint16_t port)
 {

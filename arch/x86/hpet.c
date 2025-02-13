@@ -20,70 +20,37 @@ static clock_source_t hpet_clock = {
     .read = &hpet_read,
 };
 
-static uint32_t hpet_readl_native(uint32_t reg)
+static inline uint32_t hpet_readl(uint32_t reg)
 {
-    void* h = hpet;
-    return readl(h + reg);
+    return readl(hpet + reg);
 }
 
-static uint32_t hpet_readl_impl(uint32_t reg, uint32_t offset, uint32_t mask)
+static inline void hpet_writel(uint32_t reg, uint32_t val)
 {
-    void* h = hpet;
-
-    uint32_t dword = offset >> 5;
-    uint32_t dword_offset = offset % 32;
-    uint32_t value = readl(h + reg + dword * 4);
-
-    return (value >> dword_offset) & mask;
+    writel(val, hpet + reg);
 }
 
-static void hpet_writel_impl(uint32_t reg, uint32_t offset, uint32_t mask, uint32_t value)
+static inline uint64_t hpet_readq(uint32_t reg)
 {
-    void* h = hpet;
-
-    uint32_t dword = offset >> 5;
-    uint32_t dword_offset = offset % 32;
-    void* iomem = h + reg + dword * 4;
-    uint32_t orig_value = readl(iomem);
-
-    orig_value &= ~(mask << dword_offset);
-    orig_value |= value << dword_offset;
-
-    writel(orig_value, iomem);
+    return readq(hpet + reg);
 }
 
-#define HPET_READL(reg) \
-    ({ \
-        hpet_readl_impl(HPET_##reg##_REG, HPET_##reg##_OFFSET, HPET_##reg##_MASK); \
-    })
-
-#define HPET_WRITEL(value, reg) \
-    ({ \
-        hpet_writel_impl(HPET_##reg##_REG, HPET_##reg##_OFFSET, HPET_##reg##_MASK, value); \
-    })
-
-#define HPET_TIMER_READL(reg, n) \
-    ({ \
-        hpet_readl_impl(HPET_##reg##_REG + 0x20 * n, HPET_##reg##_OFFSET, HPET_##reg##_MASK); \
-    })
-
-#define HPET_TIMER_WRITEL(value, reg, n) \
-    ({ \
-        hpet_writel_impl(HPET_##reg##_REG + 0x20 * n, HPET_##reg##_OFFSET, HPET_##reg##_MASK, value); \
-    })
+bool hpet_available(void)
+{
+    return !!hpet;
+}
 
 UNMAP_AFTER_INIT void hpet_initialize(void)
 {
     hpet_acpi_t* sdt = acpi_find("HPET");
-    uint32_t hpet_freq, mhz, mhz_remainder;
 
-    if (!sdt)
+    if (unlikely(!sdt))
     {
         log_notice("no HPET");
         return;
     }
 
-    if (sdt->address.type == 1)
+    if (unlikely(sdt->address.type == 1))
     {
         log_notice("no MMIO registers");
         return;
@@ -91,40 +58,69 @@ UNMAP_AFTER_INIT void hpet_initialize(void)
 
     hpet = mmio_map_uc(addr(sdt->address.address), PAGE_SIZE, "hpet");
 
-    if (HPET_READL(REV_ID) == 0)
+    if (unlikely(!hpet))
+    {
+        log_notice("cannot map MMIO");
+        return;
+    }
+
+    uint64_t general_cap = hpet_readq(HPET_REG_GENERAL_CAP);
+    uint32_t general_config = hpet_readl(HPET_REG_GENERAL_CONFIG);
+
+    uint8_t rev_id = REV_ID_GET(general_cap);
+    uint16_t vendor_id = VENDOR_ID_GET(general_cap);
+    uint32_t counter_clk_period = COUNTER_CLK_PERIOD_GET(general_cap);
+
+    if (unlikely(rev_id == 0))
     {
         log_notice("empty REV_ID");
         return;
     }
 
+    if (unlikely(!counter_clk_period || counter_clk_period > 0x05f5e100))
+    {
+        log_notice("invalid COUNTER_CLK_PERIOD: %#x", counter_clk_period);
+        return;
+    }
+
+    uint32_t hpet_freq, mhz, mhz_remainder;
+
     mhz = hpet_freq = hpet_freq_get();
     hpet_clock.freq_khz = hpet_freq / KHz;
     mhz_remainder = do_div(mhz, MHz);
 
-    size_t num_tim = HPET_READL(NUM_TIM_CAP) + 1;
+    size_t num_tim = NUM_TIM_CAP_GET(general_cap) + 1;
 
-    log_notice("freq: %u.%04u MHz; timers: %u", mhz, mhz_remainder, num_tim);
+    log_notice("vendor: %#x; rev: %#x; freq: %u.%04u MHz; timers: %u; legacy replacement: %s",
+        vendor_id,
+        rev_id,
+        mhz,
+        mhz_remainder,
+        num_tim,
+        (general_cap & LEG_RT_CAP) ? "true" : "false");
 
-    HPET_WRITEL(0, ENABLE_CNF);
+    hpet_writel(HPET_REG_GENERAL_CONFIG, general_config & ~ENABLE_CNF);
 
     for (size_t i = 0; i < num_tim; ++i)
     {
-        bool is_64bit = HPET_TIMER_READL(Tn_SIZE_CAP, i);
+        uint64_t tn_config = hpet_readq(TIMER_N_CONFIG(i));
 
-        log_notice("timer[%u]: periodic mode: %s; IRQ routing cap: %#x; %u bits",
+        log_notice("timer[%u]: periodic: %s; IRQ routing: %#x; %u bits; FSB: %s",
             i,
-            HPET_TIMER_READL(Tn_PER_INT_CAP, i) ? "supported" : "unsupported",
-            HPET_TIMER_READL(Tn_INT_ROUTE_CAP, i),
-            is_64bit ? 64 : 32);
-
-        HPET_TIMER_WRITEL(0, Tn_INT_ENB_CNF, i);
+            tn_config & Tn_PER_INT_CAP ? "true" : "false",
+            (uint32_t)Tn_INT_ROUTE_CAP_GET(tn_config),
+            tn_config & Tn_SIZE_CAP ? 64 : 32,
+            tn_config & Tn_FSB_INT_DEL_CAP ? "true" : "false");
 
         // If timer works in 64bit mode, force 32bit
-        if (is_64bit)
+        if (tn_config & Tn_SIZE_CAP)
         {
-            log_continue("; forcing 32 bits");
-            HPET_TIMER_WRITEL(1, Tn_32MODE_CNF, i);
+            tn_config |= Tn_32MODE_CNF;
         }
+
+        tn_config &= ~Tn_INT_ENB_CNF;
+
+        hpet_writel(TIMER_N_CONFIG(i), tn_config);
     }
 
     clock_source_register_khz(&hpet_clock, hpet_freq);
@@ -132,30 +128,34 @@ UNMAP_AFTER_INIT void hpet_initialize(void)
 
 uint32_t hpet_freq_get(void)
 {
-    uint64_t freq = 1000000000000000LL;
-    uint64_t hpet_clk_period = HPET_READL(COUNTER_CLK_PERIOD);
+    uint64_t freq = 1000000000000000ULL;
+    uint64_t hpet_clk_period = COUNTER_CLK_PERIOD_GET(hpet_readq(HPET_REG_GENERAL_CAP));
     do_div(freq, hpet_clk_period);
     return freq;
 }
 
 int hpet_enable(void)
 {
-    HPET_WRITEL(1, ENABLE_CNF);
+    hpet_writel(
+        HPET_REG_GENERAL_CONFIG,
+        hpet_readl(HPET_REG_GENERAL_CONFIG) | ENABLE_CNF);
     return 0;
 }
 
 int hpet_disable(void)
 {
-    HPET_WRITEL(0, ENABLE_CNF);
+    hpet_writel(
+        HPET_REG_GENERAL_CONFIG,
+        hpet_readl(HPET_REG_GENERAL_CONFIG) & ~ENABLE_CNF);
     return 0;
 }
 
 static uint64_t hpet_read(void)
 {
-    return hpet_readl_native(HPET_REG_MAIN_COUNTER);
+    return hpet_readl(HPET_REG_MAIN_COUNTER);
 }
 
 uint32_t hpet_cnt_value(void)
 {
-    return hpet_readl_native(HPET_REG_MAIN_COUNTER);
+    return hpet_readl(HPET_REG_MAIN_COUNTER);
 }
