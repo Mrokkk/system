@@ -8,7 +8,7 @@ static const char* eflags_bits[] = {
 };
 
 static const char* cr0_bits[] = {
-    "pe", "mp", "em", "ts", "et", "ne", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "wp", "am", "nw", "cd", "pg"
+    "pe", "mp", "em", "ts", "et", "ne", [16] = "wp", "am", [29] = "nw", "cd", "pg"
 };
 
 static const char* cr4_bits[] = {

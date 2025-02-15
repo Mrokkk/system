@@ -10,11 +10,11 @@
 
 #define SEGMENT_REGISTERS_SET(value, scratch_register) \
     mov $value, %scratch_register; \
-    mov %ax, %ds; \
-    mov %ax, %es; \
-    mov %ax, %fs; \
-    mov %ax, %gs; \
-    mov %ax, %ss
+    mov %scratch_register, %ds; \
+    mov %scratch_register, %es; \
+    mov %scratch_register, %fs; \
+    mov %scratch_register, %gs; \
+    mov %scratch_register, %ss
 
 #else
 #define ASM_VALUE(x) "$" STRINGIFY(x)

@@ -72,6 +72,7 @@ void do_irq(uint32_t nr, struct pt_regs* regs)
     if (unlikely(!irq_list[nr].handler))
     {
         log_error("not handled IRQ %u", nr);
+        used_chip->eoi(nr);
         return;
     }
 

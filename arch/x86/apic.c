@@ -1,6 +1,7 @@
 #define log_fmt(fmt) "apic: " fmt
 #include <arch/io.h>
 #include <arch/irq.h>
+#include <arch/smp.h>
 #include <arch/apic.h>
 #include <arch/hpet.h>
 #include <arch/i8253.h>
@@ -13,7 +14,7 @@
 #include <kernel/kernel.h>
 #include <kernel/page_mmio.h>
 
-#define DEBUG_MADT 0
+#define DEBUG_MADT 1
 #define DEBUG_APIC 0
 #define DEBUG_IOAPIC 1
 #define HPET_CALIBRATION_LOOPS 16
@@ -60,12 +61,122 @@ static irq_chip_t ioapic_chip = {
     .vector_offset = IOAPIC_IRQ_VECTOR_OFFSET,
 };
 
+#define MADT_LOG(type, ...) \
+    if (DEBUG_MADT) \
+    { \
+        type(__VA_ARGS__); \
+    }
+
+static void madt_scan(uint8_t* lapic_ids, size_t* num_cores)
+{
+    uint32_t offset;
+    madt_entry_t* entry;
+    madt_t* madt = acpi_find("APIC");
+
+    static_assert(offsetof(madt_entry_t, ioapic.address) == 4);
+    static_assert(offsetof(madt_entry_t, lapic_nmi.lint) == 5);
+
+    if (!madt)
+    {
+        return;
+    }
+
+    entry = ptr(addr(madt) + sizeof(madt_t));
+
+    for (; addr(entry) < addr(madt) + madt->header.len; entry = ptr(addr(entry) + entry->len))
+    {
+        MADT_LOG(log_info, "type: %u ", entry->type);
+        switch (entry->type)
+        {
+            case MADT_TYPE_LAPIC:
+                MADT_LOG(log_continue, "(Local APIC), cpu id: %#x, id = %#x, flags = %#x",
+                    entry->lapic.cpu_id, entry->lapic.apic_id, entry->lapic.flags);
+                lapic_ids[(*num_cores)++] = entry->lapic.apic_id;
+                break;
+
+            case MADT_TYPE_IOAPIC:
+                MADT_LOG(log_continue, "(IOAPIC), id = %#x, address = %#x, gsi_base = %#x",
+                    entry->ioapic.id, entry->ioapic.address, entry->ioapic.gsi);
+
+                offset = entry->ioapic.address - page_beginning(entry->ioapic.address);
+                ioapic = mmio_map_uc(page_beginning(entry->ioapic.address), PAGE_SIZE, "ioapic");
+                ioapic = ptr(addr(ioapic) + offset);
+                break;
+
+            case MADT_TYPE_IOAPIC_OVERRIDE:
+                MADT_LOG(log_continue, "(IOAPIC Interrupt Source Override), bus = %#x, irq = %u, gsi = %#x, flags = %#x",
+                    entry->ioapic_override.bus,
+                    entry->ioapic_override.irq,
+                    entry->ioapic_override.gsi,
+                    entry->ioapic_override.flags);
+
+                overrides[entry->ioapic_override.irq].irq = entry->ioapic_override.gsi;
+                overrides[entry->ioapic_override.irq].flags = entry->ioapic_override.flags;
+                break;
+
+            case MADT_TYPE_LAPIC_NMI:
+                MADT_LOG(log_continue, "(Local APIC NMI), cpu id: %#x, LINT#%u, flags: %#x",
+                    entry->lapic_nmi.cpu_id,
+                    entry->lapic_nmi.lint,
+                    entry->lapic_nmi.flags);
+                break;
+
+            case MADT_TYPE_LAPIC_ADDR_OVERRIDE:
+                MADT_LOG(log_continue, "(Local APIC Address Override), address: %llx",
+                    entry->lapic_addr_override.address);
+                break;
+
+            case MADT_TYPE_X2LAPIC:
+                MADT_LOG(log_continue, "(Local x2APIC), local x2APIC ID: %u, APIC ID: %u, flags: %#x",
+                    entry->x2apic.x2apic_id,
+                    entry->x2apic.apic_id,
+                    entry->x2apic.flags);
+                break;
+        }
+    }
+}
+
+void apic_error(void)
+{
+    log_notice("error IRQ: ESR: %#x", apic->esr);
+    apic_eoi(0);
+}
+
+void apic_spurious(void)
+{
+    log_notice("spurious IRQ");
+    apic_eoi(0);
+}
+
+void apic_ipi_send(uint8_t lapic_id, uint32_t value)
+{
+    apic->esr = 0;
+    apic->icr_hi = lapic_id << 24;
+    apic->icr_low = value;
+
+    while (apic->icr_low & APIC_ICR_SEND_PENDING)
+    {
+        cpu_relax();
+    }
+}
+
+extern void apic_error_isr(void);
+extern void apic_spurious_isr(void);
+
 UNMAP_AFTER_INIT int apic_initialize(void)
 {
     uint32_t eax, edx, apic_base;
+    uint8_t lapic_ids[16];
+    size_t num_cores = 0;
 
     static_assert(offsetof(apic_t, eoi) == 0xb0);
     static_assert(offsetof(apic_t, siv) == 0xf0);
+    static_assert(offsetof(apic_t, esr) == 0x280);
+    static_assert(offsetof(apic_t, icr_low) == 0x300);
+    static_assert(offsetof(apic_t, icr_hi) == 0x310);
+    static_assert(offsetof(apic_t, lvt_error) == 0x370);
+    static_assert(offsetof(apic_t, lvt_lint0) == 0x350);
+    static_assert(offsetof(apic_t, lvt_lint1) == 0x360);
     static_assert(offsetof(apic_t, timer_init_cnt) == 0x380);
     static_assert(offsetof(apic_t, timer_current_cnt) == 0x390);
     static_assert(offsetof(apic_t, timer_div) == 0x3e0);
@@ -91,13 +202,25 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     apic_base = eax & APIC_BASE_MASK;
     apic = mmio_map_uc(apic_base, PAGE_SIZE, "apic");
 
-    eax = (apic_base & 0xfffff0000) | IA32_APIC_BASE_MSR_ENABLE;
+    eax |= IA32_APIC_BASE_MSR_ENABLE;
 
     wrmsr(IA32_APIC_BASE_MSR, eax, edx);
 
-    apic->siv |= APIC_SIV_ENABLE;
+    apic->esr = 0;
 
-    log_notice("base: %#x; id: %#x (CPUID: %#x); version: %#x", apic_base, apic->id, cpu_info.lapic_id, apic->version);
+    idt_set(254, addr(&apic_error_isr));
+    idt_set(255, addr(&apic_spurious_isr));
+
+    apic->lvt_error = 254;
+    apic->siv = 255 | APIC_SIV_ENABLE;
+
+    log_notice("base: %#x; id: %#x; bsp: %B; version: %#x",
+        apic_base,
+        apic->id,
+        !!(eax & IA32_APIC_BASE_MSR_BSP),
+        apic->version);
+
+    rdmsr(IA32_APIC_BASE_MSR, eax, edx);
 
     switch (apic->version)
     {
@@ -111,7 +234,10 @@ UNMAP_AFTER_INIT int apic_initialize(void)
             log_continue(" (Unknown APIC)");
     }
 
+    madt_scan(lapic_ids, &num_cores);
+
     ioapic_initialize();
+    cpus_boot(lapic_ids, num_cores);
 
     return 0;
 }
@@ -316,78 +442,9 @@ static int ioapic_irq_enable(uint32_t irq, int)
     return 0;
 }
 
-#define MADT_LOG(type, ...) \
-    if (DEBUG_MADT) \
-    { \
-        type(__VA_ARGS__); \
-    }
-
 static void ioapic_initialize(void)
 {
-    uint32_t offset, data, id;
-    madt_entry_t* entry;
-    madt_t* madt = acpi_find("APIC");
-
-    static_assert(offsetof(madt_entry_t, ioapic.address) == 4);
-    static_assert(offsetof(madt_entry_t, lapic_nmi.lint) == 5);
-
-    if (!madt)
-    {
-        return;
-    }
-
-    entry = ptr(addr(madt) + sizeof(madt_t));
-
-    for (; addr(entry) < addr(madt) + madt->header.len; entry = ptr(addr(entry) + entry->len))
-    {
-        MADT_LOG(log_info, "type: %u", entry->type);
-        switch (entry->type)
-        {
-            case MADT_TYPE_LAPIC:
-                MADT_LOG(log_continue, " (Local APIC), cpu id: %#x, id = %#x, flags = %#x",
-                    entry->lapic.cpu_id, entry->lapic.apic_id, entry->lapic.flags);
-                break;
-
-            case MADT_TYPE_IOAPIC:
-                MADT_LOG(log_continue, " (IOAPIC), id = %#x, address = %#x, gsi_base = %#x",
-                    entry->ioapic.id, entry->ioapic.address, entry->ioapic.gsi);
-
-                offset = entry->ioapic.address - page_beginning(entry->ioapic.address);
-                ioapic = mmio_map_uc(page_beginning(entry->ioapic.address), PAGE_SIZE, "ioapic");
-                ioapic = ptr(addr(ioapic) + offset);
-                break;
-
-            case MADT_TYPE_IOAPIC_OVERRIDE:
-                MADT_LOG(log_continue, " (IOAPIC Interrupt Source Override), bus = %#x, irq = %u, gsi = %#x, flags = %#x",
-                    entry->ioapic_override.bus,
-                    entry->ioapic_override.irq,
-                    entry->ioapic_override.gsi,
-                    entry->ioapic_override.flags);
-
-                overrides[entry->ioapic_override.irq].irq = entry->ioapic_override.gsi;
-                overrides[entry->ioapic_override.irq].flags = entry->ioapic_override.flags;
-                break;
-
-            case MADT_TYPE_LAPIC_NMI:
-                MADT_LOG(log_continue, " (Local APIC NMI), cpu id: %#x, LINT#%u, flags: %#x",
-                    entry->lapic_nmi.cpu_id,
-                    entry->lapic_nmi.lint,
-                    entry->lapic_nmi.flags);
-                break;
-
-            case MADT_TYPE_LAPIC_ADDR_OVERRIDE:
-                MADT_LOG(log_continue, " (Local APIC Address Override), address: %llx",
-                    entry->lapic_addr_override.address);
-                break;
-
-            case MADT_TYPE_X2LAPIC:
-                MADT_LOG(log_continue, " (Local x2APIC), local x2APIC ID: %u, APIC ID: %u, flags: %#x",
-                    entry->x2apic.x2apic_id,
-                    entry->x2apic.apic_id,
-                    entry->x2apic.flags);
-                break;
-        }
-    }
+    uint32_t data, id;
 
     if (!ioapic)
     {

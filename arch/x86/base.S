@@ -137,3 +137,19 @@ ENTRY(bad_syscall)
     movl $-ENOSYS, REGS_EAX(%esp)
     jmp exit_kernel
 ENDPROC(bad_syscall)
+
+ENTRY(apic_error_isr)
+    cli
+    SAVE_ALL(0)
+    call apic_error
+    sti
+    jmp exit_kernel
+ENDPROC(apic_error_isr)
+
+ENTRY(apic_spurious_isr)
+    cli
+    SAVE_ALL(0)
+    call apic_spurious
+    sti
+    jmp exit_kernel
+ENDPROC(apic_spurious_isr)

@@ -24,20 +24,30 @@ typedef struct ioapic_route ioapic_route_t;
 
 #define APIC_BASE_MASK              0xfffff000
 
-#define APIC_SIV_ENABLE             (1 << 8)
-#define APIC_LVT_INT_MASKED         (1 << 16)
-#define APIC_LVT_TIMER_PERIODIC     (1 << 17)
-#define APIC_TIMER DIV_1            0xb
-#define APIC_TIMER_DIV_2            0x0
-#define APIC_TIMER_DIV_4            0x1
-#define APIC_TIMER_DIV_8            0x2
-#define APIC_TIMER_DIV_16           0x3
-#define APIC_TIMER_DIV_32           0x8
-#define APIC_TIMER_DIV_64           0x9
-#define APIC_TIMER_DIV_128          0xa
-#define APIC_TIMER_MAXCNT           (~(uint32_t)0)
+#define APIC_SIV_ENABLE                (1 << 8)
+#define APIC_LVT_INT_MASKED            (1 << 16)
+#define APIC_LVT_TIMER_PERIODIC        (1 << 17)
+#define APIC_ICR_SEND_PENDING          (1 << 12)
+#define APIC_ICR_DELIVERY_START_UP     (6 << 8)
+#define APIC_ICR_DELIVERY_INIT         (5 << 8)
+#define APIC_ICR_LEVEL_ASSERT          (1 << 14)
+#define APIC_ICR_LEVEL_DEASSERT        (0 << 14)
+#define APIC_ICR_TRIGGER_LEVEL         (1 << 15)
+#define APIC_ICR_TRIGGER_EDGE          (0 << 15)
+#define APIC_ICR_DEST_SELF             (1 << 18)
+#define APIC_ICR_DEST_ALL              (2 << 18)
+#define APIC_ICR_DEST_ALL_SELF_EXCLUDE (3 << 18)
+#define APIC_TIMER DIV_1               0xb
+#define APIC_TIMER_DIV_2               0x0
+#define APIC_TIMER_DIV_4               0x1
+#define APIC_TIMER_DIV_8               0x2
+#define APIC_TIMER_DIV_16              0x3
+#define APIC_TIMER_DIV_32              0x8
+#define APIC_TIMER_DIV_64              0x9
+#define APIC_TIMER_DIV_128             0xa
+#define APIC_TIMER_MAXCNT              (~(uint32_t)0)
 
-#define IOAPIC_REG_REDIRECT         0x10
+#define IOAPIC_REG_REDIRECT            0x10
 
 struct apic
 {
@@ -45,14 +55,20 @@ struct apic
     io32 id,                __2[3];
     io8 version;
     io8 reserved;
-    io8 max_lvt_entry,      __;
-    io32                    __3[31];
-    io32 eoi,               __4[15];
-    io32 siv,               __5[139];
-    io32 lvt_timer,         __6[23];
-    io32 timer_init_cnt,    __7[3];
-    io32 timer_current_cnt, __8[19];
-    io32 timer_div,         __9[];
+    io8 max_lvt_entry,      __4;
+    io32                    __5[31];
+    io32 eoi,               __6[15];
+    io32 siv,               __7[99];
+    io32 esr,               __8[31];
+    io32 icr_low,           __9[3];
+    io32 icr_hi,            __10[3];
+    io32 lvt_timer,         __11[11];
+    io32 lvt_lint0,         __12[3];
+    io32 lvt_lint1,         __13[3];
+    io32 lvt_error,         __14[3];
+    io32 timer_init_cnt,    __15[3];
+    io32 timer_current_cnt, __16[19];
+    io32 timer_div;
 } PACKED;
 
 struct madt
@@ -142,5 +158,6 @@ struct ioapic_route
 int apic_initialize(void);
 void apic_timer_initialize(void);
 void apic_eoi(uint32_t);
+void apic_ipi_send(uint8_t lapic_id, uint32_t value);
 
 extern apic_t* apic;

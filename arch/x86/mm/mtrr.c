@@ -192,7 +192,7 @@ static void mtrr_fix_clear(uint16_t reg)
     wrmsrll(reg, 0x0606060606060606ULL);
 }
 
-void mtrr_initialize(void)
+UNMAP_AFTER_INIT void mtrr_initialize(void)
 {
     uint64_t mtrrcap;
     bool disable = false;
@@ -258,7 +258,7 @@ void mtrr_initialize(void)
         {
             uint64_t paddr = mtrr_paddr_get(base);
             size_t size = mtrr_size_get(mask);
-            log_info("clearing entry %u: [%llx - %llx]", i, paddr, paddr + size - 1);
+            log_info("clearing entry %u: [%#llx - %#llx]", i, paddr, paddr + size - 1);
 
             wrmsrll(IA32_MSR_MTRR_PHYSMASK(i), 0ULL);
             wrmsrll(IA32_MSR_MTRR_PHYSBASE(i), 0ULL);

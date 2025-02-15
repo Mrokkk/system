@@ -24,7 +24,8 @@ args="\
 -chardev pipe,id=char2,path=qemumon \
 -mon chardev=char2 \
 -serial chardev:char1 \
--usb"
+-usb \
+-smp 4"
 kernel_params=
 
 supported_kernel_params_value=(
