@@ -437,7 +437,8 @@ loglevel_to_color = [
     Color.blue,
     Color.yellow,
     Color.red,
-    Color.red
+    Color.red,
+    Color.magenta,
 ]
 
 def line_process(line : str, context : Context) -> None:

@@ -1,8 +1,13 @@
-commit f7b4c75e440eb6828102e957b2f739bb26a448f6
+commit e42eb14080c9846f52a3b25d7bb08855869e45d0
 Author: Mrokkk <mrokk@protonmail.com>
 Date:   Sat Feb 1 17:39:28 2025 +0100
 
-    Add support for 0xe9 debug console and add QT_NO_DEBUG_OUTPUT flag
+    Some features
+    
+    * add logger
+    * add support for 0xe9 debug console
+    * add exit button
+    * add QT_NO_DEBUG_OUTPUT flag
 
 diff --git a/src/86box.c b/src/86box.c
 index 97c211b..67b2e49 100644
@@ -42,3 +47,109 @@ index 7d6daff..2a07b6f 100644
  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
      add_compile_definitions(_FILE_OFFSET_BITS=64 _LARGEFILE_SOURCE=1 _LARGEFILE64_SOURCE=1)
  endif()
+diff --git a/src/cpu/x86.c b/src/cpu/x86.c
+index 6f15560..a197920 100644
+--- a/src/cpu/x86.c
++++ b/src/cpu/x86.c
+@@ -35,6 +35,7 @@
+ #include <86box/mem.h>
+ #include <86box/rom.h>
+ #include <86box/nmi.h>
++#include <86box/log.h>
+ #include <86box/pic.h>
+ #include <86box/pci.h>
+ #include <86box/ppi.h>
+@@ -237,6 +238,7 @@ makeznptable(void)
+ static void
+ reset_common(int hard)
+ {
++    logger("CPU reset");
+ #ifdef ENABLE_X86_LOG
+     if (hard)
+         x86_log("x86 reset\n");
+diff --git a/src/cpu/x86seg.c b/src/cpu/x86seg.c
+index 61c0edd..17d114a 100644
+--- a/src/cpu/x86seg.c
++++ b/src/cpu/x86seg.c
+@@ -28,6 +28,7 @@
+ #include "cpu.h"
+ #include <86box/device.h>
+ #include <86box/timer.h>
++#include <86box/log.h>
+ #include <86box/machine.h>
+ #include <86box/mem.h>
+ #include <86box/nvr.h>
+@@ -1536,6 +1537,15 @@ pmodeint(int num, int soft)
+         x86gpf("pmodeint(): V86 banned int", 0);
+         return;
+     }
++
++    if (num < 14 && ((cpu_state.seg_cs.seg & 0x3) == 0)) {
++        logger("exception %u at %#x", num, cpu_state.pc);
++        if (num == 6) {
++            logger("  opcode: %#x", readmeml(0, cpu_state.pc));
++        }
++        putc('\n', stderr);
++    }
++
+     addr = (num << 3);
+     if ((addr + 7) > idt.limit) {
+         if (num == 0x08) {
+diff --git a/src/include/86box/log.h b/src/include/86box/log.h
+index a37bdec..a67b613 100644
+--- a/src/include/86box/log.h
++++ b/src/include/86box/log.h
+@@ -29,6 +29,7 @@ extern "C" {
+ #define LOG_MINIMUM_REPEAT_ORDER        4               /* Minimum repeat size */
+ 
+ /* Function prototypes. */
++extern void logger(const char* fmt, ...);
+ extern void log_set_suppr_seen(void *priv, int suppr_seen);
+ extern void log_set_dev_name(void *priv, char *dev_name);
+ #ifndef RELEASE_BUILD
+diff --git a/src/log.c b/src/log.c
+index c8dddf6..e7fb179 100644
+--- a/src/log.c
++++ b/src/log.c
+@@ -51,6 +51,18 @@ extern FILE *stdlog;
+ /* Functions only used in this translation unit. */
+ void log_ensure_stdlog_open(void);
+ 
++void logger(const char* fmt, ...)
++{
++    va_list args;
++    char buffer[256];
++
++    va_start(args, fmt);
++    vsnprintf(buffer, sizeof(buffer), fmt, args);
++    va_end(args);
++
++    fprintf(stderr, "7,0,0.000000;[86Box] %s\n", buffer);
++}
++
+ void
+ log_set_dev_name(void *priv, char *dev_name)
+ {
+diff --git a/src/qt/qt_mainwindow.ui b/src/qt/qt_mainwindow.ui
+index b1dc0ec..f8dd504 100644
+--- a/src/qt/qt_mainwindow.ui
++++ b/src/qt/qt_mainwindow.ui
+@@ -259,6 +259,7 @@
+    <addaction name="actionHard_Reset"/>
+    <addaction name="separator"/>
+    <addaction name="actionACPI_Shutdown"/>
++   <addaction name="actionExit"/>
+    <addaction name="separator"/>
+    <addaction name="actionCtrl_Alt_Del"/>
+    <addaction name="actionCtrl_Alt_Esc"/>
+@@ -353,6 +354,10 @@
+    <property name="text">
+     <string>Exit</string>
+    </property>
++   <property name="icon">
++    <iconset resource="../qt_resources.qrc">
++     <normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</iconset>
++   </property>
+   </action>
+   <action name="actionSettings">
+    <property name="icon">
