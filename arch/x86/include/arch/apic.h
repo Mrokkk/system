@@ -47,6 +47,10 @@ typedef struct ioapic_route ioapic_route_t;
 #define APIC_TIMER_DIV_128             0xa
 #define APIC_TIMER_MAXCNT              (~(uint32_t)0)
 
+#define APIC_SMP_NOTIF_VECTOR          253
+#define APIC_ERROR_IRQ_VECTOR          254
+#define APIC_SPURIOUS_IRQ_VECTOR       255
+
 #define IOAPIC_REG_REDIRECT            0x10
 
 struct apic
@@ -156,6 +160,7 @@ struct ioapic_route
 } PACKED;
 
 int apic_initialize(void);
+void apic_ap_initialize(void);
 void apic_timer_initialize(void);
 void apic_eoi(uint32_t);
 void apic_ipi_send(uint8_t lapic_id, uint32_t value);

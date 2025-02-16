@@ -41,5 +41,6 @@ void idt_write_protect(void);
 
 extern gdt_t gdt;
 extern gdt_entry_t gdt_entries[];
+extern gdt_entry_t gdt_entries_end[];
 
 #endif

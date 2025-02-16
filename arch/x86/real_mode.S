@@ -28,6 +28,10 @@ ENTRY(real_mode_call)
 #ifdef __x86_64__
     SAVE_ALL(0)
 #else
+    push %gs
+    push %fs
+    push %es
+    push %ds
     pusha
 #endif
     pushf
@@ -212,6 +216,10 @@ protected_paging_32:
     mov SAVED_STACK_ADDRESS, %esp
     popf
     popa
+    pop %ds
+    pop %es
+    pop %fs
+    pop %gs
     ret
 #endif
 

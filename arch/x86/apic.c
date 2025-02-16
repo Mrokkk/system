@@ -115,7 +115,7 @@ static void madt_scan(uint8_t* lapic_ids, size_t* num_cores)
                 break;
 
             case MADT_TYPE_LAPIC_NMI:
-                MADT_LOG(log_continue, "(Local APIC NMI), cpu id: %#x, LINT#%u, flags: %#x",
+                MADT_LOG(log_continue, "(Local APIC NMI), cpu id: %#x, LINT%u, flags: %#x",
                     entry->lapic_nmi.cpu_id,
                     entry->lapic_nmi.lint,
                     entry->lapic_nmi.flags);
@@ -160,13 +160,14 @@ void apic_ipi_send(uint8_t lapic_id, uint32_t value)
     }
 }
 
+extern void empty_isr(void);
 extern void apic_error_isr(void);
 extern void apic_spurious_isr(void);
 
 UNMAP_AFTER_INIT int apic_initialize(void)
 {
     uint32_t eax, edx, apic_base;
-    uint8_t lapic_ids[16];
+    uint8_t lapic_ids[CPU_COUNT];
     size_t num_cores = 0;
 
     static_assert(offsetof(apic_t, eoi) == 0xb0);
@@ -208,11 +209,12 @@ UNMAP_AFTER_INIT int apic_initialize(void)
 
     apic->esr = 0;
 
-    idt_set(254, addr(&apic_error_isr));
-    idt_set(255, addr(&apic_spurious_isr));
+    idt_set(APIC_SMP_NOTIF_VECTOR, addr(&empty_isr));
+    idt_set(APIC_ERROR_IRQ_VECTOR, addr(&apic_error_isr));
+    idt_set(APIC_SPURIOUS_IRQ_VECTOR, addr(&apic_spurious_isr));
 
-    apic->lvt_error = 254;
-    apic->siv = 255 | APIC_SIV_ENABLE;
+    apic->lvt_error = APIC_ERROR_IRQ_VECTOR;
+    apic->siv = APIC_SPURIOUS_IRQ_VECTOR | APIC_SIV_ENABLE;
 
     log_notice("base: %#x; id: %#x; bsp: %B; version: %#x",
         apic_base,
@@ -237,9 +239,18 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     madt_scan(lapic_ids, &num_cores);
 
     ioapic_initialize();
-    cpus_boot(lapic_ids, num_cores);
+    smp_cpus_boot(lapic_ids, num_cores);
 
     return 0;
+}
+
+UNMAP_AFTER_INIT void apic_ap_initialize(void)
+{
+    apic->siv = APIC_SPURIOUS_IRQ_VECTOR | APIC_SIV_ENABLE;
+    apic->esr = 0;
+    apic->lvt_error = APIC_ERROR_IRQ_VECTOR;
+
+    apic_eoi(0);
 }
 
 UNMAP_AFTER_INIT void apic_timer_initialize(void)

@@ -54,6 +54,7 @@ static int earlycon_close(tty_t* tty, file_t* file);
 static int earlycon_write(tty_t* tty, const char* buffer, size_t size);
 static void earlycon_putch(tty_t* tty, int c);
 
+static bool unavailable;
 static bool escape_seq;
 static uint16_t curx;
 static uint16_t cury;
@@ -76,6 +77,7 @@ UNMAP_AFTER_INIT void earlycon_init(void)
     if (vga_probe())
     {
         log_info("not available");
+        unavailable = true;
         return;
     }
 
@@ -91,6 +93,11 @@ UNMAP_AFTER_INIT void earlycon_disable(void)
 int earlycon_enable(void)
 {
     regs_t regs;
+
+    if (unavailable)
+    {
+        return 0;
+    }
 
     if (!tty_driver.initialized)
     {

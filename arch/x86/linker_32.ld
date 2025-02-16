@@ -56,7 +56,6 @@ SECTIONS
         _rodata_end = .;
         _data_start = .;
         KEEP(*(.data.pagedir))
-        KEEP(*(.data.gdt))
         *(.data)
         . = ALIGN(64);
         _smodules_data = .;
@@ -64,10 +63,19 @@ SECTIONS
         _emodules_data = .;
     }
 
-    .bss ALIGN(4K) : AT(ADDR(.bss) - _kernel_offset)
+    .data.per_cpu ALIGN(4K) : AT(ADDR(.data.per_cpu) - _kernel_offset)
     {
         _data_end = .;
-        _bss_start = _data_end;
+        _data_per_cpu_start = .;
+        . += 4;
+        KEEP(*(.data.gdt))
+        KEEP(*(.data.per_cpu))
+    }
+
+    .bss ALIGN(4K) : AT(ADDR(.bss) - _kernel_offset)
+    {
+        _data_per_cpu_end = .;
+        _bss_start = _data_per_cpu_end;
         *(COMMON)
         *(.bss)
     }

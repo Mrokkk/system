@@ -16,32 +16,6 @@ READONLY static int acpi_offset;
 READONLY static uint16_t reset_port;
 READONLY static uint8_t reset_value;
 
-static inline rsdp_descriptor_t* acpi_rsdp_find(void)
-{
-    uint32_t* ebda = bios_ebda_get();
-    uint32_t* ebda_end = ebda + 0x100;
-    uint32_t* bios = ptr(0xe0000);
-    uint32_t* bios_end = ptr(0xfffff);
-
-    for (; ebda < ebda_end; ebda += 4)
-    {
-        if (*ebda == RSDP_SIGNATURE)
-        {
-            return ptr(ebda);
-        }
-    }
-
-    for (; bios < bios_end; bios += 4)
-    {
-        if (*bios == RSDP_SIGNATURE)
-        {
-            return ptr(bios);
-        }
-    }
-
-    return NULL;
-}
-
 static void reboot_by_acpi(void)
 {
     outb(reset_value, reset_port);
@@ -53,7 +27,7 @@ UNMAP_AFTER_INIT void acpi_initialize(void)
     void* mapped;
     fadt_t* fadt = NULL;
     sdt_header_t* header;
-    rsdp_descriptor_t* rsdp = acpi_rsdp_find();
+    rsdp_descriptor_t* rsdp = bios_find(RSDP_SIGNATURE);
 
     if (!rsdp)
     {

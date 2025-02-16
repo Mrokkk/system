@@ -8,7 +8,8 @@
 #define TLS_ENTRY           8
 #define KERNEL_16_CODE      9
 #define KERNEL_16_DATA      10
-#define TSS_ENTRY           11
+#define KERNEL_PER_CPU_DATA 11
+#define TSS_ENTRY           12
 
 #ifndef __ASSEMBLER__
 

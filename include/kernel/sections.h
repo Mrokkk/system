@@ -9,6 +9,7 @@ extern char _text_start[], _text_end[];
 extern char _rodata_after_init_start[], _rodata_after_init_end[];
 extern char _rodata_start[], _rodata_end[];
 extern char _data_start[], _data_end[];
+extern char _data_per_cpu_start[], _data_per_cpu_end[];
 extern char _bss_start[], _bss_end[];
 extern char _end[];
 

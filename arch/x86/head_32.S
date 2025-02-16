@@ -129,7 +129,7 @@ SECTION(.data.gdt)
 
 ALIGN(8)
 ENTRY(gdt)
-    .word . - gdt_entries - 1
+    .word gdt_entries_end - gdt_entries - 1
     .long gdt_entries
 END(gdt)
 
@@ -177,9 +177,14 @@ ENTRY(gdt_entries)
     // Kernel 16 bit data segment
     descriptor_entry(DESC_ACCESS_DATA | DESC_ACCESS_RING(0), DESC_FLAGS_1B | DESC_FLAGS_16BIT, 0, 0xffff)
 
+    // Kernel per CPU data segment
+    descriptor_entry(DESC_ACCESS_DATA | DESC_ACCESS_RING(0), DESC_FLAGS_4KB | DESC_FLAGS_32BIT, 0, 0xfffff)
+
     // TSS
     descriptor_entry(DESC_ACCESS_TSS | DESC_ACCESS_RING(0), 0, 0, 0)
 
+gdt_entries_end:
+.global gdt_entries_end
 END(gdt_entries)
 
 SECTION(.data.pagetable)

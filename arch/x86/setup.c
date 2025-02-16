@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "x86-setup: " fmt
 #include <arch/io.h>
+#include <arch/mp.h>
 #include <arch/apm.h>
 #include <arch/asm.h>
 #include <arch/dmi.h>
@@ -19,6 +20,7 @@
 #include <arch/i8259.h>
 #include <arch/bios32.h>
 #include <arch/memory.h>
+#include <arch/percpu.h>
 #include <arch/segment.h>
 #include <arch/earlycon.h>
 #include <arch/register.h>
@@ -40,7 +42,7 @@
 
 #define VIRTIO_GPU_DISABLED 0
 
-struct cpu_info cpu_info;
+PER_CPU_DECLARE(cpu_info_t cpu_info);
 bool panic_mode;
 
 int vgafb_initialize(void);
@@ -62,8 +64,11 @@ static void shutdown_dummy(void)
 
 UNMAP_AFTER_INIT void arch_setup(void)
 {
+    bsp_per_cpu_setup();
+
     ASSERT(cs_get() == KERNEL_CS);
     ASSERT(ds_get() == KERNEL_DS);
+    ASSERT(fs_get() == KERNEL_PER_CPU_DS);
     ASSERT(gs_get() == KERNEL_DS);
     ASSERT(ss_get() == KERNEL_DS);
 
@@ -76,7 +81,7 @@ UNMAP_AFTER_INIT void arch_setup(void)
     idt_init();
     tss_init();
     nmi_enable();
-    cpu_detect();
+    cpu_detect(true);
     memory_detect();
     bios32_init();
     rtc_print();
@@ -110,6 +115,7 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
 
     acpi_initialize();
 
+    mp_read();
     i8259_preinit();
     apic_initialize();
 
@@ -190,6 +196,9 @@ void panic_mode_enter(void)
 void panic_mode_die(void)
 {
     log(KERN_CRIT, "Press ENTER to reboot...");
+
+    i8042_flush();
+    i8042_send_cmd(I8042_KBD_PORT_ENABLE);
 
     while (i8042_receive() != 0x1c);
 

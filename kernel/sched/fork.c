@@ -349,6 +349,7 @@ cannot_create_process:
 
 process_t* process_spawn(const char* name, process_entry_t entry, void* args, int flags)
 {
+    flags_t irqflags;
     int errno = -ENOMEM;
 
     process_t* child;
@@ -356,7 +357,7 @@ process_t* process_spawn(const char* name, process_entry_t entry, void* args, in
         ? &init_process
         : process_current;
 
-    cli();
+    irq_save(irqflags);
 
     if (!(child = alloc(process_t, process_init(this, parent)))) goto cannot_create_process;
     child->type = KERNEL_PROCESS;
@@ -375,8 +376,7 @@ process_t* process_spawn(const char* name, process_entry_t entry, void* args, in
     child->stat = PROCESS_RUNNING;
     list_add_tail(&child->running, &running);
 
-    sti();
-    scheduler();
+    irq_restore(irqflags);
 
     return child;
 

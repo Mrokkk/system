@@ -10,13 +10,13 @@ struct cpu_info
     char         producer[16];
     int          family;
     int          model;
+    unsigned int max_function;
+    unsigned int max_extended_function;
     int          type;
     char         name[49];
     int          stepping;
     unsigned int phys_bits;
     unsigned int virt_bits;
-    unsigned int mhz;
-    unsigned int bogomips;
     unsigned int features[NR_FEATURES];
     unsigned int cacheline_size;
     unsigned int cache_size;

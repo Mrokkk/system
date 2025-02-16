@@ -70,9 +70,14 @@ smp_entry_end:
 .global smp_entry_end
 
 1:
+    mov SMP_GDT_OFFSET(%edi), %eax
     mov SMP_STACK_OFFSET(%edi), %esp
     lidt (idt)
-    lgdt (gdt)
+    lgdt (%eax)
+
+    mov $KERNEL_PER_CPU_DS, %eax
+    mov %eax, %fs
+
     ljmp $KERNEL_CS, $1f
 
 1:

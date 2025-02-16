@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "init: " fmt
 #include <stdarg.h>
+#include <arch/smp.h>
 #include <kernel/cpu.h>
 #include <kernel/tty.h>
 #include <kernel/init.h>
@@ -31,16 +32,15 @@ void breakpoint(void)
 {
 }
 
-NOINLINE static void NORETURN(spawn_init_and_go_idle(void))
+NOINLINE static void NORETURN(idle_run(void))
 {
     sti();
-
-    process_spawn("init", &init, cmdline, SPAWN_KERNEL);
 
     // Remove process from the running queue and reschedule
     process_stop(process_current);
     scheduler();
 
+    smp_notify(SMP_IDLE_START);
     idle();
 
     ASSERT_NOT_REACHED();
@@ -183,6 +183,8 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 
     arch_late_setup();
 
+    process_spawn("init", &init, cmdline, SPAWN_KERNEL);
+
     premodules_initcalls_run();
     modules_init();
     pipefs_init();
@@ -197,7 +199,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
         log_notice("boot finished in %u.%06u s", ts.tv_sec, ts.tv_usec);
     }
 
-    spawn_init_and_go_idle();
+    idle_run();
 
     ASSERT_NOT_REACHED();
 }

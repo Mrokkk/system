@@ -1,4 +1,5 @@
 #define log_fmt(fmt) "bios32: " fmt
+#include <arch/bios.h>
 #include <arch/bios32.h>
 #include <arch/register.h>
 
@@ -10,20 +11,19 @@ READONLY static bios32_entry_t entry;
 
 UNMAP_AFTER_INIT int bios32_init(void)
 {
-    for (uint32_t* lowmem = (uint32_t*)0xe0000; lowmem < (uint32_t*)0x100000; ++lowmem)
+    bios32_header = bios_find(BIOS32_SIGNATURE);
+
+    if (!bios32_header)
     {
-        if (*lowmem == BIOS32_SIGNATURE)
-        {
-            bios32_header = ptr(lowmem);
-
-            log_notice("base: %p; entry: %p", bios32_header, ptr(bios32_header->entry));
-
-            entry.addr = bios32_header->entry;
-            entry.seg = KERNEL_CS;
-            return 0;
-        }
+        return -ENOSYS;
     }
-    return -ENOSYS;
+
+    log_notice("base: %p; entry: %p", bios32_header, ptr(bios32_header->entry));
+
+    entry.addr = bios32_header->entry;
+    entry.seg = KERNEL_CS;
+
+    return 0;
 }
 
 int bios32_find(uint32_t service, bios32_entry_t* service_entry)

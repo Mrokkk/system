@@ -23,6 +23,8 @@ struct bios_bda
 
 typedef struct bios_bda bios_bda_t;
 
+void* bios_find(uint32_t signature);
+
 void bios_call(uint32_t function_address, regs_t* param);
 
 static inline void* bios_ebda_get(void)

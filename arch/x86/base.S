@@ -138,10 +138,14 @@ ENTRY(bad_syscall)
     jmp exit_kernel
 ENDPROC(bad_syscall)
 
+ENTRY(empty_isr)
+    iret
+ENDPROC(empty_isr)
+
 ENTRY(apic_error_isr)
     cli
     SAVE_ALL(0)
-    call apic_error
+    call SYMBOL_NAME(apic_error)
     sti
     jmp exit_kernel
 ENDPROC(apic_error_isr)

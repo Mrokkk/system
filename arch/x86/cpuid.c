@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "cpu: " fmt
 #include <arch/cpuid.h>
+#include <arch/percpu.h>
 #include <kernel/cpu.h>
 #include <kernel/kernel.h>
 #include <kernel/string.h>
@@ -60,17 +61,17 @@ static inline const char* cache_type_string(cache_type_t t)
 {
     switch (t)
     {
-        case DATA: return "data";
+        case DATA:        return "data";
         case INSTRUCTION: return "instruction";
-        case UNIFIED: return "unified";
-        default: return "unknown";
+        case UNIFIED:     return "unified";
+        default:          return "unknown";
     }
 }
 
 #define NAME_APPEND(str) \
     it = csnprintf(it, end, str)
 
-UNMAP_AFTER_INIT static void extended_functions_read(void)
+UNMAP_AFTER_INIT static void extended_functions_read(cpu_info_t* this_cpu)
 {
     cpuid_regs_t cpuid_regs = {};
     uint32_t max_function;
@@ -79,7 +80,7 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     cpuid_read(0x80000000, &cpuid_regs);
     max_function = cpuid_regs.eax;
 
-    log_info("max function: %#x", max_function);
+    this_cpu->max_extended_function = max_function;
 
     if (max_function >= 0x80000001)
     {
@@ -90,37 +91,37 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     if (max_function >= 0x80000004)
     {
         cpuid_read(0x80000002, &cpuid_regs);
-        memcpy(cpu_info.name, &cpuid_regs.eax, 4);
-        memcpy(&cpu_info.name[4], &cpuid_regs.ebx, 4);
-        memcpy(&cpu_info.name[8], &cpuid_regs.ecx, 4);
-        memcpy(&cpu_info.name[12], &cpuid_regs.edx, 4);
+        memcpy(this_cpu->name, &cpuid_regs.eax, 4);
+        memcpy(&this_cpu->name[4], &cpuid_regs.ebx, 4);
+        memcpy(&this_cpu->name[8], &cpuid_regs.ecx, 4);
+        memcpy(&this_cpu->name[12], &cpuid_regs.edx, 4);
 
         cpuid_read(0x80000003, &cpuid_regs);
-        memcpy(&cpu_info.name[16], &cpuid_regs.eax, 4);
-        memcpy(&cpu_info.name[20], &cpuid_regs.ebx, 4);
-        memcpy(&cpu_info.name[24], &cpuid_regs.ecx, 4);
-        memcpy(&cpu_info.name[28], &cpuid_regs.edx, 4);
+        memcpy(&this_cpu->name[16], &cpuid_regs.eax, 4);
+        memcpy(&this_cpu->name[20], &cpuid_regs.ebx, 4);
+        memcpy(&this_cpu->name[24], &cpuid_regs.ecx, 4);
+        memcpy(&this_cpu->name[28], &cpuid_regs.edx, 4);
 
         cpuid_read(0x80000004, &cpuid_regs);
-        memcpy(&cpu_info.name[32], &cpuid_regs.eax, 4);
-        memcpy(&cpu_info.name[36], &cpuid_regs.ebx, 4);
-        memcpy(&cpu_info.name[40], &cpuid_regs.ecx, 4);
-        memcpy(&cpu_info.name[44], &cpuid_regs.edx, 4);
+        memcpy(&this_cpu->name[32], &cpuid_regs.eax, 4);
+        memcpy(&this_cpu->name[36], &cpuid_regs.ebx, 4);
+        memcpy(&this_cpu->name[40], &cpuid_regs.ecx, 4);
+        memcpy(&this_cpu->name[44], &cpuid_regs.edx, 4);
 
-        cpu_info.name[48] = 0;
+        this_cpu->name[48] = 0;
     }
     else
     {
-        char* it = cpu_info.name;
-        const char* end = cpu_info.name + sizeof(cpu_info.name);
-        switch (cpu_info.vendor_id)
+        char* it = this_cpu->name;
+        const char* end = this_cpu->name + sizeof(this_cpu->name);
+        switch (this_cpu->vendor_id)
         {
             case INTEL:
                 NAME_APPEND("Intel ");
-                switch (cpu_info.family)
+                switch (this_cpu->family)
                 {
                     case 4:
-                        switch (cpu_info.model)
+                        switch (this_cpu->model)
                         {
                             case 0:
                             case 1:
@@ -149,7 +150,7 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
                         }
                         break;
                     case 5:
-                        switch (cpu_info.model)
+                        switch (this_cpu->model)
                         {
                             case 1:
                                 NAME_APPEND("Pentium");
@@ -165,7 +166,7 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
                         }
                         break;
                     case 6:
-                        switch (cpu_info.model)
+                        switch (this_cpu->model)
                         {
                             case 1:
                                 NAME_APPEND("Pentium Pro");
@@ -187,17 +188,17 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
                     default:
                         goto unknown;
                 }
-                if (cpu_info.type == 1)
+                if (this_cpu->type == 1)
                 {
                     NAME_APPEND(" OverDrive");
                 }
                 break;
             case AMD:
                 NAME_APPEND("AMD ");
-                switch (cpu_info.family)
+                switch (this_cpu->family)
                 {
                     case 4:
-                        switch (cpu_info.model)
+                        switch (this_cpu->model)
                         {
                             case 3:
                                 NAME_APPEND("Am486DX2-WT");
@@ -227,7 +228,7 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
                 break;
             unknown:
             default:
-                strlcpy(cpu_info.name, "unrecognized", sizeof(cpu_info.name));
+                strlcpy(this_cpu->name, "unrecognized", sizeof(this_cpu->name));
                 break;
         }
     }
@@ -235,8 +236,8 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     if (max_function >= 0x80000006)
     {
         cpuid_read(0x80000006, &cpuid_regs);
-        cpu_info.cacheline_size = cpuid_regs.ecx & 0xff;
-        cpu_info.cache_size = (cpuid_regs.ecx >> 16) * KiB;
+        this_cpu->cacheline_size = cpuid_regs.ecx & 0xff;
+        this_cpu->cache_size = (cpuid_regs.ecx >> 16) * KiB;
     }
 
     if (max_function >= 0x80000007)
@@ -246,23 +247,25 @@ UNMAP_AFTER_INIT static void extended_functions_read(void)
     }
 
 #ifdef __i386__
-    cpu_info.phys_bits = 32;
-    cpu_info.virt_bits = 32;
+    this_cpu->phys_bits = 32;
+    this_cpu->virt_bits = 32;
 #endif
 }
 
-UNMAP_AFTER_INIT int cpu_detect(void)
+UNMAP_AFTER_INIT int cpu_detect(bool bsp)
 {
     uint32_t max_function, vendor;
     cpuid_regs_t cpuid_regs = {};
 
+    cpu_info_t* this_cpu = THIS_CPU_GET(cpu_info);
+
     if (unlikely(!cpuid_available))
     {
         log_notice("CPUID not available");
-        cpu_info.family = family;
-        strcpy(cpu_info.vendor, "unknown");
-        strcpy(cpu_info.producer, "unknown");
-        strcpy(cpu_info.name, family == 4 ? "486" : "386");
+        this_cpu->family = family;
+        strcpy(this_cpu->vendor, "unknown");
+        strcpy(this_cpu->producer, "unknown");
+        strcpy(this_cpu->name, family == 4 ? "486" : "386");
 
         goto print;
     }
@@ -270,26 +273,28 @@ UNMAP_AFTER_INIT int cpu_detect(void)
     cpuid_read(0, &cpuid_regs);
 
     // Vendor is found in EBX, EDX, ECX in extact order
-    memcpy(cpu_info.vendor, &cpuid_regs.ebx, 4);
-    memcpy(&cpu_info.vendor[4], &cpuid_regs.edx, 4);
-    memcpy(&cpu_info.vendor[8], &cpuid_regs.ecx, 4);
-    cpu_info.vendor[12] = 0;
+    memcpy(this_cpu->vendor, &cpuid_regs.ebx, 4);
+    memcpy(&this_cpu->vendor[4], &cpuid_regs.edx, 4);
+    memcpy(&this_cpu->vendor[8], &cpuid_regs.ecx, 4);
+    this_cpu->vendor[12] = 0;
 
     max_function = cpuid_regs.eax;
     vendor = cpuid_regs.ebx;
 
+    this_cpu->max_function = max_function;
+
     if (max_function >= 1)
     {
         cpuid_read(1, &cpuid_regs);
-        cpu_info.stepping = (cpuid_regs.eax) & 0xf;
-        cpu_info.model = cpu_model(cpuid_regs.eax);
-        cpu_info.family = cpu_family(cpuid_regs.eax);
-        cpu_info.type = cpu_type(cpuid_regs.eax);
-        cpu_info.lapic_id = cpuid_regs.ebx >> 24;
+        this_cpu->stepping = (cpuid_regs.eax) & 0xf;
+        this_cpu->model = cpu_model(cpuid_regs.eax);
+        this_cpu->family = cpu_family(cpuid_regs.eax);
+        this_cpu->type = cpu_type(cpuid_regs.eax);
+        this_cpu->lapic_id = cpuid_regs.ebx >> 24;
 
         // The AMD-K5 processor (model 0) reserves bit 13 and implements feature bit 9 to
         // indicate support for Global Paging Extensions instead of support for APIC
-        if (cpu_info.vendor_id == AMD && cpu_info.family == 5 && cpu_info.model == 0)
+        if (this_cpu->vendor_id == AMD && this_cpu->family == 5 && this_cpu->model == 0)
         {
             int pge = (cpuid_regs.edx >> 9) & 1;
             cpuid_regs.edx &= ~((1 << 13) | (1 << 9));
@@ -326,43 +331,48 @@ UNMAP_AFTER_INIT int cpu_detect(void)
         }
     }
 
-    cpu_info.vendor_id = vendor;
+    this_cpu->vendor_id = vendor;
 
-    switch (cpu_info.vendor_id)
+    switch (this_cpu->vendor_id)
     {
         case INTEL:
-            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "Intel");
+            snprintf(this_cpu->producer, sizeof(this_cpu->producer), "Intel");
             break;
         case AMD:
-            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "AMD");
+            snprintf(this_cpu->producer, sizeof(this_cpu->producer), "AMD");
             break;
         case CYRIX:
-            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "Cyrix");
+            snprintf(this_cpu->producer, sizeof(this_cpu->producer), "Cyrix");
             break;
         default:
-            snprintf(cpu_info.producer, sizeof(cpu_info.producer), "unknown");
+            snprintf(this_cpu->producer, sizeof(this_cpu->producer), "unknown");
             break;
     }
 
-    extended_functions_read();
+    extended_functions_read(this_cpu);
 
-    if ((cpu_info.family == 0xf && cpu_info.model >= 0x03) ||
-        (cpu_info.family == 0x6 && cpu_info.model >= 0x0e))
+    if ((this_cpu->family == 0xf && this_cpu->model >= 0x03) ||
+        (this_cpu->family == 0x6 && this_cpu->model >= 0x0e))
     {
         cpu_feature_set(X86_FEATURE_INVTSC);
     }
 
 print:
+    if (!bsp)
+    {
+        return 0;
+    }
+
     log_notice("producer: %s (%s), name: %s",
-        cpu_info.producer,
-        cpu_info.vendor,
-        cpu_info.name);
+        this_cpu->producer,
+        this_cpu->vendor,
+        this_cpu->name);
 
     log_notice("family: %#x, model: %#x, type: %#x, stepping: %#x",
-        cpu_info.family,
-        cpu_info.model,
-        cpu_info.type,
-        cpu_info.stepping);
+        this_cpu->family,
+        this_cpu->model,
+        this_cpu->type,
+        this_cpu->stepping);
 
     for (uint32_t i = 0; i < 6; ++i)
     {
@@ -380,6 +390,8 @@ print:
             c->ways,
             c->line_size);
     }
+
+    log_info("max functions: %#x/%#x", this_cpu->max_function, this_cpu->max_extended_function);
 
     log_notice("features:");
     for (uint32_t i = 0; i < NR_FEATURES * 32; ++i)

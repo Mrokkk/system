@@ -2,7 +2,7 @@
 #include <kernel/sections.h>
 #include <kernel/page_alloc.h>
 
-#define FREE_SECTION 7
+#define FREE_SECTION 8
 
 #define SECTION_DEF(name, flags) \
     {#name, _##name##_start, _##name##_end, flags}
@@ -14,6 +14,7 @@ section_t sections[] = {
     SECTION_DEF(rodata_after_init, SECTION_READ | SECTION_WRITE),
     SECTION_DEF(rodata, SECTION_READ),
     SECTION_DEF(data, SECTION_READ | SECTION_WRITE),
+    SECTION_DEF(data_per_cpu, SECTION_READ | SECTION_WRITE),
     SECTION_DEF(bss, SECTION_READ | SECTION_WRITE),
     {NULL, 0, 0, 0},
     {NULL, 0, 0, 0}

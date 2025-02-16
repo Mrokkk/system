@@ -139,4 +139,4 @@ static inline void cpuid_read(uint32_t function, cpuid_regs_t* regs)
     );
 }
 
-int cpu_detect(void);
+int cpu_detect(bool bsp);

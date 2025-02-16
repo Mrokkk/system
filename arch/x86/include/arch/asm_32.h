@@ -17,8 +17,9 @@
     mov $KERNEL_DS, %eax;         \
     mov %ax, %ds;                 \
     mov %ax, %es;                 \
-    mov %ax, %fs;                 \
     mov %ax, %ss;                 \
+    mov $KERNEL_PER_CPU_DS, %eax; \
+    mov %ax, %fs;                 \
     mov 4(%esp), %eax;            \
     push %ebp;          /* ebp */ \
     push %edi;          /* edi */ \

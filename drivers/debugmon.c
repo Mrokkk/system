@@ -153,10 +153,8 @@ static int c_cpu()
     print_ul(cpu_info.family);
     print_ul(cpu_info.model);
     print_ul(cpu_info.stepping);
-    print_ul(cpu_info.mhz);
     print_ul(cpu_info.cacheline_size);
     print_ul(cpu_info.cache_size);
-    print_ul(cpu_info.bogomips);
     return 0;
 }
 

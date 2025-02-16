@@ -116,17 +116,17 @@ int arch_process_spawn(process_t* child, process_entry_t entry, void* args, int)
     uintptr_t eflags = EFL_IF;
 
 #define pushk(v) push((v), kernel_stack)
-    pushk(args);        // args
-    pushk(0);           // ret
-    pushk(eflags);      // eflags
-    pushk(KERNEL_CS);   // cs
-    pushk(entry);       // eip
-    pushk(0);           // error_code
-    pushk(KERNEL_DS);   // gs
-    pushk(KERNEL_DS);   // fs
-    pushk(KERNEL_DS);   // es
-    pushk(KERNEL_DS);   // ds
-    kernel_stack -= 8; // eax, cr2, ebp, edi, esi, edx, ecx, ebx
+    pushk(args);              // args
+    pushk(0);                 // ret
+    pushk(eflags);            // eflags
+    pushk(KERNEL_CS);         // cs
+    pushk(entry);             // eip
+    pushk(0);                 // error_code
+    pushk(KERNEL_DS);         // gs
+    pushk(KERNEL_PER_CPU_DS); // fs
+    pushk(KERNEL_DS);         // es
+    pushk(KERNEL_DS);         // ds
+    kernel_stack -= 8;        // eax, cr2, ebp, edi, esi, edx, ecx, ebx
 #undef pushk
 
     child->context.esp0 = 0;
