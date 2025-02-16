@@ -50,9 +50,6 @@ smp_gdt_entries:
     // Kernel data segment
     descriptor_entry(DESC_ACCESS_DATA | DESC_ACCESS_RING(0), DESC_FLAGS_4KB | DESC_FLAGS_32BIT, 0, 0xfffff)
 
-smp_entry_end:
-.global smp_entry_end
-
 .code32
 1:
     SEGMENT_REGISTERS_SET(KERNEL_DS, ax)
@@ -68,6 +65,9 @@ smp_entry_end:
 
     mov $1f, %eax
     jmp *%eax
+
+smp_entry_end:
+.global smp_entry_end
 
 1:
     mov SMP_STACK_OFFSET(%edi), %esp

@@ -34,6 +34,7 @@ logseq_t printk(const printk_entry_t* entry, const char*, ...)
 ;
 void NORETURN(panic(const char* fmt, ...));
 
+void printk_init(void);
 void printk_register(struct tty* tty);
 void ensure_printk_will_print(void);
 

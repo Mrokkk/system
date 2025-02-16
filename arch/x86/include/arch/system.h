@@ -67,9 +67,8 @@ static inline void __flags_restore(flags_t* flags)
     flags_restore(*flags);
 }
 
-#define __flags_save()      ({ flags_t f; irq_save(f); f; })
 #define scoped_flags_t      CLEANUP(__flags_restore) flags_t
-#define scoped_irq_lock()   scoped_flags_t __flags = __flags_save(); (void)__flags
+#define scoped_irq_lock()   scoped_flags_t __flags = ({ flags_t f; irq_save(f); f; })
 
 extern void exit_kernel(void);
 extern void context_restore(void);

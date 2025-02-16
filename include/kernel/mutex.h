@@ -14,7 +14,7 @@ typedef semaphore_t mutex_t;
 #define mutex_init(m) semaphore_init(m, 1)
 
 #define scoped_mutex_lock(mutex) \
-    CLEANUP(__mutex_unlock) mutex_t* __m = mutex
+    CLEANUP(__mutex_unlock) mutex_t* __m = ({ mutex_lock(mutex); mutex; })
 
 static inline void mutex_lock(mutex_t* m)
 {

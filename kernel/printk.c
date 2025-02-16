@@ -11,6 +11,7 @@
 #include <kernel/reboot.h>
 #include <kernel/process.h>
 #include <kernel/seq_file.h>
+#include <kernel/spinlock.h>
 #include <kernel/backtrace.h>
 #include <kernel/api/syslog.h>
 
@@ -33,6 +34,7 @@ struct printk_state
     off_t      prev_cur;
     loglevel_t prev_loglevel;
     int        initialized;
+    spinlock_t lock;
     char       buffer[PRINTK_BUFFER_SIZE];
 };
 
@@ -103,7 +105,7 @@ logseq_t printk(const printk_entry_t* entry, const char* fmt, ...)
     va_list args;
     int len, content_start;
 
-    scoped_irq_lock();
+    scoped_spinlock_irq_lock(&state.lock);
 
     state.prev_cur = state.cur;
 
@@ -259,4 +261,9 @@ int sys__syslog(int priority, int option, const char* message)
     printk(&e, "%s", message);
 
     return 0;
+}
+
+void printk_init(void)
+{
+    spinlock_init(&state.lock);
 }

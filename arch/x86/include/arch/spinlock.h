@@ -4,26 +4,25 @@
 
 static inline void spinlock_lock(spinlock_t* lock)
 {
-    register int dummy = SPINLOCK_LOCKED;
-
     asm volatile(
-        "1: "
-        "xchgl %0, %1;"
-        "test %1, %1;"
-        "rep nop;"
-        "jnz 1b;"
+        "1:"
+        "lock; btsl $0, %0;"
+        "jc 2f;"
+        ".section .text.lock, \"ax\";"
+        "2:"
+        "rep; nop;"
+        "testb $1, %0;"
+        "jne 2b;"
+        "jmp 1b;"
+        ".previous;"
         : "=m" (lock->lock)
-        : "r" (dummy)
-        : "memory");
+        :: "memory");
 }
 
 static inline void spinlock_unlock(spinlock_t* lock)
 {
-    register int dummy = SPINLOCK_UNLOCKED;
-
     asm volatile(
-        "xchgl %0, %1;"
+        "lock; btrl $0, %0;"
         : "=m" (lock->lock)
-        : "r" (dummy)
-        : "memory");
+        :: "memory");
 }

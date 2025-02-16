@@ -3,9 +3,11 @@
 #include <arch/register.h>
 #include <kernel/cpu.h>
 #include <kernel/kernel.h>
+#include <kernel/spinlock.h>
 #include <kernel/page_alloc.h>
 
-extern void smp_entry();
+extern void smp_entry(void);
+extern void smp_entry_end(void);
 
 static io32 booted = 1;
 
@@ -82,7 +84,7 @@ void cpus_boot(uint8_t* lapic_ids, size_t count)
         return;
     }
 
-    memcpy(ptr(SMP_CODE_AREA), &smp_entry, PAGE_SIZE);
+    memcpy(ptr(SMP_CODE_AREA), &smp_entry, addr(&smp_entry_end) - addr(&smp_entry));
     memset(ptr(SMP_SIGNATURE_AREA), 0, PAGE_SIZE);
 
     uint32_t cr0 = cr0_get();
@@ -138,6 +140,11 @@ void smp_kmain(uint8_t lapic_id, uint32_t cpu_signature)
     cpu->cpu_signature = cpu_signature;
     cpu->signature     = SMP_SIGNATURE;
     ++booted;
+
+    log_notice("cpu%u: signature: %#x, lapic id: %#x",
+        lapic_id,
+        cpu->cpu_signature,
+        cpu->lapic_id);
 
     while (1)
     {
