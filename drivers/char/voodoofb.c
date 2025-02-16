@@ -445,6 +445,8 @@ UNMAP_AFTER_INIT int voodoofb_init(void)
         goto error;
     }
 
+    memset(device->fb_vaddr, 0, 16 * MiB);
+
     device->io = mmio_map_uc(device->io_paddr, PAGE_SIZE, "voodoo_io");
 
     if (unlikely(!device->io))
