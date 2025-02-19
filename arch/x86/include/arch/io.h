@@ -66,7 +66,7 @@ static inline void insl(int port, void* addr, uint32_t count)
     asm volatile("rep; insl" : "+D" (addr), "+c" (count) : "d" (port));
 }
 
-static inline void outsw(int port, void* addr, uint32_t count)
+static inline void outsw(int port, const void* addr, uint32_t count)
 {
     asm volatile("rep; outsw" :: "c" (count), "d" (port), "S" (addr));
 }

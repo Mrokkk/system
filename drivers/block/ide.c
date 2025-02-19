@@ -21,8 +21,9 @@
 #include "ata.h"
 #include "scsi.h"
 
+#define DEBUG_IDE                   0
 #define FORCE_PIO                   0
-#define DISABLE_DMA_AFTER_FAILURE   1
+#define DISABLE_DMA_AFTER_FAILURE   0
 #define IDE_POLLING_TIMEOUT_MS      1000
 #define IDE_IO_DELAY                2
 
@@ -66,9 +67,14 @@ static void ide_write(uint8_t channel, uint8_t reg, uint8_t data)
     outb(data, channels[channel].base + reg);
 }
 
-static void ide_read_buffer(uint8_t channel, uint8_t reg, void* buffer, uint32_t size)
+static void ide_buffer_read(uint8_t channel, uint8_t reg, void* buffer, uint32_t size)
 {
     insw(channels[channel].base + reg, buffer, size / 2);
+}
+
+static void ide_buffer_write(uint8_t channel, uint8_t reg, const void* buffer, uint32_t size)
+{
+    outsw(channels[channel].base + reg, buffer, size / 2);
 }
 
 static void ide_enable_irq(uint8_t channel)
@@ -137,7 +143,6 @@ static void ide_device_atapi(int device)
 {
     uint32_t channel  = device / 2;
     uint32_t slavebit = device % 2;
-    uint32_t bus      = channels[channel].base;
     uint32_t count    = ATAPI_SECTOR_SIZE;
     uint8_t err;
     scsi_packet_t packet = ATAPI_READ_PACKET(0, 1);
@@ -155,7 +160,7 @@ static void ide_device_atapi(int device)
         return;
     }
 
-    outsw(bus, &packet, 6);
+    ide_buffer_write(channel, ATA_REG_DATA, &packet, sizeof(packet));
     ide_wait();
 
     page_t* page = page_alloc(1, 0);
@@ -173,7 +178,7 @@ static void ide_device_atapi(int device)
         goto finish;
     }
 
-    insw(bus, buf, count / 2);
+    ide_buffer_read(channel, ATA_REG_DATA, ide_buf, ATAPI_SECTOR_SIZE);
 
     memcpy(ide_buf, buf, ATA_SECTOR_SIZE);
 
@@ -287,7 +292,7 @@ static void ide_device_detect(int drive, bool use_dma)
 
     memset(ide_buf, 0, ATA_IDENT_SIZE);
 
-    ide_read_buffer(channel, ATA_REG_DATA, ide_buf, ATA_IDENT_SIZE);
+    ide_buffer_read(channel, ATA_REG_DATA, ide_buf, ATA_IDENT_SIZE);
 
     bm_status = bm_readb(channel, BM_REG_STATUS);
 
@@ -589,7 +594,7 @@ static int ide_pio_request(request_t* req)
                 log_warning("polling error: %#x", err);
                 return -EIO;
             }
-            ide_read_buffer(channel, ATA_REG_DATA, buf, ATA_SECTOR_SIZE);
+            ide_buffer_read(channel, ATA_REG_DATA, buf, ATA_SECTOR_SIZE);
             buf = shift(buf, ATA_SECTOR_SIZE);
         }
     }
@@ -598,7 +603,7 @@ static int ide_pio_request(request_t* req)
         for (int i = 0; i < req->sectors; i++)
         {
             ide_polling(channel);
-            outsw(channels[channel].data_reg, buf, words);
+            ide_buffer_write(channel, ATA_REG_DATA, buf, ATA_SECTOR_SIZE);
             buf = shift(buf, words * 2);
         }
 
@@ -710,7 +715,6 @@ static int ide_atapi_request(request_t* req)
     flags_t flags;
     uint32_t channel  = req->drive / 2;
     uint32_t slavebit = req->drive % 2;
-    uint32_t bus      = channels[channel].base;
     uint32_t count    = req->count;
     // Request contains offset in sectors of ATA_SECTOR_SIZE
     int lba = req->offset / (ATAPI_SECTOR_SIZE / ATA_SECTOR_SIZE);
@@ -753,10 +757,10 @@ static int ide_atapi_request(request_t* req)
     {
         log_warning("channel %u: polling error");
         errno = -EIO;
-        goto error;
+        goto cleanup_request;
     }
 
-    outsw(bus, &packet, 6);
+    ide_buffer_write(channel, ATA_REG_DATA, &packet, sizeof(packet));
 
     log_debug(DEBUG_IDE, "putting %u to sleep", process_current->pid);
     WAIT_QUEUE_DECLARE(q, process_current);
@@ -766,7 +770,7 @@ static int ide_atapi_request(request_t* req)
         goto cleanup_request;
     }
 
-    if (unlikely((errno = (*current_request)->errno)))
+    if (unlikely(errno = (*current_request)->errno))
     {
         goto cleanup_request;
     }
@@ -777,9 +781,9 @@ static int ide_atapi_request(request_t* req)
         if ((ide_polling(channel)))
         {
             errno = -EIO;
-            goto error;
+            goto cleanup_request;
         }
-        insw(bus, buf, ATAPI_SECTOR_SIZE / 2);
+        ide_buffer_read(channel, ATA_REG_DATA, buf, ATAPI_SECTOR_SIZE);
         buf += ATAPI_SECTOR_SIZE;
     }
 
@@ -813,7 +817,6 @@ static int ide_atapi_read_capacity(ata_device_t* device)
     flags_t flags;
     uint32_t channel  = device->id / 2;
     uint32_t slavebit = device->id % 2;
-    uint32_t bus      = channels[channel].base;
     u32_msb_t buffer[2];
     scsi_packet_t packet = ATAPI_READ_CAPACITY_PACKET();
     request_t** current_request = &channels[channel].current_request;
@@ -852,7 +855,7 @@ static int ide_atapi_read_capacity(ata_device_t* device)
         goto error;
     }
 
-    outsw(bus, &packet, 6);
+    ide_buffer_write(channel, ATA_REG_DATA, &packet, sizeof(packet));
 
     log_debug(DEBUG_IDE, "putting %u to sleep", process_current->pid);
     WAIT_QUEUE_DECLARE(q, process_current);
@@ -870,10 +873,10 @@ static int ide_atapi_read_capacity(ata_device_t* device)
     if (unlikely(ide_polling(channel)))
     {
         errno = -EIO;
-        goto error;
+        goto cleanup_request;
     }
 
-    insw(bus, buffer, 4);
+    ide_buffer_read(channel, ATA_REG_DATA, buffer, 8);
 
     log_debug(DEBUG_IDE, "putting %u to sleep", process_current->pid);
     if ((errno = process_wait_locked(&channels[channel].queue, &q, &flags)))
@@ -928,7 +931,7 @@ static void ide_irq(int nr)
     if (unlikely((ata_status = ide_read(channel, ATA_REG_STATUS)) & ATA_SR_ERR))
     {
         error = ide_read(channel, ATA_REG_ERROR);
-        log_warning("irq: error %#x (%s)", error, ide_error_string(error));
+        log_info("irq: error %#x (%s)", error, ide_error_string(error));
         errno = -EIO;
     }
 
@@ -1001,7 +1004,7 @@ static request_t ide_request_create(int direction, file_t* file, char* buf, size
         }
         if (!(last_sector = ide_devices[drive].size))
         {
-            log_warning("cannot determine drive %u size", drive);
+            log_info("cannot determine drive %u size", drive);
             errno = -EAGAIN;
         }
     }
@@ -1036,7 +1039,7 @@ static int ide_request_handle(request_t* req)
 {
     int errno;
 
-    if (unlikely((errno = req->errno)))
+    if (unlikely(errno = req->errno))
     {
         return errno;
     }
@@ -1059,7 +1062,7 @@ static int ide_fs_read(file_t* file, char* buf, size_t count)
     int errno;
     request_t req = ide_request_create(ATA_READ, file, buf, count);
 
-    if ((errno = ide_request_handle(&req)))
+    if (unlikely(errno = ide_request_handle(&req)))
     {
         return errno;
     }
