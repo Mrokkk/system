@@ -248,9 +248,9 @@ UNMAP_AFTER_INIT void apm_initialize(void)
     }
     else if (dmi.bios && dmi.bios_version &&
         !strcmp("Award Software International, Inc.", dmi.bios) &&
-        !strcmp("4.51 PG", dmi.bios_version))
+        (!strcmp("4.51 PG", dmi.bios_version) || !strcmp("6.00 PG", dmi.bios_version)))
     {
-        log_notice("[Award 4.51 PG] disabling 32bit interface");
+        log_notice("[Award] disabling 32bit interface");
         apm_mode = APM_REALMODE;
     }
 
