@@ -17,6 +17,8 @@ typedef struct iso9660_data iso9660_data_t;
 typedef struct iso9660_dirent iso9660_dirent_t;
 typedef struct px px_t;
 typedef struct nm nm_t;
+typedef struct sl sl_t;
+typedef struct sl_component sl_component_t;
 typedef struct rrip rrip_t;
 
 enum
@@ -37,6 +39,7 @@ enum
 
 #define PX_SIGNATURE    U16('P', 'X')
 #define NM_SIGNATURE    U16('N', 'M')
+#define SL_SIGNATURE    U16('S', 'L')
 #define NM_NAME_LEN(rr) ((size_t)(rr)->len - 5)
 
 struct lsb_msb16
@@ -100,6 +103,24 @@ struct nm
     char        name[0];
 };
 
+struct sl_component
+{
+    uint8_t flags;
+    uint8_t len;
+    char    content[];
+};
+
+struct sl
+{
+    uint8_t        flags;
+    sl_component_t components[];
+};
+
+#define SL_COMP_CONTINUE (1 << 0)
+#define SL_COMP_CURRENT  (1 << 1)
+#define SL_COMP_PARENT   (1 << 2)
+#define SL_COMP_ROOT     (1 << 3)
+
 struct rrip
 {
     uint16_t    sig;
@@ -109,6 +130,7 @@ struct rrip
     {
         px_t    px;
         nm_t    nm;
+        sl_t    sl;
     };
 } PACKED;
 
