@@ -62,7 +62,7 @@ UNMAP_AFTER_INIT int vsyscall_init(void)
         return -1;
     }
 
-    wrmsr(IA32_SYSENTER_ESP, page_virt(page), 0);
+    wrmsr(IA32_SYSENTER_ESP, page_virt(page) + PAGE_SIZE, 0);
     wrmsr(IA32_SYSENTER_CS, KERNEL_CS, 0);
     wrmsr(IA32_SYSENTER_EIP, &vsyscall_handler, 0);
 
