@@ -2,6 +2,7 @@
 #include <arch/asm.h>
 #include <arch/pat.h>
 #include <arch/register.h>
+#include <arch/real_mode.h>
 
 #include <kernel/cpu.h>
 #include <kernel/list.h>
@@ -85,6 +86,7 @@ static UNMAP_AFTER_INIT void rodata_after_init_write_protect()
 
 void paging_finalize(void)
 {
+    real_mode_finalize();
     rodata_after_init_write_protect();
     sections_unmap();
 

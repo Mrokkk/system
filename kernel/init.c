@@ -34,13 +34,14 @@ void breakpoint(void)
 
 NOINLINE static void NORETURN(idle_run(void))
 {
+    smp_notify(SMP_IDLE_START);
+
     sti();
 
     // Remove process from the running queue and reschedule
     process_stop(process_current);
     scheduler();
 
-    smp_notify(SMP_IDLE_START);
     idle();
 
     ASSERT_NOT_REACHED();
@@ -179,6 +180,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     devfs_init();
     procfs_init();
     sysfs_init();
+    pipefs_init();
     processes_init();
 
     arch_late_setup();
@@ -187,7 +189,6 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 
     premodules_initcalls_run();
     modules_init();
-    pipefs_init();
 
     ASSERT(init_in_progress == INIT_IN_PROGRESS);
     init_in_progress = 0;

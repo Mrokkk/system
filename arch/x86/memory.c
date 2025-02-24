@@ -70,8 +70,8 @@ int e820_entries_read(e820_data_t* map, int sorted[])
             return 0;
         }
 
-#if E820_PRINT
         e820_data_t* e = map + count;
+#if E820_PRINT
         log_notice("[mem %#018llx - %#018llx] %s(%#x)",
             e->base,
             e->base + e->len - 1,

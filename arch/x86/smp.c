@@ -15,7 +15,7 @@ extern void smp_entry_end(void);
 
 READONLY static io32 booted = 1;
 READONLY void* per_cpu_data[CPU_COUNT];
-volatile uint8_t notification;
+io8 notification;
 
 static_assert(sizeof(cpu_boot_t) == SMP_CPU_SIZE);
 static_assert(offsetof(cpu_boot_t, stack) == SMP_STACK_OFFSET);
@@ -23,18 +23,33 @@ static_assert(offsetof(cpu_boot_t, cr0) == SMP_CR0_OFFSET);
 static_assert(offsetof(cpu_boot_t, cr3) == SMP_CR3_OFFSET);
 static_assert(offsetof(cpu_boot_t, cr4) == SMP_CR4_OFFSET);
 
+static inline void atomic_writeb(io8* address, uint8_t value)
+{
+    asm volatile("lock; xchg %1, (%0);" :: "r" (address), "r" (value) : "memory");
+}
+
+static inline void atomic_incl(io32* address)
+{
+    asm volatile("lock; incl (%0);" :: "r" (address) : "memory");
+}
+
+static inline uint8_t atomic_readb(io8* address)
+{
+    return *address;
+}
+
 void smp_notify(uint8_t notif)
 {
     if (apic && booted > 1)
     {
-        notification = notif;
+        atomic_writeb(&notification, notif);
         apic_ipi_send(0, APIC_SMP_NOTIF_VECTOR | APIC_ICR_DEST_ALL_SELF_EXCLUDE);
     }
 }
 
 void smp_wait_for(uint8_t notif)
 {
-    while (notification != notif)
+    while (atomic_readb(&notification) != notif)
     {
         halt();
     }
@@ -196,7 +211,7 @@ void smp_kmain(uint8_t lapic_id, uint32_t cpu_signature)
     cpu->lapic_id      = lapic_id;
     cpu->cpu_signature = cpu_signature;
     cpu->signature     = SMP_SIGNATURE;
-    ++booted;
+    atomic_incl(&booted);
 
     log_notice("cpu%u: signature: %#x, lapic id: %#x",
         lapic_id,
