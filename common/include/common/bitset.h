@@ -7,7 +7,7 @@ typedef uint32_t bitset_data_t;
 
 #define BITSET_BITS 32
 
-#define BITSET_SIZE(count) ((count) / BITSET_BITS)
+#define BITSET_SIZE(count) (((count) + BITSET_BITS - 1) / BITSET_BITS)
 
 #define BITSET_DECLARE(name, count) \
     bitset_data_t name[BITSET_SIZE(count)]

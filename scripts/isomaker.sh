@@ -68,14 +68,14 @@ menuentry "${binary}" {
 
 create_dir ${name}.d/boot/grub
 
-write_to "${menu_entry}" "${grub_cfg}"
-
 for mod in "${modules[@]}"; do
     copy "${mod}" ${name}.d/boot
 done
 
 copy ${binary} ${name}.d/boot
 copy_dir_content "mnt" "${iso_dir}"
+
+write_to "${menu_entry}" "${grub_cfg}"
 
 if [[ -n "${verbose}" ]]
 then

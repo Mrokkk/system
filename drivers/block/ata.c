@@ -22,33 +22,52 @@ void ata_device_initialize(ata_device_t* device, uint8_t* buf, uint8_t id, void*
         if (device->command_sets & (1 << 26))
         {
             // Device uses 48-Bit Addressing:
-            device->size = identl(ATA_IDENT_MAX_LBA_EXT);
+            device->sectors = identl(ATA_IDENT_MAX_LBA_EXT);
         }
         else
         {
             // Device uses CHS or 28-bit Addressing:
-            device->size = identl(ATA_IDENT_MAX_LBA);
+            device->sectors = identl(ATA_IDENT_MAX_LBA);
         }
 
-        if (device->size == 0)
+        if (!device->sectors)
         {
-            device->size = identw(ATA_IDENT_CYLINDERS) * identw(ATA_IDENT_HEADS) * identw(ATA_IDENT_SECTORS);
+            // Fallback to CHS
+            device->sectors = identw(ATA_IDENT_CYLINDERS) * identw(ATA_IDENT_HEADS) * identw(ATA_IDENT_SECTORS);
+        }
+
+        uint16_t word106 = identw(212);
+
+        if ((word106 & (1 << 14)) && !(word106 & (1 << 15)))
+        {
+            if (word106 & (1 << 12))
+            {
+                device->sector_size = identl(ATA_IDENT_SECTOR_SIZE);
+            }
+        }
+
+        if (!device->sector_size)
+        {
+            device->sector_size = ATA_SECTOR_SIZE;
         }
     }
     else
     {
-        device->size = 0;
+        device->sectors     = 0;
+        device->sector_size = 0;
     }
 
     for (i = 0; i < 40; i += 2)
     {
         if (identb(ATA_IDENT_MODEL + i + 1) < 0x20 || identb(ATA_IDENT_MODEL + i + 1) > 0x7e)
         {
-            strlcpy(device->model, "<garbage>", sizeof(device->model));
-            return;
+            snprintf(device->model, sizeof(device->model), "<empty>");
         }
-        device->model[i] = identb(ATA_IDENT_MODEL + i + 1);
-        device->model[i + 1] = identb(ATA_IDENT_MODEL + i);
+        else
+        {
+            device->model[i] = identb(ATA_IDENT_MODEL + i + 1);
+            device->model[i + 1] = identb(ATA_IDENT_MODEL + i);
+        }
     }
 
     for (; i; --i)

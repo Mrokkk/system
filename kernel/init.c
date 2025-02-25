@@ -208,7 +208,7 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 UNMAP_AFTER_INIT static int root_mount(void)
 {
     int errno;
-    const char* sources[] = {"/dev/hdc", "/dev/sda0", "/dev/hda0", "/dev/img0"};
+    const char* sources[] = {"/dev/hdc", "/dev/sda1", "/dev/hda1", "/dev/sdc", "/dev/sdc1"};
     const char* fs_types[] = {"iso9660", "ext2"};
 
     for (size_t i = 0; i < array_size(sources); ++i)
@@ -338,6 +338,7 @@ UNMAP_AFTER_INIT static void read_some_data(void)
 
 static void NORETURN(init(const char* cmdline))
 {
+    int errno;
     rootfs_prepare();
     syslog_configure();
     read_some_data();
@@ -346,12 +347,12 @@ static void NORETURN(init(const char* cmdline))
 
     const char* init_path = param_value_or_get(KERNEL_PARAM("init"), "/bin/init");
 
-    const char* const argv[] = {init_path, ptr(cmdline), NULL, };
+    const char* const argv[] = {init_path, ptr(cmdline), NULL};
     const char* const envp[] = {"PHOENIX=TRUE", NULL};
 
-    if (unlikely(do_exec(init_path, argv, envp)))
+    if (unlikely(errno = do_exec(init_path, argv, envp)))
     {
-        panic("cannot run %s", init_path);
+        panic("cannot run %s: %s", init_path, errno_name(errno));
     }
 
     ASSERT_NOT_REACHED();

@@ -1,4 +1,5 @@
 #include <kernel/debug.h>
+#include <kernel/timer.h>
 #include <kernel/procfs.h>
 #include <kernel/signal.h>
 #include <kernel/process.h>
@@ -116,6 +117,21 @@ int sys_setsid(void)
     }
     process_current->sid = process_current->pid;
     return 0;
+}
+
+static void wake_callback(ktimer_t* timer)
+{
+    process_t* p = timer->data;
+    process_wake(p);
+}
+
+timer_t repeating_wake_schedule(timeval_t timeval)
+{
+    return ktimer_create_and_start(
+        KTIMER_REPEATING,
+        timeval,
+        &wake_callback,
+        process_current);
 }
 
 int processes_init()

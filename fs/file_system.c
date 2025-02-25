@@ -91,7 +91,7 @@ static int mount_impl(file_system_t* fs, const char* source, const char* mount_p
             return -ENOTDIR;
         }
 
-        log_info("mounting %s in inode = %p", fs->name, dentry->inode);
+        log_info("mounting %s in %s on %s", fs->name, mount_point, source);
 
         errno = fs->mount(sb, dentry->inode, NULL, 0);
 

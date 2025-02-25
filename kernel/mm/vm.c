@@ -578,7 +578,14 @@ uintptr_t vm_paddr(uintptr_t vaddr, const pgd_t* pgd)
 
     const pte_t* pte = pte_offset(pmde, vaddr);
 
-    return pte_entry_paddr(pte);
+    uintptr_t page_paddr = pte_entry_paddr(pte);
+
+    if (unlikely(!page_paddr))
+    {
+        return 0;
+    }
+
+    return page_paddr + (vaddr & PAGE_MASK);
 }
 
 static void pte_range_free(pmd_t* pmd, uintptr_t start, uintptr_t end, uintptr_t floor, uintptr_t ceil, bool free_pages)

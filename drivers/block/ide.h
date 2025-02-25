@@ -3,7 +3,10 @@
 #include <stdint.h>
 #include <kernel/mbr.h>
 #include <kernel/wait.h>
+#include <kernel/mutex.h>
 #include <kernel/kernel.h>
+
+#include "ata.h"
 
 // References:
 // http://ftp.parisc-linux.org/docs/chips/PC87415.pdf
@@ -19,6 +22,7 @@ typedef struct ide_channel ide_channel_t;
 #define ATA_MASTER          0x00
 #define ATA_SLAVE           0x01
 
+#define ATA_REG_BASE        0x1f0
 #define ATA_REG_DATA        0x00
 #define ATA_REG_ERROR       0x01
 #define ATA_REG_FEATURES    0x01
@@ -62,30 +66,22 @@ typedef struct ide_channel ide_channel_t;
 
 struct request
 {
-    int drive;
-    int direction;
-    uint32_t offset;
-    uint8_t sectors;
-    uint32_t count;
-    char* buffer;
-    int errno;
-    int dma;
+    ata_device_t* device;
+    int           direction;
+    size_t        offset;
+    uint8_t       sectors;
+    size_t        count;
+    void*         buffer;
+    volatile int  errno;
+    int           dma;
 };
 
 struct ide_channel
 {
-    uint16_t base;
-    uint16_t data_reg;
-    uint16_t error_reg;
-    uint16_t nsector_reg;
-    uint16_t sector_reg;
-    uint16_t lcyl_reg;
-    uint16_t hcyl_reg;
-    uint16_t select_reg;
-    uint16_t status_reg;
-    uint16_t ctrl;
-    uint16_t irq_reg;
-    uint16_t bmide;
-    request_t* current_request;
+    uint16_t          base;
+    uint16_t          ctrl;
+    uint16_t          bmide;
+    mutex_t           lock;
+    request_t*        current_request;
     wait_queue_head_t queue;
 };

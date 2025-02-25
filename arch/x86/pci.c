@@ -181,52 +181,24 @@ skip_pci_bios:
 }
 
 #define DEVICE_ID(id, name) \
-    case id: it = csnprintf(it, end, name); break
+    case id: if (device_id) { *device_id = name; }; break
 
 #define UNKNOWN_DEVICE_ID() \
-    default: it = csnprintf(it, end, "<unknown>"); break
+    default: if (device_id) { *device_id = "<unknown>"; }; break
 
 #define VENDOR_ID(id, name) \
     case id: \
-        it = csnprintf(it, end, name " "); \
+        if (vendor_id) { *vendor_id = name; }; \
         switch (device->device_id)
 
 #define UNKNOWN_VENDOR_ID() \
-    default: it = csnprintf(it, end, "Device")
+    default: \
+        if (vendor_id) { *vendor_id = "Device"; }; \
+        if (device_id) { *device_id = "<unknown>"; }; \
+        break
 
-static inline char* pci_device_description(pci_device_t* device, char* buf, size_t size)
+void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_id)
 {
-    char* it = buf;
-    const char* end = buf + size;
-
-    switch (device->class)
-    {
-        case PCI_UNCLASSIFIED:
-            it = csnprintf(it, end, "Unclassified");
-            break;
-        case PCI_STORAGE:
-            it = csnprintf(it, end, storage_subclass_string(device->subclass));
-            break;
-        case PCI_NETWORK:
-            it = csnprintf(it, end, "Network controller");
-            break;
-        case PCI_DISPLAY:
-            it = csnprintf(it, end, display_subclass_string(device->subclass));
-            break;
-        case PCI_MULTIMEDIA:
-            it = csnprintf(it, end, multimedia_subclass_string(device->subclass));
-            break;
-        case PCI_BRIDGE:
-            it = csnprintf(it, end, bridge_subclass_string(device->subclass));
-            break;
-        case PCI_COMCONTROLLER:
-            it = csnprintf(it, end, "Communication controller");
-            break;
-        case PCI_SERIAL_BUS:
-            it = csnprintf(it, end, serial_bus_subclass_string(device->subclass));
-            break;
-    }
-    it = csnprintf(it, end, " [%02x%02x]: ", device->class, device->subclass);
     switch (device->vendor_id)
     {
         VENDOR_ID(PCI_AMD, "Advanced Micro Devices, Inc. [AMD/ATI]")
@@ -259,6 +231,7 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
             DEVICE_ID(0x0166, "3rd Gen Core processor Graphics Controller");
             DEVICE_ID(0x100e, "82540EM Gigabit Ethernet Controller");
             DEVICE_ID(0x101e, "82540EP Gigabit Ethernet Controller (Mobile)");
+            DEVICE_ID(0x10d3, "82574L Gigabit Network Connection");
             DEVICE_ID(0x1503, "82579V Gigabit Network Connection");
             DEVICE_ID(0x1e03, "7 Series Chipset Family 6-port SATA Controller [AHCI mode]");
             DEVICE_ID(0x1e10, "7 Series/C216 Chipset Family PCI Express Root Port 1");
@@ -283,7 +256,18 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
             DEVICE_ID(0x24ca, "82801DBM (ICH4-M) IDE Controller");
             DEVICE_ID(0x24cc, "82801DBM (ICH4-M) LPC Interface Bridge");
             DEVICE_ID(0x24cd, "82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller");
+            DEVICE_ID(0x2918, "82801IB (ICH9) LPC Interface Controller");
             DEVICE_ID(0x2922, "82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode]");
+            DEVICE_ID(0x2930, "82801I (ICH9 Family) SMBus Controller");
+            DEVICE_ID(0x2934, "82801I (ICH9 Family) USB UHCI Controller #1");
+            DEVICE_ID(0x2935, "82801I (ICH9 Family) USB UHCI Controller #2");
+            DEVICE_ID(0x2936, "82801I (ICH9 Family) USB UHCI Controller #3");
+            DEVICE_ID(0x2937, "82801I (ICH9 Family) USB UHCI Controller #4");
+            DEVICE_ID(0x2938, "82801I (ICH9 Family) USB UHCI Controller #5");
+            DEVICE_ID(0x2939, "82801I (ICH9 Family) USB UHCI Controller #6");
+            DEVICE_ID(0x293a, "82801I (ICH9 Family) USB2 EHCI Controller #1");
+            DEVICE_ID(0x293c, "82801I (ICH9 Family) USB2 EHCI Controller #2");
+            DEVICE_ID(0x29c0, "82G33/G31/P35/P31 Express DRAM Controller");
             DEVICE_ID(0x3340, "82855PM Processor to I/O Controller");
             DEVICE_ID(0x3341, "82855PM Processor to AGP Controller");
             DEVICE_ID(0x7000, "82371SB PIIX3 ISA [Natoma/Triton II]");
@@ -368,7 +352,53 @@ static inline char* pci_device_description(pci_device_t* device, char* buf, size
 
         UNKNOWN_VENDOR_ID();
     }
-    it = csnprintf(it, end, " [%04x:%04x]", device->vendor_id, device->device_id);
+}
+
+static char* pci_device_description(pci_device_t* device, char* buf, size_t size)
+{
+    char* it = buf;
+    const char* end = buf + size;
+
+    switch (device->class)
+    {
+        case PCI_UNCLASSIFIED:
+            it = csnprintf(it, end, "Unclassified");
+            break;
+        case PCI_STORAGE:
+            it = csnprintf(it, end, storage_subclass_string(device->subclass));
+            break;
+        case PCI_NETWORK:
+            it = csnprintf(it, end, "Network controller");
+            break;
+        case PCI_DISPLAY:
+            it = csnprintf(it, end, display_subclass_string(device->subclass));
+            break;
+        case PCI_MULTIMEDIA:
+            it = csnprintf(it, end, multimedia_subclass_string(device->subclass));
+            break;
+        case PCI_BRIDGE:
+            it = csnprintf(it, end, bridge_subclass_string(device->subclass));
+            break;
+        case PCI_COMCONTROLLER:
+            it = csnprintf(it, end, "Communication controller");
+            break;
+        case PCI_SERIAL_BUS:
+            it = csnprintf(it, end, serial_bus_subclass_string(device->subclass));
+            break;
+    }
+
+    char* vendor_id = NULL;
+    char* device_id = NULL;
+
+    pci_device_describe(device, &vendor_id, &device_id);
+
+    it = csnprintf(it, end, " [%02x%02x]: %s %s [%04x:%04x]",
+        device->class,
+        device->subclass,
+        vendor_id,
+        device_id,
+        device->vendor_id,
+        device->device_id);
 
     return buf;
 }
@@ -390,6 +420,7 @@ static inline char* pci_device_subsystem_description(pci_device_t* device, char*
         SUBSYSTEM_VENDOR_ID(0x103c, "Hewlett-Packard Company");
         SUBSYSTEM_VENDOR_ID(0x1af4, "QEMU Virtual Machine");
         SUBSYSTEM_VENDOR_ID(0x121a, "3Dfx Interactive, Inc.");
+        SUBSYSTEM_VENDOR_ID(0x8086, "Intel");
         UNKNOWN_SUBSYSTEM_VENDOR_ID();
     }
     it = csnprintf(it, end, " [%04x:%04x]", device->subsystem_vendor_id, device->subsystem_id);
@@ -521,7 +552,7 @@ void pci_device_print(pci_device_t* device)
         case 0:
             if (device->interrupt_pin && device->interrupt_line != 0xff)
             {
-                log_notice("  Interrupt: pin %u IRQ %u", device->interrupt_pin, device->interrupt_line);
+                log_notice("  Interrupt: INT%c# IRQ%u", device->interrupt_pin - 1 + 'A', device->interrupt_line);
             }
             for (int i = 0; i < 6; ++i)
             {
@@ -584,4 +615,13 @@ pci_device_t* pci_device_get(uint8_t class, uint8_t subclass)
         }
     }
     return NULL;
+}
+
+void pci_device_enumerate(void (*probe)(pci_device_t* device, void* data), void* data)
+{
+    pci_device_t* device;
+    list_for_each_entry(device, &pci_devices, list_entry)
+    {
+        probe(device, data);
+    }
 }

@@ -62,7 +62,6 @@ struct module
 
 char* multiboot_read(va_list args);
 
-extern void* disk_img;
 extern void* ksyms_module;
 extern void* ksyms_start;
 extern void* ksyms_end;

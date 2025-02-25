@@ -5,6 +5,7 @@
 #include <kernel/fs.h>
 #include <kernel/irq.h>
 #include <kernel/devfs.h>
+#include <kernel/blkdev.h>
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/execute.h>
@@ -22,12 +23,10 @@ module_init(ahci_init);
 module_exit(ahci_deinit);
 KERNEL_MODULE(ahci);
 
-static int ahci_fs_open(file_t* file);
-static int ahci_fs_read(file_t* file, char* buf, size_t count);
+static int ahci_blk_read(void* blkdev, size_t offset, void* buffer, size_t size, bool irq);
 
-static file_operations_t ops = {
-    .open = &ahci_fs_open,
-    .read = &ahci_fs_read,
+READONLY static blkdev_ops_t bops = {
+    .read = &ahci_blk_read,
 };
 
 static LIST_DECLARE(requests);
@@ -260,13 +259,13 @@ static int ahci_drive_wait(ahci_port_t* port)
     size_t time_elapsed = 0;
     while (port->regs->tfd & (ATA_SR_BSY | ATA_SR_DRQ))
     {
-        if (unlikely(time_elapsed > 250))
+        if (unlikely(time_elapsed > 2500))
         {
             log_warning("port %u: timeout while waiting for drive to go idle", port->id);
             ahci_dump(ahci);
             return -ETIMEDOUT;
         }
-        udelay(1000);
+        udelay(100);
         ++time_elapsed;
     }
     return 0;
@@ -339,7 +338,7 @@ static int ahci_read(ata_device_t* device, uint32_t offset, uint32_t count, char
     int errno;
     ahci_port_t* port = ports + device->id;
     int slot = ahci_port_cmd_slot_find(port->regs);
-    uint32_t sectors = count / ATA_SECTOR_SIZE;
+    uint32_t sectors = count / device->sector_size;
 
     if (unlikely(slot == -1))
     {
@@ -427,55 +426,19 @@ static int ahci_read(ata_device_t* device, uint32_t offset, uint32_t count, char
     return 0;
 }
 
-static int ahci_fs_open(file_t* file)
-{
-    int drive = BLK_DRIVE(MINOR(file->dentry->inode->rdev));
-    if (unlikely(!devices[drive].mbr.signature))
-    {
-        return -ENODEV;
-    }
-    return 0;
-}
-
-static int ahci_fs_read(file_t* file, char* buf, size_t count)
+static int ahci_blk_read(void* blkdev, size_t offset, void* buffer, size_t size, bool irq)
 {
     int errno;
-    int drive = BLK_DRIVE(MINOR(file->dentry->inode->rdev));
-    ata_device_t* device = devices + drive;
-    int partition = BLK_PARTITION(MINOR(file->dentry->inode->rdev));
-    uint32_t offset = file->offset / ATA_SECTOR_SIZE;
-    uint32_t first_sector, last_sector, max_count;
+    ata_device_t* device = blkdev;
+    size_t count = size * device->sector_size;
 
-    if (partition != BLK_NO_PARTITION)
-    {
-        first_sector = device->mbr.partitions[partition].lba_start;
-        offset += first_sector;
-        last_sector = first_sector + device->mbr.partitions[partition].sectors;
-    }
-    else
-    {
-        last_sector = devices->size;
-    }
-
-    max_count = (last_sector - offset) * ATA_SECTOR_SIZE;
-    count = count > max_count
-        ? max_count
-        : count;
-
-    if (!count)
-    {
-        return 0;
-    }
-
-    if (unlikely(errno = ahci_read(device, offset, count, buf, true)))
+    if (unlikely(errno = ahci_read(device, offset, count, buffer, irq)))
     {
         log_warning("read error!");
         return errno;
     }
 
-    file->offset += count;
-
-    return count;
+    return 0;
 }
 
 static int ahci_mode_set(void)
@@ -549,9 +512,9 @@ static int ahci_port_setup(int id)
         return -ENOMEM;
     }
 
-    port->id    = id;
-    port->data  = page_virt_ptr(port->data_pages);
-    port->regs  = &ahci->ports[id];
+    port->id   = id;
+    port->data = page_virt_ptr(port->data_pages);
+    port->regs = &ahci->ports[id];
 
     port->regs->cmd &= ~AHCI_PxCMD_ST;
     while (port->regs->cmd & AHCI_PxCMD_CR);
@@ -559,10 +522,10 @@ static int ahci_port_setup(int id)
     port->regs->cmd &= ~AHCI_PxCMD_FRE;
     while (port->regs->cmd & (AHCI_PxCMD_FRE | AHCI_PxCMD_CR));
 
-    port->regs->clb     = ahci_port_phys_addr(port, &port->data->cmdlist);
-    port->regs->clbu    = 0;
-    port->regs->fb      = ahci_port_phys_addr(port, &port->data->fis);
-    port->regs->fbu     = 0;
+    port->regs->clb  = ahci_port_phys_addr(port, &port->data->cmdlist);
+    port->regs->clbu = 0;
+    port->regs->fb   = ahci_port_phys_addr(port, &port->data->fis);
+    port->regs->fbu  = 0;
 
     log_debug(DEBUG_AHCI, "clb = %#x, fb = %#x", port->regs->clb, port->regs->fb);
 
@@ -598,7 +561,7 @@ static int ahci_port_setup(int id)
     uint32_t det = ssts & AHCI_PxSSTS_DET;
 
     uint32_t sig = ahci->ports[id].sig;
-    log_info("port %u: DET = %#x, IPM = %#x; SIG = %#x (%s)", id, det, ipm, sig, ahci_signature_string(sig));
+    log_info("port %u: DET=%#x, IPM=%#x; SIG=%#x (%s)", id, det, ipm, sig, ahci_signature_string(sig));
 
     port->signature = sig;
 
@@ -623,7 +586,7 @@ static void ahci_port_detect(ahci_port_t* port)
 
     uint8_t* buf = page_virt_ptr(page);
 
-    if (slot == -1)
+    if (unlikely(slot == -1))
     {
         log_warning("cannot find empty slot!");
         return;
@@ -646,7 +609,7 @@ static void ahci_port_detect(ahci_port_t* port)
     fis->device     = 0;    // Master device
     fis->c          = 1;    // Write command register
 
-    if ((errno = ahci_drive_wait(port)))
+    if (unlikely(errno = ahci_drive_wait(port)))
     {
         return;
     }
@@ -666,62 +629,18 @@ static void ahci_port_detect(ahci_port_t* port)
 static int ahci_device_register(ata_device_t* device)
 {
     int errno;
-    partition_t* p;
-    char* buf = single_page();
-    mbr_t* mbr = ptr(buf);
-    char drive_dev_name[8];
 
-    ata_device_print(device);
+    blkdev_char_t blk = {
+        .major = device->type == ATA_TYPE_ATAPI ? MAJOR_BLK_CDROM : MAJOR_BLK_SATA,
+        .model = device->model,
+        .sectors = device->sectors,
+        .block_size = device->sector_size,
+    };
 
-    devfs_blk_register(
-        ssnprintf(drive_dev_name, sizeof(drive_dev_name), "sd%c", device->id + 'a'),
-        MAJOR_BLK_AHCI, BLK_MINOR_DRIVE(device->id),
-        &ops);
-
-    if (device->type == ATA_TYPE_ATAPI)
+    if (unlikely(errno = blkdev_register(&blk, device, &bops)))
     {
-        log_info("ATAPI not yet supported");
-        return 0;
-    }
-
-    if (unlikely(!buf))
-    {
-        return -ENOMEM;
-    }
-
-    memset(buf, 0, PAGE_SIZE);
-
-    if ((errno = ahci_read(device, 0, ATA_SECTOR_SIZE, buf, false)))
-    {
+        log_info("failed to register blk device");
         return errno;
-    }
-
-    log_info("  mbr: id = %#x, signature = %#x", mbr->id, mbr->signature);
-
-    if (mbr->signature != MBR_SIGNATURE)
-    {
-        return -ENODEV;
-    }
-
-    memcpy(&device->mbr, mbr, ATA_SECTOR_SIZE);
-
-    for (int part_id = 0; part_id < 4; ++part_id)
-    {
-        p = mbr->partitions + part_id;
-
-        if (!p->lba_start)
-        {
-            continue;
-        }
-
-        log_info("  mbr: part[%u]:%#x: [%#010x - %#010x]",
-            part_id, p->type, p->lba_start, p->lba_start + p->sectors);
-
-        devfs_blk_register(
-            ssnprintf(buf, 32, "%s%u", drive_dev_name, part_id),
-            MAJOR_BLK_AHCI,
-            BLK_MINOR(part_id, device->id),
-            &ops);
     }
 
     return 0;

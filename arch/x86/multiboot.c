@@ -8,7 +8,6 @@
 
 #define DEBUG_MULTIBOOT 0
 
-void* disk_img;
 void* ksyms_start;
 void* ksyms_end;
 
@@ -27,11 +26,7 @@ static void multiboot_modules_read(multiboot_info_t* mb)
             virt(mod->mod_start),
             virt(mod->mod_end));
 
-        if (!strcmp(name, "disk.img"))
-        {
-            disk_img = virt_ptr(mod->mod_start);
-        }
-        else if (!strcmp(name, "kernel.map"))
+        if (!strcmp(name, "kernel.map"))
         {
             ksyms_start = virt_ptr(mod->mod_start);
             ksyms_end = virt_ptr(mod->mod_end);

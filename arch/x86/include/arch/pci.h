@@ -289,3 +289,5 @@ int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t s
 int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, size_t size);
 void pci_device_print(pci_device_t* device);
 pci_device_t* pci_device_get(uint8_t class, uint8_t subclass);
+void pci_device_enumerate(void (*probe)(pci_device_t* device, void* data), void* data);
+void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_id);

@@ -208,6 +208,15 @@ void scheduler();
 void processes_stats_print(void);
 int do_exec(const char* pathname, const char* const argv[], const char* const envp[]);
 
+timer_t repeating_wake_schedule(timeval_t timeval);
+
+#define __WAIT(flags) \
+    ({ irq_save(flags); process_wait2(flags); })
+
+#define REPEAT_PER(...) \
+    repeating_wake_schedule(__VA_ARGS__); \
+    for (flags_t flags;; __WAIT(flags))
+
 // Arch-dependent functions
 int arch_process_init(void);
 int arch_process_copy(process_t* dest, process_t* src, const pt_regs_t* old_regs);

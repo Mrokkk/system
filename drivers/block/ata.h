@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <kernel/mbr.h>
 #include <kernel/kernel.h>
 
 // References:
@@ -40,6 +39,7 @@ typedef struct ata_device ata_device_t;
 #define ATA_IDENT_MAX_LBA       120
 #define ATA_IDENT_COMMANDSETS   164
 #define ATA_IDENT_MAX_LBA_EXT   200
+#define ATA_IDENT_SECTOR_SIZE   234
 
 #define ATA_CMD_READ_PIO        0x20
 #define ATA_CMD_READ_PIO_EXT    0x24
@@ -63,46 +63,16 @@ typedef struct ata_device ata_device_t;
 
 struct ata_device
 {
-    uint16_t signature;      // Drive Signature
+    uint16_t signature;
     uint8_t  id;
-    uint8_t  type:1;         // 0: ATA, 1:ATAPI.
+    uint8_t  type:1;
     uint8_t  dma:1;
-    uint16_t capabilities;   // Features.
-    uint32_t command_sets;   // Command Sets Supported.
-    uint32_t size;           // Size in Sectors.
-    char     model[41];      // model in string.
+    uint16_t capabilities;
+    uint32_t command_sets;
+    size_t   sectors;
+    size_t   sector_size;
+    char     model[41];
     void*    data;
-    mbr_t mbr;
 };
 
 void ata_device_initialize(ata_device_t* device, uint8_t* buf, uint8_t id, void* data);
-
-static inline void ata_device_print(ata_device_t* device)
-{
-    const char* unit;
-    uint64_t size = (uint64_t)device->size * ATA_SECTOR_SIZE;
-
-    human_size(size, unit);
-
-    log_info("%u: %s drive %u %s: %s; signature: %#x",
-        device->id,
-        device->type ? "ATAPI" : "ATA",
-        (uint32_t)size,
-        unit,
-        device->model,
-        device->signature);
-
-    log_continue("; cap: %#x", device->capabilities);
-    if (device->dma)
-    {
-        log_continue("; DMA");
-    }
-    if (device->capabilities & 0x200)
-    {
-        log_continue("; LBA");
-    }
-    else
-    {
-        log_continue("; CHS");
-    }
-}

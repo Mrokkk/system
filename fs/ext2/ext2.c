@@ -465,7 +465,7 @@ static int ext2_traverse_blocks(
         return -EINVAL;
     }
 
-    for (left = count = min(count, raw_inode->size - offset), count = 0;
+    for (left = min(count, raw_inode->size - offset), count = 0;
         left;
         left -= to_copy, block_offset = 0, errno = ext2_next_block(data, &cur_lvl, &cur_block))
     {
