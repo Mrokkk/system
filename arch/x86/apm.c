@@ -214,7 +214,7 @@ UNMAP_AFTER_INIT void apm_initialize(void)
 
     if (param_bool_get(KERNEL_PARAM("noapm")))
     {
-        log_notice("APM disabled through kernel parameter");
+        log_notice("disabled through kernel parameter");
         return;
     }
 
@@ -229,9 +229,9 @@ UNMAP_AFTER_INIT void apm_initialize(void)
         return;
     }
 
-    log_notice("ver: %#x", regs.ax);
+    log_notice("APM %x.%x, flags: %#x", regs.ax >> 8, regs.ax & 0xff, regs.cx);
 
-    if (regs.ax != 0x102)
+    if (regs.ax != 0x102 && regs.ax != 0x101 && regs.ax != 0x100)
     {
         log_continue("; unsupported version");
         return;
@@ -239,11 +239,7 @@ UNMAP_AFTER_INIT void apm_initialize(void)
 
     if (!(regs.cx & APM_FLAGS_32BIT_IF))
     {
-        apm_mode = APM_REALMODE;
-    }
-    else if (dmi.version && !strcmp("ThinkPad T42", dmi.version))
-    {
-        log_notice("[ThinkPad] disabling 32bit interface");
+        log_notice("32bit interface not available");
         apm_mode = APM_REALMODE;
     }
     else if (dmi.bios && dmi.bios_version &&

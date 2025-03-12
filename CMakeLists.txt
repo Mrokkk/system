@@ -132,7 +132,7 @@ add_custom_target(
    iso
    COMMAND "${PROJECT_SOURCE_DIR}/scripts/isomaker.sh"
            "-o" "${PROJECT_NAME}"
-           "--args" "console=/dev/tty0 syslog=/dev/debug0 earlycon"
+           "--args" "console=/dev/tty0 syslog=/dev/vcon0 earlycon pciprint"
            "--module" "${CMAKE_BINARY_DIR}/kernel.map"
    DEPENDS rootfs
    COMMENT "Building ISO image"

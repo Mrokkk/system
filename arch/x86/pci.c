@@ -325,6 +325,7 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
             DEVICE_ID(0x8598, "VT82C598/694x [Apollo MVP3/Pro133x AGP]");
             DEVICE_ID(0x3057, "VT82C686 [Apollo Super ACPI]");
             DEVICE_ID(0x0686, "VT82C686 [Apollo Super South]");
+            UNKNOWN_DEVICE_ID();
         }
         break;
 
@@ -335,18 +336,21 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
             DEVICE_ID(0x0003, "Voodoo Banshee");
             DEVICE_ID(0x0004, "Voodoo Banshee [Velocity 100]");
             DEVICE_ID(0x0005, "Voodoo 3");
+            UNKNOWN_DEVICE_ID();
         }
         break;
 
         VENDOR_ID(PCI_S3, "S3 Graphics Ltd.")
         {
             DEVICE_ID(0x5631, "86c325 [ViRGE]");
+            UNKNOWN_DEVICE_ID();
         }
         break;
 
         VENDOR_ID(PCI_ESONIQ, "Ensoniq")
         {
             DEVICE_ID(0x1371, "ES1371/ES1373 / Creative Labs CT2518");
+            UNKNOWN_DEVICE_ID();
         }
         break;
 

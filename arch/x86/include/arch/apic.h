@@ -159,7 +159,7 @@ struct ioapic_route
     uint8_t destination;
 } PACKED;
 
-int apic_initialize(void);
+void apic_initialize(void);
 void apic_ap_initialize(void);
 void apic_timer_initialize(void);
 void apic_eoi(uint32_t);

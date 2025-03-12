@@ -280,7 +280,6 @@ static int vesafb_fb_mode_set(int resx, int resy, int bpp)
 
 static int vesafb_framebuffer_setup(mode_info_t* mode)
 {
-    size_t size = mode->fb_size;
     uintptr_t prev_paddr = framebuffer.paddr;
 
     switch (mode->memory_model)
@@ -322,7 +321,7 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
             mmio_unmap(framebuffer.vaddr);
         }
 
-        framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, size, "fb");
+        framebuffer.vaddr = mmio_map_wc(framebuffer.paddr, framebuffer.size, "fb");
 
         if (unlikely(!framebuffer.vaddr))
         {

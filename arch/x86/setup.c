@@ -45,8 +45,6 @@
 PER_CPU_DECLARE(cpu_info_t cpu_info);
 bool panic_mode;
 
-int vgafb_initialize(void);
-
 static void reboot_by_8042(void)
 {
     while (inb(0x64) & 0x02);
@@ -136,6 +134,7 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     int vmwarefb_init(void);
     int voodoofb_init(void);
     int bochsfb_init(void);
+    int vgafb_initialize(void);
 
     if (!bochsfb_init())
     {

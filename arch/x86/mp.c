@@ -165,6 +165,19 @@ static size_t mp_lapic_irq_handle(mp_lapic_irq_t* irq, const bus_t* busses)
     return sizeof(*irq);
 }
 
+static int mp_checksum_verify(void* data, size_t len)
+{
+    uint8_t checksum = 0;
+    uint8_t* byte = data;
+
+    for (size_t i = 0; i < len; ++i, ++byte)
+    {
+        checksum += *byte;
+    }
+
+    return checksum;
+}
+
 UNMAP_AFTER_INIT void mp_read(void)
 {
     mp_t* mp = bios_find(MP_SIGNATURE);
@@ -175,7 +188,13 @@ UNMAP_AFTER_INIT void mp_read(void)
         return;
     }
 
-    log_notice("rev: 1.%u", mp->spec_rev);
+    uint8_t checksum;
+
+    if (unlikely(checksum = mp_checksum_verify(mp, 16)))
+    {
+        log_notice("bad MP checksum: %#x", checksum);
+        return;
+    }
 
     mp_table_t* table = ptr(mp->mp_table);
     void* ptr = shift_as(void*, table, sizeof(mp_table_t));
@@ -188,7 +207,8 @@ UNMAP_AFTER_INIT void mp_read(void)
     mp_string_copy(oem_id, table->oem_id, sizeof(table->oem_id));
     mp_string_copy(product_id, table->product_id, sizeof(table->product_id));
 
-    log_info("mp table: %p: %s %s (entries count: %u):",
+    log_notice("rev: 1.%u, mp table: %p: %s %s (entries count: %u):",
+        mp->spec_rev,
         mp->mp_table,
         oem_id,
         product_id,

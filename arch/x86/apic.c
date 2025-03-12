@@ -91,7 +91,10 @@ static void madt_scan(uint8_t* lapic_ids, size_t* num_cores)
             case MADT_TYPE_LAPIC:
                 MADT_LOG(log_continue, "(Local APIC), cpu id: %#x, id = %#x, flags = %#x",
                     entry->lapic.cpu_id, entry->lapic.apic_id, entry->lapic.flags);
-                lapic_ids[(*num_cores)++] = entry->lapic.apic_id;
+                if (entry->lapic.flags)
+                {
+                    lapic_ids[(*num_cores)++] = entry->lapic.apic_id;
+                }
                 break;
 
             case MADT_TYPE_IOAPIC:
@@ -164,7 +167,7 @@ extern void empty_isr(void);
 extern void apic_error_isr(void);
 extern void apic_spurious_isr(void);
 
-UNMAP_AFTER_INIT int apic_initialize(void)
+UNMAP_AFTER_INIT void apic_initialize(void)
 {
     uint32_t eax, edx, apic_base;
     uint8_t lapic_ids[CPU_COUNT];
@@ -185,7 +188,7 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     if (!cpu_has(X86_FEATURE_MSR))
     {
         log_notice("cpu does not support MSR");
-        return -ENOSYS;
+        return;
     }
 
     // FIXME: IBM T42's Pentium-M has an APIC and it should be possible to enable it even though APIC bit is 0
@@ -195,7 +198,7 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     if (!cpu_has(X86_FEATURE_APIC))
     {
         log_notice("cpu does not have APIC");
-        return -ENOSYS;
+        return;
     }
 
     rdmsr(IA32_APIC_BASE_MSR, eax, edx);
@@ -213,6 +216,7 @@ UNMAP_AFTER_INIT int apic_initialize(void)
     idt_set(APIC_ERROR_IRQ_VECTOR, addr(&apic_error_isr));
     idt_set(APIC_SPURIOUS_IRQ_VECTOR, addr(&apic_spurious_isr));
 
+    apic->lvt_timer = APIC_LVT_INT_MASKED;
     apic->lvt_error = APIC_ERROR_IRQ_VECTOR;
     apic->siv = APIC_SPURIOUS_IRQ_VECTOR | APIC_SIV_ENABLE;
 
@@ -240,8 +244,6 @@ UNMAP_AFTER_INIT int apic_initialize(void)
 
     ioapic_initialize();
     smp_cpus_boot(lapic_ids, num_cores);
-
-    return 0;
 }
 
 UNMAP_AFTER_INIT void apic_ap_initialize(void)
@@ -249,6 +251,7 @@ UNMAP_AFTER_INIT void apic_ap_initialize(void)
     apic->siv = APIC_SPURIOUS_IRQ_VECTOR | APIC_SIV_ENABLE;
     apic->esr = 0;
     apic->lvt_error = APIC_ERROR_IRQ_VECTOR;
+    apic->lvt_timer = APIC_LVT_INT_MASKED;
 
     apic_eoi(0);
 }
@@ -314,9 +317,6 @@ static uint32_t apic_timer_calibrate_by_i8253(void)
     while (!(inb(NMI_SC_PORT) & NMI_SC_TMR2_OUT_STS));
     ticks = APIC_TIMER_MAXCNT - apic->timer_current_cnt;
 
-    // Disable timer
-    apic->lvt_timer = APIC_LVT_INT_MASKED;
-
     apic_timer_clock.freq_khz = mhz = ticks * 16;
     do_div(apic_timer_clock.freq_khz, KHz / FREQ_100HZ);
     mhz_remainder = do_div(mhz, MHz / FREQ_100HZ);
@@ -350,9 +350,8 @@ static uint32_t apic_timer_calibrate_by_hpet(void)
     while (hpet_cnt_value() < hpet_max);
     ticks = APIC_TIMER_MAXCNT - apic->timer_current_cnt;
 
-    // Disable timers
+    // Disable HPET
     hpet_disable();
-    apic->lvt_timer = APIC_LVT_INT_MASKED;
 
     apic_timer_clock.freq_khz = mhz = ticks;
     do_div(apic_timer_clock.freq_khz, KHz / FREQ_100HZ);

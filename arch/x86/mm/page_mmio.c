@@ -300,10 +300,10 @@ void mmio_print(void)
 
     for (mmio_region_t* region = regions; region; region = region->next)
     {
-        log_info("[%p - %p] paddr: %p size: %#zx name: %s",
-            ptr(region->start),
-            ptr(region->end - 1),
-            ptr(region->paddr),
+        log_info("[%#llx - %#llx] paddr: %#010lx size: %#zx name: %s",
+            region->start,
+            region->end - 1,
+            region->paddr,
             (size_t)(region->end - region->start),
             region->name);
     }
