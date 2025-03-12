@@ -124,7 +124,6 @@ alias ktest=/bin/test
 alias ..="cd .."
 alias ls="ls --color=auto"
 alias l="ls -lah"
-alias dmesg="cat /proc/syslog"
 alias f="find . -name"
 alias p="path"
 alias lf="ls -lah /usr/share/kbd/consolefonts"
