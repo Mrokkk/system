@@ -195,6 +195,29 @@ static void console_refresh(void* data)
     }
 }
 
+static void console_refresh_schedule(console_t* console)
+{
+    scoped_irq_lock();
+
+    if (console->redraw)
+    {
+        return;
+    }
+
+    console->redraw = true;
+
+    int id = rtc_event_schedule(&console_refresh, console);
+
+    if (unlikely(id < 0))
+    {
+        log_error("cannot schedule refresh event");
+        redraw(console);
+        return;
+    }
+
+    console->rtc_event_id = id;
+}
+
 static void ff(console_t* console)
 {
     console->current_line++;
@@ -207,7 +230,8 @@ static void ff(console_t* console)
 
     console->visible_lines = console->current_line;
     console->y = 0;
-    redraw(console);
+
+    console_refresh_schedule(console);
 }
 
 static void lf(console_t* console)
@@ -239,26 +263,9 @@ static void lf(console_t* console)
             return;
         }
 
-        scoped_irq_lock();
         console->visible_lines++;
 
-        if (console->redraw)
-        {
-            return;
-        }
-
-        console->redraw = true;
-
-        int id = rtc_event_schedule(&console_refresh, console);
-
-        if (unlikely(id < 0))
-        {
-            log_error("cannot schedule refresh event");
-            redraw(console);
-            return;
-        }
-
-        console->rtc_event_id = id;
+        console_refresh_schedule(console);
     }
 }
 
@@ -477,13 +484,13 @@ static void tmux_mode_scroll_up(console_t* console)
         {
             console->visible_lines = console->lines;
         }
+
+        redraw(console);
     }
     else
     {
         --console->y;
     }
-
-    redraw(console);
 }
 
 static void tmux_mode_scroll_page_down(console_t* console)
@@ -512,15 +519,14 @@ static void tmux_mode_scroll_down(console_t* console)
         {
             console->visible_lines = console->current_line - console->y;
         }
+        redraw(console);
     }
-
-    if (console->visible_lines + console->y > console->current_line)
+    else if (console->visible_lines + console->y > console->current_line)
     {
         --console->y;
         console->visible_lines = console->current_line - console->y;
+        redraw(console);
     }
-
-    redraw(console);
 }
 
 static void tmux_mode_scroll_to(console_t* console, line_t* line)
@@ -564,7 +570,7 @@ static int clear_cmd(console_t* console, const char*[])
     console->current_line = console->visible_lines = console->lines;
     console->x = console->y = 0;
 
-    redraw(console);
+    console_refresh_schedule(console);
 
     return 0;
 }
@@ -653,7 +659,7 @@ static void region_clear(console_t* console, int top, int bottom)
         }
     }
 
-    redraw(console);
+    console_refresh_schedule(console);
 }
 
 static void lines_swap(line_t* lhs, line_t* rhs)
@@ -682,7 +688,7 @@ static void scroll_up(console_t* console, size_t origin, size_t count)
         lines_swap(&console->visible_lines[i], &console->visible_lines[i - count]);
     }
 
-    redraw(console);
+    console_refresh_schedule(console);
 }
 
 static void scroll_down(console_t* console, size_t origin, size_t count)
@@ -703,7 +709,7 @@ static void scroll_down(console_t* console, size_t origin, size_t count)
         lines_swap(&console->visible_lines[i], &console->visible_lines[i + count]);
     }
 
-    redraw(console);
+    console_refresh_schedule(console);
 }
 
 static void blank_insert(console_t* console, size_t count)
@@ -722,7 +728,7 @@ static void blank_insert(console_t* console, size_t count)
         GLYPH_CLEAR(&line->glyphs[x]);
     }
 
-    redraw(console);
+    console_refresh_schedule(console);
 }
 
 static void char_delete(console_t* console, size_t count)
@@ -741,7 +747,7 @@ static void char_delete(console_t* console, size_t count)
         GLYPH_CLEAR(&line->glyphs[x]);
     }
 
-    redraw(console);
+    console_refresh_schedule(console);
 }
 
 static void alt_buffer_enable(console_t* console)
@@ -793,7 +799,7 @@ static void alt_buffer_disable(console_t* console)
     console->current_bgcolor    = console->default_bgcolor;
     console->alt_buffer_enabled = false;
 
-    redraw(console);
+    console_refresh_schedule(console);
 }
 
 #define TMUX_TRANSITION(from, to, ...) \
@@ -916,9 +922,9 @@ finish:
     {
         cursor_update(console);
         line_nr_print(console);
-        glyph_t glyph = {.fgcolor = console->default_fgcolor, .bgcolor = console->default_bgcolor};
         if (console->command_it)
         {
+            glyph_t glyph = {.fgcolor = console->default_fgcolor, .bgcolor = console->default_bgcolor};
             for (size_t i = 0; i < sizeof(console->command); ++i)
             {
                 char c = console->command[i];
