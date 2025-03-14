@@ -40,8 +40,6 @@
 #include <kernel/reboot.h>
 #include <kernel/process.h>
 
-#define VIRTIO_GPU_DISABLED 0
-
 PER_CPU_DECLARE(cpu_info_t cpu_info);
 bool panic_mode;
 
@@ -129,40 +127,6 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     rtc_initialize();
     clock_sources_setup();
     time_setup();
-
-    int virtio_gpu_init(void);
-    int vmwarefb_init(void);
-    int voodoofb_init(void);
-    int bochsfb_init(void);
-    int vgafb_initialize(void);
-
-    if (!bochsfb_init())
-    {
-        log_info("initialized bochsfb");
-    }
-    else if (!voodoofb_init())
-    {
-        log_info("initialized voodoofb");
-    }
-    else if (!vmwarefb_init())
-    {
-        log_info("initialized vmwarefb");
-    }
-    else if (!VIRTIO_GPU_DISABLED && !virtio_gpu_init())
-    {
-        log_info("initialized virtio_gpu");
-    }
-    else if (!vesafb_initialize())
-    {
-        log_info("initialized vesafb");
-    }
-    else
-    {
-        log_info("fallback to VGA");
-        vgafb_initialize();
-    }
-
-    earlycon_disable();
 
     // Make sure PIC is in proper state
     i8259_check();

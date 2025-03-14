@@ -9,6 +9,7 @@
 #include <kernel/ksyms.h>
 #include <kernel/sysfs.h>
 #include <kernel/timer.h>
+#include <kernel/video.h>
 #include <kernel/kernel.h>
 #include <kernel/memory.h>
 #include <kernel/module.h>
@@ -208,19 +209,14 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
 UNMAP_AFTER_INIT static int root_mount(void)
 {
     int errno;
-    const char* sources[] = {"/dev/hdc", "/dev/sda1", "/dev/hda1", "/dev/sdc", "/dev/sdc1"};
+    const char* sources[] = {"/dev/sdc", "/dev/sdb", "/dev/sda", "/dev/hda", "/dev/sr0", "/dev/sda1", "/dev/hda1", "/dev/sdc1"};
     const char* fs_types[] = {"iso9660", "ext2"};
 
     for (size_t i = 0; i < array_size(sources); ++i)
     {
         for (size_t j = 0; j < array_size(fs_types); ++j)
         {
-            log_info("mounting root as %s on %s", fs_types[j], sources[i]);
-            if ((errno = do_mount(sources[i], "/root", fs_types[j], 0)))
-            {
-                log_info("mounting %s on %s failed with %d", fs_types[j], sources[i], errno);
-            }
-            else
+            if (!(errno = do_mount(sources[i], "/root", fs_types[j], 0)))
             {
                 return 0;
             }
@@ -339,8 +335,10 @@ UNMAP_AFTER_INIT static void read_some_data(void)
 static void NORETURN(init(const char* cmdline))
 {
     int errno;
+
     rootfs_prepare();
     syslog_configure();
+    video_init();
     read_some_data();
 
     paging_finalize();

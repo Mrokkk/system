@@ -3,10 +3,13 @@
 #include <arch/pci.h>
 #include <kernel/abs.h>
 #include <kernel/vga.h>
+#include <kernel/init.h>
 #include <kernel/mutex.h>
 #include <kernel/kernel.h>
 #include <kernel/page_mmio.h>
 #include <kernel/framebuffer.h>
+
+#include "video_driver.h"
 
 // References:
 // http://www.bitsavers.org/components/3dfx/Voodoo2_Banshee-2D_Databook_r1.0_199806.pdf
@@ -472,3 +475,16 @@ error:
     device = NULL;
     return errno;
 }
+
+READONLY static video_driver_t driver = {
+    .name = "voodoo",
+    .score = 30,
+    .initialize = &voodoofb_init,
+};
+
+UNMAP_AFTER_INIT static int voodoo_driver_register(void)
+{
+    return video_driver_register(&driver);
+}
+
+premodules_initcall(voodoo_driver_register);

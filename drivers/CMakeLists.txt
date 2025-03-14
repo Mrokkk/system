@@ -1,8 +1,9 @@
 file(GLOB_RECURSE BLOCK_SRC "block/*.c")
 file(GLOB_RECURSE CHAR_SRC "char/*.c")
 file(GLOB_RECURSE USB_SRC "usb/*.c")
+file(GLOB_RECURSE VIDEO_SRC "video/*.c")
 
-add_library(drivers OBJECT ${BLOCK_SRC} ${CHAR_SRC} ${USB_SRC})
+add_library(drivers OBJECT ${BLOCK_SRC} ${CHAR_SRC} ${USB_SRC} ${VIDEO_SRC})
 
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/modules")
 

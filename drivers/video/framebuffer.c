@@ -46,15 +46,6 @@ KERNEL_MODULE(framebuffer);
 UNMAP_AFTER_INIT static int framebuffer_init(void)
 {
     int errno;
-    uintptr_t paddr = framebuffer.paddr;
-    size_t pitch = framebuffer.pitch;
-    size_t width = framebuffer.width;
-    size_t height = framebuffer.height;
-    size_t bpp = framebuffer.bpp;
-    size_t size = framebuffer.size;
-
-    log_notice("paddr = %#x vaddr = %#x, resolution = %ux%u, pitch = %#x, bpp=%u, size = %#x",
-        paddr, framebuffer.vaddr, width, height, pitch, bpp, size);
 
     if (unlikely(errno = devfs_register("fb0", MAJOR_CHR_FB, 0, &fops)))
     {

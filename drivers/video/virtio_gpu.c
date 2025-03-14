@@ -2,15 +2,17 @@
 #include "virtio_gpu.h"
 
 #include <arch/pci.h>
+#include <kernel/init.h>
 #include <kernel/timer.h>
 #include <kernel/kernel.h>
 #include <kernel/minmax.h>
 #include <kernel/string.h>
+#include <kernel/virtio.h>
 #include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
 #include <kernel/framebuffer.h>
 
-#include "virtio.h"
+#include "video_driver.h"
 
 #define VIRTIO_GPU_FB_SIZE (16 * MiB)
 
@@ -302,7 +304,7 @@ static void refresh_callback(ktimer_t*)
     dirty = false;
 }
 
-UNMAP_AFTER_INIT int virtio_gpu_init(void)
+UNMAP_AFTER_INIT static int virtio_gpu_init(void)
 {
     int errno;
     pci_device_t* pci_device;
@@ -374,3 +376,16 @@ UNMAP_AFTER_INIT int virtio_gpu_init(void)
 
     return 0;
 }
+
+READONLY static video_driver_t driver = {
+    .name = "virtio-gpu",
+    .score = 30,
+    .initialize = &virtio_gpu_init,
+};
+
+UNMAP_AFTER_INIT static int virtio_gpu_driver_register(void)
+{
+    return video_driver_register(&driver);
+}
+
+premodules_initcall(virtio_gpu_driver_register);

@@ -2,18 +2,18 @@
 #include <arch/io.h>
 #include <arch/pci.h>
 #include <kernel/vga.h>
-#include <kernel/vga.h>
+#include <kernel/init.h>
 #include <kernel/mutex.h>
 #include <kernel/kernel.h>
 #include <kernel/page_mmio.h>
 #include <kernel/framebuffer.h>
 
+#include "video_driver.h"
+
 // References:
 // https://wiki.osdev.org/Bochs_VBE_Extensions
 // https://github.com/qemu/vgabios/blob/master/vbe_display_api.txt
 // https://www.qemu.org/docs/master/specs/standard-vga.html
-
-#define DEBUG_BOCHS 1
 
 #define VBE_DISPI_IOPORT_INDEX 0x01ce
 #define VBE_DISPI_IOPORT_DATA  0x01cf
@@ -145,7 +145,7 @@ static int bochsfb_fb_mode_set(int resx, int resy, int bpp)
     return 0;
 }
 
-UNMAP_AFTER_INIT int bochsfb_init(void)
+UNMAP_AFTER_INIT static int bochsfb_init(void)
 {
     int errno;
     pci_device_t* pci_device;
@@ -214,3 +214,16 @@ error:
     device = NULL;
     return errno;
 }
+
+READONLY static video_driver_t driver = {
+    .name = "bochs",
+    .score = 20,
+    .initialize = &bochsfb_init,
+};
+
+UNMAP_AFTER_INIT int bochs_driver_register(void)
+{
+    return video_driver_register(&driver);
+}
+
+premodules_initcall(bochs_driver_register);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <arch/io.h>
-#include "virtio.h"
+#include <kernel/virtio.h>
 
 #define VIRTIO_GPU_CONTROLQ  0
 #define VIRTIO_GPU_CURSORQ   1

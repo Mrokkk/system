@@ -136,5 +136,4 @@ struct vbe_mode_info_block
     uint8_t  reserved4[206];
 };
 
-int vesafb_initialize(void);
 int vbe_call(vbe_regs_t* regs);

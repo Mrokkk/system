@@ -7,11 +7,10 @@
 #include <kernel/kernel.h>
 #include <kernel/module.h>
 #include <kernel/string.h>
+#include <kernel/virtio.h>
 #include <kernel/process.h>
 #include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>
-
-#include "virtio.h"
 
 KERNEL_MODULE(virtio_console);
 module_init(virtio_console_init);

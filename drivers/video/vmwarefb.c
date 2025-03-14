@@ -1,6 +1,7 @@
 #define log_fmt(fmt) "vmwarefb: " fmt
 #include <arch/io.h>
 #include <arch/pci.h>
+#include <kernel/init.h>
 #include <kernel/time.h>
 #include <kernel/timer.h>
 #include <kernel/kernel.h>
@@ -8,6 +9,7 @@
 #include <kernel/framebuffer.h>
 
 #include "vmwarefb.h"
+#include "video_driver.h"
 
 static int vmwarefb_mode_set(int resx, int resy, int bpp);
 
@@ -162,3 +164,16 @@ UNMAP_AFTER_INIT int vmwarefb_init(void)
 
     return 0;
 }
+
+READONLY static video_driver_t driver = {
+    .name = "vmware",
+    .score = 30,
+    .initialize = &vmwarefb_init,
+};
+
+UNMAP_AFTER_INIT static int vmware_driver_register(void)
+{
+    return video_driver_register(&driver);
+}
+
+premodules_initcall(vmware_driver_register);

@@ -1,13 +1,15 @@
 #define log_fmt(fmt) "vgafb: " fmt
 #include <arch/bios.h>
-#include <arch/earlycon.h>
 #include <arch/real_mode.h>
 
 #include <kernel/vga.h>
+#include <kernel/init.h>
 #include <kernel/kernel.h>
 #include <kernel/api/ioctl.h>
 #include <kernel/page_mmio.h>
 #include <kernel/framebuffer.h>
+
+#include "video_driver.h"
 
 // References:
 // https://stanislavs.org/helppc/int_10.html
@@ -147,7 +149,7 @@ static int vgafb_fb_mode_set(int resx, int resy, int bpp)
     return -EINVAL;
 }
 
-int vgafb_initialize(void)
+UNMAP_AFTER_INIT static int vgafb_init(void)
 {
     regs_t regs;
     mode_info_t current_mode;
@@ -169,7 +171,7 @@ int vgafb_initialize(void)
             .fb_paddr = 0xb0000,
         };
         mda = true;
-        log_continue("MDA available");
+        log_notice("MDA available");
     }
     else if (vga_probe())
     {
@@ -195,3 +197,16 @@ int vgafb_initialize(void)
 
     return 0;
 }
+
+READONLY static video_driver_t vesa_driver = {
+    .name = "vga",
+    .score = 0,
+    .initialize = &vgafb_init,
+};
+
+UNMAP_AFTER_INIT int vga_driver_register(void)
+{
+    return video_driver_register(&vesa_driver);
+}
+
+premodules_initcall(vga_driver_register);

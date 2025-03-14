@@ -1,11 +1,10 @@
 #define log_fmt(fmt) "virtio: " fmt
-#include "virtio.h"
-
 #include <stdarg.h>
 #include <stddef.h>
 #include <kernel/time.h>
 #include <kernel/kernel.h>
 #include <kernel/malloc.h>
+#include <kernel/virtio.h>
 #include <kernel/execute.h>
 #include <kernel/page_mmio.h>
 #include <kernel/page_alloc.h>

@@ -8,6 +8,8 @@
 #include <kernel/page_alloc.h>
 #include <kernel/framebuffer.h>
 
+#include "video_driver.h"
+
 #define VBE_INFO_BLOCK_ADDR         0x1000
 #define VBE_MODE_INFO_BLOCK_ADDR    0x1300
 #define VBE_EDID_ADDR               0x1400
@@ -334,7 +336,7 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
     return 0;
 }
 
-int vesafb_initialize(void)
+UNMAP_AFTER_INIT int vesafb_initialize(void)
 {
     int resx = 0, resy = 0;
     size_t index = 0;
@@ -395,7 +397,6 @@ int vesafb_initialize(void)
 
         if (regs.ax != VBE_SUPPORTED || !mode_info->mode_attr.supported)
         {
-            log_info("%#x: unsupported", *mode_ptr);
             continue;
         }
 
@@ -461,3 +462,16 @@ int vesafb_initialize(void)
 
     return 0;
 }
+
+READONLY static video_driver_t vesa_driver = {
+    .name = "vesa",
+    .score = 10,
+    .initialize = &vesafb_initialize,
+};
+
+UNMAP_AFTER_INIT int vesa_driver_register(void)
+{
+    return video_driver_register(&vesa_driver);
+}
+
+premodules_initcall(vesa_driver_register);
