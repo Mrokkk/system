@@ -72,14 +72,37 @@ static void ide_buffer_write(uint8_t channel, uint8_t reg, const void* buffer, u
     outsw(channels[channel].base + reg, buffer, size / 2);
 }
 
+static uint8_t ide_status_read(uint8_t channel)
+{
+    return ide_read(channel, ATA_REG_STATUS);
+}
+
+static uint8_t ide_alt_status_read(uint8_t channel)
+{
+    return inb(channels[channel].ctrl + ATA_REG_ALTSTATUS);
+}
+
+static void ide_control_write(uint8_t channel, uint8_t data)
+{
+    outb(data, channels[channel].ctrl + ATA_REG_CONTROL);
+}
+
 static void ide_enable_irq(uint8_t channel)
 {
-    outb(0x00, channels[channel].ctrl + ATA_REG_CONTROL);
+    ide_control_write(channel, 0x00);
 }
 
 static void ide_disable_irq(uint8_t channel)
 {
-    outb(0x02, channels[channel].ctrl + ATA_REG_CONTROL);
+    ide_control_write(channel, 0x02);
+}
+
+static void ide_wait(uint8_t channel)
+{
+    ide_alt_status_read(channel);
+    ide_alt_status_read(channel);
+    ide_alt_status_read(channel);
+    ide_alt_status_read(channel);
 }
 
 static uint8_t bm_readb(uint8_t channel, uint8_t reg)
@@ -102,8 +125,24 @@ static void bm_writel(uint8_t channel, uint8_t reg, uint32_t data)
 static void ide_channel_fill(int channel, pci_device_t* ide_pci)
 {
     uint16_t base = channel ? 0x170 : 0x1f0;
+    uint16_t ctrl = base + 0x206;
+
+    if (ide_pci)
+    {
+        bar_t* cmd_bar = &ide_pci->bar[channel * 2];
+        bar_t* ctrl_bar = &ide_pci->bar[channel * 2 + 1];
+        if (cmd_bar->addr && cmd_bar->size && cmd_bar->region == PCI_IO)
+        {
+            base = cmd_bar->addr;
+        }
+        if (ctrl_bar->addr && ctrl_bar->size && ctrl_bar->region == PCI_IO)
+        {
+            ctrl = ctrl_bar->addr + 2;
+        }
+    }
+
     channels[channel].base  = base;
-    channels[channel].ctrl  = base + 0x206;
+    channels[channel].ctrl  = ctrl;
     channels[channel].bmide = ide_pci ? ide_pci->bar[4].addr & ~1 : 0;
     mutex_init(&channels[channel].lock);
     wait_queue_head_init(&channels[channel].queue);
@@ -153,17 +192,43 @@ static void ide_device_register(ata_device_t* device)
     }
 }
 
+static int ide_ready_wait(uint8_t channel)
+{
+    size_t time_elapsed = 0;
+
+    while (ide_read(channel, ATA_REG_STATUS) & ATA_SR_BSY)
+    {
+        udelay(10);
+        if (time_elapsed++ > 100)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static void ide_device_detect(int drive, bool use_dma)
 {
     uint8_t channel = drive / 2;
     uint8_t role = drive % 2;
     bool atapi = false;
-    uint8_t ch, cl, bm_status;
+    uint8_t ch, cl;
+
+    memset(ide_buf, 0, ATA_IDENT_SIZE);
 
     ide_write(channel, ATA_REG_HDDEVSEL, 0xa0 | (role << 4));
+    ide_wait(channel);
     ide_write(channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
+    ide_wait(channel);
 
-    if (ide_read(channel, ATA_REG_STATUS) == 0)
+    if (ide_ready_wait(channel))
+    {
+        log_warning("[drive %u] timeout; status: %#x", drive, ide_read(channel, ATA_REG_STATUS));
+        return;
+    }
+
+    if (ide_status_read(channel) == 0)
     {
         return;
     }
@@ -177,8 +242,19 @@ static void ide_device_detect(int drive, bool use_dma)
         {
             atapi = true;
             use_dma = false;
+
             ide_write(channel, ATA_REG_HDDEVSEL, 0xa0 | (role << 4));
+            ide_wait(channel);
+            ide_write(channel, ATA_REG_FEATURES, 0);
+            ide_wait(channel);
             ide_write(channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
+            ide_wait(channel);
+
+            if (ide_polling(channel))
+            {
+                log_warning("[drive %u] IDENTIFY PACKET failed");
+                return;
+            }
         }
         else
         {
@@ -186,11 +262,12 @@ static void ide_device_detect(int drive, bool use_dma)
         }
     }
 
-    memset(ide_buf, 0, ATA_IDENT_SIZE);
-
     ide_buffer_read(channel, ATA_REG_DATA, ide_buf, ATA_IDENT_SIZE);
 
-    bm_status = bm_readb(channel, BM_REG_STATUS);
+    if (ide_ready_wait(channel))
+    {
+        log_warning("[drive %u] busy; status: %#x", ide_status_read(channel));
+    }
 
     ata_device_initialize(&ide_devices[drive], ide_buf, drive, NULL);
 
@@ -202,6 +279,7 @@ static void ide_device_detect(int drive, bool use_dma)
 
     if ((ide_devices[drive].dma = use_dma))
     {
+        uint8_t bm_status = bm_readb(channel, BM_REG_STATUS);
         bm_writeb(channel, BM_REG_STATUS, bm_status | BM_STATUS_INTERRUPT | BM_STATUS_DRV0_DMA | BM_STATUS_DRV1_DMA);
         ide_enable_irq(channel);
     }
@@ -343,19 +421,15 @@ static uint8_t ide_polling(uint8_t channel)
 
     while (1)
     {
-        status = ide_read(channel, ATA_REG_STATUS);
+        status = ide_status_read(channel);
         if (time_elapsed > IDE_POLLING_TIMEOUT_MS * 100)
         {
             log_warning("channel %u: timeout, status: %#x", channel, status);
-            return 2;
+            return IDE_TIMEOUT;
         }
-        if (status & ATA_SR_ERR)
+        else if (status & (ATA_SR_ERR | ATA_SR_DF))
         {
-            return 2;
-        }
-        else if (status & ATA_SR_DF)
-        {
-            return 1;
+            return IDE_ERROR;
         }
         else if ((status & (ATA_SR_DRQ | ATA_SR_BSY)) == ATA_SR_DRQ)
         {
@@ -365,7 +439,7 @@ static uint8_t ide_polling(uint8_t channel)
         ++time_elapsed;
     }
 
-    return 0;
+    return IDE_NO_ERROR;
 }
 
 enum mode
@@ -422,7 +496,7 @@ static int ide_ata_prepare_transfer(request_t* req)
         head      = (lba + 1 - sect) % (16 * 63) / (63);
     }
 
-    while (ide_read(channel, ATA_REG_STATUS) & ATA_SR_BSY);
+    while (ide_status_read(channel) & ATA_SR_BSY);
 
     if (lba_mode == IDE_CHS)
     {
@@ -446,7 +520,7 @@ static int ide_ata_prepare_transfer(request_t* req)
     ide_write(channel, ATA_REG_LBA1,      lba_io[1]);
     ide_write(channel, ATA_REG_LBA2,      lba_io[2]);
 
-    while (ide_read(channel, ATA_REG_STATUS) & ATA_SR_BSY);
+    while (ide_status_read(channel) & ATA_SR_BSY);
 
     if (lba_mode == IDE_CHS   && dma == 0 && direction == 0) cmd = ATA_CMD_READ_PIO;
     if (lba_mode == IDE_LBA28 && dma == 0 && direction == 0) cmd = ATA_CMD_READ_PIO;
@@ -506,7 +580,7 @@ static int ide_pio_request(request_t* req)
         ide_polling(channel);
     }
 
-    ide_read(channel, ATA_REG_STATUS);
+    ide_status_read(channel);
 
     return 0;
 }

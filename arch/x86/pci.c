@@ -225,6 +225,13 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
         }
         break;
 
+        VENDOR_ID(PCI_REDHAT, "Red Hat, Inc.")
+        {
+            DEVICE_ID(0x000d, "QEMU XHCI Host Controller");
+            UNKNOWN_DEVICE_ID();
+        }
+        break;
+
         VENDOR_ID(PCI_INTEL, "Intel")
         {
             DEVICE_ID(0x0154, "3rd Gen Core processor DRAM Controller");
@@ -247,6 +254,10 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
             DEVICE_ID(0x1237, "440FX - 82441FX PMC [Natoma]");
             DEVICE_ID(0x2415, "82801AA AC'97 Audio Controller");
             DEVICE_ID(0x2448, "82801 Mobile PCI Bridge");
+            DEVICE_ID(0x2482, "82801CA/CAM USB Controller #1");
+            DEVICE_ID(0x2484, "82801CA/CAM USB Controller #2");
+            DEVICE_ID(0x2487, "82801CA/CAM USB Controller #3");
+            DEVICE_ID(0x248a, "82801CAM IDE U100 Controller");
             DEVICE_ID(0x24c2, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
             DEVICE_ID(0x24c3, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
             DEVICE_ID(0x24c4, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2");

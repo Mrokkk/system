@@ -271,6 +271,7 @@ enum pci_vendor
     PCI_AMD         = 0x1002,
     PCI_TI          = 0x104c,
     PCI_VIRTIO      = 0x1af4,
+    PCI_REDHAT      = 0x1b36,
     PCI_INTEL       = 0x8086,
     PCI_QEMU        = 0x1234,
     PCI_VMWARE      = 0x15ad,

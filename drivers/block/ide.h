@@ -14,6 +14,7 @@
 // https://wiki.osdev.org/PCI_IDE_Controller
 // http://bos.asmhackers.net/docs/ata/docs/29860001.pdf
 // https://forum.osdev.org/viewtopic.php?f=1&t=21151
+// https://bochs.sourceforge.io/techspec/IDE-reference.txt
 
 typedef struct request request_t;
 typedef struct ide_device ide_device_t;
@@ -63,6 +64,13 @@ typedef struct ide_channel ide_channel_t;
 #define BM_STATUS_DRV0_DMA  (1 << 5)
 #define BM_STATUS_DRV1_DMA  (1 << 6)
 #define BM_STATUS_SIMPLEX   (1 << 7)
+
+enum ide_polling_result
+{
+    IDE_NO_ERROR = 0,
+    IDE_ERROR    = 1,
+    IDE_TIMEOUT  = 2,
+};
 
 struct request
 {
