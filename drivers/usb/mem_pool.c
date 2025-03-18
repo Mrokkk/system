@@ -38,6 +38,11 @@ mem_buffer_t* mem_pool_allocate(mem_pool_t* pool, size_t count)
     size_t size = count * pool->block_size;
     mem_buffer_t* buf = alloc(mem_buffer_t);
 
+    if (unlikely(!buf))
+    {
+        return NULL;
+    }
+
     scoped_mutex_lock(&pool->lock);
 
     int buffer_id = bitset_find_clear_range(pool->map, count);
@@ -45,11 +50,7 @@ mem_buffer_t* mem_pool_allocate(mem_pool_t* pool, size_t count)
 
     if (unlikely(buffer_id < 0))
     {
-        return NULL;
-    }
-
-    if (unlikely(!buf))
-    {
+        delete(buf);
         return NULL;
     }
 

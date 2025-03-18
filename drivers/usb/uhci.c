@@ -28,6 +28,8 @@ static int uhci_address_assign(usb_device_t* device);
 static int uhci_control_transfer(usb_device_t* device, usb_packet_t* packets, size_t count);
 static int uhci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, void* data, size_t size);
 
+static int uhci_port_enable(uhci_t* uhci, int port);
+
 READONLY static usb_hc_ops_t ops = {
     .name = "uhci",
     .init = &uhci_init,
@@ -57,7 +59,7 @@ READONLY static usb_hc_ops_t ops = {
     } \
     while (0)
 
-static int uhci_error_handle(usb_device_t* device, uint16_t status, uhci_td_t* td, size_t packet_count, bool timeout)
+static int uhci_error_handle(usb_device_t* device, uhci_td_t* td, size_t packet_count, bool timeout)
 {
     int errno;
     const char* error_name;
@@ -68,7 +70,7 @@ static int uhci_error_handle(usb_device_t* device, uint16_t status, uhci_td_t* t
         errno = -ETIMEDOUT;
         error_name = "timeout";
     }
-    else if (td[packet_count - 1].status)
+    else if (td[packet_count - 1].status & TD_STATUS_ERROR)
     {
         errno = -EIO;
         error_name = "TD error";
@@ -84,14 +86,7 @@ static int uhci_error_handle(usb_device_t* device, uint16_t status, uhci_td_t* t
         error_name,
         uhci_usbcmd_read(uhci),
         uhci_portsc_read(uhci, device->port),
-        status);
-
-    STATUS_PRINT(status, USBSTS_USB_INTERRUPT, "USB interrupt");
-    STATUS_PRINT(status, USBSTS_USB_ERROR_INTERRUPT, "USB error interrupt");
-    STATUS_PRINT(status, USBSTS_RESUME_RECEIVED, "resume detect");
-    STATUS_PRINT(status, USBSTS_HOST_SYSTEM_ERROR, "host system error");
-    STATUS_PRINT(status, USBSTS_HOST_CONTROLLER_PROCESS_ERROR, "host controller process error");
-    STATUS_PRINT(status, USBSTS_HOST_CONTROLLER_HALTED, "host controller halted");
+        uhci_usbsts_read(uhci));
 
     for (size_t i = 0; i < packet_count; ++i)
     {
@@ -109,8 +104,7 @@ static int uhci_error_handle(usb_device_t* device, uint16_t status, uhci_td_t* t
 
 static int uhci_stop(uhci_t* uhci)
 {
-    uint16_t value = uhci_usbcmd_read(uhci);
-    uhci_usbcmd_write(uhci, value & ~UHCI_USBCMD_RUN);
+    uhci_usbcmd_write(uhci, 0);
 
     if (WAIT_WHILE(!(uhci_usbsts_read(uhci) & USBSTS_HOST_CONTROLLER_HALTED)))
     {
@@ -130,44 +124,51 @@ static int uhci_reset(uhci_t* uhci)
         return errno;
     }
 
-    uhci_usbcmd_write(uhci, UHCI_USBCMD_HOST_CONTROLLER_RESET);
+    uhci_usbcmd_write(uhci, USBCMD_GLOBAL_RESET);
 
-    if (WAIT_WHILE((cmd = uhci_usbcmd_read(uhci)) & UHCI_USBCMD_HOST_CONTROLLER_RESET))
+    mdelay(100);
+
+    uhci_usbcmd_write(uhci, 0);
+
+    if (WAIT_WHILE((cmd = uhci_usbcmd_read(uhci)) & USBCMD_GLOBAL_RESET))
     {
-        log_info("[hc] timeout while waiting for reset; cmd: %#x", cmd);
+        log_notice("[hc] global reset: timeout; USBCMD: %#x", cmd);
     }
 
-    uhci_sofmod_write(uhci, 0x40);
+    uhci_usbcmd_write(uhci, USBCMD_HOST_CONTROLLER_RESET);
+
+    if (WAIT_WHILE((cmd = uhci_usbcmd_read(uhci)) & USBCMD_HOST_CONTROLLER_RESET))
+    {
+        log_notice("[hc] reset: timeout; USBCMD: %#x", cmd);
+    }
 
     return 0;
 }
 
-static int uhci_transfer_send_wait(usb_device_t* device, uhci_qh_t* qh, uhci_td_t* tds, size_t packet_count)
+static int uhci_transfer_send_wait(usb_device_t* device, uhci_td_t* tds, size_t packet_count)
 {
     int errno = 0;
-    uint16_t status;
     uhci_t* uhci = device->hc;
+    uhci_td_t* last_td = &tds[packet_count - 1];
 
-    for (int i = 0; i < FRLIST_SIZE; ++i)
+    uhci->skel_qh->first = tds[0].paddr;
+
+    mb();
+
+    if (unlikely(WAIT_WHILE(last_td->status & TD_STATUS_ACTIVE)))
     {
-        uhci->frame_list[i] = qh->paddr | FRLIST_SELECT_QH;
+        errno = uhci_error_handle(device, tds, packet_count, true);
+    }
+    else if (unlikely(last_td->status & TD_STATUS_ERROR))
+    {
+        errno = uhci_error_handle(device, tds, packet_count, false);
     }
 
-    if (unlikely(WAIT_WHILE(!(status = uhci_usbsts_read(uhci)))))
-    {
-        errno = uhci_error_handle(device, status, tds, packet_count, true);
-    }
-    else if (unlikely((status & USBSTS_ERROR) || (tds->status & TD_STATUS_ERROR)))
-    {
-        errno = uhci_error_handle(device, status, tds, packet_count, false);
-    }
+    uhci_usbsts_write(uhci, 0xff);
 
-    uhci_usbsts_write(uhci, status);
+    WAIT_WHILE(uhci_usbsts_read(uhci));
 
-    for (int i = 0; i < FRLIST_SIZE; ++i)
-    {
-        uhci->frame_list[i] = TERMINATE;
-    }
+    uhci->skel_qh->first = TERMINATE;
 
     return errno;
 }
@@ -216,21 +217,20 @@ static mem_buffer_t* uhci_qh_allocate(uhci_t* uhci)
 static int uhci_control_transfer(usb_device_t* device, usb_packet_t* packets, size_t packet_count)
 {
     uhci_t* uhci = device->hc;
+
+    scoped_mutex_lock(&uhci->lock);
+
     mem_buffer_t* td_buf = uhci_td_allocate(uhci, packet_count);
-    mem_buffer_t* qh_buf = uhci_qh_allocate(uhci);
     size_t i = 0;
 
-    if (unlikely(!td_buf || !qh_buf))
+    if (unlikely(!td_buf))
     {
-        if (td_buf) mem_pool_free(td_buf);
-        if (qh_buf) mem_pool_free(qh_buf);
         return -ENOMEM;
     }
 
     uhci_td_t* tds = td_buf->vaddr;
-    uhci_qh_t* qh = qh_buf->vaddr;
 
-    uint32_t status = (device->speed == USB_SPEED_LOW ? TD_STATUS_LOW_SPEED : 0) | TD_STATUS_ACTIVE;
+    uint32_t status = (device->speed == USB_SPEED_LOW ? TD_STATUS_LOW_SPEED : 0) | TD_STATUS_ACTIVE | (3 << 27);
     uint32_t token_base = TD_TOKEN_DEVICE_ADDR_SET(device->address);
 
     for (i = 0; i < packet_count; ++i, token_base ^= TD_TOKEN_TOGGLE)
@@ -249,12 +249,10 @@ static int uhci_control_transfer(usb_device_t* device, usb_packet_t* packets, si
     tds[i - 1].status |= TD_STATUS_IOC;
     tds[i - 1].token |= TD_TOKEN_TOGGLE;
 
-    qh->next  = TERMINATE;
-    qh->first = tds[0].paddr;
+    mb();
 
-    int errno = uhci_transfer_send_wait(device, qh, tds, packet_count);
+    int errno = uhci_transfer_send_wait(device, tds, packet_count);
 
-    mem_pool_free(qh_buf);
     mem_pool_free(td_buf);
 
     return errno;
@@ -269,14 +267,15 @@ static int uhci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, vo
         return -EINVAL;
     }
 
+    scoped_mutex_lock(&uhci->lock);
+
     size_t max_packet_size = endpoint->desc.wMaxPacketSize;
     size_t packet_count = align(size, max_packet_size) / max_packet_size;
     uintptr_t data_paddr = vm_paddr(addr(data), process_current->mm->pgd);
 
     mem_buffer_t* td_buf = uhci_td_allocate(uhci, packet_count);
-    mem_buffer_t* qh_buf = uhci_qh_allocate(uhci);
 
-    if (unlikely(!td_buf || !qh_buf))
+    if (unlikely(!td_buf))
     {
         return -ENOMEM;
     }
@@ -284,7 +283,6 @@ static int uhci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, vo
     uhci_td_t* tds = td_buf->vaddr;
 
     uint8_t endpoint_address = endpoint->desc.bEndpointAddress & 0xf;
-    uint32_t toggle = 0;
     uint32_t status = (device->speed == USB_SPEED_LOW ? TD_STATUS_LOW_SPEED : 0) | TD_STATUS_ACTIVE;
     uint32_t token_base
         = ((endpoint->desc.bEndpointAddress & USB_ENDPOINT_IN) ? USB_PACKET_IN : USB_PACKET_OUT)
@@ -297,13 +295,14 @@ static int uhci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, vo
     {
         size_t packet_size = size > max_packet_size ? max_packet_size : size;
 
-        log_debug(DEBUG_UHCI, "[%s] %s(%u): packet %u: len: %u/%u",
+        log_debug(DEBUG_UHCI, "[%s] %s(%u): packet %u: len: %u/%u, %u",
             device->id,
             (endpoint->desc.bEndpointAddress & 0x80) ? "in" : "out",
             endpoint->desc.bEndpointAddress & 0xf,
             i,
             packet_size,
-            size);
+            size,
+            endpoint->toggle);
 
         if (i > 0)
         {
@@ -312,19 +311,16 @@ static int uhci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, vo
 
         tds[i].buffer_addr = data_paddr + max_packet_size * i;
         tds[i].status      = status;
-        tds[i].token       = TD_TOKEN_SIZE_SET(packet_size) | TD_TOKEN_TOGGLE_SET(toggle) | token_base;
+        tds[i].token       = TD_TOKEN_SIZE_SET(packet_size) | TD_TOKEN_TOGGLE_SET(endpoint->toggle) | token_base;
     }
 
     tds[i - 1].status |= TD_STATUS_IOC;
     tds[i - 1].next = TERMINATE;
 
-    uhci_qh_t* qh = qh_buf->vaddr;
-    qh->next = TERMINATE;
-    qh->first = tds[0].paddr;
+    mb();
 
-    int errno = uhci_transfer_send_wait(device, qh, tds, packet_count);
+    int errno = uhci_transfer_send_wait(device, tds, packet_count);
 
-    mem_pool_free(qh_buf);
     mem_pool_free(td_buf);
 
     return errno;
@@ -333,22 +329,33 @@ static int uhci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, vo
 static int uhci_port_enable(uhci_t* uhci, int port)
 {
     uhci_portsc_write(uhci, port, PORTSC_RESET);
+
+    if (WAIT_WHILE(!(uhci_portsc_read(uhci, port) & PORTSC_RESET)))
+    {
+        log_warning("[port %u] reset start: timeout", port);
+    }
+
     mdelay(50);
     uhci_portsc_write(uhci, port, 0);
+    mdelay(1);
 
     uint16_t status = uhci_portsc_read(uhci, port);
 
     if (!(status & PORTSC_PRESENT))
     {
+        log_warning("[port %u] device not present after reset", port);
         return -ENODEV;
     }
 
-    uhci_portsc_write(uhci, port, PORTSC_ENABLE | PORTSC_CHANGE);
+    uhci_portsc_write(uhci, port, PORTSC_ENABLE);
 
     if (WAIT_WHILE(!(uhci_portsc_read(uhci, port) & PORTSC_ENABLE)))
     {
+        log_warning("[port %u] enable: timeout", port);
         return -ETIMEDOUT;
     }
+
+    uhci_portsc_write(uhci, port, PORTSC_ENABLE | PORTSC_CHANGE | PORTSC_ENABLE_CHANGE);
 
     return 0;
 }
@@ -357,18 +364,20 @@ static void uhci_device_detect(uhci_t* uhci, int port)
 {
     int errno = 0;
 
+    log_info("[port %u] PORTSC: %#x", port, uhci_portsc_read(uhci, port));
+
     switch (uhci_port_enable(uhci, port))
     {
         case -ENODEV:
-            return;
         case -ETIMEDOUT:
-            log_warning("[port %u] timeout while waiting for port to enable", port);
             return;
     }
 
     usb_speed_t speed = (uhci_portsc_read(uhci, port) & PORTSC_LOW_SPEED)
         ? USB_SPEED_LOW
         : USB_SPEED_FULL;
+
+    log_info("[port %u] device present: %#x", port, uhci_portsc_read(uhci, port));
 
     if (unlikely(errno = usb_device_detect(
         uhci,
@@ -383,47 +392,76 @@ static void uhci_device_detect(uhci_t* uhci, int port)
 
 static void uhci_port_check(uhci_t* uhci, int port)
 {
-    uint16_t status = uhci_portsc_read(uhci, port);
+    uint16_t portsc = uhci_portsc_read(uhci, port);
 
-    if (!(status & PORTSC_CHANGE))
+    if (!(portsc & PORTSC_CHANGE))
     {
         return;
     }
 
-    uhci_portsc_write(uhci, port, PORTSC_CHANGE);
-
-    if (status & PORTSC_PRESENT)
+    if (portsc & PORTSC_PRESENT)
     {
         uhci_device_detect(uhci, port);
         return;
     }
 
+    uhci_portsc_write(uhci, port, portsc);
     usb_controller_port_disconnected(uhci, port);
 }
 
 static void uhci_ports_poll(usb_hc_t* hc)
 {
     uhci_t* uhci = hc->data;
-    uhci_port_check(uhci, UHCI_PORT1);
-    uhci_port_check(uhci, UHCI_PORT2);
+
+    for (size_t i = 0; i < uhci->ports; ++i)
+    {
+        uhci_port_check(uhci, i);
+    }
 }
 
 static int uhci_hc_init(uhci_t* uhci)
 {
     int errno;
 
+    uint16_t pci_reg = USBPIRQEN;
+    pci_config_write(uhci->pci, USB_LEGKEY, &pci_reg, sizeof(pci_reg));
+
     if (unlikely(errno = uhci_reset(uhci)))
     {
         return errno;
     }
 
+    for (size_t i = 0; i < UHCI_MAX_PORTS_COUNT; ++i)
+    {
+        if (uhci_portsc_read(uhci, i) & PORTSC_VALID)
+        {
+            uhci->ports++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
     uhci_frbaseadd_write(uhci, page_phys(uhci->frame_list_page));
     uhci_frnum_write(uhci, 0);
+    uhci_sofmod_write(uhci, 64);
     uhci_usbintr_write(uhci, 0);
-    uhci_usbcmd_write(uhci, UHCI_USBCMD_RUN | UHCI_USBCMD_CONFIGURE_FLAG);
+    uhci_usbsts_write(uhci, 0xff);
+    uhci_usbcmd_write(uhci, USBCMD_RUN | USBCMD_MAX_PACKET | USBCMD_CONFIGURE_FLAG);
 
-    uhci_port_check(uhci, UHCI_PORT1);
-    uhci_port_check(uhci, UHCI_PORT2);
+    if (WAIT_WHILE(uhci_usbsts_read(uhci) & USBSTS_HOST_CONTROLLER_HALTED))
+    {
+        log_warning("[hc] run: timeout");
+        return -ETIMEDOUT;
+    }
+
+    log_notice("ports: %u", uhci->ports);
+
+    for (size_t i = 0; i < uhci->ports; ++i)
+    {
+        uhci_port_check(uhci, i);
+    }
 
     return 0;
 }
@@ -458,6 +496,7 @@ UNMAP_AFTER_INIT static int uhci_init(usb_hc_t* hc, pci_device_t* pci_device)
     uhci->pci     = pci_device;
     uhci->qh_pool = mem_pool_create(sizeof(uhci_qh_t));
     uhci->td_pool = mem_pool_create(sizeof(uhci_td_t));
+    mutex_init(&uhci->lock);
 
     if (unlikely(!uhci->qh_pool || !uhci->td_pool))
     {
@@ -465,7 +504,19 @@ UNMAP_AFTER_INIT static int uhci_init(usb_hc_t* hc, pci_device_t* pci_device)
         goto error;
     }
 
-    page_t* page = page_alloc(1, PAGE_ALLOC_ZEROED);
+    mem_buffer_t* skel_qh_buf = uhci_qh_allocate(uhci);
+
+    if (unlikely(!skel_qh_buf))
+    {
+        errno = -ENOMEM;
+        goto error;
+    }
+
+    uhci->skel_qh = skel_qh_buf->vaddr;
+    uhci->skel_qh->first = TERMINATE;
+    uhci->skel_qh->next = TERMINATE;
+
+    page_t* page = page_alloc(1, PAGE_ALLOC_ZEROED | PAGE_ALLOC_UNCACHED);
 
     if (unlikely(!page))
     {
@@ -478,8 +529,10 @@ UNMAP_AFTER_INIT static int uhci_init(usb_hc_t* hc, pci_device_t* pci_device)
 
     for (int i = 0; i < FRLIST_SIZE; i++)
     {
-        uhci->frame_list[i] = TERMINATE;
+        uhci->frame_list[i] = uhci->skel_qh->paddr | FRLIST_SELECT_QH;
     }
+
+    mb();
 
     if (unlikely(errno = uhci_hc_init(uhci)))
     {

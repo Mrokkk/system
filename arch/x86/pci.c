@@ -83,17 +83,24 @@ int pci_device_initialize(pci_device_t* device)
 
 int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size)
 {
-    uint32_t* buf = buffer;
+    uint32_t* buf32 = buffer;
 
-    if (unlikely(size % 4))
+    if (unlikely(size % 2))
     {
         log_error("invalid read from PCI device");
         return -1;
     }
 
-    for (; size >= 4; size -= 4, buf++, offset += 4)
+    for (; size >= 4; size -= 4, buf32++, offset += 4)
     {
-        *buf = pci_config_read_u32(device->bus, device->slot, device->func, offset);
+        *buf32 = pci_config_read_u32(device->bus, device->slot, device->func, offset);
+    }
+
+    uint16_t* buf16 = ptr(buf32);
+
+    for (; size >= 2; size -= 2, buf16++, offset += 2)
+    {
+        *buf16 = pci_config_read_u16(device->bus, device->slot, device->func, offset);
     }
 
     return 0;
@@ -101,17 +108,24 @@ int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t s
 
 int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, size_t size)
 {
-    const uint32_t* buf = buffer;
+    const uint32_t* buf32 = buffer;
 
-    if (unlikely(size % 4))
+    if (unlikely(size % 2))
     {
         log_error("invalid read from PCI device");
         return -1;
     }
 
-    for (; size >= 4; size -= 4, buf++, offset += 4)
+    for (; size >= 4; size -= 4, buf32++, offset += 4)
     {
-        pci_config_write_u32(device->bus, device->slot, device->func, offset, *buf);
+        pci_config_write_u32(device->bus, device->slot, device->func, offset, *buf32);
+    }
+
+    uint16_t* buf16 = ptr(buf32);
+
+    for (; size >= 2; size -= 2, buf16++, offset += 2)
+    {
+        *buf16 = pci_config_read_u16(device->bus, device->slot, device->func, offset);
     }
 
     return 0;
@@ -203,6 +217,7 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
     {
         VENDOR_ID(PCI_AMD, "Advanced Micro Devices, Inc. [AMD/ATI]")
         {
+            DEVICE_ID(0x4c57, "RV200/M7 [Mobility Radeon 7500]");
             DEVICE_ID(0x4e50, "RV350/M10 / RV360/M11 [Mobility Radeon 9600 (PRO) / 9700]");
             DEVICE_ID(0x5046, "Rage 4 [Rage 128 PRO AGP 4X]");
             UNKNOWN_DEVICE_ID();
@@ -212,6 +227,7 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
         VENDOR_ID(PCI_TI, "Texas Instruments")
         {
             DEVICE_ID(0xac46, "PCI4520 PC card Cardbus Controller");
+            DEVICE_ID(0xac55, "PCI1520 PC card Cardbus Controller");
             UNKNOWN_DEVICE_ID();
         }
         break;
@@ -238,8 +254,11 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
             DEVICE_ID(0x0166, "3rd Gen Core processor Graphics Controller");
             DEVICE_ID(0x100e, "82540EM Gigabit Ethernet Controller");
             DEVICE_ID(0x101e, "82540EP Gigabit Ethernet Controller (Mobile)");
+            DEVICE_ID(0x1031, "82801CAM (ICH3) PRO/100 VE (LOM) Ethernet Controller");
             DEVICE_ID(0x10d3, "82574L Gigabit Network Connection");
             DEVICE_ID(0x1503, "82579V Gigabit Network Connection");
+            DEVICE_ID(0x1a30, "82845 845 [Brookdale] Chipset Host Bridge");
+            DEVICE_ID(0x1a31, "82845 845 [Brookdale] Chipset AGP Bridge");
             DEVICE_ID(0x1e03, "7 Series Chipset Family 6-port SATA Controller [AHCI mode]");
             DEVICE_ID(0x1e10, "7 Series/C216 Chipset Family PCI Express Root Port 1");
             DEVICE_ID(0x1e12, "7 Series/C210 Series Chipset Family PCI Express Root Port 2");
@@ -255,9 +274,13 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
             DEVICE_ID(0x2415, "82801AA AC'97 Audio Controller");
             DEVICE_ID(0x2448, "82801 Mobile PCI Bridge");
             DEVICE_ID(0x2482, "82801CA/CAM USB Controller #1");
+            DEVICE_ID(0x2483, "82801CA/CAM SMBus Controller");
             DEVICE_ID(0x2484, "82801CA/CAM USB Controller #2");
+            DEVICE_ID(0x2485, "82801CA/CAM AC'97 Audio Controller");
+            DEVICE_ID(0x2486, "82801CA/CAM AC'97 Modem Controller");
             DEVICE_ID(0x2487, "82801CA/CAM USB Controller #3");
             DEVICE_ID(0x248a, "82801CAM IDE U100 Controller");
+            DEVICE_ID(0x248c, "82801CAM ISA Bridge (LPC)");
             DEVICE_ID(0x24c2, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1");
             DEVICE_ID(0x24c3, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller");
             DEVICE_ID(0x24c4, "82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2");

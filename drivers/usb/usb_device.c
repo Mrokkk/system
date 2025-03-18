@@ -500,7 +500,7 @@ static usb_packet_t* packets_create(size_t packet_count, usb_setup_t* setup, voi
         return NULL;
     }
 
-    page_t* pages = page_alloc(packet_count - 1, PAGE_ALLOC_UNCACHED);
+    page_t* pages = page_alloc(packet_count - 1, PAGE_ALLOC_UNCACHED | PAGE_ALLOC_ZEROED);
 
     if (unlikely(!pages))
     {

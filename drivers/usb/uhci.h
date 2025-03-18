@@ -2,19 +2,20 @@
 
 #include <arch/io.h>
 #include <arch/pci.h>
+#include <kernel/mutex.h>
 #include "mem_pool.h"
 
 enum
 {
-    USBCMD                                = 0x00,
-    UHCI_USBCMD_RUN                       = (1 << 0),
-    UHCI_USBCMD_HOST_CONTROLLER_RESET     = (1 << 1),
-    UHCI_USBCMD_GLOBAL_RESET              = (1 << 2),
-    UHCI_USBCMD_ENTER_GLOBAL_SUSPEND_MODE = (1 << 3),
-    UHCI_USBCMD_FORCE_GLOBAL_RESUME       = (1 << 4),
-    UHCI_USBCMD_SOFTWARE_DEBUG            = (1 << 5),
-    UHCI_USBCMD_CONFIGURE_FLAG            = (1 << 6),
-    UHCI_USBCMD_MAX_PACKET                = (1 << 7),
+    USBCMD                           = 0x00,
+    USBCMD_RUN                       = (1 << 0),
+    USBCMD_HOST_CONTROLLER_RESET     = (1 << 1),
+    USBCMD_GLOBAL_RESET              = (1 << 2),
+    USBCMD_ENTER_GLOBAL_SUSPEND_MODE = (1 << 3),
+    USBCMD_FORCE_GLOBAL_RESUME       = (1 << 4),
+    USBCMD_SOFTWARE_DEBUG            = (1 << 5),
+    USBCMD_CONFIGURE_FLAG            = (1 << 6),
+    USBCMD_MAX_PACKET                = (1 << 7),
 
     USBSTS                               = 0x02,
     USBSTS_USB_INTERRUPT                 = (1 << 0),
@@ -41,14 +42,13 @@ enum
     PORTSC1   = 0x10,
     PORTSC2   = 0x12,
 
-    UHCI_PORT1 = 0,
-    UHCI_PORT2 = 1,
-
-    PORTSC_PRESENT   = (1 << 0),
-    PORTSC_CHANGE    = (1 << 1),
-    PORTSC_ENABLE    = (1 << 2),
-    PORTSC_LOW_SPEED = (1 << 8),
-    PORTSC_RESET     = (1 << 9),
+    PORTSC_PRESENT       = (1 << 0),
+    PORTSC_CHANGE        = (1 << 1),
+    PORTSC_ENABLE        = (1 << 2),
+    PORTSC_ENABLE_CHANGE = (1 << 3),
+    PORTSC_VALID         = (1 << 7),
+    PORTSC_LOW_SPEED     = (1 << 8),
+    PORTSC_RESET         = (1 << 9),
 
     FRLIST_SIZE      = 1024,
     FRLIST_SELECT_QH = (1 << 1),
@@ -75,6 +75,11 @@ enum
     TD_TOKEN_TOGGLE     = (1 << 19),
 
     TERMINATE = (1 << 0),
+
+    UHCI_MAX_PORTS_COUNT = 8,
+
+    USB_LEGKEY = 0xc0,
+    USBPIRQEN = (1 << 13),
 };
 
 #define TD_TOKEN_DEVICE_ADDR_SET(addr)   ((addr) << 8)
@@ -82,26 +87,24 @@ enum
 #define TD_TOKEN_TOGGLE_SET(toggle)      ((toggle) << 19)
 #define TD_TOKEN_SIZE_SET(size)          (((((uint32_t)size) - 1) & 0x7ff) << 21)
 
-typedef io32 uhci_frame_t;
-
 struct uhci_td
 {
-    uhci_frame_t next;
+    io32         next;
     io32         status;
-    uint32_t     token;
-    uint32_t     buffer_addr;
+    io32         token;
+    io32         buffer_addr;
     uint32_t     paddr;
-    uint32_t     padding[3];
+    uint32_t     padding[11];
 };
 
 typedef struct uhci_td uhci_td_t;
 
 struct uhci_qh
 {
-    uint32_t next;
-    uint32_t first;
+    io32     next;
+    io32     first;
     uint32_t paddr;
-    uint32_t padding[1];
+    uint32_t padding[5];
 };
 
 typedef struct uhci_qh uhci_qh_t;
@@ -110,55 +113,35 @@ struct uhci
 {
     pci_device_t* pci;
     uint16_t      iobase;
+    uint8_t       ports;
+    mutex_t       lock;
     page_t*       frame_list_page;
-    uhci_frame_t* frame_list;
+    io32*         frame_list;
     mem_pool_t*   td_pool;
     mem_pool_t*   qh_pool;
+    uhci_qh_t*    skel_qh;
     int           last_addr;
     int           hc_id;
 };
 
 typedef struct uhci uhci_t;
 
-static inline void uhci_usbcmd_write(uhci_t* uhci, uint16_t value)
-{
-    outw(value, uhci->iobase + USBCMD);
-}
+#define DEFINE_REGISTER_RW_FUNC(reg, name, type, suffix) \
+    static inline type uhci_##name##_read(uhci_t* uhci) \
+    { \
+        return in##suffix(uhci->iobase + reg); \
+    } \
+    static inline void uhci_##name##_write(uhci_t* uhci, type value) \
+    { \
+        out##suffix(value, uhci->iobase + reg); \
+    }
 
-static inline uint16_t uhci_usbcmd_read(uhci_t* uhci)
-{
-    return inw(uhci->iobase + USBCMD);
-}
-
-static inline uint16_t uhci_usbsts_read(uhci_t* uhci)
-{
-    return inw(uhci->iobase + USBSTS);
-}
-
-static inline void uhci_usbsts_write(uhci_t* uhci, uint16_t value)
-{
-    outw(value, uhci->iobase + USBSTS);
-}
-
-static inline void uhci_usbintr_write(uhci_t* uhci, uint16_t value)
-{
-    outw(value, uhci->iobase + USBINTR);
-}
-
-static inline void uhci_frnum_write(uhci_t* uhci, uint16_t value)
-{
-    outw(value, uhci->iobase + FRNUM);
-}
-
-static inline void uhci_sofmod_write(uhci_t* uhci, uint8_t value)
-{
-    outb(value, uhci->iobase + SOFMOD);
-}
-
-static inline void uhci_frbaseadd_write(uhci_t* uhci, uint32_t value)
-{
-    outl(value, uhci->iobase + FRBASEADD);
-}
+DEFINE_REGISTER_RW_FUNC(USBCMD, usbcmd, uint16_t, w);
+DEFINE_REGISTER_RW_FUNC(USBSTS, usbsts, uint16_t, w);
+DEFINE_REGISTER_RW_FUNC(USBINTR, usbintr, uint16_t, w);
+DEFINE_REGISTER_RW_FUNC(FRNUM, frnum, uint16_t, w);
+DEFINE_REGISTER_RW_FUNC(SOFMOD, sofmod, uint8_t, b);
+DEFINE_REGISTER_RW_FUNC(FRBASEADD, frbaseadd, uint32_t, l);
 
 static inline uint16_t uhci_portsc_read(uhci_t* uhci, int port)
 {

@@ -1,6 +1,7 @@
 #define log_fmt(fmt) "x86-setup: " fmt
 #include <arch/io.h>
 #include <arch/mp.h>
+#include <arch/agp.h>
 #include <arch/apm.h>
 #include <arch/asm.h>
 #include <arch/dmi.h>
@@ -107,6 +108,7 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     dmi_read();
     pci_scan();
 
+    agp_initialize();
     apm_initialize();
 
     acpi_initialize();

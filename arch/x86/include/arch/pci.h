@@ -63,8 +63,9 @@ typedef struct base_address_register bar_t;
 
 enum pci_cap_id
 {
-    PCI_CAP_ID_VNDR         = 0x09,
+    PCI_CAP_ID_AGP          = 0x02,
     PCI_CAP_ID_MSI          = 0x05,
+    PCI_CAP_ID_VNDR         = 0x09,
     PCI_CAP_ID_MSIX         = 0x0b,
     PCI_CAP_MSG_CTRL_ENABLE = 0x01,
     PCI_CAP_MSG_CTRL_64BIT  = 0x80,
@@ -79,6 +80,19 @@ struct pci_cap
 };
 
 typedef struct pci_cap pci_cap_t;
+
+struct pci_agp_cap
+{
+    uint8_t  id;
+    uint8_t  next;
+    uint8_t  minor:4;
+    uint8_t  major:4;
+    uint8_t  reserved;
+    uint32_t status;
+    uint32_t command;
+};
+
+typedef struct pci_agp_cap pci_agp_cap_t;
 
 enum msi
 {

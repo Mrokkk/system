@@ -12,11 +12,15 @@
 #include <kernel/byteorder.h>
 #include <kernel/page_alloc.h>
 
+#include "mem_pool.h"
 #include "usb_driver.h"
 
 static int usb_msd_probe(usb_device_t* device);
 static int usb_msd_initialize(usb_driver_t* driver);
 static int usb_msd_read(void* blkdev, size_t offset, void* buffer, size_t size, bool irq);
+
+static_assert(sizeof(usb_cbw_t) <= DMA_BLOCK_SIZE);
+static_assert(sizeof(usb_csw_t) <= DMA_BLOCK_SIZE);
 
 READONLY static usb_driver_ops_t ops = {
     .name = "USB Mass Storage Driver",
@@ -79,7 +83,7 @@ static int usb_msd_reset(usb_driver_t* driver)
 
     if (unlikely(errno = usb_control_transfer(
         driver->device,
-        CLEAR_ENDPOINT_HALT_SETUP(msd->in->desc.bEndpointAddress & 0xf),
+        CLEAR_ENDPOINT_HALT_SETUP(msd->in->desc.bEndpointAddress),
         NULL)))
     {
         return errno;
@@ -87,7 +91,7 @@ static int usb_msd_reset(usb_driver_t* driver)
 
     if (unlikely(errno = usb_control_transfer(
         driver->device,
-        CLEAR_ENDPOINT_HALT_SETUP(msd->out->desc.bEndpointAddress & 0xf),
+        CLEAR_ENDPOINT_HALT_SETUP(msd->out->desc.bEndpointAddress),
         NULL)))
     {
         return errno;
@@ -107,39 +111,51 @@ static int usb_msd_scsi_command(usb_driver_t* driver, scsi_packet_t packet, void
     int errno;
     usb_device_t* device = driver->device;
     usb_msd_t* msd = driver->data;
-    usb_cbw_t cbw = {};
-    usb_csw_t csw = {};
+    mem_buffer_t* dma_buf = mem_pool_allocate(msd->dma_pool, 2);
 
-    cbw.signature = CBW_SIGNATURE;
-    cbw.tag       = msd->last_tag++;
-    cbw.len       = size;
-    cbw.direction = 0x80;
-    cbw.unit      = 0;
-    cbw.cmd_len   = sizeof(packet);
-
-    memcpy(cbw.cmd_data, &packet, sizeof(packet));
-
-    if (unlikely(errno = device->ops->bulk_transfer(device, msd->out, &cbw, sizeof(cbw))))
+    if (unlikely(!dma_buf))
     {
-        return errno;
+        return -ENOMEM;
+    }
+
+    usb_cbw_t* cbw = dma_buf->vaddr;
+    usb_csw_t* csw = dma_buf->vaddr + DMA_BLOCK_SIZE;
+
+    cbw->signature = CBW_SIGNATURE;
+    cbw->tag       = msd->last_tag++;
+    cbw->len       = size;
+    cbw->direction = 0x80;
+    cbw->unit      = 0;
+    cbw->cmd_len   = sizeof(packet);
+
+    memcpy(cbw->cmd_data, &packet, sizeof(packet));
+
+    if (unlikely(errno = device->ops->bulk_transfer(device, msd->out, cbw, sizeof(*cbw))))
+    {
+        goto error;
     }
 
     if (unlikely(errno = device->ops->bulk_transfer(device, msd->in, data, size)))
     {
-        return errno;
+        goto error;
     }
 
-    if (unlikely(errno = device->ops->bulk_transfer(device, msd->in, &csw, sizeof(csw))))
+    if (unlikely(errno = device->ops->bulk_transfer(device, msd->in, csw, sizeof(*csw))))
     {
-        return errno;
+        goto error;
     }
 
-    if (csw.signature == CSW_SIGNATURE && csw.status == 0 && csw.tag == cbw.tag)
+    if (csw->signature == CSW_SIGNATURE && csw->status == 0 && csw->tag == cbw->tag)
     {
+        mem_pool_free(dma_buf);
         return 0;
     }
 
-    return -EIO;
+    errno = -EIO;
+
+error:
+    mem_pool_free(dma_buf);
+    return errno;
 }
 
 void usb_msd_string_fix(char* s, size_t len)
@@ -221,15 +237,22 @@ static int usb_msd_device_register(usb_driver_t* driver)
 static int usb_msd_initialize(usb_driver_t* driver)
 {
     int errno;
-    page_t* msd_page = page_alloc(1, PAGE_ALLOC_ZEROED);
+    usb_device_t* device = driver->device;
 
-    if (unlikely(!msd_page))
+    usb_msd_t* msd = zalloc(usb_msd_t);
+
+    if (unlikely(!msd))
     {
         return -ENOMEM;
     }
 
-    usb_device_t* device = driver->device;
-    usb_msd_t* msd = page_virt_ptr(msd_page);
+    msd->dma_pool = mem_pool_create(DMA_BLOCK_SIZE);
+
+    if (unlikely(!msd->dma_pool))
+    {
+        delete(msd);
+        return -ENOMEM;
+    }
 
     driver->data = msd;
 
@@ -240,6 +263,8 @@ static int usb_msd_initialize(usb_driver_t* driver)
         (errno = usb_msd_inquiry(driver)) ||
         (errno = usb_msd_capacity_read(driver)))
     {
+        delete(msd);
+        driver->data = NULL;
         return errno;
     }
 
@@ -248,16 +273,10 @@ static int usb_msd_initialize(usb_driver_t* driver)
 
 static int usb_msd_read(void* blkdev, size_t offset, void* buffer, size_t sectors, bool)
 {
-    int errno;
     usb_driver_t* driver = blkdev;
     usb_msd_t* msd = driver->data;
 
-    if (unlikely(errno = usb_msd_scsi_command(driver, SCSI_READ_PACKET(offset, sectors), buffer, sectors * msd->block_size)))
-    {
-        return errno;
-    }
-
-    return 0;
+    return usb_msd_scsi_command(driver, SCSI_READ_PACKET(offset, sectors), buffer, sectors * msd->block_size);
 }
 
 static int usb_msd_register(void)

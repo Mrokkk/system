@@ -2,16 +2,18 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <kernel/mbr.h>
 #include <kernel/scsi.h>
 #include <kernel/compiler.h>
 #include <kernel/page_types.h>
 
+#include "mem_pool.h"
 #include "usb_device.h"
 #include "usb_descriptors.h"
 
 #define CBW_SIGNATURE 0x43425355
 #define CSW_SIGNATURE 0x53425355
+
+#define DMA_BLOCK_SIZE 32
 
 struct usb_msd
 {
@@ -21,8 +23,8 @@ struct usb_msd
     size_t          size;
     size_t          block_size;
     uint8_t         max_lun;
+    mem_pool_t*     dma_pool;
     scsi_inquiry_t  inquiry;
-    mbr_t           mbr;
 };
 
 typedef struct usb_msd usb_msd_t;
