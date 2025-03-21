@@ -184,66 +184,67 @@ static void ahci_irq_handle(void)
 
 static int ahci_irq_enable(void)
 {
-    pci_cap_t cap = {};
     pci_msi_cap_t msi_cap = {};
 
-    for (uint8_t ptr = ahci_pci->capabilities; ptr; ptr = cap.next)
+    int cap_ptr = pci_cap_find(ahci_pci, PCI_CAP_ID_MSI, &msi_cap, sizeof(msi_cap));
+
+    if (errno_get(cap_ptr))
     {
-        if (unlikely(pci_config_read(ahci_pci, ptr, &cap, sizeof(cap))))
+        log_info("no MSI support");
+        return 0;
+    }
+
+    log_notice("MSI supported; 64bit: %B, maskable: %B",
+        !!(msi_cap.msg_ctrl & MSI_MSG_CTRL_64BIT),
+        !!(msi_cap.msg_ctrl & MSI_MSG_CTRL_MASKABLE));
+
+    int irq, errno;
+
+    if (unlikely(errno = irq_allocate(&ahci_irq_handle, "ahci", 0, &irq)))
+    {
+        return errno;
+    }
+
+    interrupts = true;
+
+    msi_cap.msg_ctrl |= MSI_MSG_CTRL_ENABLE;
+
+    if (msi_cap.msg_ctrl & MSI_MSG_CTRL_64BIT)
+    {
+        msi_cap.b64.msg_addr = 0xfee00000;
+        msi_cap.b64.msg_data = irq;
+        msi_cap.b64.mask = 0;
+
+        pci_config_write(ahci_pci, cap_ptr + 0x4, &msi_cap.b64.msg_addr, 8);
+        pci_config_write(ahci_pci, cap_ptr + 0xc, &msi_cap.b64.msg_data, 4);
+
+        if (msi_cap.msg_ctrl & MSI_MSG_CTRL_MASKABLE)
         {
-            log_warning("cannot read CAP at %#x", ptr);
-            continue;
+            pci_config_write(ahci_pci, cap_ptr + 0x10, &msi_cap.b64.mask, 4);
         }
+    }
+    else
+    {
+        msi_cap.b32.msg_addr = 0xfee00000;
+        msi_cap.b32.msg_data = irq;
+        msi_cap.b32.mask = 0;
 
-        if (cap.id == PCI_CAP_ID_MSI)
+        pci_config_write(ahci_pci, cap_ptr + 0x4, &msi_cap.b32.msg_addr, 4);
+        pci_config_write(ahci_pci, cap_ptr + 0x8, &msi_cap.b32.msg_data, 4);
+
+        if (msi_cap.msg_ctrl & MSI_MSG_CTRL_MASKABLE)
         {
-            log_info("got MSI support");
-
-            if (unlikely(pci_config_read(ahci_pci, ptr, &msi_cap, sizeof(msi_cap))))
-            {
-                log_warning("cannot read MSI CAP");
-                continue;
-            }
-
-            int irq, errno;
-
-            if (unlikely(errno = irq_allocate(&ahci_irq_handle, "ahci", 0, &irq)))
-            {
-                return errno;
-            }
-
-            interrupts = true;
-
-            msi_cap.msg_addr_low = 0xfee00000;
-            msi_cap.msg_data = irq;
-            msi_cap.msg_ctrl |= PCI_CAP_MSG_CTRL_ENABLE;
-
-            pci_config_write(ahci_pci, ptr + 0x4, &msi_cap.msg_addr_low, 4);
-            if (msi_cap.msg_ctrl & PCI_CAP_MSG_CTRL_64BIT)
-            {
-                pci_config_write(ahci_pci, ptr + 0xc, &msi_cap.msg_data, 4);
-            }
-            else
-            {
-                pci_config_write(ahci_pci, ptr + 0x8, &msi_cap.msg_data, 4);
-            }
-            pci_config_write(ahci_pci, ptr, &msi_cap, 4);
-        }
-        else if (cap.id == PCI_CAP_ID_MSIX)
-        {
-            log_info("got MSI-X support");
-            // TODO
+            pci_config_write(ahci_pci, cap_ptr + 0xc, &msi_cap.b32.mask, 4);
         }
     }
 
-    if (interrupts)
-    {
-        ahci->ghc.ie = 1;
+    pci_config_write(ahci_pci, cap_ptr, &msi_cap, 4);
 
-        if (unlikely(ahci->ghc.ie != 1))
-        {
-            return -1;
-        }
+    ahci->ghc.ie = 1;
+
+    if (unlikely(ahci->ghc.ie != 1))
+    {
+        return -1;
     }
 
     return 0;

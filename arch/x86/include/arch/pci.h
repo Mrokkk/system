@@ -67,8 +67,6 @@ enum pci_cap_id
     PCI_CAP_ID_MSI          = 0x05,
     PCI_CAP_ID_VNDR         = 0x09,
     PCI_CAP_ID_MSIX         = 0x0b,
-    PCI_CAP_MSG_CTRL_ENABLE = 0x01,
-    PCI_CAP_MSG_CTRL_64BIT  = 0x80,
 };
 
 struct pci_cap
@@ -81,22 +79,12 @@ struct pci_cap
 
 typedef struct pci_cap pci_cap_t;
 
-struct pci_agp_cap
-{
-    uint8_t  id;
-    uint8_t  next;
-    uint8_t  minor:4;
-    uint8_t  major:4;
-    uint8_t  reserved;
-    uint32_t status;
-    uint32_t command;
-};
-
-typedef struct pci_agp_cap pci_agp_cap_t;
-
 enum msi
 {
     MSI_BASE_ADDRESS = 0xfee00000,
+    MSI_MSG_CTRL_ENABLE   = (1 << 0),
+    MSI_MSG_CTRL_64BIT    = (1 << 7),
+    MSI_MSG_CTRL_MASKABLE = (1 << 8),
 };
 
 struct pci_msi_cap
@@ -104,12 +92,25 @@ struct pci_msi_cap
     uint8_t id;
     uint8_t next;
     uint16_t msg_ctrl;
-    uint32_t msg_addr_low;
-    uint32_t msg_addr_hi;
-    uint16_t msg_data;
-    uint16_t reserved;
-    uint32_t mask;
-    uint32_t pending;
+    union
+    {
+        struct
+        {
+            uint32_t msg_addr;
+            uint16_t msg_data;
+            uint16_t reserved;
+            uint32_t mask;
+            uint32_t pending;
+        } b32;
+        struct
+        {
+            uint64_t msg_addr;
+            uint16_t msg_data;
+            uint16_t reserved;
+            uint32_t mask;
+            uint32_t pending;
+        } b64;
+    };
 };
 
 typedef struct pci_msi_cap pci_msi_cap_t;
@@ -302,6 +303,7 @@ void pci_scan(void);
 int pci_device_initialize(pci_device_t* device);
 int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size);
 int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, size_t size);
+int pci_cap_find(pci_device_t* device, uint8_t id, void* buffer, size_t size);
 void pci_device_print(pci_device_t* device);
 pci_device_t* pci_device_get(uint8_t class, uint8_t subclass);
 void pci_device_enumerate(void (*probe)(pci_device_t* device, void* data), void* data);

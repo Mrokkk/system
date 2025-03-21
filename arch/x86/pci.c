@@ -131,6 +131,37 @@ int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, s
     return 0;
 }
 
+int pci_cap_find(pci_device_t* device, uint8_t id, void* buffer, size_t size)
+{
+    pci_cap_t* cap = buffer;
+
+    if (unlikely(size < sizeof(*cap) || size % 2))
+    {
+        return -EINVAL;
+    }
+
+    for (uint8_t ptr = device->capabilities; ptr; ptr = cap->next)
+    {
+        if (unlikely(pci_config_read(device, ptr, buffer, sizeof(*cap))))
+        {
+            log_warning("cannot read CAP at %#x", ptr);
+            continue;
+        }
+
+        if (cap->id == id)
+        {
+            if (size > sizeof(pci_cap_t))
+            {
+                pci_config_read(device, ptr, buffer + sizeof(*cap), size - sizeof(*cap));
+
+                return ptr;
+            }
+        }
+    }
+
+    return -ENOENT;
+}
+
 UNMAP_AFTER_INIT void pci_scan(void)
 {
     uint32_t bus, slot, func;
