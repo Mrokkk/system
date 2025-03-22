@@ -53,8 +53,8 @@ UNMAP_AFTER_INIT static int i8259_initialize(void)
     outb(0xff, PIC1_DATA);
     outb(0xff, PIC2_DATA);
 
-    irq_register(2, &empty_isr, "cascade", IRQ_DEFAULT);
-    irq_register(13, &empty_isr, "fpu", IRQ_DEFAULT);
+    irq_register(2, &empty_isr, "cascade", IRQ_DEFAULT, NULL);
+    irq_register(13, &empty_isr, "fpu", IRQ_DEFAULT, NULL);
 
     i8259_used = true;
 

@@ -71,7 +71,7 @@ UNMAP_AFTER_INIT static int mouse_init()
     }
 
     return devfs_register("mouse", MAJOR_CHR_MOUSE, 0, &fops)
-        || irq_register(12, mouse_irs, "mouse", IRQ_DEFAULT);
+        || irq_register(12, mouse_irs, "mouse", IRQ_DEFAULT, NULL);
 
     return 0;
 }

@@ -8,24 +8,71 @@
 
 typedef struct
 {
-    void (*handler)();
-    const char* name;
-    int flags;
+    irq_handler_t handler;
+    void*         private;
+    const char*   name;
+    int           flags;
 } irq_t;
 
 static irq_chip_t* chips[IRQ_CHIPS_COUNT];
 static irq_chip_t* used_chip;
 static irq_t irq_list[IRQ_COUNT];
 
-int irq_allocate(void (*handler)(), const char* name, int flags, int* irq_vector)
+int irq_register(uint32_t nr, irq_handler_t handler, const char* name, int flags, void* private)
+{
+    if (unlikely(irq_list[nr].handler))
+    {
+        return -EBUSY;
+    }
+
+    log_debug(DEBUG_IRQ, "%u:%s flags: %#x", nr, name, flags);
+
+    irq_list[nr].name    = name;
+    irq_list[nr].flags   = flags;
+    irq_list[nr].private = private;
+    irq_list[nr].handler = handler;
+
+    if (flags & IRQ_ENABLE)
+    {
+        used_chip->irq_enable(nr, flags);
+    }
+
+    return 0;
+}
+
+int irq_register_naked(uint32_t nr, irq_naked_handler_t handler, const char* name, int flags)
+{
+    if (unlikely(irq_list[nr].handler))
+    {
+        return -EBUSY;
+    }
+
+    log_debug(DEBUG_IRQ, "%u:%s flags: %#x", nr, name, flags);
+
+    irq_list[nr].name    = name;
+    irq_list[nr].flags   = flags;
+    irq_list[nr].private = NULL;
+    irq_list[nr].handler = NULL;
+
+    idt_set(nr + used_chip->vector_offset, addr(handler));
+
+    if (flags & IRQ_ENABLE)
+    {
+        used_chip->irq_enable(nr, flags);
+    }
+
+    return 0;
+}
+
+int irq_allocate(irq_handler_t handler, const char* name, int flags, void* private, int* irq_vector)
 {
     int errno;
 
-    for (int i = 16; i < IRQ_COUNT; ++i)
+    for (size_t i = 16; i < IRQ_COUNT; ++i)
     {
         if (!irq_list[i].handler)
         {
-            if (unlikely(errno = irq_register(i, handler, name, flags)))
+            if (unlikely(errno = irq_register(i, handler, name, flags, private)))
             {
                 return errno;
             }
@@ -39,33 +86,7 @@ int irq_allocate(void (*handler)(), const char* name, int flags, int* irq_vector
     return -ENOMEM;
 }
 
-int irq_register(uint32_t nr, void (*handler)(), const char* name, int flags)
-{
-    if (unlikely(irq_list[nr].handler))
-    {
-        return -EBUSY;
-    }
-
-    log_debug(DEBUG_IRQ, "%u:%s flags: %#x", nr, name, flags);
-
-    irq_list[nr].handler = handler;
-    irq_list[nr].name = name;
-    irq_list[nr].flags = flags;
-
-    if (flags & IRQ_NAKED)
-    {
-        idt_set(nr + used_chip->vector_offset, addr(handler));
-    }
-
-    if (flags & IRQ_ENABLE)
-    {
-        used_chip->irq_enable(nr, flags);
-    }
-
-    return 0;
-}
-
-void do_irq(uint32_t nr, struct pt_regs* regs)
+void do_irq(uint32_t nr, pt_regs_t* regs)
 {
     log_debug(DEBUG_IRQ, "%u", nr);
 
@@ -76,7 +97,7 @@ void do_irq(uint32_t nr, struct pt_regs* regs)
         return;
     }
 
-    irq_list[nr].handler(nr, regs);
+    irq_list[nr].handler(nr, irq_list[nr].private, regs);
     used_chip->eoi(nr);
 }
 

@@ -98,7 +98,7 @@ static inline void rtc_eoi(void)
 void rtc_initialize(void)
 {
     clock_source_register_hz(&rtc, RTC_TICK);
-    irq_register(8, &rtc_irq, "rtc", IRQ_DEFAULT);
+    irq_register(8, &rtc_irq, "rtc", IRQ_DEFAULT, NULL);
 }
 
 static int rtc_disable(void)
