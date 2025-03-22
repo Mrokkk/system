@@ -214,7 +214,7 @@ int keyboard_init(tty_t* tty)
 
     kb_tty = tty;
 
-    irq_register(1, keyboard_irs, "keyboard", IRQ_DEFAULT);
+    irq_register(1, keyboard_irs, "keyboard", IRQ_DEFAULT, NULL);
 
     return 0;
 }

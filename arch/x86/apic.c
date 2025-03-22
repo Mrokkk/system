@@ -22,7 +22,6 @@
 #define apic_debug(...) ({ if (DEBUG_APIC) log_info(__VA_ARGS__); })
 #define ioapic_debug(...) ({ if (DEBUG_IOAPIC) log_info(__VA_ARGS__); })
 
-extern void timer_handler(void);
 static int apic_timer_irq_enable(void);
 static int apic_disable(void);
 static uint32_t apic_timer_calibrate_by_i8253(void);
@@ -226,8 +225,6 @@ UNMAP_AFTER_INIT void apic_initialize(void)
         !!(eax & IA32_APIC_BASE_MSR_BSP),
         apic->version);
 
-    rdmsr(IA32_APIC_BASE_MSR, eax, edx);
-
     switch (apic->version)
     {
         case 0x00 ... 0x0f:
@@ -285,8 +282,6 @@ static int apic_timer_irq_enable(void)
     apic->lvt_timer = 32 | APIC_LVT_TIMER_PERIODIC;
     apic->timer_div = APIC_TIMER_DIV_16;
     apic->timer_init_cnt = init_cnt;
-
-    irq_register(0, &timer_handler, "apic_timer", IRQ_NAKED);
 
     return 0;
 }

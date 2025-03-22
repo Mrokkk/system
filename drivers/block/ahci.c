@@ -122,7 +122,7 @@ static uintptr_t ahci_port_phys_addr(ahci_port_t* port, void* ptr)
     return addr(ptr) - addr(port->data) + page_phys(port->data_pages);
 }
 
-static void ahci_irq_handle(void)
+static void ahci_irq_handle(uint32_t, void*, pt_regs_t*)
 {
     scoped_irq_lock();
 
@@ -200,7 +200,7 @@ static int ahci_irq_enable(void)
 
     int irq, errno;
 
-    if (unlikely(errno = irq_allocate(&ahci_irq_handle, "ahci", 0, &irq)))
+    if (unlikely(errno = irq_allocate(&ahci_irq_handle, "ahci", 0, NULL, &irq)))
     {
         return errno;
     }

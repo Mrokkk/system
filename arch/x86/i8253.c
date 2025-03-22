@@ -45,7 +45,7 @@ UNMAP_AFTER_INIT static int i8253_irq_enable(void)
     outb(I8253_CHANNEL0 | I8253_MODE_2 | I8253_ACCESS_LOHI | I8253_16BIN, I8253_PORT_COMMAND);
     outb(LATCH & 0xff, I8253_PORT_CHANNEL0);
     outb(LATCH >> 8, I8253_PORT_CHANNEL0);
-    irq_register(0, &timer_handler, "i8253", IRQ_NAKED | IRQ_ENABLE);
+    irq_register_naked(0, &timer_handler, "i8253", IRQ_ENABLE);
     return 0;
 }
 

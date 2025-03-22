@@ -22,7 +22,7 @@ static int serial_open(tty_t* tty, file_t* file);
 static int serial_close(tty_t* tty, file_t* file);
 static int serial_write(tty_t* tty, const char* buffer, size_t size);
 static void serial_putch(tty_t* tty, int c);
-static void serial_irs(void);
+static void serial_irs(uint32_t irq, void* data, pt_regs_t* regs);
 
 static tty_driver_t serial_driver = {
     .name = "ttyS",
@@ -68,8 +68,8 @@ static inline int port_to_minor(uint16_t port)
 UNMAP_AFTER_INIT static int serial_init()
 {
     tty_driver_register(&serial_driver);
-    irq_register(0x4, &serial_irs, "com1", IRQ_DEFAULT);
-    irq_register(0x3, &serial_irs, "com2", IRQ_DEFAULT);
+    irq_register(0x4, &serial_irs, "com1", IRQ_DEFAULT, NULL);
+    irq_register(0x3, &serial_irs, "com2", IRQ_DEFAULT, NULL);
     return 0;
 }
 
@@ -141,7 +141,7 @@ void serial_print(const char* string)
     for (; *string; serial_send(*string++, COM1));
 }
 
-void serial_irs(void)
+void serial_irs(uint32_t, void*, pt_regs_t*)
 {
     char c;
     tty_t* tty = serial_tty[0];

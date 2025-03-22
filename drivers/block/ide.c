@@ -403,8 +403,8 @@ UNMAP_AFTER_INIT int ide_initialize(void)
         ide_devices_detect(use_dma);
     }
 
-    irq_register(14, &ide_irq, "ata1", IRQ_DEFAULT);
-    irq_register(15, &ide_irq, "ata2", IRQ_DEFAULT);
+    irq_register(14, &ide_irq, "ata1", IRQ_DEFAULT, NULL);
+    irq_register(15, &ide_irq, "ata2", IRQ_DEFAULT, NULL);
 
     return 0;
 }
