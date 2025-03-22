@@ -1,10 +1,13 @@
 #pragma once
 
 #include <arch/io.h>
+#include <arch/pci.h>
 #include <kernel/list.h>
 #include <kernel/wait.h>
 #include <kernel/compiler.h>
 #include <kernel/page_alloc.h>
+
+#include "ata.h"
 
 // References:
 // https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/serial-ata-ahci-spec-rev1-3-1.pdf
@@ -23,12 +26,6 @@ typedef struct ahci_received_fis ahci_received_fis_t;
 typedef struct ahci_command_table ahci_command_table_t;
 typedef struct ahci_command ahci_command_t;
 typedef struct ahci_prdt_entry ahci_prdt_entry_t;
-
-#define AHCI_DEV_NULL       0
-#define AHCI_DEV_SATA       1
-#define AHCI_DEV_SEMB       2
-#define AHCI_DEV_PM         3
-#define AHCI_DEV_SATAPI     4
 
 #define AHCI_REG(name, val) \
     AHCI_##name = val
@@ -424,23 +421,24 @@ struct ahci_hba
 
 struct request
 {
-    int         slot;
-    int         id;
-    int         errno;
-    list_head_t list_entry;
+    int               slot;
+    int               errno;
+    wait_queue_head_t queue;
+    list_head_t       list_entry;
 };
 
 struct ahci_port
 {
-    uint8_t             id;
-    uint32_t            signature;
-    ahci_hba_port_t*    regs;
-    page_t*             data_pages;
-    ahci_port_data_t*   data;
+    uint8_t           id;
+    uint32_t          signature;
+    ahci_hba_port_t*  regs;
+    list_head_t       requests;
+    ahci_port_data_t* data;
+    page_t*           data_pages;
 };
 
 #define CMDLIST_COUNT 32
-#define PRDT_COUNT 4
+#define PRDT_COUNT    4
 
 struct ahci_port_data
 {
@@ -450,6 +448,17 @@ struct ahci_port_data
     ahci_command_table_t    cmdtable;
     ahci_prdt_entry_t       prdt[PRDT_COUNT];
 };
+
+struct ahci
+{
+    ahci_hba_t*       hba;
+    bool              interrupts;
+    ahci_port_t*      ports[AHCI_PORT_COUNT];
+    ata_device_t*     devices[AHCI_PORT_COUNT];
+    pci_device_t*     pci;
+};
+
+typedef struct ahci ahci_t;
 
 void ahci_dump(ahci_hba_t* ahci);
 void ahci_port_dump(ahci_hba_port_t* ahci);
