@@ -3,7 +3,7 @@
 #include <kernel/compiler.h>
 
 #define PER_CPU_DECLARE(...) \
-    SECTION(.data_per_cpu) __VA_ARGS__
+    SECTION(.data.per_cpu) __VA_ARGS__
 
 #define THIS_CPU_GET(data) \
     ({ \
