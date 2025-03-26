@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "apm: " fmt
 #include <arch/apm.h>
+#include <arch/asm.h>
 #include <arch/dmi.h>
 #include <arch/bios.h>
 #include <arch/reboot.h>
@@ -124,7 +125,7 @@ static inline int apm_32bit_call(regs_t* regs, const char* name)
         "pushf;"
         "pushl $0;"
         "popf;"
-        "mov $0, %%edx;"
+        "mov "ASM_VALUE(APM_DS)", %%edx;"
         "mov %%edx, %%ds;"
         "mov %%edx, %%es;"
         "mov %%edx, %%fs;"
