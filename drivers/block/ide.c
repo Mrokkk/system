@@ -26,7 +26,6 @@
 #define FORCE_PIO                   0
 #define DISABLE_DMA_AFTER_FAILURE   0
 #define IDE_POLLING_TIMEOUT_MS      1000
-#define IDE_IO_DELAY                2
 
 static int ide_blk_read(void* blkdev, size_t offset, void* buffer, size_t size, bool irq);
 static int ide_blk_medium_detect(void* blkdev, size_t* block_size, size_t* sectors);
@@ -127,7 +126,7 @@ static void ide_channel_fill(int channel, pci_device_t* ide_pci)
     uint16_t base = channel ? 0x170 : 0x1f0;
     uint16_t ctrl = base + 0x206;
 
-    if (ide_pci)
+    if (ide_pci && (ide_pci->prog_if & 0x01))
     {
         bar_t* cmd_bar = &ide_pci->bar[channel * 2];
         bar_t* ctrl_bar = &ide_pci->bar[channel * 2 + 1];
@@ -143,7 +142,16 @@ static void ide_channel_fill(int channel, pci_device_t* ide_pci)
 
     channels[channel].base  = base;
     channels[channel].ctrl  = ctrl;
-    channels[channel].bmide = ide_pci ? ide_pci->bar[4].addr & ~1 : 0;
+
+    if (ide_pci && ide_pci->bar[4].addr)
+    {
+        channels[channel].bmide = (ide_pci->bar[4].addr & ~1) + channel * 0x08;
+    }
+    else
+    {
+        channels[channel].bmide = 0;
+    }
+
     mutex_init(&channels[channel].lock);
     wait_queue_head_init(&channels[channel].queue);
 }
@@ -219,17 +227,20 @@ static void ide_device_detect(int drive, bool use_dma)
 
     ide_write(channel, ATA_REG_HDDEVSEL, 0xa0 | (role << 4));
     ide_wait(channel);
+
+    uint8_t status = ide_status_read(channel);
+
+    if (status == 0 || status == 0xff)
+    {
+        return;
+    }
+
     ide_write(channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
-    ide_wait(channel);
+    mdelay(1);
 
     if (ide_ready_wait(channel))
     {
         log_warning("[drive %u] timeout; status: %#x", drive, ide_read(channel, ATA_REG_STATUS));
-        return;
-    }
-
-    if (ide_status_read(channel) == 0)
-    {
         return;
     }
 
@@ -248,11 +259,11 @@ static void ide_device_detect(int drive, bool use_dma)
             ide_write(channel, ATA_REG_FEATURES, 0);
             ide_wait(channel);
             ide_write(channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
-            ide_wait(channel);
+            mdelay(1);
 
             if (ide_polling(channel))
             {
-                log_warning("[drive %u] IDENTIFY PACKET failed");
+                log_warning("[drive %u] IDENTIFY PACKET failed", drive);
                 return;
             }
         }
@@ -301,7 +312,7 @@ static void ide_pci_bm_initialize(bool* use_dma)
 #if FORCE_PIO
     *use_dma = false;
 #else
-    if (!(ide_pci->prog_if & 0x80))
+    if (!(ide_pci->prog_if & 0x80) || !ide_pci->bar[4].addr || !ide_pci->bar[4].size)
     {
         log_info("bus mastering is not supported");
         *use_dma = false;
@@ -424,7 +435,6 @@ static uint8_t ide_polling(uint8_t channel)
         status = ide_status_read(channel);
         if (time_elapsed > IDE_POLLING_TIMEOUT_MS * 100)
         {
-            log_warning("channel %u: timeout, status: %#x", channel, status);
             return IDE_TIMEOUT;
         }
         else if (status & (ATA_SR_ERR | ATA_SR_DF))
@@ -556,7 +566,7 @@ static int ide_pio_request(request_t* req)
         {
             if (unlikely(err = ide_polling(channel)))
             {
-                log_warning("polling error: %#x", err);
+                log_warning("[drive %u] polling error: %#x", req->device->id, err);
                 return -EIO;
             }
             ide_buffer_read(channel, ATA_REG_DATA, buf, sector_size);
@@ -701,7 +711,7 @@ static int ide_atapi_scsi_command(ata_device_t* device, scsi_packet_t* packet, v
 
     if (unlikely(ide_polling(channel)))
     {
-        log_warning("channel %u: polling error");
+        log_warning("[drive %u] polling error", device->id);
         errno = -EIO;
         goto error;
     }
@@ -727,6 +737,7 @@ static int ide_atapi_scsi_command(ata_device_t* device, scsi_packet_t* packet, v
         size_t packet_size = size > sector_size ? sector_size : size;
         if (unlikely(ide_polling(channel)))
         {
+            log_warning("[drive %u] polling error", device->id);
             errno = -EIO;
             goto cleanup_request;
         }
