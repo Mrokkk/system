@@ -356,26 +356,23 @@ static int ehci_bulk_transfer(usb_device_t* device, usb_endpoint_t* endpoint, vo
 
 static bool ehci_hc_ownership_taken(ehci_t* ehci)
 {
-    uint32_t usblegsup;
-    pci_config_read(ehci->pci, ehci->eecp, &usblegsup, sizeof(usblegsup));
+    uint32_t usblegsup = pci_config_readl(ehci->pci, ehci->eecp, NULL);
     return (usblegsup & (USBLEGSUP_HC_OS_OWNERSHIP | USBLEGSUP_HC_BIOS_OWNERSHIP))
         == USBLEGSUP_HC_OS_OWNERSHIP;
 }
 
 static int ehci_hc_ownership_take(ehci_t* ehci)
 {
-    uint32_t usblegsup;
-
     if (!ehci->eecp)
     {
         return 0;
     }
 
-    pci_config_read(ehci->pci, ehci->eecp, &usblegsup, sizeof(usblegsup));
+    uint32_t usblegsup = pci_config_readl(ehci->pci, ehci->eecp, NULL);
 
     usblegsup |= USBLEGSUP_HC_OS_OWNERSHIP;
 
-    pci_config_write(ehci->pci, ehci->eecp, &usblegsup, sizeof(usblegsup));
+    pci_config_writel(ehci->pci, ehci->eecp, usblegsup);
 
     if (WAIT_WHILE(!ehci_hc_ownership_taken(ehci)))
     {

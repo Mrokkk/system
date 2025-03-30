@@ -4,8 +4,6 @@
 #include <kernel/init.h>
 #include <kernel/kernel.h>
 
-static void pci_device_add(uint32_t vendor, uint8_t bus, uint8_t slot, uint8_t func);
-
 static LIST_DECLARE(pci_devices);
 
 #define PCI_BIOS_DISABLED 1
@@ -27,6 +25,12 @@ static LIST_DECLARE(pci_devices);
         &regs; \
     })
 
+#define PCI_MULTIFUNCTION  0x80
+#define PCI_BUS_COUNT      32
+#define PCI_SLOT_COUNT     32
+#define PCI_FUNCTION_COUNT 8
+#define PCI_NO_DEVICE      0xffff
+
 #ifdef __i386__
 static bios32_entry_t pci_bios_entry;
 #endif
@@ -39,6 +43,7 @@ static int pci_devices_list(void)
     {
         pci_device_print(device);
     }
+
     return 0;
 }
 
@@ -47,37 +52,169 @@ static uint32_t pci_io_address(uint8_t bus, uint8_t slot, uint8_t func, uint8_t 
     return 0x80000000 | (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc);
 }
 
-static uint16_t pci_config_read_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
-{
-    outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
-    return inl(PCI_CONFIG_DATA) >> ((offset & 2) * 8) & 0xffff;
-}
-
-static uint32_t pci_config_read_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
+static uint32_t pci_config_readl_impl(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)
 {
     outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
     return inl(PCI_CONFIG_DATA);
 }
 
-static void pci_config_write_u16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t val)
-{
-    outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
-    outw(val, PCI_CONFIG_DATA);
-}
-
-static void pci_config_write_u32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val)
+static void pci_config_writel_impl(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t val)
 {
     outl(pci_io_address(bus, slot, func, offset), PCI_CONFIG_ADDRESS);
     outl(val, PCI_CONFIG_DATA);
 }
 
+static void pci_command_write(pci_device_t* device, uint16_t command)
+{
+    pci_config_writel_impl(device->bus, device->slot, device->func, PCI_REG_COMMAND, command);
+    device->command = pci_config_readl_impl(device->bus, device->slot, device->func, PCI_REG_COMMAND) & 0xffff;
+}
+
+#define STATUS_SET(x) \
+    if (status) *status = (x)
+
+uint32_t pci_config_readl(pci_device_t* device, uint8_t offset, int* status)
+{
+    if (unlikely(offset + 4 < offset))
+    {
+        STATUS_SET(-EINVAL);
+        return 0;
+    }
+
+    uint8_t dword_offset = (offset & 3) * 8;
+    offset &= ~3;
+
+    if (!dword_offset)
+    {
+        STATUS_SET(0);
+        return pci_config_readl_impl(device->bus, device->slot, device->func, offset);
+    }
+
+    uint32_t data = pci_config_readl_impl(device->bus, device->slot, device->func, offset) >> dword_offset;
+    data |= pci_config_readl_impl(device->bus, device->slot, device->func, offset + 4) << (32 - dword_offset);
+
+    STATUS_SET(0);
+
+    return data;
+}
+
+uint16_t pci_config_readw(pci_device_t* device, uint8_t offset, int* status)
+{
+    if (unlikely(offset + 2 < offset))
+    {
+        STATUS_SET(-EINVAL);
+        return 0;
+    }
+
+    uint8_t dword_offset = (offset & 3) * 8;
+    offset &= ~3;
+
+    if (dword_offset < 24)
+    {
+        STATUS_SET(0);
+        return (pci_config_readl_impl(device->bus, device->slot, device->func, offset) >> dword_offset) & 0xffff;
+    }
+
+    uint32_t data = (pci_config_readl_impl(device->bus, device->slot, device->func, offset) >> dword_offset) & 0xff;
+    data |= (pci_config_readl_impl(device->bus, device->slot, device->func, offset + 4) & 0xff) << 8;
+
+    STATUS_SET(0);
+
+    return data;
+}
+
+uint8_t pci_config_readb(pci_device_t* device, uint8_t offset, int* status)
+{
+    uint8_t dword_offset = (offset & 3) * 8;
+
+    STATUS_SET(0);
+
+    return (pci_config_readl_impl(device->bus, device->slot, device->func, offset) >> dword_offset) & 0xff;
+}
+
+int pci_config_writel(pci_device_t* device, uint8_t offset, uint32_t value)
+{
+    if (unlikely(offset + 4 < offset))
+    {
+        return -EINVAL;
+    }
+
+    uint8_t dword_offset = (offset & 3) * 8;
+    offset &= ~3;
+
+    if (!dword_offset)
+    {
+        pci_config_writel_impl(device->bus, device->slot, device->func, offset, value);
+        return 0;
+    }
+
+    uint32_t data = pci_config_readl_impl(device->bus, device->slot, device->func, offset);
+
+    data &= 0xffffffff >> dword_offset;
+    data |= value << dword_offset;
+
+    pci_config_writel_impl(device->bus, device->slot, device->func, offset, data);
+
+    data = pci_config_readl_impl(device->bus, device->slot, device->func, offset + 4);
+
+    data &= 0xffffffff << (32 - dword_offset);
+    data |= value >> (32 - dword_offset);
+
+    pci_config_writel_impl(device->bus, device->slot, device->func, offset, data);
+
+    return 0;
+}
+
+int pci_config_writew(pci_device_t* device, uint8_t offset, uint32_t value)
+{
+    if (unlikely(offset + 2 < offset))
+    {
+        return -EINVAL;
+    }
+
+    uint8_t dword_offset = (offset & 3) * 8;
+    offset &= ~3;
+
+    uint32_t data = pci_config_readl_impl(device->bus, device->slot, device->func, offset);
+
+    uint32_t mask = ~(0xffff << dword_offset);
+    data &= mask;
+    data |= value << dword_offset;
+
+    pci_config_writel_impl(device->bus, device->slot, device->func, offset, data);
+
+    if (dword_offset == 3)
+    {
+        data = pci_config_readl_impl(device->bus, device->slot, device->func, offset + 4);
+
+        data &= 0xffffffff << (32 - dword_offset);
+        data |= value >> (32 - dword_offset);
+
+        pci_config_writel_impl(device->bus, device->slot, device->func, offset, data);
+    }
+
+    return 0;
+}
+
+int pci_config_writeb(pci_device_t* device, uint8_t offset, uint32_t value)
+{
+    uint8_t dword_offset = (offset & 3) * 8;
+    offset &= ~3;
+
+    uint32_t data = pci_config_readl_impl(device->bus, device->slot, device->func, offset);
+
+    uint32_t mask = ~(0xff << dword_offset);
+    data &= mask;
+    data |= value << dword_offset;
+
+    pci_config_writel_impl(device->bus, device->slot, device->func, offset, data);
+
+    return 0;
+}
+
 int pci_device_initialize(pci_device_t* device)
 {
-    device->command |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_BM;
-
-    pci_config_write_u16(device->bus, device->slot, device->func, PCI_REG_COMMAND, device->command);
-    device->command = pci_config_read_u16(device->bus, device->slot, device->func, PCI_REG_COMMAND);
-
+    pci_command_write(device, device->command | PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_BM);
     return !(device->command & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_BM));
 }
 
@@ -85,22 +222,15 @@ int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t s
 {
     uint32_t* buf32 = buffer;
 
-    if (unlikely(size % 2))
+    if (unlikely(size % 4 || offset % 4))
     {
-        log_error("invalid read from PCI device");
+        log_error("unaligned read of %u to %#04x", size, offset);
         return -1;
     }
 
     for (; size >= 4; size -= 4, buf32++, offset += 4)
     {
-        *buf32 = pci_config_read_u32(device->bus, device->slot, device->func, offset);
-    }
-
-    uint16_t* buf16 = ptr(buf32);
-
-    for (; size >= 2; size -= 2, buf16++, offset += 2)
-    {
-        *buf16 = pci_config_read_u16(device->bus, device->slot, device->func, offset);
+        *buf32 = pci_config_readl_impl(device->bus, device->slot, device->func, offset);
     }
 
     return 0;
@@ -110,22 +240,15 @@ int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, s
 {
     const uint32_t* buf32 = buffer;
 
-    if (unlikely(size % 2))
+    if (unlikely(size % 4 || offset % 4))
     {
-        log_error("invalid read from PCI device");
+        log_error("unaligned write of %u to %#04x", size, offset);
         return -1;
     }
 
     for (; size >= 4; size -= 4, buf32++, offset += 4)
     {
-        pci_config_write_u32(device->bus, device->slot, device->func, offset, *buf32);
-    }
-
-    uint16_t* buf16 = ptr(buf32);
-
-    for (; size >= 2; size -= 2, buf16++, offset += 2)
-    {
-        *buf16 = pci_config_read_u16(device->bus, device->slot, device->func, offset);
+        pci_config_writel_impl(device->bus, device->slot, device->func, offset, *buf32);
     }
 
     return 0;
@@ -135,7 +258,7 @@ int pci_cap_find(pci_device_t* device, uint8_t id, void* buffer, size_t size)
 {
     pci_cap_t* cap = buffer;
 
-    if (unlikely(size < sizeof(*cap) || size % 2))
+    if (unlikely(size < sizeof(*cap) || size % 4))
     {
         return -EINVAL;
     }
@@ -162,13 +285,97 @@ int pci_cap_find(pci_device_t* device, uint8_t id, void* buffer, size_t size)
     return -ENOENT;
 }
 
+static void pci_device_add(uint8_t bus, uint8_t slot, uint8_t func)
+{
+    pci_device_t* device = zalloc(pci_device_t);
+
+    if (unlikely(!device))
+    {
+        log_error("cannot allocate pci_device");
+        return;
+    }
+
+    list_init(&device->list_entry);
+    device->bus  = bus;
+    device->slot = slot;
+    device->func = func;
+
+    uint32_t* buf = ptr(device);
+
+    for (uint8_t addr = 0; addr < PCI_REG_BAR0; addr += 4)
+    {
+        *buf++ = pci_config_readl_impl(bus, slot, func, addr);
+    }
+
+    mb();
+
+    if (device->header_type == PCI_HEADER_DEVICE || device->header_type == PCI_HEADER_PCI_BRIDGE)
+    {
+        uint32_t last_bar = device->header_type == PCI_HEADER_DEVICE
+            ? PCI_REG_BAR_END
+            : PCI_REG_BAR2;
+
+        uint32_t command = pci_config_readl_impl(bus, slot, func, PCI_REG_COMMAND);
+        pci_config_writel_impl(bus, slot, func, PCI_REG_COMMAND, command & ~(PCI_COMMAND_IO | PCI_COMMAND_MEMORY));
+
+        for (uint8_t addr = PCI_REG_BAR0; addr < last_bar; addr += 4)
+        {
+            bar_t* bar = ptr(buf);
+            uint32_t raw_bar = pci_config_readl_impl(bus, slot, func, addr);
+
+            if (raw_bar)
+            {
+                pci_config_writel_impl(bus, slot, func, addr, ~0);
+
+                bar->size = ~(pci_config_readl_impl(bus, slot, func, addr) & ~0xf) + 1;
+                bar->region = raw_bar & 0x1;
+
+                if (bar->region == PCI_MEMORY)
+                {
+                    bar->space = (raw_bar >> 1) & 0x3;
+                    bar->addr = raw_bar & ~0xf;
+                }
+                else
+                {
+                    bar->space = 0;
+                    bar->addr = raw_bar & ~0x1;
+                    bar->size &= 0xffff;
+                }
+
+                pci_config_writel_impl(bus, slot, func, addr, raw_bar);
+            }
+            buf = ptr(addr(buf) + sizeof(bar_t));
+        }
+
+        pci_config_writel_impl(bus, slot, func, PCI_REG_COMMAND, command);
+
+        for (uint32_t addr = last_bar; addr < PCI_REG_HEADER0_END; addr += 4)
+        {
+            *buf++ = pci_config_readl_impl(bus, slot, func, addr);
+        }
+    }
+    else
+    {
+        for (uint32_t addr = PCI_REG_BAR0; addr < PCI_REG_HEADER0_END; addr += 4)
+        {
+            *buf++ = pci_config_readl_impl(bus, slot, func, addr);
+        }
+    }
+
+    mb();
+
+    if (device->header_type == PCI_HEADER_DEVICE)
+    {
+        device->capabilities &= ~3;
+    }
+
+    list_add_tail(&device->list_entry, &pci_devices);
+}
+
 UNMAP_AFTER_INIT void pci_scan(void)
 {
     uint32_t bus, slot, func;
-    uint16_t vendor_id, header_type;
-    uint32_t bus_size = 32;
-
-    scoped_irq_lock();
+    uint32_t bus_size = PCI_BUS_COUNT;
 
 #ifdef __i386__
     if (!PCI_BIOS_DISABLED && !bios32_find(PCI_BIOS_SIGNATURE, &pci_bios_entry))
@@ -197,25 +404,28 @@ UNMAP_AFTER_INIT void pci_scan(void)
 skip_pci_bios:
     for (bus = 0; bus < bus_size; ++bus)
     {
-        for (slot = 0; slot < 32; ++slot)
+        for (slot = 0; slot < PCI_SLOT_COUNT; ++slot)
         {
-            vendor_id = pci_config_read_u16(bus, slot, 0, PCI_REG_VENDOR_DEVICE_ID);
-            if (vendor_id == 0xffff)
+            uint16_t vendor_id = pci_config_readl_impl(bus, slot, 0, PCI_REG_VENDOR_DEVICE_ID) & 0xffff;
+
+            if (vendor_id == PCI_NO_DEVICE)
             {
                 continue;
             }
 
-            header_type = pci_config_read_u16(bus, slot, 0, PCI_REG_HEADER_TYPE) & 0xff;
-            pci_device_add(vendor_id, bus, slot, 0);
+            pci_device_add(bus, slot, 0);
 
-            if (header_type & 0x80)
+            uint8_t header_type = (pci_config_readl_impl(bus, slot, 0, 12) >> 16) & 0xff;
+
+            if (header_type & PCI_MULTIFUNCTION)
             {
-                for (func = 1; func < 8; ++func)
+                for (func = 1; func < PCI_FUNCTION_COUNT; ++func)
                 {
-                    vendor_id = pci_config_read_u16(bus, slot, func, PCI_REG_VENDOR_DEVICE_ID);
-                    if (vendor_id != 0xffff)
+                    vendor_id = pci_config_readl_impl(bus, slot, func, PCI_REG_VENDOR_DEVICE_ID) & 0xffff;
+
+                    if (vendor_id != PCI_NO_DEVICE)
                     {
-                        pci_device_add(vendor_id, bus, slot, func);
+                        pci_device_add(bus, slot, func);
                     }
                 }
             }
@@ -223,6 +433,64 @@ skip_pci_bios:
     }
 
     param_call_if_set(KERNEL_PARAM("pciprint"), &pci_devices_list);
+}
+
+static inline const char* storage_subclass_string(int c)
+{
+    switch (c)
+    {
+        case PCI_STORAGE_SCSI: return "SCSI storage controller";
+        case PCI_STORAGE_IDE:  return "IDE interface";
+        case PCI_STORAGE_SATA: return "SATA controller";
+        default:               return "Unknown";
+    }
+}
+
+static inline const char* display_subclass_string(int c)
+{
+    switch (c)
+    {
+        case PCI_DISPLAY_VGA:        return "VGA compatible controller";
+        case PCI_DISPLAY_XGA:        return "XGA compatible controller";
+        case PCI_DISPLAY_3D:         return "3D controller";
+        case PCI_DISPLAY_CONTROLLER: return "Display controller";
+        default:                     return "Unknown";
+    }
+}
+
+static inline const char* multimedia_subclass_string(int c)
+{
+    switch (c)
+    {
+        case PCI_MULTIMEDIA_VIDEO_CONTROLLER: return "Multimedia video controller";
+        case PCI_MULTIMEDIA_AUDIO_CONTROLLER: return "Multimedia audio controller";
+        case PCI_MULTIMEDIA_AUTIO_DEVICE:     return "Audio device";
+        default:                              return "Unknown";
+    }
+}
+
+static inline const char* bridge_subclass_string(int c)
+{
+    switch (c)
+    {
+        case PCI_BRIDGE_HOST:    return "Host bridge";
+        case PCI_BRIDGE_ISA:     return "ISA bridge";
+        case PCI_BRIDGE_EISA:    return "EISA bridge";
+        case PCI_BRIDGE_MCA:     return "MCA bridge";
+        case PCI_BRIDGE_PCI:     return "PCI bridge";
+        case PCI_BRIDGE_CARDBUS: return "CardBus bridge";
+        case PCI_BRIDGE_OTHER:   return "Bridge";
+        default:                 return "Unknown bridge";
+    }
+}
+
+static inline const char* serial_bus_subclass_string(int c)
+{
+    switch (c)
+    {
+        case PCI_SERIAL_BUS_USB: return "USB controller";
+        default:                 return "Serial bus controller";
+    }
 }
 
 #define DEVICE_ID(id, name) \
@@ -248,6 +516,7 @@ void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_i
     {
         VENDOR_ID(PCI_AMD, "Advanced Micro Devices, Inc. [AMD/ATI]")
         {
+            DEVICE_ID(0x4c4d, "Rage Mobility AGP 2x Series");
             DEVICE_ID(0x4c57, "RV200/M7 [Mobility Radeon 7500]");
             DEVICE_ID(0x4e50, "RV350/M10 / RV360/M11 [Mobility Radeon 9600 (PRO) / 9700]");
             DEVICE_ID(0x5046, "Rage 4 [Rage 128 PRO AGP 4X]");
@@ -514,85 +783,6 @@ static inline char* pci_bar_description(bar_t* bar, char* buf, size_t size)
     return buf;
 }
 
-static void pci_device_add(uint32_t, uint8_t bus, uint8_t slot, uint8_t func)
-{
-    pci_device_t* device = zalloc(pci_device_t);
-
-    if (unlikely(!device))
-    {
-        log_error("cannot allocate pci_device");
-        return;
-    }
-
-    uint32_t* buf = ptr(device);
-
-    for (uint8_t addr = 0; addr < PCI_REG_BAR0; addr += 4)
-    {
-        *buf++ = pci_config_read_u32(bus, slot, func, addr);
-    }
-
-    if (device->header_type == 0 || device->header_type == 1)
-    {
-        uint32_t last_bar = device->header_type == 0 ? PCI_REG_BAR_END : 0x18;
-        uint16_t command = pci_config_read_u16(bus, slot, func, 0x4);
-        pci_config_write_u16(bus, slot, func, 0x4, command & ~(3));
-
-        for (uint32_t addr = PCI_REG_BAR0; addr < last_bar; addr += 4)
-        {
-            bar_t* bar = ptr(buf);
-            uint32_t raw_bar = pci_config_read_u32(bus, slot, func, addr);
-            if (raw_bar)
-            {
-                pci_config_write_u32(bus, slot, func, addr, ~(uint32_t)0);
-                bar->size = ~(pci_config_read_u32(bus, slot, func, addr) & ~0xf) + 1;
-                pci_config_write_u32(bus, slot, func, addr, raw_bar);
-
-                bar->region = raw_bar & 0x1;
-                if (bar->region == PCI_MEMORY)
-                {
-                    bar->space = (raw_bar >> 1) & 0x3;
-                    bar->addr = raw_bar & ~0xf;
-                }
-                else
-                {
-                    bar->space = 0;
-                    bar->addr = raw_bar & ~0x1;
-                    bar->size &= 0xffff;
-                }
-            }
-            buf = ptr(addr(buf) + sizeof(bar_t));
-        }
-
-        pci_config_write_u16(bus, slot, func, 0x4, command);
-
-        for (uint32_t addr = last_bar; addr < PCI_REG_HEADER0_END; addr += 4)
-        {
-            *buf++ = pci_config_read_u32(bus, slot, func, addr);
-        }
-    }
-    else
-    {
-        for (uint32_t addr = PCI_REG_BAR0; addr < PCI_REG_HEADER0_END; addr += 4)
-        {
-            *buf++ = pci_config_read_u32(bus, slot, func, addr);
-        }
-    }
-
-    mb();
-
-    list_init(&device->list_entry);
-    device->bus = bus;
-    device->slot = slot;
-    device->func = func;
-
-    if (device->header_type == 0)
-    {
-        device->capabilities &= ~3;
-    }
-
-    list_add_tail(&device->list_entry, &pci_devices);
-}
-
 static uint32_t pci_bridge_io(uint16_t low, uint16_t hi)
 {
     return ((low & ~(0xf)) << 8) | (hi << 16);
@@ -606,24 +796,22 @@ void pci_device_print(pci_device_t* device)
         device->bus, device->slot, device->func,
         pci_device_description(device, description, sizeof(description)));
 
-    if (device->header_type == 0)
-    {
-        log_notice("  Subsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
-    }
+    log_notice("  Header:  %#x;    Status:  %#06x",
+        device->header_type,
+        device->status);
 
-    log_notice("  Header: %#x", device->header_type);
-    log_notice("  Status: %#06x", device->status);
-    log_notice("  Command: %#06x", device->command);
-    log_notice("  Prog IF: %#04x", device->prog_if);
+    log_notice("  Command: %#06x; Prog IF: %#04x",
+        device->command,
+        device->prog_if);
 
     switch (device->header_type)
     {
-        case 0:
-            if (device->interrupt_pin && device->interrupt_line != 0xff)
+        case PCI_HEADER_DEVICE:
+            if (pci_interrupt_valid(device))
             {
                 log_notice("  Interrupt: INT%c# IRQ%u", device->interrupt_pin - 1 + 'A', device->interrupt_line);
             }
-            for (int i = 0; i < 6; ++i)
+            for (size_t i = 0; i < array_size(device->bar); ++i)
             {
                 bar_t* bar = device->bar + i;
                 if (!bar->addr)
@@ -636,15 +824,19 @@ void pci_device_print(pci_device_t* device)
             {
                 log_notice("  Expansion ROM address: %#x", device->rom_base);
             }
-            break;
-        case 1:
-            if (device->bridge.interrupt_pin && device->bridge.interrupt_line != 0xff)
+            if (device->subsystem_id || device->subsystem_vendor_id)
             {
-                log_notice("  Interrupt: pin %u IRQ %u", device->bridge.interrupt_pin, device->bridge.interrupt_line);
+                log_notice("  Subsystem: %s", pci_device_subsystem_description(device, description, sizeof(description)));
             }
-            for (int i = 0; i < 2; ++i)
+            break;
+        case PCI_HEADER_PCI_BRIDGE:
+            if (pci_interrupt_valid(device))
             {
-                bar_t* bar = device->bridge.bar + i;
+                log_notice("  Interrupt: INT%c# IRQ %u", device->pci_bridge.interrupt_pin - 1 + 'A', device->pci_bridge.interrupt_line);
+            }
+            for (size_t i = 0; i < array_size(device->pci_bridge.bar); ++i)
+            {
+                bar_t* bar = device->pci_bridge.bar + i;
                 if (!bar->addr)
                 {
                     continue;
@@ -652,22 +844,22 @@ void pci_device_print(pci_device_t* device)
                 log_notice("  BAR%u: %s", i, pci_bar_description(bar, description, sizeof(description)));
             }
             log_notice("  Primary/secondary/subordinate bus: %02x/%02x/%02x",
-                device->bridge.primary_bus,
-                device->bridge.secondary_bus,
-                device->bridge.subordinate_bus);
+                device->pci_bridge.primary_bus,
+                device->pci_bridge.secondary_bus,
+                device->pci_bridge.subordinate_bus);
 
             log_notice("  IO range: [%#x - %#x]",
-                pci_bridge_io(device->bridge.io_base, device->bridge.io_base_hi),
-                pci_bridge_io(device->bridge.io_limit, device->bridge.io_limit_hi) | 0xfff);
+                pci_bridge_io(device->pci_bridge.io_base, device->pci_bridge.io_base_hi),
+                pci_bridge_io(device->pci_bridge.io_limit, device->pci_bridge.io_limit_hi) | 0xfff);
 
-            if (device->bridge.memory_limit)
+            if (device->pci_bridge.memory_limit)
             {
-                log_notice("  Memory range: [%#x - %#x]", device->bridge.memory_base << 16, device->bridge.memory_limit << 16);
+                log_notice("  Memory range: [%#x - %#x]", device->pci_bridge.memory_base << 16, device->pci_bridge.memory_limit << 16);
             }
 
-            if (device->bridge.rom_base)
+            if (device->pci_bridge.rom_base)
             {
-                log_notice("  Expansion ROM address: %#x", device->bridge.rom_base);
+                log_notice("  Expansion ROM address: %#x", device->pci_bridge.rom_base);
             }
             break;
     }
@@ -679,6 +871,19 @@ pci_device_t* pci_device_get(uint8_t class, uint8_t subclass)
     list_for_each_entry(device, &pci_devices, list_entry)
     {
         if (device->class == class && device->subclass == subclass)
+        {
+            return device;
+        }
+    }
+    return NULL;
+}
+
+pci_device_t* pci_device_get_at(uint8_t bus, uint8_t slot, uint8_t func)
+{
+    pci_device_t* device;
+    list_for_each_entry(device, &pci_devices, list_entry)
+    {
+        if (device->bus == bus && device->slot == slot && device->func == func)
         {
             return device;
         }

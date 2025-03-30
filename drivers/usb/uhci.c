@@ -423,8 +423,7 @@ static int uhci_hc_init(uhci_t* uhci)
 {
     int errno;
 
-    uint16_t pci_reg = USBPIRQEN;
-    pci_config_write(uhci->pci, USB_LEGKEY, &pci_reg, sizeof(pci_reg));
+    pci_config_writew(uhci->pci, USB_LEGKEY, USBPIRQEN);
 
     if (unlikely(errno = uhci_reset(uhci)))
     {

@@ -7,16 +7,20 @@
 
 typedef struct pci_device pci_device_t;
 
-#define PCI_CONFIG_ADDRESS  0xcf8
-#define PCI_CONFIG_DATA     0xcfc
-
-enum header_type
+enum pci_registers
 {
-    PCI_HEADER_DEVICE = 0,
-    PCI_HEADER_BRIDGE = 1,
+    PCI_CONFIG_ADDRESS = 0xcf8,
+    PCI_CONFIG_DATA    = 0xcfc,
 };
 
-enum register_offset
+enum pci_header_type
+{
+    PCI_HEADER_DEVICE         = 0,
+    PCI_HEADER_PCI_BRIDGE     = 1,
+    PCI_HEADER_CARDBUS_BRIDGE = 2,
+};
+
+enum pci_register_offset
 {
     PCI_REG_VENDOR_DEVICE_ID = 0x00,
     PCI_REG_COMMAND          = 0x04,
@@ -31,7 +35,13 @@ enum register_offset
     PCI_REG_HEADER0_END      = 0x40,
 };
 
-enum command
+enum pci_interrupt
+{
+    PCI_INTERRUPT_PIN_UNUSED   = 0x00,
+    PCI_INTERRUPT_LINE_INVALID = 0xff,
+};
+
+enum pci_command
 {
     PCI_COMMAND_IO     = 1 << 0,
     PCI_COMMAND_MEMORY = 1 << 1,
@@ -79,9 +89,9 @@ struct pci_cap
 
 typedef struct pci_cap pci_cap_t;
 
-enum msi
+enum pci_msi
 {
-    MSI_BASE_ADDRESS = 0xfee00000,
+    MSI_BASE_ADDRESS      = 0xfee00000,
     MSI_MSG_CTRL_ENABLE   = (1 << 0),
     MSI_MSG_CTRL_64BIT    = (1 << 7),
     MSI_MSG_CTRL_MASKABLE = (1 << 8),
@@ -128,7 +138,7 @@ struct pci_device
     uint8_t     cacheline_size;
     uint8_t     latency_timer;
     uint8_t     header_type:7;
-    uint8_t     mf:1;
+    uint8_t     multi_function:1;
     uint8_t     bist;
     union
     {
@@ -167,13 +177,18 @@ struct pci_device
             uint8_t     interrupt_line;
             uint8_t     interrupt_pin;
             uint16_t    bridge_control;
-        } bridge;
+        } pci_bridge;
+        struct
+        {
+
+        } cardbus_bridge;
     };
-    uint8_t     bus, slot, func, padding;
+    uint8_t     bus, slot, func;
+    void*       private;
     list_head_t list_entry;
 };
 
-enum class
+enum pci_class
 {
     PCI_UNCLASSIFIED  = 0x0,
     PCI_STORAGE       = 0x1,
@@ -185,25 +200,14 @@ enum class
     PCI_SERIAL_BUS    = 0xc,
 };
 
-enum storage_subclass
+enum pci_storage_subclass
 {
     PCI_STORAGE_SCSI = 0,
     PCI_STORAGE_IDE  = 1,
     PCI_STORAGE_SATA = 6,
 };
 
-static inline const char* storage_subclass_string(int c)
-{
-    switch (c)
-    {
-        case PCI_STORAGE_SCSI: return "SCSI storage controller";
-        case PCI_STORAGE_IDE: return "IDE interface";
-        case PCI_STORAGE_SATA: return "SATA controller";
-        default: return "Unknown";
-    }
-}
-
-enum display_subclass
+enum pci_display_subclass
 {
     PCI_DISPLAY_VGA        = 0,
     PCI_DISPLAY_XGA        = 1,
@@ -211,37 +215,14 @@ enum display_subclass
     PCI_DISPLAY_CONTROLLER = 0x80,
 };
 
-static inline const char* display_subclass_string(int c)
-{
-    switch (c)
-    {
-        case PCI_DISPLAY_VGA: return "VGA compatible controller";
-        case PCI_DISPLAY_XGA: return "XGA compatible controller";
-        case PCI_DISPLAY_3D: return "3D controller";
-        case PCI_DISPLAY_CONTROLLER: return "Display controller";
-        default: return "Unknown";
-    }
-}
-
-enum multimedia_subclass
+enum pci_multimedia_subclass
 {
     PCI_MULTIMEDIA_VIDEO_CONTROLLER = 0,
     PCI_MULTIMEDIA_AUDIO_CONTROLLER = 1,
     PCI_MULTIMEDIA_AUTIO_DEVICE     = 3,
 };
 
-static inline const char* multimedia_subclass_string(int c)
-{
-    switch (c)
-    {
-        case PCI_MULTIMEDIA_VIDEO_CONTROLLER: return "Multimedia video controller";
-        case PCI_MULTIMEDIA_AUDIO_CONTROLLER: return "Multimedia audio controller";
-        case PCI_MULTIMEDIA_AUTIO_DEVICE: return "Audio device";
-        default: return "Unknown";
-    }
-}
-
-enum bridge_subclass
+enum pci_bridge_subclass
 {
     PCI_BRIDGE_HOST    = 0,
     PCI_BRIDGE_ISA     = 1,
@@ -252,59 +233,57 @@ enum bridge_subclass
     PCI_BRIDGE_OTHER   = 0x80,
 };
 
-static inline const char* bridge_subclass_string(int c)
-{
-    switch (c)
-    {
-        case PCI_BRIDGE_HOST: return "Host bridge";
-        case PCI_BRIDGE_ISA: return "ISA bridge";
-        case PCI_BRIDGE_EISA: return "EISA bridge";
-        case PCI_BRIDGE_MCA: return "MCA bridge";
-        case PCI_BRIDGE_PCI: return "PCI bridge";
-        case PCI_BRIDGE_CARDBUS: return "CardBus bridge";
-        case PCI_BRIDGE_OTHER: return "Bridge";
-        default: return "Unknown bridge";
-    }
-}
-
-enum serial_bus_subclass
+enum pci_serial_bus_subclass
 {
     PCI_SERIAL_BUS_USB = 3,
 };
 
-static inline const char* serial_bus_subclass_string(int c)
-{
-    switch (c)
-    {
-        case PCI_SERIAL_BUS_USB: return "USB controller";
-        default: return "Serial bus controller";
-    }
-}
-
 enum pci_vendor
 {
-    PCI_AMD         = 0x1002,
-    PCI_TI          = 0x104c,
-    PCI_VIRTIO      = 0x1af4,
-    PCI_REDHAT      = 0x1b36,
-    PCI_INTEL       = 0x8086,
-    PCI_QEMU        = 0x1234,
-    PCI_VMWARE      = 0x15ad,
-    PCI_QUALCOMM    = 0x168c,
-    PCI_CIRRUS      = 0x1013,
-    PCI_VIA         = 0x1106,
-    PCI_3DFX        = 0x121a,
-    PCI_S3          = 0x5333,
-    PCI_ESONIQ      = 0x1274,
+    PCI_AMD            = 0x1002,
+    PCI_TI             = 0x104c,
+    PCI_VIRTIO         = 0x1af4,
+    PCI_REDHAT         = 0x1b36,
+    PCI_INTEL          = 0x8086,
+    PCI_QEMU           = 0x1234,
+    PCI_VMWARE         = 0x15ad,
+    PCI_QUALCOMM       = 0x168c,
+    PCI_CIRRUS         = 0x1013,
+    PCI_VIA            = 0x1106,
+    PCI_3DFX           = 0x121a,
+    PCI_S3             = 0x5333,
+    PCI_ESONIQ         = 0x1274,
+    PCI_VENDOR_INVALID = 0xffff,
 };
+
+static inline bool pci_interrupt_valid(pci_device_t* device)
+{
+    return device->interrupt_pin != PCI_INTERRUPT_PIN_UNUSED
+        && device->interrupt_line != PCI_INTERRUPT_LINE_INVALID;
+}
 
 void pci_scan(void);
 
 int pci_device_initialize(pci_device_t* device);
+
+uint32_t pci_config_readl(pci_device_t* device, uint8_t offset, int* status);
+uint16_t pci_config_readw(pci_device_t* device, uint8_t offset, int* status);
+uint8_t pci_config_readb(pci_device_t* device, uint8_t offset, int* status);
+
+// Below functions will always write 4-bytes aligned uint32_t. When offset is
+// unaligned it reads 4 or 8 bytes (depending on length and alignment), replaces
+// proper bytes and writes it back
+int pci_config_writel(pci_device_t* device, uint8_t offset, uint32_t value);
+int pci_config_writew(pci_device_t* device, uint8_t offset, uint32_t value);
+int pci_config_writeb(pci_device_t* device, uint8_t offset, uint32_t value);
+
+// Below require 4-bytes aligned offset and 4-bytes aligned size
 int pci_config_read(pci_device_t* device, uint8_t offset, void* buffer, size_t size);
 int pci_config_write(pci_device_t* device, uint8_t offset, const void* buffer, size_t size);
+
 int pci_cap_find(pci_device_t* device, uint8_t id, void* buffer, size_t size);
 void pci_device_print(pci_device_t* device);
 pci_device_t* pci_device_get(uint8_t class, uint8_t subclass);
+pci_device_t* pci_device_get_at(uint8_t bus, uint8_t slot, uint8_t func);
 void pci_device_enumerate(void (*probe)(pci_device_t* device, void* data), void* data);
 void pci_device_describe(pci_device_t* device, char** vendor_id, char** device_id);
