@@ -203,6 +203,13 @@ ENTRY(kernel_page_dir)
     // First entry will be zeroed in arch_setup
     .long page_table0
     .fill KERNEL_PAGE_OFFSET / (PAGE_SIZE * 1024) - 1, 4, 0
-    .long page_table0
+    .long page_table0 + 0 * PAGE_SIZE
+    .long page_table0 + 1 * PAGE_SIZE
+    .long page_table0 + 2 * PAGE_SIZE
+    .long page_table0 + 3 * PAGE_SIZE
+    .long page_table0 + 4 * PAGE_SIZE
+    .long page_table0 + 5 * PAGE_SIZE
+    .long page_table0 + 6 * PAGE_SIZE
+    .long page_table0 + 7 * PAGE_SIZE
 ALIGN(PAGE_SIZE)
 END(kernel_page_dir)
