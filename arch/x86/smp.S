@@ -35,7 +35,7 @@ ENTRY(smp_entry)
 
 ALIGN(16)
 smp_gdt:
-    .word smp_entry_end - smp_gdt_entries - 1
+    .word smp_gdt_entries_end - smp_gdt_entries - 1
     .long RELOCATED(smp_gdt_entries)
 
 ALIGN(16)
@@ -49,6 +49,7 @@ smp_gdt_entries:
 
     // Kernel data segment
     descriptor_entry(DESC_ACCESS_DATA | DESC_ACCESS_RING(0), DESC_FLAGS_4KB | DESC_FLAGS_32BIT, 0, 0xfffff)
+smp_gdt_entries_end:
 
 .code32
 1:
@@ -72,7 +73,7 @@ smp_entry_end:
 1:
     mov SMP_GDT_OFFSET(%edi), %eax
     mov SMP_STACK_OFFSET(%edi), %esp
-    lidt (idt)
+
     lgdt (%eax)
 
     mov $KERNEL_PER_CPU_DS, %eax
@@ -81,6 +82,7 @@ smp_entry_end:
     ljmp $KERNEL_CS, $1f
 
 1:
+    lidt (idt)
     push %esi
     push %ebx
     push $0

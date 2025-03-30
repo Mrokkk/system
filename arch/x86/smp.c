@@ -19,6 +19,8 @@ io8 notification;
 
 static_assert(sizeof(cpu_boot_t) == SMP_CPU_SIZE);
 static_assert(offsetof(cpu_boot_t, stack) == SMP_STACK_OFFSET);
+static_assert(offsetof(cpu_boot_t, gdt) == SMP_GDT_OFFSET);
+static_assert(offsetof(cpu_boot_t, cpu_data) == SMP_CPU_DATA_OFFSET);
 static_assert(offsetof(cpu_boot_t, cr0) == SMP_CR0_OFFSET);
 static_assert(offsetof(cpu_boot_t, cr3) == SMP_CR3_OFFSET);
 static_assert(offsetof(cpu_boot_t, cr4) == SMP_CR4_OFFSET);
@@ -38,9 +40,14 @@ static inline uint8_t atomic_readb(io8* address)
     return *address;
 }
 
+static inline uint32_t atomic_readl(io32* address)
+{
+    return *address;
+}
+
 void smp_notify(uint8_t notif)
 {
-    if (apic && booted > 1)
+    if (apic && atomic_readl(&booted) > 1)
     {
         atomic_writeb(&notification, notif);
         apic_ipi_send(0, APIC_SMP_NOTIF_VECTOR | APIC_ICR_DEST_ALL_SELF_EXCLUDE);
@@ -66,7 +73,7 @@ static gdt_t* cpu_gdt_setup(uint8_t lapic_id)
 {
     gdt_t* this_gdt = CPU_GET(lapic_id, &gdt);
     gdt_entry_t* this_gdt_entries = CPU_GET(lapic_id, (gdt_entry_t*)gdt_entries);
-    size_t gdt_entries_size = addr(gdt_entries_end) - addr(gdt_entries);
+    size_t gdt_entries_size = gdt.limit + 1;
 
     memcpy(this_gdt_entries, gdt_entries, gdt_entries_size);
 
@@ -92,6 +99,8 @@ static void cpu_boot(uint8_t lapic_id, void* stack, void* cpu_data, uint32_t cr0
     cpu->cr0      = cr0;
     cpu->cr3      = cr3;
     cpu->cr4      = cr4;
+
+    mb();
 
     // Assert INIT
     apic_ipi_send(lapic_id, APIC_ICR_DELIVERY_INIT | APIC_ICR_LEVEL_ASSERT | APIC_ICR_TRIGGER_LEVEL);
@@ -160,7 +169,7 @@ UNMAP_AFTER_INIT void smp_cpus_boot(uint8_t* lapic_ids, size_t count)
     log_notice("cpus: %u", count);
 
     size_t per_cpu_size = _data_per_cpu_end - _data_per_cpu_start;
-    size_t pages_count = 1 + align(per_cpu_size, PAGE_SIZE) / PAGE_SIZE;
+    size_t pages_count = 1 + page_align(per_cpu_size) / PAGE_SIZE;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -190,7 +199,7 @@ UNMAP_AFTER_INIT void smp_cpus_boot(uint8_t* lapic_ids, size_t count)
 
     int timeout = 10000;
 
-    while (booted != count && --timeout)
+    while (atomic_readl(&booted) != count && --timeout)
     {
         io_delay(50);
     }
