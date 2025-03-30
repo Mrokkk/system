@@ -94,6 +94,7 @@ else()
         $<TARGET_OBJECTS:drivers>
         $<TARGET_OBJECTS:arch>
         $<TARGET_OBJECTS:fs>
+        $<TARGET_OBJECTS:uacpi>
     )
 endif()
 

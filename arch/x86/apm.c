@@ -2,6 +2,7 @@
 #include <arch/apm.h>
 #include <arch/asm.h>
 #include <arch/dmi.h>
+#include <arch/acpi.h>
 #include <arch/bios.h>
 #include <arch/reboot.h>
 #include <arch/segment.h>
@@ -253,6 +254,12 @@ UNMAP_AFTER_INIT void apm_initialize(void)
 
 disconnect:
     apm_bios_call(APM_INTERFACE_DISCONNECT(regs), "disconnect interface");
+
+    if (acpi_enabled)
+    {
+        log_notice("ACPI enabled; disconnected the interface");
+        return;
+    }
 
     if (apm_bios_call(APM_INTERFACE_CONNECT(regs, apm_mode), "connect interface"))
     {

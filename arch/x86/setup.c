@@ -107,17 +107,13 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
 
     dmi_read();
     pci_scan();
-
     agp_initialize();
-    apm_initialize();
 
     acpi_initialize();
 
     mp_read();
     i8259_preinit();
     apic_initialize();
-
-    i8042_initialize();
 
     i8253_initialize();
     hpet_initialize();
@@ -129,6 +125,11 @@ UNMAP_AFTER_INIT void arch_late_setup(void)
     rtc_initialize();
     clock_sources_setup();
     time_setup();
+
+    acpi_finalize();
+    apm_initialize();
+
+    i8042_initialize();
 
     // Make sure PIC is in proper state
     i8259_check();
