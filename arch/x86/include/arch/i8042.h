@@ -3,6 +3,7 @@
 #include <arch/io.h>
 #include <kernel/kernel.h>
 
+#define I8042_BUFFER_SIZE         16
 #define I8042_CMD_PORT            0x64
 #define I8042_DATA_PORT           0x60
 #define I8042_STATUS_PORT         0x64
@@ -38,8 +39,6 @@
 #define I8042_RESP_RESEND       0xfe
 #define I8042_RESP_SUCCESS      0xaa
 
-#define I8042_TIMEOUT           1000
-
 #define KBD_EKI     0x01
 #define AUX_EKI     0x02
 #define KBD_SYS     0x04
@@ -58,10 +57,9 @@ int i8042_initialize(void);
 int i8042_wait_read(void);
 int i8042_wait_write(void);
 void i8042_flush(void);
-void i8042_send_cmd(uint8_t byte);
-void i8042_send_data(uint8_t byte, uint8_t port);
+int i8042_send_cmd(uint8_t byte);
+int i8042_send_data(uint8_t byte, uint8_t port);
 uint8_t i8042_send_and_receive(uint8_t byte, uint8_t port);
 uint8_t i8042_receive(void);
 int i8042_config_set(uint8_t config);
-uint8_t i8042_device_reset(uint8_t port);
 bool i8042_is_detected(int device);
