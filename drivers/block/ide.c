@@ -13,6 +13,7 @@
 #include <kernel/mutex.h>
 #include <kernel/blkdev.h>
 #include <kernel/kernel.h>
+#include <kernel/malloc.h>
 #include <kernel/module.h>
 #include <kernel/execute.h>
 #include <kernel/process.h>
@@ -385,13 +386,20 @@ UNMAP_AFTER_INIT int ide_initialize(void)
         }
     }
 
-    if (unlikely(!(ide_devices = single_page())))
+    if (unlikely(!(ide_devices = alloc_array(ata_device_t, 4))))
     {
         return -ENOMEM;
     }
 
-    ide_buf = shift_as(void*, ide_devices, PAGE_SIZE - MBR_SECTOR_SIZE);
-    memset(ide_devices, 0, PAGE_SIZE);
+    memset(ide_devices, 0, sizeof(*ide_devices) * 4);
+
+    ide_buf = alloc_array(uint8_t, ATA_SECTOR_SIZE);
+
+    if (unlikely(!ide_buf))
+    {
+        delete_array(ide_devices, 4);
+        return -ENOMEM;
+    }
 
     if (ide_pci)
     {
@@ -416,6 +424,8 @@ UNMAP_AFTER_INIT int ide_initialize(void)
 
     irq_register(14, &ide_irq, "ata1", IRQ_DEFAULT, NULL);
     irq_register(15, &ide_irq, "ata2", IRQ_DEFAULT, NULL);
+
+    delete_array(ide_buf, ATA_SECTOR_SIZE);
 
     return 0;
 }

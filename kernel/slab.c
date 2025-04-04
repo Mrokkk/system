@@ -3,151 +3,235 @@
 #include <kernel/kernel.h>
 #include <kernel/malloc.h>
 #include <kernel/printk.h>
+#include <kernel/compiler.h>
 #include <kernel/page_alloc.h>
 
-#define SLAB_ZERO_AFTER_FREE 1
-#define SLAB_REDZONE        0
-#define SLAB_POISON         0x5324
-#define SLAB_REDZONE_POISON 0xffc0deff
-#define SLAB_REDZONE_SIZE   8
+#define SLAB_CLASS(class_size, count) \
+    SLAB_##class_size,
 
-typedef struct slab
+enum
+{
+#include "slab_classes.h"
+};
+
+#define SLAB_ZERO_AFTER_FREE 1
+#define SLAB_POISON          0x02532401
+
+struct slab_block
 {
     list_head_t list_entry;
     uint32_t    poison;
-} slab_t;
+};
 
-typedef struct slab_allocator
+struct slab
+{
+    page_t*     pages;
+    uintptr_t   start;
+    uintptr_t   end;
+    size_t      allocated;
+    list_head_t free;
+    list_head_t list_entry;
+};
+
+struct slab_allocator
 {
     mutex_t     lock;
     size_t      size;
-    page_t*     pages;
-    list_head_t free;
-} slab_allocator_t;
+    size_t      slab_size;
+    list_head_t slabs;
+};
 
-#define SLAB_32     0
-#define SLAB_64     1
-#define SLAB_128    2
-#define SLAB_256    3
-#define SLAB_512    4
-#define SLAB_768    5
-#define SLAB_1024   6
-#define SLABS_SIZE  7
+typedef struct slab slab_t;
+typedef struct slab_block slab_block_t;
+typedef struct slab_allocator slab_allocator_t;
 
-static slab_allocator_t allocators[SLABS_SIZE];
+static MUTEX_DECLARE(lock);
+static page_t* metadata_pages;
+static void* current_ptr;
+static void* current_end;
+
+#undef SLAB_CLASS
+#define SLAB_CLASS(class_size, count) \
+    [SLAB_##class_size] = { \
+        .lock = MUTEX_INIT(allocators[SLAB_##class_size].lock), \
+        .size = class_size, \
+        .slab_size = page_align((class_size) * (count)), \
+        .slabs = LIST_INIT(allocators[SLAB_##class_size].slabs) \
+    },
+
+static slab_allocator_t allocators[] = {
+#include "slab_classes.h"
+};
 
 static inline slab_allocator_t* slab_allocator_get(size_t size)
 {
-#if SLAB_REDZONE
-    size += SLAB_REDZONE_SIZE;
-#endif
-    if (size <= 32) return allocators + SLAB_32;
-    else if (size <= 64) return allocators + SLAB_64;
-    else if (size <= 128) return allocators + SLAB_128;
-    else if (size <= 256) return allocators + SLAB_256;
-    else if (size <= 512) return allocators + SLAB_512;
-    else if (size <= 768) return allocators + SLAB_768;
-    else if (size <= 1024) return allocators + SLAB_1024;
-    else return NULL;
+#undef SLAB_CLASS
+#define SLAB_CLASS(class_size, count) \
+    if (size <= class_size) return allocators + SLAB_##class_size;
+#include "slab_classes.h"
+    return NULL;
 }
 
-void* slab_alloc(size_t size)
+static void* slab_entry_alloc(void)
 {
-    slab_allocator_t* allocator = slab_allocator_get(size);
+    void* slab;
 
-    if (unlikely(!allocator))
+    scoped_mutex_lock(&lock);
+
+    if (unlikely(current_ptr >= current_end))
     {
-        return NULL;
+        page_t* page = page_alloc(1, 0);
+
+        if (unlikely(!page))
+        {
+            return NULL;
+        }
+
+        slab = current_ptr = page_virt_ptr(page);
+        current_end = current_ptr + PAGE_SIZE;
+    }
+    else
+    {
+        slab = current_ptr;
     }
 
-    scoped_mutex_lock(&allocator->lock);
-
-    if (unlikely(list_empty(&allocator->free)))
-    {
-        return NULL;
-    }
-
-    slab_t* slab = list_front(&allocator->free, slab_t, list_entry);
-    list_del(&slab->list_entry);
-    slab->poison = 0;
-
-#if SLAB_REDZONE
-    uint32_t* redzone = ptr(slab);
-    *redzone = SLAB_REDZONE_POISON;
-    redzone = ptr(addr(redzone) + size + 4);
-    *redzone = SLAB_REDZONE_POISON;
-    slab = ptr(addr(slab) + 4);
-#endif
+    current_ptr += align(sizeof(slab_t), 32);
 
     return slab;
 }
 
-void slab_free(void* ptr, size_t size)
+static slab_t* slab_create(slab_allocator_t* allocator)
 {
-    slab_t* slab = ptr;
-    slab_allocator_t* allocator = slab_allocator_get(size);
+    page_t* pages = page_alloc(
+        allocator->slab_size / PAGE_SIZE,
+        PAGE_ALLOC_CONT | PAGE_ALLOC_ZEROED);
 
-#if SLAB_REDZONE
-    slab = ptr(addr(slab) - 4);
-    uint32_t* redzone = ptr(slab);
-    ASSERT(*redzone == SLAB_REDZONE_POISON);
-    redzone = ptr(addr(redzone) + size + 4);
-    ASSERT(*redzone == SLAB_REDZONE_POISON);
-#endif
-
-    // FIXME: this can be randomly happen on some data which happens to set exact same value
-    if (unlikely(slab->poison == SLAB_POISON))
+    if (unlikely(!pages))
     {
-        log_info("possibly freeing already free block %p", ptr);
+        return NULL;
     }
 
-    if (unlikely(!allocator))
+    slab_t* slab = slab_entry_alloc();
+
+    if (unlikely(!slab))
     {
-        return;
+        pages_free(pages);
+        return NULL;
     }
 
     list_init(&slab->list_entry);
+    list_init(&slab->free);
+    list_add_tail(&slab->list_entry, &allocator->slabs);
+    slab->pages     = pages;
+    slab->start     = page_virt(pages);
+    slab->end       = page_virt(pages) + allocator->slab_size;
+    slab->allocated = 0;
+
+    void* ptr = page_virt_ptr(pages);
+
+    for (size_t i = 0; i < allocator->slab_size / allocator->size; ++i, ptr += allocator->size)
+    {
+        slab_block_t* block = ptr(ptr);
+        list_init(&block->list_entry);
+        list_add_tail(&block->list_entry, &slab->free);
+        block->poison = SLAB_POISON;
+    }
+
+    return slab;
+}
+
+static void* slab_block_get(slab_t* slab)
+{
+    slab_block_t* block = list_front(&slab->free, slab_block_t, list_entry);
+    list_del(&block->list_entry);
+    block->poison = 0;
+    slab->allocated++;
+    return block;
+}
+
+void* slab_alloc(size_t size)
+{
+    slab_t* slab;
+    slab_allocator_t* allocator = slab_allocator_get(size);
+
+    if (unlikely(!allocator))
+    {
+        return NULL;
+    }
 
     scoped_mutex_lock(&allocator->lock);
 
-    list_add_tail(&slab->list_entry, &allocator->free);
-    slab->poison = SLAB_POISON;
+    list_for_each_entry(slab, &allocator->slabs, list_entry)
+    {
+        if (unlikely(list_empty(&slab->free)))
+        {
+            continue;
+        }
 
-#if SLAB_ZERO_AFTER_FREE
-    memset(shift(slab, sizeof(*slab)), 0, allocator->size - sizeof(*slab));
-#endif
+        return slab_block_get(slab);
+    }
+
+    slab = slab_create(allocator);
+
+    if (unlikely(!slab))
+    {
+        return NULL;
+    }
+
+    return slab_block_get(slab);
 }
 
-UNMAP_AFTER_INIT static void init(slab_allocator_t* allocator, size_t size, size_t count)
+void slab_free(void* ptr, size_t size)
 {
-    uint8_t* ptr;
-    page_t* pages;
     slab_t* slab;
+    slab_block_t* block = ptr;
+    slab_allocator_t* allocator = slab_allocator_get(size);
 
-    pages = page_alloc(page_align(count * size) / PAGE_SIZE, PAGE_ALLOC_CONT | PAGE_ALLOC_ZEROED);
-    ptr = page_virt_ptr(pages);
-
-    list_init(&allocator->free);
-    mutex_init(&allocator->lock);
-    allocator->pages = pages;
-    allocator->size = size;
-
-    for (size_t i = 0; i < count; ++i, ptr += size)
+    if (unlikely(!allocator))
     {
-        slab = ptr(ptr);
-        list_init(&slab->list_entry);
-        list_add_tail(&slab->list_entry, &allocator->free);
-        slab->poison = SLAB_POISON;
+        log_error("%s: ptr: %p, size: %zu: invalid size", __func__, ptr, size);
+        return;
     }
+
+    scoped_mutex_lock(&allocator->lock);
+
+    list_for_each_entry(slab, &allocator->slabs, list_entry)
+    {
+        if (!(addr(ptr) >= slab->start && addr(ptr) < slab->end))
+        {
+            continue;
+        }
+
+        // FIXME: this can be randomly happen on some data which happens to set exact same value
+        if (unlikely(block->poison == SLAB_POISON))
+        {
+            log_info("possibly freeing already free block %p", ptr);
+        }
+
+        list_init(&block->list_entry);
+
+        list_add_tail(&block->list_entry, &slab->free);
+        block->poison = SLAB_POISON;
+        slab->allocated--;
+
+#if SLAB_ZERO_AFTER_FREE
+        memset(shift(block, sizeof(*block)), 0, allocator->size - sizeof(*block));
+#endif
+        return;
+    }
+
+    log_error("%s: ptr: %p, size: %zu: unknown pointer", __func__, ptr, size);
 }
 
 UNMAP_AFTER_INIT void slab_allocator_init(void)
 {
-    init(&allocators[SLAB_32], 32, 2048 * 8);
-    init(&allocators[SLAB_64], 64, 2048 * 16);
-    init(&allocators[SLAB_128], 128, 512 * 2);
-    init(&allocators[SLAB_256], 256, 64 * 2);
-    init(&allocators[SLAB_512], 512, 32 * 2);
-    init(&allocators[SLAB_768], 768, 32 * 2);
-    init(&allocators[SLAB_1024], 1024, 32);
+    metadata_pages = page_alloc(1, 0);
+
+    if (unlikely(!metadata_pages))
+    {
+        log_error("cannot allocate metadata page");
+        return;
+    }
+
+    current_ptr = page_virt_ptr(metadata_pages);
 }

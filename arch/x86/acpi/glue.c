@@ -45,7 +45,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr* out_rsdp_address)
 void* uacpi_kernel_alloc(uacpi_size size)
 {
     // FIXME: add proper allocator which handles all sizes
-    if (size > 1024)
+    if (size > 16384)
     {
         size = page_align(size);
         page_t* pages = page_alloc(size / PAGE_SIZE, PAGE_ALLOC_CONT);
@@ -57,6 +57,7 @@ void* uacpi_kernel_alloc(uacpi_size size)
 
         return page_virt_ptr(pages);
     }
+
     void* block = slab_alloc(size);
 
     if (unlikely(!block))
@@ -75,7 +76,7 @@ void uacpi_kernel_free(void* mem, uacpi_size size_hint)
         return;
     }
 
-    if (size_hint > 1024)
+    if (size_hint > 16384)
     {
         return;
     }
