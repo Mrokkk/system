@@ -23,12 +23,21 @@ function build()
         --enable-process-substitution \
         --enable-readline \
         --disable-largefile \
-        --disable-multibyte
+        --disable-multibyte || exit 1
 
-    make bash -j${NPROC} || die "compilation failed"
+    sed -i 's/#define HAVE_DLCLOSE 1/\/* #undef HAVE_DLCLOSE *\//' ${BUILD_DIR}/config.h \
+        || exit 1
+
+    sed -i 's/#define HAVE_DLOPEN 1/\/* #undef HAVE_DLOPEN *\//' ${BUILD_DIR}/config.h \
+        || exit 1
+
+    sed -i 's/#define HAVE_DLSYM 1/\/* #undef HAVE_DLSYM *\//' ${BUILD_DIR}/config.h \
+        || exit 1
+
+    make bash -j${NPROC} || exit 1
 }
 
 function install()
 {
-    make -O install -j${NPROC}
+    make -O install -j${NPROC} || exit 1
 }

@@ -6,11 +6,11 @@ function build()
 {
     cd ${SRC_DIR}
     make distclean
-    ./configure --uname=PhoenixOS || die "configuration failed"
-    make -O -j${NPROC} || die "compilation failed"
+    ./configure --uname=PhoenixOS || exit 1
+    make -O -j${NPROC} || exit 1
 }
 
 function install()
 {
-    cp -P --preserve=links ${SRC_DIR}/lib* ${SYSROOT}/lib
+    cp -P --preserve=links ${SRC_DIR}/lib* ${SYSROOT}/lib || exit 1
 }

@@ -12,12 +12,12 @@ function build()
     then
         "${SRC_DIR}"/configure \
             --prefix="${PREFIX}" \
-            --target-list=i386-softmmu,x86_64-softmmu || die "configuration failed"
+            --target-list=i386-softmmu,x86_64-softmmu || exit 1
     fi
-    ninja all || die "compilation failed"
+    ninja all || exit 1
 }
 
 function install()
 {
-    ninja install || die "installation failed"
+    ninja install || exit 1
 }

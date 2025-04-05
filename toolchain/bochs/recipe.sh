@@ -30,13 +30,13 @@ function build()
             --with-x \
             --with-x11 \
             --with-term \
-            --with-sdl2 || die "bosch configuration failed"
+            --with-sdl2 || exit 1
     fi
 
-    make -j${NPROC} || die "bosch compilation failed"
+    make -j${NPROC} || exit 1
 }
 
 function install()
 {
-    make install -j${NPROC} || die "bochs installation failed"
+    make install -j${NPROC} || exit 1
 }

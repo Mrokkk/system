@@ -253,10 +253,10 @@ then
     create_dir "${mountpoint}/root/.vim/bundle"
     git clone https://github.com/VundleVim/Vundle.vim.git "${mountpoint}/root/.vim/bundle/Vundle.vim"
     git clone https://github.com/preservim/nerdtree.git "${mountpoint}/root/.vim/bundle/nerdtree"
-    if [[ -d "~/.vim/bundle/gruvbox-material" ]] # FIXME: gruvbox-material writes files during first start
+    if [[ -d ~/.vim/bundle/gruvbox-material ]] # FIXME: gruvbox-material writes files during first start
     then
         create_dir "${mountpoint}/root/.vim/bundle/gruvbox-material"
-        copy_dir_content "~/.vim/bundle/gruvbox-material" "${mountpoint}/root/.vim/bundle/gruvbox-material"
+        copy_dir_content ~/.vim/bundle/gruvbox-material "${mountpoint}/root/.vim/bundle/gruvbox-material"
     fi
 fi
 

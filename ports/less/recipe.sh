@@ -10,16 +10,16 @@ function build()
         --with-regex=none \
         --disable-xattr \
         --disable-libsmack \
-        --disable-libcap || die "configuration failed"
+        --disable-libcap || exit 1
 
     sed -i 's/#define HAVE_WCTYPE 1/\/* #undef HAVE_WCTYPE *\//' ${BUILD_DIR}/defines.h \
-        || die "cannot sed"
+        || exit 1
     touch ${BUILD_DIR}/stamp-h
 
-    make -O -j ${NPROC} || die "compilation failed"
+    make -O -j ${NPROC} || exit 1
 }
 
 function install()
 {
-    make install
+    make install || exit 1
 }

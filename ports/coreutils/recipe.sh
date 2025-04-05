@@ -12,13 +12,13 @@ function build()
         --disable-xattr \
         --disable-libsmack \
         --disable-libcap \
-        --enable-no-install-program=arch,coreutils,hostname,chcon,runcon,df,pinky,users,who,nice
+        --enable-no-install-program=arch,coreutils,hostname,chcon,runcon,df,pinky,users,who,nice || exit 1
 
     make -O -j${NPROC}
 
     for app in "${APPS[@]}"
     do
-        make -O src/${app} -j${NPROC} || die "${app} build failed"
+        make -O src/${app} -j${NPROC} || exit 1
     done
 }
 

@@ -3,7 +3,7 @@ OPTIONAL=true
 
 function build()
 {
-    cmake -B . -S "${SRC_DIR}" || exit 1
+    cmake -B . -S "${SRC_DIR}" --preset optimized || exit 1
     cmake --build . -- -j4 || exit 1
 }
 

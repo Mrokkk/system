@@ -44,16 +44,23 @@ function build()
         --disable-icon-cache-update \
         --disable-canberra \
         --disable-libsodium \
-        --with-features=normal
+        --with-features=normal || exit 1
 
-    sed -i 's#default_vim_dir.*#default_vim_dir = (char*)"/usr/share/vim";#g' src/auto/pathdef.c || die "cannot fix pathdef.c"
-    sed
+    sed -i 's/#define HAVE_DLOPEN 1/\/* #undef HAVE_DLOPEN *\//' ${SRC_DIR}/src/auto/config.h \
+        || exit 1
 
-    make -O -j4 || die "compilation failed"
+    sed -i 's/#define HAVE_DLSYM 1/\/* #undef HAVE_DLSYM *\//' ${SRC_DIR}/src/auto/config.h \
+        || exit 1
+
+    make -O -j${NPROC} || exit 1
+
+    sed -i 's#default_vim_dir.*#default_vim_dir = (char*)"/usr/share/vim";#g' src/auto/pathdef.c || exit 1
+
+    make -O -j${NPROC} || exit 1
 }
 
 function install()
 {
     cd "${SRC_DIR}"
-    make install
+    make install || exit 1
 }

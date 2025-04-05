@@ -6,12 +6,12 @@ BRANCH="dmidecode-3-6"
 function build()
 {
     cd "${SRC_DIR}"
-    make all -j${NPROC} || die "compilation failed"
+    make all -j${NPROC} || exit 1
 }
 
 function install()
 {
-    rsync -a --checksum "${SRC_DIR}/dmidecode" "${SYSROOT}/bin"
-    rsync -a --checksum "${SRC_DIR}/biosdecode" "${SYSROOT}/bin"
-    rsync -a --checksum "${SRC_DIR}/vpddecode" "${SYSROOT}/bin"
+    rsync -a --checksum "${SRC_DIR}/dmidecode" "${SYSROOT}/bin" || exit 1
+    rsync -a --checksum "${SRC_DIR}/biosdecode" "${SYSROOT}/bin" || exit 1
+    rsync -a --checksum "${SRC_DIR}/vpddecode" "${SYSROOT}/bin" || exit 1
 }

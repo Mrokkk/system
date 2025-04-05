@@ -27,5 +27,5 @@ function build()
 function install()
 {
     make -O -j${NPROC} install || exit 1
-    cp ${SYSROOT}/lib/tcc/include/stddef.h ${SYSROOT}/lib/tcc/include/stdint.h
+    cp ${SYSROOT}/lib/tcc/include/stddef.h ${SYSROOT}/lib/tcc/include/stdint.h || exit 1
 }

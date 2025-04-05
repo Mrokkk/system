@@ -21,15 +21,15 @@ function build()
             --enable-shared \
             --enable-default-pie \
             --enable-host-shared \
-            --with-system-zlib || die "configuration failed"
+            --with-system-zlib || exit 1
     fi
 
-    make -O all-gcc -j${NPROC}           || die "gcc compilation failed"
-    make -O all-target-libgcc -j${NPROC} || die "libgcc compilation failed"
+    make -O all-gcc -j${NPROC} || exit 1
+    make -O all-target-libgcc -j${NPROC} || exit 1
 }
 
 function install()
 {
-    make -O install-gcc -j${NPROC}           || die "gcc installation failed"
-    make -O install-target-libgcc -j${NPROC} || die "libgcc installation failed"
+    make -O install-gcc -j${NPROC} || exit 1
+    make -O install-target-libgcc -j${NPROC} || exit 1
 }

@@ -18,12 +18,12 @@ function build()
             --disable-libdecnumber \
             --disable-threads \
             --disable-sim \
-            --with-system-zlib || die "binutils configuration failed"
+            --with-system-zlib || exit 1
     fi
-    make -O all -j${NPROC} || die "binutils compilation failed"
+    make -O all -j${NPROC} || exit 1
 }
 
 function install()
 {
-    make -O install -j${NPROC} || die "binutils installation failed"
+    make -O install -j${NPROC} || exit 1
 }

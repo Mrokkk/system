@@ -7,12 +7,12 @@ BRANCH=
 function build()
 {
     gnu_configuration \
-        --disable-largefile
+        --disable-largefile || exit 1
 
-    make -O -j${NPROC} || die "compilation failed"
+    make -O -j${NPROC} || exit 1
 }
 
 function install()
 {
-    make -O -j${NPROC} install || die "installation failed"
+    make -O -j${NPROC} install || exit 1
 }

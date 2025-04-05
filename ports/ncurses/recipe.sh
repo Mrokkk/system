@@ -25,7 +25,7 @@ function build()
 
     sed -i 's/^.* TERMINFO_DIRS .*/#define TERMINFO_DIRS \"\/usr\/share\/terminfo\"/g;
             s/^.* TERMINFO .*/#define TERMINFO_DIRS \"\/usr\/share\/terminfo\"/g' \
-        ${BUILD_DIR}/include/ncurses_cfg.h || die "cannot fix ncurses_cfg.h"
+        ${BUILD_DIR}/include/ncurses_cfg.h || exit 1
 
     make -O -j${NPROC} || exit 1
 }

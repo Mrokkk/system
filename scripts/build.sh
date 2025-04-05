@@ -159,6 +159,7 @@ function main()
     create_dir "${sysroot}/usr/include"
     create_dir "${sysroot}/usr/lib"
     copy_dir_content "${base_dir}/../lib/include" "${sysroot}/usr/include"
+    copy_dir_content "${base_dir}/../common/include" "${sysroot}/usr/include"
     copy_dir_content "${base_dir}/../include" "${sysroot}/usr/include"
 
     local packages=()
