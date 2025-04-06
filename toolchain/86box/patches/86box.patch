@@ -1,6 +1,6 @@
-commit e42eb14080c9846f52a3b25d7bb08855869e45d0
+commit 5c88ecbfddb187d41b56d0aea9a3968e93a55d3a
 Author: Mrokkk <mrokk@protonmail.com>
-Date:   Sat Feb 1 17:39:28 2025 +0100
+Date:   Sun Apr 6 20:59:02 2025 +0200
 
     Some features
     
@@ -8,12 +8,13 @@ Date:   Sat Feb 1 17:39:28 2025 +0100
     * add support for 0xe9 debug console
     * add exit button
     * add QT_NO_DEBUG_OUTPUT flag
+    * change the mouse capture exit keys to Ctrl+Alt+G (like in QEMU)
 
 diff --git a/src/86box.c b/src/86box.c
-index 97c211b..67b2e49 100644
+index ad1cfc519..069672bb0 100644
 --- a/src/86box.c
 +++ b/src/86box.c
-@@ -943,6 +943,11 @@ pc_full_speed(void)
+@@ -1025,6 +1025,11 @@ pc_full_speed(void)
      atfullspeed = 1;
  }
  
@@ -25,7 +26,7 @@ index 97c211b..67b2e49 100644
  /* Initialize modules, ran once, after pc_init. */
  int
  pc_init_modules(void)
-@@ -1183,6 +1188,8 @@ pc_reset_hard_init(void)
+@@ -1304,6 +1309,8 @@ pc_reset_hard_init(void)
      /* Reset the general machine support modules. */
      io_init();
  
@@ -35,11 +36,11 @@ index 97c211b..67b2e49 100644
      timer_init();
  
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 7d6daff..2a07b6f 100644
+index 8cf67043f..4dadd2e9c 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -52,6 +52,8 @@ add_executable(86Box
-     cJSON.c
+@@ -46,6 +46,8 @@ add_executable(86Box
+     machine_status.c
  )
  
 +add_compile_definitions("QT_NO_DEBUG_OUTPUT")
@@ -48,7 +49,7 @@ index 7d6daff..2a07b6f 100644
      add_compile_definitions(_FILE_OFFSET_BITS=64 _LARGEFILE_SOURCE=1 _LARGEFILE64_SOURCE=1)
  endif()
 diff --git a/src/cpu/x86.c b/src/cpu/x86.c
-index 6f15560..a197920 100644
+index 97ae19f3a..290598143 100644
 --- a/src/cpu/x86.c
 +++ b/src/cpu/x86.c
 @@ -35,6 +35,7 @@
@@ -68,7 +69,7 @@ index 6f15560..a197920 100644
      if (hard)
          x86_log("x86 reset\n");
 diff --git a/src/cpu/x86seg.c b/src/cpu/x86seg.c
-index 61c0edd..17d114a 100644
+index 145752237..9186c2391 100644
 --- a/src/cpu/x86seg.c
 +++ b/src/cpu/x86seg.c
 @@ -28,6 +28,7 @@
@@ -79,7 +80,7 @@ index 61c0edd..17d114a 100644
  #include <86box/machine.h>
  #include <86box/mem.h>
  #include <86box/nvr.h>
-@@ -1536,6 +1537,15 @@ pmodeint(int num, int soft)
+@@ -1548,6 +1549,14 @@ pmodeint(int num, int soft)
          x86gpf("pmodeint(): V86 banned int", 0);
          return;
      }
@@ -89,17 +90,35 @@ index 61c0edd..17d114a 100644
 +        if (num == 6) {
 +            logger("  opcode: %#x", readmeml(0, cpu_state.pc));
 +        }
-+        putc('\n', stderr);
 +    }
 +
      addr = (num << 3);
      if ((addr + 7) > idt.limit) {
          if (num == 0x08) {
+diff --git a/src/device/keyboard.c b/src/device/keyboard.c
+index a00968cf7..4187cf32d 100644
+--- a/src/device/keyboard.c
++++ b/src/device/keyboard.c
+@@ -485,13 +485,7 @@ keyboard_isfsexit_up(void)
+ int
+ keyboard_ismsexit(void)
+ {
+-    if ((key_prefix_2_1 != 0x000) || (key_prefix_2_2 != 0x000))
+-        return ((recv_key_ui[key_prefix_1_1] || recv_key_ui[key_prefix_1_2]) &&
+-                (recv_key_ui[key_prefix_2_1] || recv_key_ui[key_prefix_2_2]) &&
+-                (recv_key_ui[key_uncapture_1] || recv_key_ui[key_uncapture_2]));
+-    else
+-        return ((recv_key_ui[key_prefix_1_1] || recv_key_ui[key_prefix_1_2]) &&
+-                (recv_key_ui[key_uncapture_1] || recv_key_ui[key_uncapture_2]));
++    return ((recv_key_ui[0x01d] || recv_key_ui[0x11d]) && (recv_key_ui[0x038] || recv_key_ui[0x138]) && (recv_key_ui[0x022] || recv_key_ui[0x122]));
+ }
+ 
+ /* This is so we can disambiguate scan codes that would otherwise conflict and get
 diff --git a/src/include/86box/log.h b/src/include/86box/log.h
-index a37bdec..a67b613 100644
+index 80ed6d108..75d91e0ee 100644
 --- a/src/include/86box/log.h
 +++ b/src/include/86box/log.h
-@@ -29,6 +29,7 @@ extern "C" {
+@@ -34,6 +34,7 @@ extern "C" {
  #define LOG_MINIMUM_REPEAT_ORDER        4               /* Minimum repeat size */
  
  /* Function prototypes. */
@@ -107,10 +126,61 @@ index a37bdec..a67b613 100644
  extern void log_set_suppr_seen(void *priv, int suppr_seen);
  extern void log_set_dev_name(void *priv, char *dev_name);
  #ifndef RELEASE_BUILD
-diff --git a/src/log.c b/src/log.c
-index c8dddf6..e7fb179 100644
---- a/src/log.c
-+++ b/src/log.c
+diff --git a/src/include/86box/plat.h b/src/include/86box/plat.h
+index 7ed6e80d4..a1b01bcd0 100644
+--- a/src/include/86box/plat.h
++++ b/src/include/86box/plat.h
+@@ -32,8 +32,8 @@
+ /* String ID numbers. */
+ enum {
+     STRING_MOUSE_CAPTURE,             /* "Click to capture mouse" */
+-    STRING_MOUSE_RELEASE,             /* "Press F8+F12 to release mouse" */
+-    STRING_MOUSE_RELEASE_MMB,         /* "Press F8+F12 or middle button to release mouse" */
++    STRING_MOUSE_RELEASE,             /* "Press Ctrl+Alt+G to release mouse" */
++    STRING_MOUSE_RELEASE_MMB,         /* "Press Ctrl+Alt+G or middle button to release mouse" */
+     STRING_INVALID_CONFIG,            /* "Invalid configuration" */
+     STRING_NO_ST506_ESDI_CDROM,       /* "MFM/RLL or ESDI CD-ROM drives never existed" */
+     STRING_NET_ERROR,                 /* "Failed to initialize network driver" */
+diff --git a/src/qt/qt_mainwindow.ui b/src/qt/qt_mainwindow.ui
+index ef3cf16c6..12848f090 100644
+--- a/src/qt/qt_mainwindow.ui
++++ b/src/qt/qt_mainwindow.ui
+@@ -259,6 +259,7 @@
+    <addaction name="actionHard_Reset"/>
+    <addaction name="separator"/>
+    <addaction name="actionACPI_Shutdown"/>
++   <addaction name="actionExit"/>
+    <addaction name="separator"/>
+    <addaction name="actionCtrl_Alt_Del"/>
+    <addaction name="actionCtrl_Alt_Esc"/>
+@@ -356,6 +357,10 @@
+    <property name="menuRole">
+     <enum>QAction::QuitRole</enum>
+    </property>
++   <property name="icon">
++    <iconset resource="../qt_resources.qrc">
++     <normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</iconset>
++   </property>
+   </action>
+   <action name="actionSettings">
+    <property name="icon">
+diff --git a/src/qt/qt_platform.cpp b/src/qt/qt_platform.cpp
+index e8a02fc3b..62805dcd1 100644
+--- a/src/qt/qt_platform.cpp
++++ b/src/qt/qt_platform.cpp
+@@ -612,7 +612,7 @@ c16stombs(char dst[], const uint16_t src[], int len)
+ }
+ #endif
+ 
+-#    define MOUSE_CAPTURE_KEYSEQ "F8+F12"
++#    define MOUSE_CAPTURE_KEYSEQ "Ctrl+Alt+G"
+ 
+ #ifdef _WIN32
+ #    if defined(__amd64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64)
+diff --git a/src/utils/log.c b/src/utils/log.c
+index 257029b51..b24d17d97 100644
+--- a/src/utils/log.c
++++ b/src/utils/log.c
 @@ -51,6 +51,18 @@ extern FILE *stdlog;
  /* Functions only used in this translation unit. */
  void log_ensure_stdlog_open(void);
@@ -130,26 +200,3 @@ index c8dddf6..e7fb179 100644
  void
  log_set_dev_name(void *priv, char *dev_name)
  {
-diff --git a/src/qt/qt_mainwindow.ui b/src/qt/qt_mainwindow.ui
-index b1dc0ec..f8dd504 100644
---- a/src/qt/qt_mainwindow.ui
-+++ b/src/qt/qt_mainwindow.ui
-@@ -259,6 +259,7 @@
-    <addaction name="actionHard_Reset"/>
-    <addaction name="separator"/>
-    <addaction name="actionACPI_Shutdown"/>
-+   <addaction name="actionExit"/>
-    <addaction name="separator"/>
-    <addaction name="actionCtrl_Alt_Del"/>
-    <addaction name="actionCtrl_Alt_Esc"/>
-@@ -353,6 +354,10 @@
-    <property name="text">
-     <string>Exit</string>
-    </property>
-+   <property name="icon">
-+    <iconset resource="../qt_resources.qrc">
-+     <normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</iconset>
-+   </property>
-   </action>
-   <action name="actionSettings">
-    <property name="icon">
