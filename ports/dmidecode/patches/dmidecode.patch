@@ -1,0 +1,29 @@
+commit b6675a939f5f901a147727b9128ed9dbf7874f7b
+Author: Mrokkk <mrokk@protonmail.com>
+Date:   Sun Apr 6 14:10:54 2025 +0200
+
+    Remove inet usages
+
+diff --git a/dmidecode.c b/dmidecode.c
+index 45a6c06..8ae8561 100644
+--- a/dmidecode.c
++++ b/dmidecode.c
+@@ -68,7 +68,6 @@
+ #include <strings.h>
+ #include <stdlib.h>
+ #include <unistd.h>
+-#include <arpa/inet.h>
+ #include <sys/socket.h>
+ 
+ #if defined(__FreeBSD__) || defined(__DragonFly__)
+@@ -3926,10 +3925,6 @@ static const char *dmi_address_type(u8 type)
+  */
+ static const char *dmi_address_decode(u8 *data, char *storage, u8 addrtype)
+ {
+-	if (addrtype == 0x1) /* IPv4 */
+-		return inet_ntop(AF_INET, data, storage, 64);
+-	if (addrtype == 0x2) /* IPv6 */
+-		return inet_ntop(AF_INET6, data, storage, 64);
+ 	return out_of_spec;
+ }
+ 
