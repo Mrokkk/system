@@ -177,7 +177,6 @@ UNMAP_AFTER_INIT void NORETURN(kmain(void* data, ...))
     paging_init();
     ksyms_load(ksyms_start, ksyms_end);
     fmalloc_init();
-    slab_allocator_init();
     devfs_init();
     procfs_init();
     sysfs_init();

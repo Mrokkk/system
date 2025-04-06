@@ -36,7 +36,8 @@ struct slab
 struct slab_allocator
 {
     mutex_t     lock;
-    size_t      size;
+    uint16_t    size;
+    uint16_t    slabs_count;
     size_t      slab_size;
     list_head_t slabs;
 };
@@ -46,17 +47,20 @@ typedef struct slab_block slab_block_t;
 typedef struct slab_allocator slab_allocator_t;
 
 static MUTEX_DECLARE(lock);
-static page_t* metadata_pages;
-static void* current_ptr;
-static void* current_end;
+static LIST_DECLARE(slabs_free);
+
+#define SLAB_ENTRY_SIZE  (align(sizeof(slab_t), 32))
+#define SLAB_ENTRY_COUNT 512
+
+static_assert((PAGE_SIZE % SLAB_ENTRY_SIZE) == 0);
 
 #undef SLAB_CLASS
 #define SLAB_CLASS(class_size, count) \
     [SLAB_##class_size] = { \
-        .lock = MUTEX_INIT(allocators[SLAB_##class_size].lock), \
-        .size = class_size, \
+        .lock      = MUTEX_INIT(allocators[SLAB_##class_size].lock), \
+        .size      = class_size, \
         .slab_size = page_align((class_size) * (count)), \
-        .slabs = LIST_INIT(allocators[SLAB_##class_size].slabs) \
+        .slabs     = LIST_INIT(allocators[SLAB_##class_size].slabs) \
     },
 
 static slab_allocator_t allocators[] = {
@@ -74,30 +78,31 @@ static inline slab_allocator_t* slab_allocator_get(size_t size)
 
 static void* slab_entry_alloc(void)
 {
-    void* slab;
-
     scoped_mutex_lock(&lock);
 
-    if (unlikely(current_ptr >= current_end))
+    if (list_empty(&slabs_free))
     {
-        page_t* page = page_alloc(1, 0);
+        size_t size = page_align(SLAB_ENTRY_COUNT * SLAB_ENTRY_SIZE);
+        page_t* pages = page_alloc(size / PAGE_SIZE, 0);
+        page_t* page;
 
-        if (unlikely(!page))
+        PAGES_FOR_EACH(page, pages)
         {
-            return NULL;
+            void* ptr = page_virt_ptr(page);
+            for (size_t i = 0; i < PAGE_SIZE / SLAB_ENTRY_SIZE; ++i, ptr += SLAB_ENTRY_SIZE)
+            {
+                slab_block_t* block = ptr(ptr);
+                list_init(&block->list_entry);
+                list_add_tail(&block->list_entry, &slabs_free);
+                block->poison = SLAB_POISON;
+            }
         }
-
-        slab = current_ptr = page_virt_ptr(page);
-        current_end = current_ptr + PAGE_SIZE;
-    }
-    else
-    {
-        slab = current_ptr;
     }
 
-    current_ptr += align(sizeof(slab_t), 32);
+    slab_block_t* block = list_front(&slabs_free, slab_block_t, list_entry);
+    list_del(&block->list_entry);
 
-    return slab;
+    return block;
 }
 
 static slab_t* slab_create(slab_allocator_t* allocator)
@@ -122,6 +127,7 @@ static slab_t* slab_create(slab_allocator_t* allocator)
     list_init(&slab->list_entry);
     list_init(&slab->free);
     list_add_tail(&slab->list_entry, &allocator->slabs);
+    allocator->slabs_count++;
     slab->pages     = pages;
     slab->start     = page_virt(pages);
     slab->end       = page_virt(pages) + allocator->slab_size;
@@ -217,21 +223,9 @@ void slab_free(void* ptr, size_t size)
 #if SLAB_ZERO_AFTER_FREE
         memset(shift(block, sizeof(*block)), 0, allocator->size - sizeof(*block));
 #endif
+
         return;
     }
 
     log_error("%s: ptr: %p, size: %zu: unknown pointer", __func__, ptr, size);
-}
-
-UNMAP_AFTER_INIT void slab_allocator_init(void)
-{
-    metadata_pages = page_alloc(1, 0);
-
-    if (unlikely(!metadata_pages))
-    {
-        log_error("cannot allocate metadata page");
-        return;
-    }
-
-    current_ptr = page_virt_ptr(metadata_pages);
 }

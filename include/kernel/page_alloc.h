@@ -29,3 +29,9 @@ void page_kernel_unmap(page_t* page);
 
 #define single_page() \
     ({ page_t* res = page_alloc(1, PAGE_ALLOC_DISCONT); res ? page_virt_ptr(res) : NULL; })
+
+#define PAGES_FOR_EACH(page, pages) \
+    bool __started; \
+    for (page = pages, __started = false; \
+        !__started || page != (pages); \
+        page = list_next_entry(&page->list_entry, page_t, list_entry), __started = true)

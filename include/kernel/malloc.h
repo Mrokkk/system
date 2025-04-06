@@ -17,9 +17,6 @@ void fmalloc_stats_print(void);
 
 MUST_CHECK(void*) slab_alloc(size_t size);
 void slab_free(void* ptr, size_t size);
-void slab_allocator_init(void);
-
-#define USE_SLAB_ALLOCATION 1
 
 #define __CONSTRUCT(type, init) \
     ({ type* this = slab_alloc(sizeof(type)); if (likely(this)) { (void)init; } this; })
