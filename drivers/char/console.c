@@ -1443,12 +1443,13 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
     glyph_t* normal_glyphs;
     page_t* prev_pages = console->pages;
     size_t max_capacity = MAX_CAPACITY - MAX_CAPACITY % resy;
-    size_t normal_size = page_align(sizeof(glyph_t) * resx * INITIAL_CAPACITY + sizeof(line_t) * max_capacity);
+    size_t initial_capacity = align(resy > INITIAL_CAPACITY ? resy : INITIAL_CAPACITY, 32);
+    size_t normal_size = page_align(sizeof(glyph_t) * resx * initial_capacity + sizeof(line_t) * max_capacity);
     size_t alt_size = page_align(sizeof(glyph_t) * resx * resy + sizeof(line_t) * resy);
     size_t size = normal_size + alt_size;
     size_t needed_pages = size / PAGE_SIZE;
 
-    log_notice("size: %u x %u; need %u B (%u pages) for %u lines", resx, resy, size, needed_pages, INITIAL_CAPACITY);
+    log_notice("size: %u x %u; need %u B (%u pages) for %u lines", resx, resy, size, needed_pages, initial_capacity);
 
     pages = page_alloc(needed_pages, PAGE_ALLOC_CONT);
 
@@ -1464,7 +1465,7 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
     alt_lines = page_virt_ptr(pages) + normal_size;
     alt_glyphs = shift_as(glyph_t*, alt_lines, resy * sizeof(line_t));
 
-    for (size_t i = 0; i < INITIAL_CAPACITY; ++i)
+    for (size_t i = 0; i < initial_capacity; ++i)
     {
         normal_lines[i].glyphs = normal_glyphs + i * resx;
     }
@@ -1474,9 +1475,9 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
         alt_lines[i].glyphs = alt_glyphs + i * resx;
     }
 
-    memset(&normal_lines[INITIAL_CAPACITY], 0, (max_capacity - INITIAL_CAPACITY) * sizeof(line_t*));
+    memset(&normal_lines[initial_capacity], 0, (max_capacity - initial_capacity) * sizeof(line_t*));
 
-    for (size_t i = 0; i < INITIAL_CAPACITY; ++i)
+    for (size_t i = 0; i < initial_capacity; ++i)
     {
         for (size_t x = 0; x < resx; ++x)
         {
@@ -1504,7 +1505,7 @@ static int console_resize(console_t* console, size_t resx, size_t resy)
     console->lines         = normal_lines;
     console->current_line  = normal_lines;
     console->visible_lines = normal_lines;
-    console->capacity      = INITIAL_CAPACITY;
+    console->capacity      = initial_capacity;
     console->max_capacity  = max_capacity;
     console->scroll_bottom = console->resy - 1;
     console->scroll_top    = 0;
@@ -1735,11 +1736,6 @@ static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
             rtc_event_cancel(console->rtc_event_id);
             console->rtc_event_id = 0;
         }
-
-        console->prev_x = 0;
-        console->prev_y = 0;
-        console->x      = 0;
-        console->y      = 0;
 
         tty_session_kill(tty, SIGWINCH);
     }
