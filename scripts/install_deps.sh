@@ -23,6 +23,7 @@ case "${NAME}" in
             gperf \
             libevdev \
             libfreetype \
+            libisoburn \
             libpng \
             libserialport \
             libslirp \
@@ -38,6 +39,7 @@ case "${NAME}" in
             patch \
             pkgconf \
             python \
+            python-distlib \
             python-jinja \
             qt5 \
             rsync \
