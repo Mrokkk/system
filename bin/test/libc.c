@@ -258,14 +258,14 @@ TEST(strcat)
     char buf[128];
     strcpy(buf, "test");
     EXPECT_EQ(strcat(buf, "_test"), buf);
-    EXPECT_STR_EQ(buf, "test_test");
+    EXPECT_STREQ(buf, "test_test");
 }
 
 TEST(strncat)
 {
     char buf[32] = "this";
     strncat(buf, "_is_test", 3);
-    EXPECT_STR_EQ(buf, "this_is");
+    EXPECT_STREQ(buf, "this_is");
 }
 
 TEST(strpbrk)
@@ -284,12 +284,12 @@ TEST(memmove)
     char buf[16] = {0, };
     const char* data1 = "test123";
     EXPECT_EQ(memmove(buf, data1, 8), buf);
-    EXPECT_STR_EQ(buf, "test123");
+    EXPECT_STREQ(buf, "test123");
     EXPECT_EQ(memmove(buf, buf + 2, 6), buf);
-    EXPECT_STR_EQ(buf, "st123");
+    EXPECT_STREQ(buf, "st123");
     memcpy(buf, data1, 8);
     EXPECT_EQ(memmove(buf + 2, buf, 6), buf + 2);
-    EXPECT_STR_EQ(buf, "tetest12");
+    EXPECT_STREQ(buf, "tetest12");
 }
 
 TEST(memchr)
@@ -320,7 +320,7 @@ TEST(atoi)
 TEST(env)
 {
     EXPECT_EQ(setenv("PHOENIX", "TEST", 1), 0);
-    EXPECT_STR_EQ(getenv("PHOENIX"), "TEST");
+    EXPECT_STREQ(getenv("PHOENIX"), "TEST");
 
     EXPECT_EXIT_WITH(0)
     {
@@ -329,32 +329,32 @@ TEST(env)
         // Set value with same length
         {
             EXPECT_EQ(setenv("PHOENIX", "TEST", 1), 0);
-            EXPECT_STR_EQ(getenv("PHOENIX"), "TEST");
+            EXPECT_STREQ(getenv("PHOENIX"), "TEST");
         }
 
         // Set value with longer length
         {
             char* old_var = getenv("PHOENIX");
             EXPECT_EQ(setenv("PHOENIX", "__PHOENIX__", 1), 0);
-            EXPECT_STR_EQ(getenv("PHOENIX"), "__PHOENIX__");
+            EXPECT_STREQ(getenv("PHOENIX"), "__PHOENIX__");
             EXPECT_NE(getenv("PHOENIX"), old_var);
         }
 
         // Set value for new variable (reallocate environ)
         {
             char** old_environ = environ;
-            EXPECT_STR_EQ(getenv("TEST"), NULL);
+            EXPECT_STREQ(getenv("TEST"), NULL);
             EXPECT_EQ(setenv("TEST", "AAABBB", 0), 0);
-            EXPECT_STR_EQ(getenv("TEST"), "AAABBB");
+            EXPECT_STREQ(getenv("TEST"), "AAABBB");
             EXPECT_NE(environ, old_environ);
         }
 
         // Set value for new variable (no reallocation)
         {
             char** old_environ = environ;
-            EXPECT_STR_EQ(getenv("TEST2"), NULL);
+            EXPECT_STREQ(getenv("TEST2"), NULL);
             EXPECT_EQ(setenv("TEST2", "BBBB", 0), 0);
-            EXPECT_STR_EQ(getenv("TEST2"), "BBBB");
+            EXPECT_STREQ(getenv("TEST2"), "BBBB");
             EXPECT_EQ(environ, old_environ);
         }
 
@@ -368,13 +368,13 @@ TEST(env)
                 EXPECT_EQ(setenv(buf, "VALUE", 0), 0);
             }
             EXPECT_NE(environ, old_environ);
-            EXPECT_STR_EQ(getenv("TEST30"), "VALUE");
+            EXPECT_STREQ(getenv("TEST30"), "VALUE");
         }
 
         // Check that variables are passed to child process
         EXPECT_EXIT_WITH(0)
         {
-            EXPECT_STR_EQ(getenv("TEST30"), "VALUE");
+            EXPECT_STREQ(getenv("TEST30"), "VALUE");
             exit(FAILED_EXPECTATIONS());
         }
 
@@ -623,7 +623,7 @@ TEST(getopt)
     {
         EXPECT_EQ(getopt(argc, argv, "-"), 1);
         EXPECT_EQ(optind, 2);
-        EXPECT_STR_EQ(optarg, "test");
+        EXPECT_STREQ(optarg, "test");
 
         EXPECT_EQ(getopt(argc, argv, "-"), -1);
         EXPECT_EQ(optind, 2);
@@ -637,7 +637,7 @@ TEST(getopt)
 
         EXPECT_EQ(getopt(argc, argv, optstring), 'o');
         EXPECT_EQ(optind, 2);
-        EXPECT_STR_EQ(optarg, "test");
+        EXPECT_STREQ(optarg, "test");
 
         EXPECT_EQ(getopt(argc, argv, optstring), -1);
         EXPECT_EQ(optind, 2);
@@ -651,7 +651,7 @@ TEST(getopt)
 
         EXPECT_EQ(getopt(argc, argv, optstring), 'o');
         EXPECT_EQ(optind, 3);
-        EXPECT_STR_EQ(optarg, "test");
+        EXPECT_STREQ(optarg, "test");
 
         EXPECT_EQ(getopt(argc, argv, optstring), -1);
         EXPECT_EQ(optind, 3);
@@ -711,7 +711,7 @@ TEST(getopt)
 
         EXPECT_EQ(getopt(argc, argv, optstring), 'o');
         EXPECT_EQ(optind, 2);
-        EXPECT_STR_EQ(optarg, "test");
+        EXPECT_STREQ(optarg, "test");
 
         EXPECT_EQ(getopt(argc, argv, optstring), -1);
         EXPECT_EQ(optind, 2);
@@ -737,10 +737,10 @@ TEST(getopt)
         const char* optstring = "-o:";
 
         EXPECT_EQ(getopt(argc, argv, optstring), 1);
-        EXPECT_STR_EQ(optarg, "arg1");
+        EXPECT_STREQ(optarg, "arg1");
 
         EXPECT_EQ(getopt(argc, argv, optstring), 1);
-        EXPECT_STR_EQ(optarg, "arg2");
+        EXPECT_STREQ(optarg, "arg2");
 
         EXPECT_EQ(getopt(argc, argv, optstring), '?');
 
@@ -823,17 +823,17 @@ TEST(getopt_long)
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 0);
         EXPECT_EQ(optind, 2);
-        EXPECT_STR_EQ(optarg, "aaa");
+        EXPECT_STREQ(optarg, "aaa");
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 1);
         EXPECT_EQ(optind, 4);
-        EXPECT_STR_EQ(optarg, "bbb");
+        EXPECT_STREQ(optarg, "bbb");
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 2);
         EXPECT_EQ(optind, 5);
-        EXPECT_STR_EQ(optarg, NULL);
+        EXPECT_STREQ(optarg, NULL);
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), -1);
         EXPECT_EQ(optind, 5);
@@ -851,13 +851,13 @@ TEST(getopt_long)
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 0);
-        EXPECT_STR_EQ(optarg, "aaa");
+        EXPECT_STREQ(optarg, "aaa");
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 't');
-        EXPECT_STR_EQ(optarg, "bbb");
+        EXPECT_STREQ(optarg, "bbb");
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), 1);
-        EXPECT_STR_EQ(optarg, "ccc");
+        EXPECT_STREQ(optarg, "ccc");
 
         EXPECT_EQ(getopt_long(argc, argv, optstring, longopts, &optindex), -1);
     }
@@ -881,15 +881,15 @@ TEST(getopt_long_only)
 
         EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 0);
-        EXPECT_STR_EQ(optarg, "aaa");
+        EXPECT_STREQ(optarg, "aaa");
 
         EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 1);
-        EXPECT_STR_EQ(optarg, "bbb");
+        EXPECT_STREQ(optarg, "bbb");
 
         EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), 0);
         EXPECT_EQ(optindex, 2);
-        EXPECT_STR_EQ(optarg, NULL);
+        EXPECT_STREQ(optarg, NULL);
 
         EXPECT_EQ(getopt_long_only(argc, argv, optstring, longopts, &optindex), -1);
     }
@@ -903,7 +903,7 @@ TEST(confstr)
     EXPECT_EQ(confstr(33, NULL, 0), 0);
     EXPECT_EQ(errno, EINVAL);
     EXPECT_EQ(confstr(_CS_PATH, buf, 32), 14);
-    EXPECT_STR_EQ(buf, "/bin:/usr/bin");
+    EXPECT_STREQ(buf, "/bin:/usr/bin");
     EXPECT_EQ(errno, 0);
 }
 

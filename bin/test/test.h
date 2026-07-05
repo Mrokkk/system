@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include <stdint.h> // IWYU pragma: keep
 #include <unistd.h>
 #include <stdbool.h>
 #include <common/list.h>
@@ -199,7 +199,7 @@ extern int __assert_failed;
     } \
     while (0)
 
-#define EXPECT_STR_EQ(l, r) \
+#define EXPECT_STREQ(l, r) \
     do \
     { \
         const char* actual = (const char*)(l); \

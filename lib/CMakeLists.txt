@@ -88,7 +88,6 @@ set(LIBC_SRC
     stdio/fwrite.c
     stdio/gnulib.c
     stdio/remove.c
-    stdio/scanf.c
     stdio/setvbuf.c
     stdio/sprintf.c
     stdio/stdio.c
