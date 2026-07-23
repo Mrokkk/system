@@ -128,6 +128,8 @@ alias f="find . -name"
 alias p="path"
 alias lf="ls -lah /usr/share/kbd/consolefonts"
 alias d="display /usr/share/images/tux.tga"
+alias bte="echo 1 > /sys/user_backtrace"
+alias btd="echo 0 > /sys/user_backtrace"
 function k()
 {
     while ktest -q -t realloc_small_to_small; do echo -n; done

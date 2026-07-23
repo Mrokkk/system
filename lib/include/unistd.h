@@ -28,6 +28,7 @@ int execvp(const char* file, char* const argv[]);
 int execvpe(const char* file, char* const argv[], char* const envp[]);
 
 unsigned int sleep(unsigned int seconds);
+int usleep(useconds_t usec);
 
 int gethostname(char* name, size_t namelen);
 int getpagesize(void);

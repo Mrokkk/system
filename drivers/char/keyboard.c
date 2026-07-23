@@ -1,5 +1,6 @@
 #define log_fmt(fmt) "kbd: " fmt
 #include <arch/i8042.h>
+#include <kernel/vm.h>
 #include <kernel/irq.h>
 #include <kernel/tty.h>
 #include <kernel/wait.h>
@@ -8,6 +9,7 @@
 #include <kernel/process.h>
 #include <kernel/termios.h>
 #include <kernel/spinlock.h>
+#include <kernel/api/ioctl.h>
 
 #define KBD_HIGHEST_RATE    0x00
 
@@ -20,6 +22,7 @@ static int shift = 0;
 static char ctrl = 0;
 static char alt = 0;
 static char e0 = 0;
+static int kbmode = K_UNICODE;
 
 static void s_shift_up()
 {
@@ -94,7 +97,22 @@ static inline void keyboard_scancode_handle(uint8_t scan_code)
 {
     char c = 0;
 
-    if (special_scancodes[scan_code] && scan_code <= L_ALT+0x80)
+    if (kbmode == K_MEDIUMRAW || kbmode == K_RAW)
+    {
+        if (scan_code == 0xe0)
+        {
+            e0 = 1;
+            return;
+        }
+        else
+        {
+            e0 = 0;
+        }
+        tty_char_insert(kb_tty, scan_code);
+        return;
+    }
+
+    if (special_scancodes[scan_code] && scan_code <= L_ALT + 0x80)
     {
         special_scancodes[scan_code]();
         return;
@@ -217,4 +235,40 @@ int keyboard_init(tty_t* tty)
     irq_register(1, keyboard_irs, "keyboard", IRQ_DEFAULT, NULL);
 
     return 0;
+}
+
+int keyboard_ioctl(tty_t* tty, unsigned long request, void* arg)
+{
+    int errno;
+    switch (request)
+    {
+        case KDGKBMODE:
+            if (unlikely(errno = vm_verify(VERIFY_WRITE, (int*)arg, process_current->mm->vm_areas)))
+            {
+                return errno;
+            }
+            *(int*)arg = kbmode;
+            return 0;
+        case KDSKBMODE:
+            kbmode = (int)arg;
+            switch (kbmode)
+            {
+                case K_RAW:
+                case K_MEDIUMRAW:
+                    tty->input_mode = TTY_INPUT_MODE_RAW;
+                    break;
+                default:
+                    tty->input_mode = TTY_INPUT_MODE_NORMAL;
+                    break;
+            }
+            return 0;
+        case KDGKBTYPE:
+            if (unlikely(errno = vm_verify(VERIFY_WRITE, (int*)arg, process_current->mm->vm_areas)))
+            {
+                return errno;
+            }
+            *(int*)arg = KB_101;
+            return 0;
+    }
+    return -EINVAL;
 }

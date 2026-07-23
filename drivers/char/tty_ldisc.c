@@ -105,6 +105,15 @@ void tty_ldisc_putch(tty_t* tty, int c)
     process_t* p;
     int special_mode = tty->special_mode;
 
+    if (tty->input_mode == TTY_INPUT_MODE_RAW)
+    {
+        if (L_ECHO(tty))
+        {
+            tty->driver->putch(tty, c);
+        }
+        goto add_to_buffer;
+    }
+
     if (c == '\r' && I_ICRNL(tty))
     {
         c = '\n';
@@ -152,6 +161,7 @@ void tty_ldisc_putch(tty_t* tty, int c)
         return;
     }
 
+add_to_buffer:
     *tty->ldisc_current++ = c;
 
     if (c == '\n' || c == C_VEOF(tty) || !L_ICANON(tty))

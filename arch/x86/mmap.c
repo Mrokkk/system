@@ -251,10 +251,8 @@ int sys_munmap(void* addr, size_t len)
     uintptr_t end = start + len;
     uintptr_t old_start;
 
-    if (unlikely(addr(addr) % PAGE_SIZE || len % PAGE_SIZE))
-    {
-        return -EINVAL;
-    }
+    addr = (void*)page_beginning((uintptr_t)addr);
+    len = page_align(len);
 
     if (unlikely(errno = vma_range_find(addr(addr), len, &vma)))
     {

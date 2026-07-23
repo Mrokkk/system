@@ -1,4 +1,3 @@
-#include "kernel/printk.h"
 #include <kernel/fs.h>
 #include <kernel/elf.h>
 #include <kernel/path.h>

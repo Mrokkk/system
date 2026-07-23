@@ -26,7 +26,7 @@ static inline int skip_atoi(const char** s)
 #define SPECIAL 64  // 0x
 
 // we are called with base 8, 10 or 16, only, thus don't need "G..."
-static const char digits[16] = "0123456789ABCDEF";
+static const char digits[] = "0123456789ABCDEF";
 
 #define PUTC(c) \
     ({ if (likely(str < end)) { *str++ = c; }; 0; })

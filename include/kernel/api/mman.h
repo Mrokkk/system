@@ -7,6 +7,7 @@
 #define PROT_WRITE      0x2     /* page can be written */
 #define PROT_EXEC       0x4     /* page can be executed */
 
+#define MAP_FILE        0x00
 #define MAP_SHARED      0x01    /* Share changes */
 #define MAP_PRIVATE     0x02    /* Changes are private */
 #define MAP_TYPE        0x0f    /* Mask for type of mapping */

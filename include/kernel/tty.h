@@ -13,6 +13,9 @@
 #define TTY_INITIALIZED  0x4215
 #define TTY_SPECIAL_MODE -1
 
+#define TTY_INPUT_MODE_NORMAL 0
+#define TTY_INPUT_MODE_RAW    1
+
 typedef struct tty tty_t;
 
 struct tty
@@ -23,6 +26,7 @@ struct tty
     termios_t         termios;
     int               driver_special_key;
     int               special_mode;
+    int               input_mode;
     char*             ldisc_buf;
     char*             ldisc_current;
     int               sid;

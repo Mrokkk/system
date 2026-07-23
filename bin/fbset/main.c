@@ -135,7 +135,7 @@ int main(int argc, char** argv)
     }
 
 show:
-    printf("device: %s\n  id: %s\n  mode: %zux%zux%zu\n  type: %s %s\n  accel: %s\n",
+    printf("device: %s\n  id: %s\n  mode: %ux%ux%u\n  type: %s %s\n  accel: %s\n",
         fbdev,
         finfo.id,
         vinfo.xres,

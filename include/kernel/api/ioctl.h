@@ -8,6 +8,16 @@
 #define     KD_GRAPHICS 0x01
 #define KDGETMODE       0x4b3b  // get current mode
 #define KDFONTOP        0x4b72
+#define KDSKBMODE       0x4b73
+#define     K_RAW       0x00
+#define     K_MEDIUMRAW 0x01
+#define     K_XLATE     0x02
+#define     K_UNICODE   0x03
+#define KDGKBMODE       0x4b74
+#define KDGKBTYPE       0x4b75
+#define     KB_84       0x01
+#define     KB_101      0x02
+#define     KB_OTHER    0x03
 
 #define TCGETA              0x4400
 #define TCSETA              0x4401
@@ -62,9 +72,9 @@ struct fb_fix_screeninfo
 
 struct fb_var_screeninfo
 {
-    size_t xres;
-    size_t yres;
-    size_t bits_per_pixel;
+    uint32_t xres;
+    uint32_t yres;
+    uint32_t bits_per_pixel;
 };
 
 struct console_font_op

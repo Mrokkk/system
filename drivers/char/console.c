@@ -1669,8 +1669,29 @@ static int kdsetmode(console_t* console, long mode)
     return -EINVAL;
 }
 
+static int kdgetmode(console_t* console, int* mode)
+{
+    int errno;
+
+    if (unlikely(errno = vm_verify(VERIFY_WRITE, mode, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
+    *mode = console->disabled ? KD_GRAPHICS : KD_TEXT;
+
+    return 0;
+}
+
 static int tiocgwinsz(console_t* console, winsize_t* w)
 {
+    int errno;
+
+    if (unlikely(errno = vm_verify(VERIFY_WRITE, w, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
     w->ws_col = console->resx;
     w->ws_row = console->resy;
     return 0;
@@ -1678,6 +1699,13 @@ static int tiocgwinsz(console_t* console, winsize_t* w)
 
 static int tiocswinsz(console_t* console, winsize_t* w)
 {
+    int errno;
+
+    if (unlikely(errno = vm_verify(VERIFY_READ, w, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
+
     if (w->ws_col == console->resx && w->ws_row == console->resy)
     {
         return 0;
@@ -1689,6 +1717,11 @@ static int kdfontop(console_t* console, tty_t* tty, console_font_op_t* op)
 {
     int errno;
     console_driver_t* drv = console->driver;
+
+    if (unlikely(errno = vm_verify(VERIFY_READ, op, process_current->mm->vm_areas)))
+    {
+        return errno;
+    }
 
     if (unlikely(!drv->ops->font_load))
     {
@@ -1755,12 +1788,18 @@ static int console_ioctl(tty_t* tty, unsigned long request, void* arg)
     {
         case KDSETMODE:
             return kdsetmode(console, (long)arg);
+        case KDGETMODE:
+            return kdgetmode(console, arg);
         case TIOCGWINSZ:
             return tiocgwinsz(console, arg);
         case TIOCSWINSZ:
             return tiocswinsz(console, arg);
         case KDFONTOP:
             return kdfontop(console, tty, arg);
+        case KDGKBMODE:
+        case KDSKBMODE:
+        case KDGKBTYPE:
+            return keyboard_ioctl(tty, request, arg);
     }
 
     return -EINVAL;

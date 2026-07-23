@@ -41,11 +41,16 @@ function _prepare()
         if [[ "${REPO}" == *".git"* ]]
         then
             local branch_arg=""
+            local revision_arg=""
             if [[ -n "${BRANCH}" ]]
             then
                 branch_arg="--branch ${BRANCH}"
             fi
-            git clone ${branch_arg} --depth 1 ${REPO} ${SRC_DIR}
+            if [[ -n "${REVISION}" ]]
+            then
+                revision_arg="--revision ${REVISION}"
+            fi
+            git clone ${branch_arg} ${revision_arg} --depth 1 ${REPO} ${SRC_DIR}
         elif [[ "${REPO}" == *"svn"* ]]
         then
             svn checkout "${REPO}" "${SRC_DIR}"

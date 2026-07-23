@@ -1,4 +1,5 @@
 #include <kernel/fs.h>
+#include <kernel/vm.h>
 #include <kernel/dev.h>
 #include <kernel/irq.h>
 #include <kernel/tty.h>
@@ -102,6 +103,7 @@ int tty_driver_register(tty_driver_t* drv)
         new_tty->minor = minor;
         new_tty->driver_special_key = -1;
         new_tty->special_mode = 0;
+        new_tty->input_mode = TTY_INPUT_MODE_NORMAL;
         new_tty->termios.c_iflag = DEFAULT_C_IFLAG;
         new_tty->termios.c_oflag = DEFAULT_C_OFLAG;
         new_tty->termios.c_cflag = DEFAULT_C_CFLAG;
@@ -207,15 +209,24 @@ static int tty_write(file_t* file, const char* buffer, size_t count)
 
 static int tty_ioctl(file_t* file, unsigned long request, void* arg)
 {
+    int errno;
     tty_t* tty = file->private;
 
     switch (request)
     {
         case TCGETA:
         case TIOCGETA:
+            if (unlikely(errno = vm_verify(VERIFY_WRITE, (termios_t*)arg, process_current->mm->vm_areas)))
+            {
+                return errno;
+            }
             memcpy(arg, &tty->termios, sizeof(tty->termios));
             return 0;
         case TCSETA:
+            if (unlikely(errno = vm_verify(VERIFY_READ, (termios_t*)arg, process_current->mm->vm_areas)))
+            {
+                return errno;
+            }
             memcpy(&tty->termios, arg, sizeof(tty->termios));
             return 0;
     }
