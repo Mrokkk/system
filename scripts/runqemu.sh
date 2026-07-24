@@ -9,11 +9,7 @@ use_kvm=
 use_cdrom=
 use_nographic=
 use_isa_debugcon=
-xres=1920
-yres=1124
 cpu="qemu64"
-default_gpu="-device virtio-gpu,edid=on,xres=${xres},yres=${yres} -vga none"
-gpu="${default_gpu}"
 args="\
 -boot once=c \
 -no-reboot \
@@ -27,6 +23,16 @@ args="\
 -usb \
 -smp 4"
 kernel_params=
+
+[[ -f runqemu.opt ]] && . runqemu.opt
+
+if [[ -n "${xres}" ]] && [[ -n "${yres}" ]]
+then
+    default_gpu="-device virtio-gpu,edid=on,xres=${xres},yres=${yres} -vga none"
+else
+    default_gpu="-device virtio-gpu,edid=on -vga none"
+fi
+gpu="${default_gpu}"
 
 supported_kernel_params_value=(
     "console"
