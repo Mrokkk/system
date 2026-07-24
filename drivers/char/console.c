@@ -117,13 +117,19 @@ static void cursor_update(console_t* console)
 {
     glyph_t current = console->visible_lines[console->y].glyphs[console->x];
     current.attr ^= GLYPH_ATTR_INVERSED;
-    console->driver->ops->glyph_draw(console->driver, console->x, console->y, &current);
+    if (!console->disabled)
+    {
+        console->driver->ops->glyph_draw(console->driver, console->x, console->y, &current);
+    }
 
     if (console->prev_x != console->x || console->prev_y != console->y)
     {
         glyph_t previous = console->visible_lines[console->prev_y].glyphs[console->prev_x];
         previous.attr ^= ~GLYPH_ATTR_INVERSED;
-        console->driver->ops->glyph_draw(console->driver, console->prev_x, console->prev_y, &previous);
+        if (!console->disabled)
+        {
+            console->driver->ops->glyph_draw(console->driver, console->prev_x, console->prev_y, &previous);
+        }
 
         console->prev_x = console->x;
         console->prev_y = console->y;
@@ -155,11 +161,22 @@ static void current_line_clear(console_t* console, int mode)
             return;
     }
 
-    for (size_t x = start; x < end; ++x)
+    if (console->disabled)
     {
-        glyph_t* glyph = &line->glyphs[x];
-        GLYPH_CLEAR(glyph);
-        drv->ops->glyph_draw(console->driver, x, console->y, glyph);
+        for (size_t x = start; x < end; ++x)
+        {
+            glyph_t* glyph = &line->glyphs[x];
+            GLYPH_CLEAR(glyph);
+        }
+    }
+    else
+    {
+        for (size_t x = start; x < end; ++x)
+        {
+            glyph_t* glyph = &line->glyphs[x];
+            GLYPH_CLEAR(glyph);
+            drv->ops->glyph_draw(console->driver, x, console->y, glyph);
+        }
     }
 }
 
@@ -199,7 +216,7 @@ static void console_refresh_schedule(console_t* console)
 {
     scoped_irq_lock();
 
-    if (console->redraw)
+    if (console->redraw || console->disabled)
     {
         return;
     }
@@ -300,7 +317,7 @@ static void console_write_char(console_t* console, uint8_t c)
     cur->fgcolor = console->current_fgcolor;
     cur->bgcolor = console->current_bgcolor;
 
-    if (!console->redraw)
+    if (!console->redraw && !console->disabled)
     {
         console->driver->ops->glyph_draw(console->driver, console->x, console->y, cur);
     }
@@ -1251,7 +1268,7 @@ static void console_putch_internal(console_t* console, tty_t* tty, int c, int* m
     }
     else if (c == TTY_SPECIAL_MODE)
     {
-        if (console->tmux_state == 0)
+        if (console->tmux_state == 0 && !console->disabled)
         {
             console->tmux_state = TTY_SPECIAL_MODE;
             console->orig_visible_lines = console->visible_lines;
@@ -1268,11 +1285,6 @@ static void console_putch(tty_t* tty, int c)
 {
     int movecsr = 0;
     console_t* console = tty->driver->driver_data;
-
-    if (console->disabled)
-    {
-        return;
-    }
 
     console_putch_internal(console, tty, c, &movecsr);
 
@@ -1626,11 +1638,6 @@ static int console_write(tty_t* tty, const char* buffer, size_t size)
 {
     int movecsr = 0;
     console_t* console = tty->driver->driver_data;
-
-    if (unlikely(console->disabled))
-    {
-        return size;
-    }
 
     for (size_t i = 0; i < size; ++i)
     {

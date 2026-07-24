@@ -72,36 +72,39 @@ static void* alloc(size_t size)
 void sighan()
 {
     graphic_mode_exit();
+    input_deinitialize();
     exit(EXIT_FAILURE);
 }
 
 static void signal_handlers_set(void)
 {
     signal(SIGTERM, sighan);
-    signal(SIGINT, sighan);
+    signal(SIGINT,  sighan);
     signal(SIGTSTP, sighan);
     signal(SIGSEGV, sighan);
 }
 
-/*static void area_refresh(int x, int y, int w, int h)*/
-/*{*/
-    /*for (int i = x; i < x + w; ++i)*/
-    /*{*/
-        /*if (i >= (int)vinfo.xres)*/
-        /*{*/
-            /*break;*/
-        /*}*/
-        /*for (int j = y; j < y + h; ++j)*/
-        /*{*/
-            /*if (j >= (int)vinfo.yres)*/
-            /*{*/
-                /*break;*/
-            /*}*/
-            /*uint32_t* pixel = (uint32_t*)(framebuffer + j * vinfo.pitch + i * 4);*/
-            /**pixel = *(uint32_t*)(buffer + j * vinfo.pitch + i * 4);*/
-        /*}*/
-    /*}*/
-/*}*/
+/*
+static void area_refresh(int x, int y, int w, int h)
+{
+    for (int i = x; i < x + w; ++i)
+    {
+        if (i >= (int)vinfo.xres)
+        {
+            break;
+        }
+        for (int j = y; j < y + h; ++j)
+        {
+            if (j >= (int)vinfo.yres)
+            {
+                break;
+            }
+            uint32_t* pixel = (uint32_t*)(framebuffer + j * vinfo.pitch + i * 4);
+            *pixel = *(uint32_t*)(buffer + j * vinfo.pitch + i * 4);
+        }
+    }
+}
+*/
 
 static void rectangle_draw(int x, int y, int w, int h, uint32_t color)
 {
@@ -288,9 +291,7 @@ static void snake_move()
 
     if (!next_cell || next_cell->flags & FLAGS_SNAKE)
     {
-        graphic_mode_exit();
-        printf("Game over!\n");
-        exit(EXIT_FAILURE);
+        die("Game over!\n");
     }
 
     if (old_tail->flags & FLAGS_FOOD)

@@ -2,33 +2,46 @@
 
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 #include <unistd.h>
 #include <termios.h>
 
 #include "macro.h"
 
-static int input_fd;
+static int input_fd = -1;
 static char input_buffer[1];
+static struct termios old_termios;
 
-void input_initialize()
+void input_initialize(void)
 {
     struct termios t;
-    if (!(input_fd = open("/dev/tty0", O_RDONLY | O_NONBLOCK, 0)))
+    if ((input_fd = open("/dev/tty0", O_RDONLY | O_NONBLOCK, 0)) == -1)
     {
         die_perror("/dev/tty0");
     }
 
     if (tcgetattr(input_fd, &t))
     {
+        input_fd = -1;
         die("cannot get termios");
     }
 
-    t.c_lflag &= ~ICANON;
+    memcpy(&old_termios, &t, sizeof(t));
+
+    t.c_lflag &= ~(ICANON | ECHO);
 
     tcsetattr(input_fd, 0, &t);
 }
 
-char* input_read()
+void input_deinitialize(void)
+{
+    if (input_fd != -1)
+    {
+        tcsetattr(input_fd, 0, &old_termios);
+    }
+}
+
+char* input_read(void)
 {
     int size = read(input_fd, input_buffer, 1);
     if (size == -1)
