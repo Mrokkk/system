@@ -1,5 +1,6 @@
 REPO="https://git.savannah.gnu.org/git/grub.git"
 BRANCH="grub-2.12-rc1"
+REVISION="7a994c87f571ac99745645be0bdde9827297321a"
 
 function build()
 {

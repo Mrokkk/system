@@ -1,6 +1,6 @@
-REPO="https://svn.code.sf.net/p/bochs/code/trunk/bochs"
-VERSION=
-BRANCH=
+REPO="https://github.com/bochs-emu/Bochs.git"
+BRANCH="REL_3_0_FINAL"
+REVISION="02c851a93572071578d15f68c5701676a109dd19"
 OPTIONAL=true
 
 function build()

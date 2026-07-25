@@ -1,4 +1,5 @@
 REPO="https://github.com/source-foundry/Hack/releases/download/v3.003/Hack-v3.003-ttf.zip"
+SHA1SUM="eab94e70abb4327a587156b719404b2534852888"
 
 function build()
 {

@@ -1,6 +1,7 @@
 REPO="git://sourceware.org/git/binutils-gdb.git"
 VERSION="2.42"
 BRANCH=binutils-$(echo "${VERSION}" | tr "." "_")-branch
+REVISION="758a2290dbdf0d6d6c148c6cf25b2bcfd7a5b84f"
 
 function build()
 {

@@ -27,7 +27,22 @@ function _recipe_read()
 function _recipe_close()
 {
     unset -f build install
-    unset REPO VERSION BRANCH OPTIONAL
+    unset REPO VERSION BRANCH OPTIONAL REVISION SHA1SUM
+}
+
+function _verify_checksum()
+{
+    if [[ -n "${SHA1SUM}" ]]
+    then
+        local actual="$(sha1sum "${1}" | awk '{print $1;}')"
+        if [[ "${actual}" != "${SHA1SUM}" ]]
+        then
+            rm "${file}"
+            rm -rf "${SRC_DIR}"
+            rm -rf "${BUILD_DIR}"
+            die "${1}: wrong checksum: ${actual}; expected: ${SHA1SUM}"
+        fi
+    fi
 }
 
 function _prepare()
@@ -42,13 +57,12 @@ function _prepare()
         then
             local branch_arg=""
             local revision_arg=""
-            if [[ -n "${BRANCH}" ]]
-            then
-                branch_arg="--branch ${BRANCH}"
-            fi
             if [[ -n "${REVISION}" ]]
             then
                 revision_arg="--revision ${REVISION}"
+            elif [[ -n "${BRANCH}" ]]
+            then
+                branch_arg="--branch ${BRANCH}"
             fi
             git clone ${branch_arg} ${revision_arg} --depth 1 ${REPO} ${SRC_DIR}
         elif [[ "${REPO}" == *"svn"* ]]
@@ -57,16 +71,18 @@ function _prepare()
         elif [[ "${REPO}" == *"tar.gz"* ]]
         then
             local file="$(basename ${REPO})"
-            wget ${REPO} -O "${file}"
-            tar xf "${file}"
-            mv "$(basename -- "${file}" .tar.gz)" "${SRC_DIR}"
-            rm "${file}"
+            wget ${REPO} -O "/tmp/${file}"
+            _verify_checksum "/tmp/${file}"
+            tar xf "/tmp/${file}"
+            mv "$(basename -- "/tmp/${file}" .tar.gz)" "${SRC_DIR}"
+            rm "/tmp/${file}"
         elif [[ "${REPO}" == *".zip"* ]]
         then
             local file="$(basename ${REPO})"
             mkdir -p "${SRC_DIR}"
             pushd_silent "${SRC_DIR}"
             wget "${REPO}" -O "/tmp/${file}"
+            _verify_checksum "/tmp/${file}"
             unzip "/tmp/${file}"
             popd_silent
             rm "/tmp/${file}"

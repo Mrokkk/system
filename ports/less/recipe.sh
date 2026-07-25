@@ -1,6 +1,5 @@
-REPO="https://ftpmirror.gnu.org/gnu/less/less-643.tar.gz"
-VERSION=
-BRANCH=
+REPO="https://ftp.gnu.org/gnu/less/less-643.tar.gz"
+SHA1SUM="ee1f35a340b2631eb0376df7e073f01d86cdfbed"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

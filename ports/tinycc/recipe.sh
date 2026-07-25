@@ -1,5 +1,6 @@
 REPO="https://github.com/TinyCC/tinycc.git"
 BRANCH="release_0_9_27"
+REVISION="d348a9a51d32cece842b7885d27a411436d7887b"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

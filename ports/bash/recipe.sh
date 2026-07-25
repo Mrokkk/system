@@ -1,6 +1,5 @@
 REPO="https://github.com/bminor/bash.git"
-VERSION=
-BRANCH=
+REVISION="6794b5478f660256a1023712b5fc169196ed0a22"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

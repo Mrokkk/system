@@ -1,6 +1,6 @@
 REPO="https://git.savannah.gnu.org/git/grep.git"
-VERSION=
-BRANCH=
+BRANCH="v3.5"
+REVISION="ecb16a23a560a13d356d35ac17b531e6f145e03b"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

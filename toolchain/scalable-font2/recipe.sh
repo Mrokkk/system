@@ -1,4 +1,5 @@
 REPO="https://gitlab.com/bztsrc/scalable-font2.git"
+REVISION="8ac41c8aaed8c9c992527548d2b76074609da7f6"
 
 function build()
 {

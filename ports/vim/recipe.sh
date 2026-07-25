@@ -1,6 +1,6 @@
 REPO="https://github.com/vim/vim.git"
-VERSION=
 BRANCH="v9.1.0983"
+REVISION="d4088edae21659e14ab5f763c820f4eab9d36981"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

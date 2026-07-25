@@ -1,6 +1,6 @@
 REPO="https://github.com/mirror/ncurses.git"
-VERSION=
 BRANCH="v6.4"
+REVISION="79b9071f2be20a24c7be031655a5638f6032f29f"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 

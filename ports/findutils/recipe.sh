@@ -1,6 +1,5 @@
 REPO="https://git.savannah.gnu.org/git/findutils.git"
-VERSION=
-BRANCH=
+REVISION="2be6812e01df4350da25c8e9c63a938d45cdc136"
 
 [[ -n "${CONF_DIR}" ]] && . ${CONF_DIR}/../port.sh
 
