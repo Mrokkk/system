@@ -13,5 +13,7 @@ function build()
 
 function install()
 {
+    mkdir -p "${SYSROOT}/usr/share/doom"
+    rsync -a --checksum "${SRC_DIR}/default.cfg" "${SYSROOT}/usr/share/doom"
     make install -j${NPROC} || exit 1
 }
