@@ -1,4 +1,4 @@
-commit 5c88ecbfddb187d41b56d0aea9a3968e93a55d3a
+commit d3f8f24b6dc63f630a5a050496617aa0f4d29191
 Author: Mrokkk <mrokk@protonmail.com>
 Date:   Sun Apr 6 20:59:02 2025 +0200
 
@@ -6,15 +6,58 @@ Date:   Sun Apr 6 20:59:02 2025 +0200
     
     * add logger
     * add support for 0xe9 debug console
-    * add exit button
     * add QT_NO_DEBUG_OUTPUT flag
-    * change the mouse capture exit keys to Ctrl+Alt+G (like in QEMU)
+    * fix for 5 seconds delay after closing app
+    * workaround for double-free
+    * do not use gamemode
 
+diff --git a/.gitignore b/.gitignore
+index 470a352ea..1cb6b5922 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -64,6 +64,7 @@ CMakeLists.txt.user
+ 
+ # clangd
+ .cache
++compile_commands.json
+ 
+ # Jetbrains CLion
+ .idea
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6338b635e..153f2fed9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -44,6 +44,16 @@ project(86Box
+ include(CPack)
+ include(CMakeDependentOption)
+ 
++set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
++
++if(CMAKE_EXPORT_COMPILE_COMMANDS)
++    execute_process(
++        COMMAND ${CMAKE_COMMAND} -E create_symlink
++            ${CMAKE_BINARY_DIR}/compile_commands.json
++            ${CMAKE_SOURCE_DIR}/compile_commands.json
++    )
++endif()
++
+ # Basic build options
+ if(VCPKG_TOOLCHAIN)
+     # For vcpkg builds we have to respect the linking method used by the
+@@ -233,6 +243,8 @@ if(NOT EMU_COPYRIGHT_YEAR)
+     set(EMU_COPYRIGHT_YEAR 2026)
+ endif()
+ 
++add_compile_options(-ggdb3)
++
+ # Libasan
+ if(LIBASAN)
+     add_compile_options(-fsanitize=address)
 diff --git a/src/86box.c b/src/86box.c
-index ad1cfc519..069672bb0 100644
+index 4f5da88f1..788470cf1 100644
 --- a/src/86box.c
 +++ b/src/86box.c
-@@ -1025,6 +1025,11 @@ pc_full_speed(void)
+@@ -1382,6 +1382,11 @@ pc_full_speed(void)
      atfullspeed = 1;
  }
  
@@ -25,8 +68,8 @@ index ad1cfc519..069672bb0 100644
 +
  /* Initialize modules, ran once, after pc_init. */
  int
- pc_init_modules(void)
-@@ -1304,6 +1309,8 @@ pc_reset_hard_init(void)
+ pc_init_roms(void)
+@@ -1727,6 +1732,8 @@ pc_reset_hard_init(void)
      /* Reset the general machine support modules. */
      io_init();
  
@@ -36,10 +79,10 @@ index ad1cfc519..069672bb0 100644
      timer_init();
  
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 8cf67043f..4dadd2e9c 100644
+index c677c5367..c386086da 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -46,6 +46,8 @@ add_executable(86Box
+@@ -51,6 +51,8 @@ add_executable(86Box
      machine_status.c
  )
  
@@ -49,7 +92,7 @@ index 8cf67043f..4dadd2e9c 100644
      add_compile_definitions(_FILE_OFFSET_BITS=64 _LARGEFILE_SOURCE=1 _LARGEFILE64_SOURCE=1)
  endif()
 diff --git a/src/cpu/x86.c b/src/cpu/x86.c
-index 97ae19f3a..290598143 100644
+index a262328b7..a35995834 100644
 --- a/src/cpu/x86.c
 +++ b/src/cpu/x86.c
 @@ -35,6 +35,7 @@
@@ -69,7 +112,7 @@ index 97ae19f3a..290598143 100644
      if (hard)
          x86_log("x86 reset\n");
 diff --git a/src/cpu/x86seg.c b/src/cpu/x86seg.c
-index 145752237..9186c2391 100644
+index 4e9b9d661..22ec79385 100644
 --- a/src/cpu/x86seg.c
 +++ b/src/cpu/x86seg.c
 @@ -28,6 +28,7 @@
@@ -95,30 +138,11 @@ index 145752237..9186c2391 100644
      addr = (num << 3);
      if ((addr + 7) > idt.limit) {
          if (num == 0x08) {
-diff --git a/src/device/keyboard.c b/src/device/keyboard.c
-index a00968cf7..4187cf32d 100644
---- a/src/device/keyboard.c
-+++ b/src/device/keyboard.c
-@@ -485,13 +485,7 @@ keyboard_isfsexit_up(void)
- int
- keyboard_ismsexit(void)
- {
--    if ((key_prefix_2_1 != 0x000) || (key_prefix_2_2 != 0x000))
--        return ((recv_key_ui[key_prefix_1_1] || recv_key_ui[key_prefix_1_2]) &&
--                (recv_key_ui[key_prefix_2_1] || recv_key_ui[key_prefix_2_2]) &&
--                (recv_key_ui[key_uncapture_1] || recv_key_ui[key_uncapture_2]));
--    else
--        return ((recv_key_ui[key_prefix_1_1] || recv_key_ui[key_prefix_1_2]) &&
--                (recv_key_ui[key_uncapture_1] || recv_key_ui[key_uncapture_2]));
-+    return ((recv_key_ui[0x01d] || recv_key_ui[0x11d]) && (recv_key_ui[0x038] || recv_key_ui[0x138]) && (recv_key_ui[0x022] || recv_key_ui[0x122]));
- }
- 
- /* This is so we can disambiguate scan codes that would otherwise conflict and get
 diff --git a/src/include/86box/log.h b/src/include/86box/log.h
-index 80ed6d108..75d91e0ee 100644
+index c2c732495..65b78a97c 100644
 --- a/src/include/86box/log.h
 +++ b/src/include/86box/log.h
-@@ -34,6 +34,7 @@ extern "C" {
+@@ -33,6 +33,7 @@ extern "C" {
  #define LOG_MINIMUM_REPEAT_ORDER        4               /* Minimum repeat size */
  
  /* Function prototypes. */
@@ -126,59 +150,45 @@ index 80ed6d108..75d91e0ee 100644
  extern void log_set_suppr_seen(void *priv, int suppr_seen);
  extern void log_set_dev_name(void *priv, char *dev_name);
  #ifndef RELEASE_BUILD
-diff --git a/src/include/86box/plat.h b/src/include/86box/plat.h
-index 7ed6e80d4..a1b01bcd0 100644
---- a/src/include/86box/plat.h
-+++ b/src/include/86box/plat.h
-@@ -32,8 +32,8 @@
- /* String ID numbers. */
- enum {
-     STRING_MOUSE_CAPTURE,             /* "Click to capture mouse" */
--    STRING_MOUSE_RELEASE,             /* "Press F8+F12 to release mouse" */
--    STRING_MOUSE_RELEASE_MMB,         /* "Press F8+F12 or middle button to release mouse" */
-+    STRING_MOUSE_RELEASE,             /* "Press Ctrl+Alt+G to release mouse" */
-+    STRING_MOUSE_RELEASE_MMB,         /* "Press Ctrl+Alt+G or middle button to release mouse" */
-     STRING_INVALID_CONFIG,            /* "Invalid configuration" */
-     STRING_NO_ST506_ESDI_CDROM,       /* "MFM/RLL or ESDI CD-ROM drives never existed" */
-     STRING_NET_ERROR,                 /* "Failed to initialize network driver" */
-diff --git a/src/qt/qt_mainwindow.ui b/src/qt/qt_mainwindow.ui
-index ef3cf16c6..12848f090 100644
---- a/src/qt/qt_mainwindow.ui
-+++ b/src/qt/qt_mainwindow.ui
-@@ -259,6 +259,7 @@
-    <addaction name="actionHard_Reset"/>
-    <addaction name="separator"/>
-    <addaction name="actionACPI_Shutdown"/>
-+   <addaction name="actionExit"/>
-    <addaction name="separator"/>
-    <addaction name="actionCtrl_Alt_Del"/>
-    <addaction name="actionCtrl_Alt_Esc"/>
-@@ -356,6 +357,10 @@
-    <property name="menuRole">
-     <enum>QAction::QuitRole</enum>
-    </property>
-+   <property name="icon">
-+    <iconset resource="../qt_resources.qrc">
-+     <normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</normaloff>:/menuicons/qt/icons/acpi_shutdown.ico</iconset>
-+   </property>
-   </action>
-   <action name="actionSettings">
-    <property name="icon">
-diff --git a/src/qt/qt_platform.cpp b/src/qt/qt_platform.cpp
-index e8a02fc3b..62805dcd1 100644
---- a/src/qt/qt_platform.cpp
-+++ b/src/qt/qt_platform.cpp
-@@ -612,7 +612,7 @@ c16stombs(char dst[], const uint16_t src[], int len)
- }
+diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
+index a99308ab1..7c1544c00 100644
+--- a/src/qt/qt_main.cpp
++++ b/src/qt/qt_main.cpp
+@@ -56,8 +56,8 @@ extern "C" {
+ #include <86box/version.h>
+ #include <86box/renderdefs.h>
+ #ifdef Q_OS_LINUX
+-#    define GAMEMODE_AUTO
+-#    include "../unix/gamemode/gamemode_client.h"
++//#    define GAMEMODE_AUTO
++//#    include "../unix/gamemode/gamemode_client.h"
  #endif
+ }
  
--#    define MOUSE_CAPTURE_KEYSEQ "F8+F12"
-+#    define MOUSE_CAPTURE_KEYSEQ "Ctrl+Alt+G"
+@@ -627,7 +627,7 @@ main(int argc, char *argv[])
+     app.setStyle(new StyleOverride());
  
- #ifdef _WIN32
- #    if defined(__amd64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64)
+     bool startMaximized = window_remember && monitor_settings[0].mon_window_maximized;
+-    fprintf(stderr, "Qt: version %s, platform \"%s\"\n", qVersion(), QApplication::platformName().toUtf8().data());
++    //fprintf(stderr, "Qt: version %s, platform \"%s\"\n", qVersion(), QApplication::platformName().toUtf8().data());
+     Preferences::loadTranslators(&app);
+ #ifdef Q_OS_WINDOWS
+     QApplication::setFont(Preferences::getUIFont());
+diff --git a/src/qt/xinput2_mouse.cpp b/src/qt/xinput2_mouse.cpp
+index 5643df4d4..ccb827a9f 100644
+--- a/src/qt/xinput2_mouse.cpp
++++ b/src/qt/xinput2_mouse.cpp
+@@ -243,7 +243,7 @@ xinput2_exit()
+ {
+     if (!exitthread) {
+         exitthread = true;
+-        procThread->wait(5000);
++        procThread->wait(20);
+         procThread->terminate();
+     }
+ }
 diff --git a/src/utils/log.c b/src/utils/log.c
-index 257029b51..b24d17d97 100644
+index 91f805d96..ee6daa0b4 100644
 --- a/src/utils/log.c
 +++ b/src/utils/log.c
 @@ -51,6 +51,18 @@ extern FILE *stdlog;
@@ -200,3 +210,16 @@ index 257029b51..b24d17d97 100644
  void
  log_set_dev_name(void *priv, char *dev_name)
  {
+diff --git a/src/video/video.c b/src/video/video.c
+index 600e59748..81dd38f72 100644
+--- a/src/video/video.c
++++ b/src/video/video.c
+@@ -842,7 +842,7 @@ video_monitor_close(int monitor_index)
+         free(monitors[monitor_index].mon_pal_lookup);
+     if (!monitors[monitor_index].mon_cga_palette_static)
+         free(monitors[monitor_index].mon_cga_palette);
+-    destroy_bitmap(monitors[monitor_index].target_buffer);
++    //destroy_bitmap(monitors[monitor_index].target_buffer); // FIXME: causes double free
+     monitors[monitor_index].target_buffer = NULL;
+     memset(&monitors[monitor_index], 0, sizeof(monitor_t));
+ }

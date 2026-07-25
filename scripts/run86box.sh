@@ -20,11 +20,12 @@ grub_cfg="mnt/boot/grub/grub.cfg"
 write_to "${grub_cfg_content}" "${grub_cfg}"
 sync "${grub_cfg}"
 
-if [[ ! -f "86box.cfg" ]]
+if [[ ! -d "phoenix" ]]
 then
-    cp ../scripts/86box.cfg .
+    mkdir -p "phoenix"
+    cp "../scripts/86box.cfg" "phoenix"
 fi
 
-${base_dir}/emulator_wrapper.py "${box86}" --logfile 86box.log ${@}
+${base_dir}/emulator_wrapper.py "${box86}" --vmpath phoenix -N -L 86box.log ${@}
 
 cleanup

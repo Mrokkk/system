@@ -57,8 +57,6 @@ done
 # For debug: set debug=all
 menu_entry="set timeout=0
 serial --unit=0 --speed=9600
-terminal_input serial
-terminal_output serial
 set default=0
 menuentry "${binary}" {
     if ! ${multiboot_command} /boot/${name} ${args}; then reboot; fi
@@ -85,7 +83,7 @@ fi
 
 if any_file_changed
 then
-    execute_cmd "creating ${iso}... " grub-mkrescue -o "${iso}" "${iso_dir}"
+    execute_cmd "creating ${iso}... " $(binary_from_native_sysroot "grub-mkrescue") -o "${iso}" "${iso_dir}"
 else
     echo "${iso}: up to date"
 fi
