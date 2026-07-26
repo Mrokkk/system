@@ -40,14 +40,14 @@ trace_syscall_template : str = """#include <kernel/trace.h>
 
 syscall_t trace_syscalls[] = {
     { },
-{% for syscall in syscalls %}
+{%- for syscall in syscalls %}
     {
         .name   = "{{ syscall.name }}",
         .ret    = {{ syscall.ret_enum }},
         .nargs  = {{ syscall.arg_types.__len__() }},
         .args   = { {{ syscall.arg_enums|join(', ')  }} },
     },
-{% endfor -%}
+{%- endfor %}
 };
 """
 
