@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <bits/compiler.h>
 
 #define STDIN_FILENO    0
 #define STDOUT_FILENO   1

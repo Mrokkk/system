@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <common/bits.h>
+#include <bits/compiler.h>
 
 void* malloc(size_t size);
 void* calloc(size_t nmemb, size_t size);

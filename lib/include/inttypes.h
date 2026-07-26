@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <bits/compiler.h>
 
 #define __PRI64_PREFIX "l"
 #define __PRIPTR_PREFIX "l"

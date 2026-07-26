@@ -2,6 +2,15 @@
 
 #include <kernel/api/types.h>
 
+#define SEEK_SET    1
+#define SEEK_CUR    2
+#define SEEK_END    3
+
+#define R_OK        4   // Test for read permission
+#define W_OK        2   // Test for write permission
+#define X_OK        1   // Test for execute permission
+#define F_OK        0   // Test for existence
+
 #define O_ACCMODE           3
 #define O_RDONLY            0
 #define O_WRONLY            1

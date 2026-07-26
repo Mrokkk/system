@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/compiler.h>
+
 // The MODE argument to `dlopen' contains one of the following:
 #define RTLD_LAZY           0x00001 // Lazy function call binding.
 #define RTLD_NOW            0x00002 // Immediate function call binding.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sys/types.h>
+#include <bits/compiler.h>
 
 // https://pubs.opengroup.org/onlinepubs/009695399/basedefs/pwd.h.html
 

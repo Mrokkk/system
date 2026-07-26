@@ -5,6 +5,7 @@ REVISION="6794b5478f660256a1023712b5fc169196ed0a22"
 
 function build()
 {
+    export CFLAGS_FOR_BUILD="-Wno-error -std=c99"
     gnu_configuration \
         --enable-alias \
         --enable-job-control \
