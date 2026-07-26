@@ -2,7 +2,7 @@
 
 # TODO: rewrite this in python
 
-base_dir=$(dirname `readlink -f "$0"`)
+base_dir="$(dirname `readlink -f "$0"`)"
 
 . "${base_dir}/utils.sh"
 
@@ -32,15 +32,16 @@ function _recipe_close()
 
 function _verify_checksum()
 {
+    local file="${1}"
     if [[ -n "${SHA1SUM}" ]]
     then
-        local actual="$(sha1sum "${1}" | awk '{print $1;}')"
+        local actual="$(sha1sum "${file}" | awk '{print $1;}')"
         if [[ "${actual}" != "${SHA1SUM}" ]]
         then
             rm "${file}"
             rm -rf "${SRC_DIR}"
             rm -rf "${BUILD_DIR}"
-            die "${1}: wrong checksum: ${actual}; expected: ${SHA1SUM}"
+            die "${file}: wrong checksum: ${actual}; expected: ${SHA1SUM}"
         fi
     fi
 }
@@ -64,13 +65,10 @@ function _prepare()
             then
                 branch_arg="--branch ${BRANCH}"
             fi
-            git clone ${branch_arg} ${revision_arg} --depth 1 ${REPO} ${SRC_DIR}
-        elif [[ "${REPO}" == *"svn"* ]]
-        then
-            svn checkout "${REPO}" "${SRC_DIR}"
+            git clone ${branch_arg} ${revision_arg} --depth 1 "${REPO}" "${SRC_DIR}"
         elif [[ "${REPO}" == *"tar.gz"* ]]
         then
-            local file="$(basename ${REPO})"
+            local file="$(basename "${REPO}")"
             wget ${REPO} -O "/tmp/${file}"
             _verify_checksum "/tmp/${file}"
             tar xf "/tmp/${file}"
@@ -78,7 +76,7 @@ function _prepare()
             rm "/tmp/${file}"
         elif [[ "${REPO}" == *".zip"* ]]
         then
-            local file="$(basename ${REPO})"
+            local file="$(basename "${REPO}")"
             mkdir -p "${SRC_DIR}"
             pushd_silent "${SRC_DIR}"
             wget "${REPO}" -O "/tmp/${file}"
@@ -86,9 +84,11 @@ function _prepare()
             unzip "/tmp/${file}"
             popd_silent
             rm "/tmp/${file}"
+        else
+            die "Unrecognized URL: ${REPO}"
         fi
 
-        pushd_silent ${SRC_DIR}
+        pushd_silent "${SRC_DIR}"
 
         if [[ -d "${CONF_DIR}/patches" ]]
         then
@@ -111,12 +111,11 @@ function _step_execute()
 
     pushd_silent "${BUILD_DIR}"
 
-    (SRC_DIR=${SRC_DIR} \
-    PREFIX=${prefix} \
-    TARGET=${target} \
-    SYSROOT=${sysroot} \
-    NPROC=${nproc} \
-        ${1}) || die "${PKG}: ${1} failed"
+    (SRC_DIR="${SRC_DIR}" \
+    PREFIX="${prefix}" \
+    TARGET="${target}" \
+    SYSROOT="${sysroot}" \
+    NPROC="${nproc}" "${1}") || die "${PKG}: ${1} failed"
 
     success "${PKG}: ${1} succeeded"
 
