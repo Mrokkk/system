@@ -258,6 +258,30 @@ static void voodoofb_fb_setup(uint16_t resx, uint16_t resy, uint16_t bpp)
     framebuffer.visual = FB_VISUAL_TRUECOLOR;
     framebuffer.accel = false;
     framebuffer.ops = &device->ops;
+
+    switch (bpp)
+    {
+        case 16:
+            fb_set_color_bitfield(red,    11, 5);
+            fb_set_color_bitfield(green,  5,  6);
+            fb_set_color_bitfield(blue,   0,  5);
+            fb_set_color_bitfield(transp, 0,  0);
+            break;
+
+        case 24:
+            fb_set_color_bitfield(red,    16, 8);
+            fb_set_color_bitfield(green,  8,  8);
+            fb_set_color_bitfield(blue,   0,  8);
+            fb_set_color_bitfield(transp, 0,  0);
+            break;
+
+        case 32:
+            fb_set_color_bitfield(red,    16, 8);
+            fb_set_color_bitfield(green,  8,  8);
+            fb_set_color_bitfield(blue,   0,  8);
+            fb_set_color_bitfield(transp, 24, 8);
+            break;
+    }
 }
 
 static int voodoofb_fifo_wait(uint32_t entries)

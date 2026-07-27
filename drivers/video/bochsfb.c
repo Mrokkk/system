@@ -106,6 +106,41 @@ static void bochsfb_fb_setup(uint16_t resx, uint16_t resy, uint16_t bpp)
     framebuffer.visual = bpp == 8 ? FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
     framebuffer.accel = false;
     framebuffer.ops = &device->ops;
+
+    switch (bpp)
+    {
+        case 8:
+            // TODO:
+            break;
+
+        case 15:
+            fb_set_color_bitfield(red,    10, 5);
+            fb_set_color_bitfield(green,  5,  5);
+            fb_set_color_bitfield(blue,   0,  5);
+            fb_set_color_bitfield(transp, 0,  0);
+            break;
+
+        case 16:
+            fb_set_color_bitfield(red,    11, 5);
+            fb_set_color_bitfield(green,  5,  6);
+            fb_set_color_bitfield(blue,   0,  5);
+            fb_set_color_bitfield(transp, 0,  0);
+            break;
+
+        case 24:
+            fb_set_color_bitfield(red,    16, 8);
+            fb_set_color_bitfield(green,  8,  8);
+            fb_set_color_bitfield(blue,   0,  8);
+            fb_set_color_bitfield(transp, 0,  0);
+            break;
+
+        case 32:
+            fb_set_color_bitfield(red,    16, 8);
+            fb_set_color_bitfield(green,  8,  8);
+            fb_set_color_bitfield(blue,   0,  8);
+            fb_set_color_bitfield(transp, 24, 8);
+            break;
+    }
 }
 
 static int bochsfb_pixel_format_get(int bpp)

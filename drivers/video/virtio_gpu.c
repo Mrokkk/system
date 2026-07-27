@@ -247,6 +247,11 @@ static void virtio_gpu_fb_setup(void)
     framebuffer.delay.tv_sec = 0;
     framebuffer.delay.tv_usec = 6000;
     framebuffer.ops = &fb_ops;
+
+    fb_set_color_bitfield(red,    16, 8);
+    fb_set_color_bitfield(green,  8,  8);
+    fb_set_color_bitfield(blue,   0,  8);
+    fb_set_color_bitfield(transp, 24, 8);
 }
 
 static void virtio_gpu_fb_dirty_set(const fb_rect_t* rect)

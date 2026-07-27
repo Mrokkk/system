@@ -57,6 +57,7 @@ typedef struct winsize winsize_t;
 typedef struct console_font_op console_font_op_t;
 typedef struct fb_fix_screeninfo fb_fix_screeninfo_t;
 typedef struct fb_var_screeninfo fb_var_screeninfo_t;
+typedef struct fb_bitfield fb_bitfield_t;
 
 struct fb_fix_screeninfo
 {
@@ -70,11 +71,23 @@ struct fb_fix_screeninfo
     int       accel;
 };
 
+struct fb_bitfield
+{
+    uint32_t offset;    // beginning of bitfield
+    uint32_t length;    // length of bitfield
+    uint32_t msb_right; // != 0 : Most significant bit is right
+};
+
 struct fb_var_screeninfo
 {
     uint32_t xres;
     uint32_t yres;
     uint32_t bits_per_pixel;
+
+    struct fb_bitfield red;     // bitfield in fb mem if true color
+    struct fb_bitfield green;   // else only length is significant
+    struct fb_bitfield blue;
+    struct fb_bitfield transp;  // transparency
 };
 
 struct console_font_op

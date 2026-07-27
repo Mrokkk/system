@@ -119,9 +119,13 @@ static int framebuffer_ioctl(file_t*, unsigned long request, void* arg)
                 return errno;
             }
 
-            vinfo->xres = framebuffer.width;
-            vinfo->yres = framebuffer.height;
+            vinfo->xres           = framebuffer.width;
+            vinfo->yres           = framebuffer.height;
             vinfo->bits_per_pixel = framebuffer.bpp;
+            memcpy(&vinfo->red,    &framebuffer.red,    sizeof(fb_bitfield_t));
+            memcpy(&vinfo->green,  &framebuffer.green,  sizeof(fb_bitfield_t));
+            memcpy(&vinfo->blue,   &framebuffer.blue,   sizeof(fb_bitfield_t));
+            memcpy(&vinfo->transp, &framebuffer.transp, sizeof(fb_bitfield_t));
 
             return 0;
 

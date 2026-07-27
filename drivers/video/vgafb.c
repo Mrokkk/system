@@ -112,7 +112,7 @@ static void vgafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.accel    = FB_ACCEL_NONE;
     framebuffer.paddr    = mode->fb_paddr;
     framebuffer.flags    = 0;
-    framebuffer.ops = &vgafb_ops;
+    framebuffer.ops      = &vgafb_ops;
 
     if (prev_fb_paddr != framebuffer.paddr)
     {

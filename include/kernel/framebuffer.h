@@ -28,26 +28,39 @@ typedef struct fb_ops fb_ops_t;
 
 struct framebuffer
 {
-    const char* id;
-    uintptr_t   paddr;
-    uint8_t*    vaddr;
-    size_t      size;
-    size_t      pitch;
-    size_t      width;
-    size_t      height;
-    uint8_t     bpp;
-    uint8_t     type;
-    uint8_t     type_aux;
-    uint8_t     visual;
-    int         accel;
-    int         flags;
-    timeval_t   delay;
-    timer_t     timer;
-    mutex_t     lock;
-    fb_rect_t   dirty;
+    const char*   id;
+    uintptr_t     paddr;
+    uint8_t*      vaddr;
+    size_t        size;
+    size_t        pitch;
+    size_t        width;
+    size_t        height;
+    uint8_t       bpp;
+    fb_bitfield_t red;
+    fb_bitfield_t green;
+    fb_bitfield_t blue;
+    fb_bitfield_t transp;
+    uint8_t       type;
+    uint8_t       type_aux;
+    uint8_t       visual;
+    int           accel;
+    int           flags;
+    timeval_t     delay;
+    timer_t       timer;
+    mutex_t       lock;
+    fb_rect_t     dirty;
 
-    fb_ops_t*   ops;
+    fb_ops_t*     ops;
 };
+
+#define fb_set_color_bitfield(color, off, len) \
+    do \
+    { \
+        framebuffer.color.offset    = off; \
+        framebuffer.color.length    = len; \
+        framebuffer.color.msb_right = 0; \
+    } \
+    while (0)
 
 typedef struct framebuffer framebuffer_t;
 

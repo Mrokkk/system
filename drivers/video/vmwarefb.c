@@ -46,6 +46,11 @@ static void vmwarefb_fb_setup(void)
     framebuffer.visual = FB_VISUAL_TRUECOLOR;
     framebuffer.accel = false;
     framebuffer.ops = &fb_ops;
+
+    fb_set_color_bitfield(red,    16, 8);
+    fb_set_color_bitfield(green,  8,  8);
+    fb_set_color_bitfield(blue,   0,  8);
+    fb_set_color_bitfield(transp, 24, 8);
 }
 
 static int vmwarefb_mode_set(int resx, int resy, int bpp)

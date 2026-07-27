@@ -31,6 +31,14 @@ struct mode_info
     uint8_t   color:1;
     uint8_t   has_lfb:1;
     uint8_t   memory_model;
+    uint8_t   red_mask_size;
+    uint8_t   red_field_position;
+    uint8_t   green_mask_size;
+    uint8_t   green_field_position;
+    uint8_t   blue_mask_size;
+    uint8_t   blue_field_position;
+    uint8_t   rsvd_mask_size;
+    uint8_t   rsvd_field_position;
 };
 
 typedef struct mode_info mode_info_t;
@@ -208,6 +216,15 @@ static void vesafb_mode_fill(
     mode->has_lfb      = vesafb_mode_info->mode_attr.linear_framebuffer;
     mode->memory_model = vesafb_mode_info->memory_model;
 
+    mode->red_mask_size         = vesafb_mode_info->red_mask_size;
+    mode->red_field_position    = vesafb_mode_info->red_field_position;
+    mode->green_mask_size       = vesafb_mode_info->green_mask_size;
+    mode->green_field_position  = vesafb_mode_info->green_field_position;
+    mode->blue_mask_size        = vesafb_mode_info->blue_mask_size;
+    mode->blue_field_position   = vesafb_mode_info->blue_field_position;
+    mode->rsvd_mask_size        = vesafb_mode_info->rsvd_mask_size;
+    mode->rsvd_field_position   = vesafb_mode_info->rsvd_field_position;
+
     if (mode->has_lfb)
     {
         mode->fb_paddr = vesafb_mode_info->framebuffer;
@@ -315,6 +332,14 @@ static int vesafb_framebuffer_setup(mode_info_t* mode)
     framebuffer.accel  = FB_ACCEL_NONE;
     framebuffer.ops    = &vesafb_ops;
     framebuffer.flags  = 0;
+
+#define SET_COLOR(color) \
+    fb_set_color_bitfield(color, mode->color##_field_position, mode->color##_mask_size)
+
+    SET_COLOR(red);
+    SET_COLOR(green);
+    SET_COLOR(blue);
+    fb_set_color_bitfield(transp, 0, 0);
 
     if (prev_paddr != framebuffer.paddr)
     {
