@@ -45,7 +45,7 @@ void real_mode_call_init(void)
 
     low_mem = null_get();
 
-    ASSERT(real_mode_code_size < 0x200);
+    ASSERT(real_mode_code_size < sizeof(low_mem->code));
 
     memcpy(low_mem->code, real_mode_code_address, real_mode_code_size);
     memcpy(low_mem->idt, &idtr_real, sizeof(idtr_real));

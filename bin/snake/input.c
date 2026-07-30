@@ -9,7 +9,6 @@
 #include "macro.h"
 
 static int input_fd = -1;
-static char input_buffer[1];
 static struct termios old_termios;
 
 void input_initialize(void)
@@ -41,16 +40,17 @@ void input_deinitialize(void)
     }
 }
 
-char* input_read(void)
+char input_read(void)
 {
-    int size = read(input_fd, input_buffer, 1);
+    char buf;
+    int size = read(input_fd, &buf, 1);
     if (size == -1)
     {
         die_perror("read");
     }
     else if (size != 0)
     {
-        return input_buffer;
+        return buf;
     }
-    return NULL;
+    return 0;
 }

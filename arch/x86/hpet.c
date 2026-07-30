@@ -13,11 +13,11 @@ void* hpet;
 static uint64_t hpet_read(void);
 
 static clock_source_t hpet_clock = {
-    .name = "hpet",
-    .mask = 0xffffffff,
-    .enable = &hpet_enable,
+    .name     = "hpet",
+    .mask     = 0xffffffff,
+    .enable   = &hpet_enable,
     .shutdown = &hpet_disable,
-    .read = &hpet_read,
+    .read     = &hpet_read,
 };
 
 static inline uint32_t hpet_readl(uint32_t reg)

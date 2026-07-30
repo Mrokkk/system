@@ -50,9 +50,9 @@ set(CMAKE_C_FLAGS
 )
 
 include_directories(
-   ${PROJECT_SOURCE_DIR}/include
-   ${PROJECT_SOURCE_DIR}/common/include
-   ${PROJECT_SOURCE_DIR}/arch/${ARCH}/include
+   SYSTEM ${PROJECT_SOURCE_DIR}/include
+   SYSTEM ${PROJECT_SOURCE_DIR}/common/include
+   SYSTEM ${PROJECT_SOURCE_DIR}/arch/${ARCH}/include
 )
 
 add_subdirectory(common)

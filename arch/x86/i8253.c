@@ -26,13 +26,13 @@ static int i8253_disable(void);
 static uint64_t i8253_read(void);
 
 static clock_source_t i8253_clock = {
-    .name = "i8253",
-    .freq_khz = CLOCK_TICK_RATE / KHz,
-    .mask = I8253_MONOTONIC_LATCH,
+    .name           = "i8253",
+    .freq_khz       = CLOCK_TICK_RATE / KHz,
+    .mask           = I8253_MONOTONIC_LATCH,
     .enable_systick = &i8253_irq_enable,
-    .enable = &i8253_enable,
-    .shutdown = &i8253_disable,
-    .read = &i8253_read,
+    .enable         = &i8253_enable,
+    .shutdown       = &i8253_disable,
+    .read           = &i8253_read,
 };
 
 UNMAP_AFTER_INIT void i8253_initialize(void)

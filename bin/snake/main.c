@@ -25,33 +25,34 @@
 
 #define CELL(x, y) (cells + (y) * xgrids + (x))
 
+typedef struct cell cell_t;
+typedef struct snake_block snake_block_t;
+
 struct cell
 {
     uint16_t x, y;
-    uint8_t flags;
+    uint8_t  flags;
 };
 
 struct snake_block
 {
-    struct cell* cell;
-    struct snake_block* next;
-    struct snake_block* prev;
+    cell_t*        cell;
+    snake_block_t* next;
+    snake_block_t* prev;
 };
 
-struct cell* cells = NULL;
-struct snake_block* head;
+static cell_t* cells = NULL;
+static snake_block_t* head = NULL;
 
-size_t xgrids;
-size_t ygrids;
+static size_t xgrids;
+static size_t ygrids;
 
-char current_direction = 'd';
+static char current_direction = 'd';
 
-uint8_t* framebuffer;
-uint8_t* buffer;
-struct fb_var_screeninfo vinfo;
-size_t pitch;
-
-int input_fd;
+static uint8_t* framebuffer;
+static uint8_t* buffer;
+static struct fb_var_screeninfo vinfo;
+static size_t pitch;
 
 static void snake_create(int segments);
 static void graphic_mode_enter();
@@ -82,6 +83,10 @@ static void signal_handlers_set(void)
     signal(SIGINT,  sighan);
     signal(SIGTSTP, sighan);
     signal(SIGSEGV, sighan);
+    signal(SIGBUS,  sighan);
+    signal(SIGILL,  sighan);
+    signal(SIGIOT,  sighan);
+    signal(SIGQUIT, sighan);
 }
 
 /*
@@ -106,17 +111,17 @@ static void area_refresh(int x, int y, int w, int h)
 }
 */
 
-static void rectangle_draw(int x, int y, int w, int h, uint32_t color)
+static void rectangle_draw(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)
 {
-    for (int i = x; i < x + w; ++i)
+    for (uint32_t i = x; i < x + w; ++i)
     {
-        if (i >= (int)vinfo.xres)
+        if (i >= vinfo.xres)
         {
             break;
         }
-        for (int j = y; j < y + h; ++j)
+        for (uint32_t j = y; j < y + h; ++j)
         {
-            if (j >= (int)vinfo.yres)
+            if (j >= vinfo.yres)
             {
                 break;
             }
@@ -133,7 +138,7 @@ static void map_initialize()
 
     printf("Map: %lu x %lu\n", xgrids, ygrids);
 
-    cells = alloc(sizeof(struct cell) * xgrids * ygrids);
+    cells = alloc(sizeof(*cells) * xgrids * ygrids);
 
     for (size_t i = 0; i < xgrids; ++i)
     {
@@ -166,7 +171,7 @@ static void graphic_mode_initialize()
     pitch = vinfo.xres * ALIGN_TO(vinfo.bits_per_pixel, 8) / 8;
     framebuffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
 
-    if ((int)framebuffer == -1)
+    if (framebuffer == MAP_FAILED)
     {
         die_perror("mmap");
     }
@@ -199,6 +204,7 @@ static void initialize()
 {
     signal_handlers_set();
 
+    srand(time(NULL));
     graphic_mode_initialize();
     input_initialize();
     map_initialize();
@@ -207,7 +213,7 @@ static void initialize()
     graphic_mode_enter();
 }
 
-static inline void cell_draw(struct cell* cell, int color)
+static inline void cell_draw(cell_t* cell, int color)
 {
     rectangle_draw(cell->x * GRID_SIZE, cell->y * GRID_SIZE, GRID_SIZE, GRID_SIZE, color);
 }
@@ -217,17 +223,17 @@ static void snake_create(int segments)
     int x = xgrids / 2 + segments / 2;
     int y = ygrids / 2;
 
-    head = alloc(sizeof(struct snake_block));
+    head = alloc(sizeof(*head));
     head->cell = CELL(x--, y);
     head->cell->flags = FLAGS_SNAKE;
 
-    struct snake_block* last = head;
+    snake_block_t* last = head;
 
     --segments;
 
     while (segments--)
     {
-        struct snake_block* new_block = alloc(sizeof(struct snake_block));
+        snake_block_t* new_block = alloc(sizeof(*new_block));
         new_block->prev = last;
         new_block->cell = CELL(x--, y);
         new_block->cell->flags = FLAGS_SNAKE;
@@ -238,7 +244,7 @@ static void snake_create(int segments)
     head->prev = last;
     last->next = head;
 
-    struct snake_block* snake = head;
+    snake_block_t* snake = head;
     while (snake->next != head)
     {
         cell_draw(snake->cell, FOREGROUND);
@@ -246,7 +252,7 @@ static void snake_create(int segments)
     }
 }
 
-static struct cell* cell_get_adjacent(struct cell* cell, int direction)
+static cell_t* cell_get_adjacent(cell_t* cell, int direction)
 {
     size_t x = cell->x;
     size_t y = cell->y;
@@ -277,15 +283,16 @@ static struct cell* cell_get_adjacent(struct cell* cell, int direction)
                 return CELL(0, y);
             }
             return CELL(x + 1, y);
-        default: return NULL;
+        default:
+            return NULL;
     }
 }
 
 static void snake_move()
 {
-    struct snake_block* new_head;
-    struct snake_block* tail = head->prev;
-    struct cell* old_tail = tail->cell;
+    snake_block_t* new_head;
+    snake_block_t* tail = head->prev;
+    cell_t* old_tail = tail->cell;
 
     struct cell* next_cell = cell_get_adjacent(head->cell, current_direction);
 
@@ -296,7 +303,7 @@ static void snake_move()
 
     if (old_tail->flags & FLAGS_FOOD)
     {
-        new_head = alloc(sizeof(struct snake_block));
+        new_head = alloc(sizeof(*new_head));
         new_head->cell = next_cell;
         new_head->next = head;
         new_head->prev = tail;
@@ -328,18 +335,18 @@ static void snake_move()
     case normal: \
         if (current_direction != opposite) \
         { \
-            current_direction = *c; \
+            current_direction = c; \
         } \
         break
 
-static void snake_direction_set(char* c)
+static void snake_direction_set(char c)
 {
     if (!c)
     {
         return;
     }
 
-    switch (*c)
+    switch (c)
     {
         CHECK_INPUT('w', 's');
         CHECK_INPUT('s', 'w');
@@ -348,23 +355,19 @@ static void snake_direction_set(char* c)
     }
 }
 
-int main()
+static void game_loop()
 {
-    initialize();
+    size_t i = 0;
 
-    int i = 0;
-    srand(time(NULL));
-    struct timespec timeout = {.tv_sec = 0, .tv_nsec = 100000000};
     while (1)
     {
-        pselect(0, NULL, NULL, NULL, &timeout, NULL);
         snake_direction_set(input_read());
 
         snake_move();
 
         if (i % 20 == 0)
         {
-            struct cell* food_cell;
+            cell_t* food_cell;
             do
             {
                 food_cell = CELL(rand() % xgrids, rand() % ygrids);
@@ -379,7 +382,14 @@ int main()
         memcpy(framebuffer, buffer, vinfo.yres * pitch);
 
         ++i;
-    }
 
+        usleep(100000);
+    }
+}
+
+int main()
+{
+    initialize();
+    game_loop();
     return 0;
 }

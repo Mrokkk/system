@@ -34,9 +34,9 @@ static LIST_DECLARE(events);
 static int lastId;
 
 static clock_source_t rtc = {
-    .name = "rtc",
+    .name     = "rtc",
     .freq_khz = RTC_TICK / KHz,
-    .enable = &rtc_enable,
+    .enable   = &rtc_enable,
     .read_rtc = &rtc_read,
     .shutdown = &rtc_disable,
 };

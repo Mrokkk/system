@@ -232,5 +232,5 @@ ENTRY(real_mode_code_address)
 END(real_mode_code_address)
 
 ENTRY(real_mode_code_size)
-    .long real_mode_call_end - protected_16
+    .int real_mode_call_end - protected_16
 END(real_mode_code_size)
