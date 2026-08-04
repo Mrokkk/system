@@ -1,5 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
+
+__BEGIN_DECLS
+
 typedef unsigned char   cc_t;
 typedef unsigned int    speed_t;
 typedef unsigned int    tcflag_t;
@@ -155,3 +159,5 @@ struct termios
 #define TCSANOW     0
 #define TCSADRAIN   1
 #define TCSAFLUSH   2
+
+__END_DECLS

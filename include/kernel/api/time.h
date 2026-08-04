@@ -1,6 +1,10 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
+
 
 struct sigevent;
 
@@ -65,3 +69,5 @@ int timer_settime(
     int flags,
     const struct itimerspec* restrict new_value,
     struct itimerspec* restrict old_value);
+
+__END_DECLS

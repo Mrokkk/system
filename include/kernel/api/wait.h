@@ -1,6 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/signal.h>
+
+__BEGIN_DECLS
 
 #define WNOHANG                 1
 #define WUNTRACED               2
@@ -13,3 +16,5 @@
 #define WIFSTOPPED(status)      (((status) & 0xff) == 0x7f)
 
 int waitpid(int pid, int* status, int options);
+
+__END_DECLS

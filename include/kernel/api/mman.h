@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stddef.h>
+#include <common/bits.h>
+
+__BEGIN_DECLS
 
 #define PROT_NONE       0x0     /* page can not be accessed */
 #define PROT_READ       0x1     /* page can be read */
@@ -25,3 +28,5 @@ void* mmap(void* addr, size_t len, int prot, int flags, int fd, size_t off);
 int munmap(void* addr, size_t len);
 int mprotect(void* addr, size_t len, int prot);
 int mimmutable(void* addr, size_t len);
+
+__END_DECLS

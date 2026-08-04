@@ -1,5 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
+
+__BEGIN_DECLS
+
 #define REBOOT_MAGIC1           ((int)0xabcddcba)
 #define REBOOT_MAGIC2           ((int)0x2137)
 
@@ -8,4 +12,4 @@
 
 int reboot(int magic, int magic2, int cmd);
 
-
+__END_DECLS

@@ -3,7 +3,9 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 #define STDIN_FILENO    0
 #define STDOUT_FILENO   1
@@ -95,6 +97,7 @@ int ferror(FILE* stream);
 int fflush(FILE* stream);
 int fpurge(FILE *stream);
 
+int rename(const char* oldpath, const char* newpath);
 int remove(const char* pathname);
 
 #define P_tmpdir    "/tmp"
@@ -102,3 +105,5 @@ int remove(const char* pathname);
 #define TMP_MAX     238328
 
 char* tmpnam(char* s);
+
+__END_DECLS

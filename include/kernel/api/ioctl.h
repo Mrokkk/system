@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <common/bits.h>
+
+__BEGIN_DECLS
 
 #define KDSETMODE       0x4b3a  // set text/graphics mode
 #define     KD_TEXT     0x00
@@ -105,3 +108,5 @@ struct winsize
 };
 
 int ioctl(int fd, unsigned long request, ...);
+
+__END_DECLS

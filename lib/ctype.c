@@ -19,3 +19,93 @@ const char _ctype_[257] = {
     _L, _L, _L, _L, _L, _L, _L, _L,
     _L, _L, _L, _P, _P, _P, _P, _C
 };
+
+#undef isalnum
+int isalnum(int c)
+{
+    return __inline_isalnum(c);
+}
+
+#undef isalpha
+int isalpha(int c)
+{
+    return __inline_isalpha(c);
+}
+
+#undef isascii
+int isascii(int c)
+{
+    return __inline_isascii(c);
+}
+
+#undef isblank
+int isblank(int c)
+{
+    return __inline_isblank(c);
+}
+
+#undef isdigit
+int isdigit(int c)
+{
+    return __inline_isdigit(c);
+}
+
+#undef islower
+int islower(int c)
+{
+    return __inline_islower(c);
+}
+
+#undef isspace
+int isspace(int c)
+{
+    return __inline_isspace(c);
+}
+
+#undef isupper
+int isupper(int c)
+{
+    return __inline_isupper(c);
+}
+
+#undef iscntrl
+int iscntrl(int c)
+{
+    return __inline_iscntrl(c);
+}
+
+#undef ispunct
+int ispunct(int c)
+{
+    return __inline_ispunct(c);
+}
+
+#undef isprint
+int isprint(int c)
+{
+    return __inline_isprint(c);
+}
+
+#undef isxdigit
+int isxdigit(int c)
+{
+    return __inline_isxdigit(c);
+}
+
+#undef isgraph
+int isgraph(int c)
+{
+    return __inline_isgraph(c);
+}
+
+#undef tolower
+int tolower(int c)
+{
+    return __inline_tolower(c);
+}
+
+#undef toupper
+int toupper(int c)
+{
+    return __inline_toupper(c);
+}

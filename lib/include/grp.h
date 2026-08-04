@@ -1,7 +1,10 @@
 #pragma once
 
 #include <stdio.h>
+#include <sys/cdefs.h>
 #include <sys/types.h>
+
+__BEGIN_DECLS
 
 struct group
 {
@@ -22,3 +25,5 @@ int getgrgid_r(gid_t gid, struct group* group_buf, char* buffer, size_t buffer_s
 int putgrent(const struct group*, FILE*);
 
 int initgroups(char const* user, gid_t);
+
+__END_DECLS

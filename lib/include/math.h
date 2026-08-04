@@ -1,5 +1,9 @@
 #pragma once
 
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+
 typedef float float_t;
 typedef double double_t;
 
@@ -21,6 +25,9 @@ typedef double double_t;
 
 double ceil(double x);
 double floor(double x);
+double fabs(double x);
+float fabsf(float x);
+long double fabsl(long double x);
 
 double exp(double x);
 double log(double x);
@@ -43,3 +50,5 @@ double atan(double x);
 double atan2(double y, double x);
 
 double fmod(double x, double y);
+
+__END_DECLS

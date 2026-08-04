@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdio.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 // File listing canonical interesting mount points
 #define MNTTAB      "/etc/fstab"
@@ -34,3 +37,5 @@ struct mntent* getmntent(FILE* stream);
 FILE* setmntent(char const* filename, char const* type);
 int endmntent(FILE* stream);
 struct mntent* getmntent_r(FILE* stream, struct mntent* mntbuf, char* buf, int buflen);
+
+__END_DECLS

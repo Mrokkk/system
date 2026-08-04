@@ -1,6 +1,10 @@
 #pragma once
 
+#include <sys/cdefs.h>
+
 // https://pubs.opengroup.org/onlinepubs/9699919799.orig/basedefs/locale.h.html
+
+__BEGIN_DECLS
 
 #define LC_CTYPE            0
 #define LC_NUMERIC          1
@@ -56,3 +60,5 @@ struct locale
 
 struct lconv* localeconv(void);
 char* setlocale(int category, const char* locale);
+
+__END_DECLS

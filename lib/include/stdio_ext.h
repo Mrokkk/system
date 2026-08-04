@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdio.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 size_t __fbufsize(FILE* stream);
 size_t __fpending(FILE* stream);
@@ -12,3 +15,5 @@ int __fwriting(FILE* stream);
 int __fsetlocking(FILE* stream, int type);
 void _flushlbf(void);
 void __fpurge(FILE* stream);
+
+__END_DECLS

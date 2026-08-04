@@ -1,7 +1,10 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/dev.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
 
 #define S_IFMT  00170000
 #define S_IFSOCK 0140000
@@ -63,3 +66,5 @@ int chmod(const char* pathname, mode_t mode);
 int fchmod(int fd, mode_t mode);
 mode_t umask(mode_t cmask);
 int mknod(const char* pathname, mode_t mode, dev_t dev);
+
+__END_DECLS

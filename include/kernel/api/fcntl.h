@@ -1,6 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
 
 #define SEEK_SET    1
 #define SEEK_CUR    2
@@ -35,3 +38,5 @@
 
 int fcntl(int fildes, int cmd, ...);
 int open(const char*, int, ...);
+
+__END_DECLS

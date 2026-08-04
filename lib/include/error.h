@@ -1,5 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
+
+__BEGIN_DECLS
+
 void error(int status, int errnum, const char* format, ...);
 
 void error_at_line(
@@ -10,3 +14,5 @@ extern unsigned int error_message_count;
 extern int error_one_per_line;
 
 extern void (*error_print_progname)(void);
+
+__END_DECLS

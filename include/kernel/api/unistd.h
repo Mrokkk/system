@@ -4,6 +4,8 @@
 #include <kernel/api/types.h>
 #include <kernel/api/fcntl.h>
 
+__BEGIN_DECLS
+
 #define _POSIX_ARG_MAX      4096
 #define ARG_MAX             _POSIX_ARG_MAX
 
@@ -60,3 +62,5 @@ ssize_t readlink(const char* pathname, char* buf, size_t bufsiz);
 #define DTRACE_FOLLOW_FORK (1 << 1)
 #define DTRACE_BACKTRACE   (1 << 2)
 int dtrace(int flag);
+
+__END_DECLS

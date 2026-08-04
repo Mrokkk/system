@@ -1,6 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
 
 typedef unsigned long __fsword_t;
 typedef unsigned long fsid_t;
@@ -22,3 +25,5 @@ struct statfs
 
 int statfs(const char* path, struct statfs* buf);
 int fstatfs(int fd, struct statfs* buf);
+
+__END_DECLS

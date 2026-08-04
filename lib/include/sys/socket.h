@@ -1,8 +1,11 @@
 #pragma once
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_socket.h.html
+
+__BEGIN_DECLS
 
 #define SOCK_DGRAM      0
 #define SOCK_RAW        1
@@ -29,3 +32,5 @@ struct sockaddr_storage
 {
     sa_family_t ss_family;
 };
+
+__END_DECLS

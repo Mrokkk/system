@@ -1,9 +1,12 @@
 #pragma once
 
 #include <sys/time.h>
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_resource.h.html
+
+__BEGIN_DECLS
 
 typedef unsigned long rlim_t;
 
@@ -43,3 +46,5 @@ int getrlimit(int resource, struct rlimit* rlp);
 int getrusage(int who, struct rusage* r_usage);
 int setpriority(int which, id_t who, int value);
 int setrlimit(int resource, const struct rlimit* rlp);
+
+__END_DECLS

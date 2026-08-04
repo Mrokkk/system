@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 #include <signal.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 typedef uintptr_t greg_t;
 
@@ -62,3 +65,5 @@ typedef struct ucontext_t
     sigset_t           uc_sigmask;
     mcontext_t         uc_mcontext;
 } ucontext_t;
+
+__END_DECLS

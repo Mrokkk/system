@@ -1,10 +1,12 @@
 #pragma once
 
 #include <locale.h>
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
 #include <kernel/api/time.h>
 
 // https://pubs.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
+
+__BEGIN_DECLS
 
 #define NSEC_PER_SEC    1000000000L // Nanoseconds per second
 #define USEC_PER_SEC    1000000L    // Microseconds per second
@@ -60,3 +62,5 @@ extern long     timezone;
 extern long     altzone;
 extern char*    tzname[2];
 extern int      daylight;
+
+__END_DECLS

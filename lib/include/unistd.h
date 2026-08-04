@@ -1,11 +1,13 @@
 #pragma once
 
 #include <time.h>
+#include <sys/cdefs.h>
 #include <bits/getopt.h>
-#include <common/bits.h>
 #include <kernel/api/unistd.h>
 
 // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/basedefs/unistd.h.html
+
+__BEGIN_DECLS
 
 #define _POSIX_VERSION 200809L
 
@@ -46,3 +48,5 @@ int symlink(const char* target, const char* linkpath);
 extern char** environ;
 
 #endif // __ASSEMBLER__
+
+__END_DECLS

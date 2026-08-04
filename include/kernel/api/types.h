@@ -2,6 +2,9 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <common/bits.h>
+
+__BEGIN_DECLS
 
 // https://pubs.opengroup.org/onlinepubs/009696899/basedefs/sys/types.h.html
 
@@ -29,3 +32,5 @@ typedef uint16_t    uid_t;
 // Additional types
 typedef uint8_t     pgid_t;
 typedef size_t      daddr_t;
+
+__END_DECLS

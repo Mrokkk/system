@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <common/bits.h>
+
+__BEGIN_DECLS
 
 #define ELF_NIDENT    16
 
@@ -322,3 +325,5 @@ typedef struct
         uint32_t a_val; /* Integer value */
     } a_un;
 } elf32_auxv_t;
+
+__END_DECLS

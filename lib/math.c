@@ -9,6 +9,9 @@
 
 BUILTIN1(ceil, double, x);
 BUILTIN1(floor, double, x);
+BUILTIN1(fabs, double, x);
+BUILTIN1(fabsf, float, x);
+BUILTIN1(fabsl, long double, x);
 BUILTIN1(exp, double, x);
 BUILTIN1(log, double, x);
 BUILTIN1(log10, double, x);

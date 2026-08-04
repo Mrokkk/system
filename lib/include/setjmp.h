@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 struct __jmp_buf
 {
@@ -20,3 +23,5 @@ int    setjmp(jmp_buf);
 
 void   siglongjmp(sigjmp_buf, int);
 int    sigsetjmp(sigjmp_buf, int);
+
+__END_DECLS

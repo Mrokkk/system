@@ -1,5 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
+
+__BEGIN_DECLS
+
 #include <bits/getopt.h>
 
 #define no_argument         0
@@ -27,3 +31,5 @@ int getopt_long_only(
     const char* optstring,
     const struct option* longopts,
     int* longindex);
+
+__END_DECLS

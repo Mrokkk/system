@@ -1,6 +1,10 @@
 #ifndef _ASSERT_H
 #define _ASSERT_H
 
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+
 #ifdef __GNUC__
 #define static_assert _Static_assert
 #else
@@ -25,3 +29,5 @@ void __assertion_failed(const char* file, unsigned long line, const char* err);
 #define assert(expr) ((void)0)
 
 #endif
+
+__END_DECLS

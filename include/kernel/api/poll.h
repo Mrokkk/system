@@ -1,7 +1,10 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/time.h>
 #include <kernel/api/signal.h>
+
+__BEGIN_DECLS
 
 #define POLLIN      0x0001
 #define POLLPRI     0x0002
@@ -42,3 +45,5 @@ int pselect(
 
 int select(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout);
 int poll(struct pollfd* fds, unsigned long nfds, int timeout);
+
+__END_DECLS

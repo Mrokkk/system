@@ -1,7 +1,10 @@
 #pragma once
 
 #include <stdint.h>
+#include <common/bits.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
 
 #define DT_UNKNOWN  0
 #define DT_FIFO     1
@@ -23,3 +26,5 @@ struct dirent
 };
 
 int getdents(unsigned int, void*, size_t);
+
+__END_DECLS

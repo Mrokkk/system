@@ -1,6 +1,10 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
+
 
 struct statvfs
 {
@@ -18,3 +22,5 @@ struct statvfs
     unsigned long f_flag;       // Bit mask of f_flag; values
     unsigned long f_namemax;    // Maximum filename length
 };
+
+__END_DECLS

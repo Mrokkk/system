@@ -1,6 +1,8 @@
 #pragma once
 
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 // The MODE argument to `dlopen' contains one of the following:
 #define RTLD_LAZY           0x00001 // Lazy function call binding.
@@ -36,3 +38,5 @@
 void* dlopen(const char* filename, int flags);
 int dlclose(void* handle);
 void* dlsym(void* restrict handle, const char* restrict symbol);
+
+__END_DECLS

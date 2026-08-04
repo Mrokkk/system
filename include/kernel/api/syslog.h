@@ -1,5 +1,9 @@
 #pragma once
 
+#include <common/bits.h>
+
+__BEGIN_DECLS
+
 // Facilities
 #define LOG_USER    (1 << 8)
 
@@ -14,3 +18,5 @@
 #define LOG_CRIT    6
 
 int _syslog(int priority, int option, const char* message);
+
+__END_DECLS

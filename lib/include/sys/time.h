@@ -1,11 +1,13 @@
 #pragma once
 
 #include <sys/poll.h>
+#include <sys/cdefs.h>
 #include <sys/types.h>
-#include <bits/compiler.h>
 #include <kernel/api/time.h>
 
 // https://pubs.opengroup.org/onlinepubs/007904975/basedefs/sys/time.h.html
+
+__BEGIN_DECLS
 
 #define ITIMER_REAL     1
 #define ITIMER_VIRTUAL  2
@@ -23,3 +25,5 @@ int setitimer(
     int which,
     const struct itimerval* restrict value,
     struct itimerval* restrict ovalue);
+
+__END_DECLS

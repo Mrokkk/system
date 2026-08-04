@@ -1,8 +1,9 @@
 #pragma once
 
 #include <stddef.h>
-#include <common/bits.h>
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 void* malloc(size_t size);
 void* calloc(size_t nmemb, size_t size);
@@ -90,3 +91,5 @@ static inline long labs(long j)
 #define MB_CUR_MAX      1
 
 #define ATEXIT_MAX      32
+
+__END_DECLS

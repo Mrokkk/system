@@ -1,7 +1,9 @@
 #pragma once
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
-#include <bits/compiler.h>
+
+__BEGIN_DECLS
 
 // https://pubs.opengroup.org/onlinepubs/009695399/basedefs/pwd.h.html
 
@@ -34,3 +36,5 @@ int getpwuid_r(
 void endpwent(void);
 struct passwd* getpwent(void);
 void setpwent(void);
+
+__END_DECLS

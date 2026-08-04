@@ -1,7 +1,9 @@
 #pragma once
 
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
 #include <kernel/api/signal.h>
+
+__BEGIN_DECLS
 
 typedef int sig_atomic_t;
 
@@ -21,3 +23,5 @@ int sigdelset(sigset_t* set, int signum);
 int sigismember(const sigset_t* set, int signum);
 
 int raise(int sig);
+
+__END_DECLS

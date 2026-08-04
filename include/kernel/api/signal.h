@@ -1,6 +1,10 @@
 #pragma once
 
+#include <common/bits.h>
 #include <kernel/api/types.h>
+
+__BEGIN_DECLS
+
 
 #define SIGHUP       1
 #define SIGINT       2
@@ -168,3 +172,5 @@ struct sigevent
 int signal(int signum, sighandler_t handler);
 int kill(int pid, int signum);
 int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact);
+
+__END_DECLS

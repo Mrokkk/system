@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
 
 #define __PRI64_PREFIX "l"
 #define __PRIPTR_PREFIX "l"
@@ -182,5 +182,9 @@
 #define SCNxFAST32 SCNx32
 #define SCNxFAST64 SCNx64
 
+__BEGIN_DECLS
+
 intmax_t strtoimax(const char* restrict nptr, char** restrict endptr, int base);
 uintmax_t strtoumax(const char* restrict nptr, char** restrict endptr, int base);
+
+__END_DECLS

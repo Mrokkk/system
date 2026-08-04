@@ -1,7 +1,9 @@
 #pragma once
 
 #include <stddef.h>
-#include <bits/compiler.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 void* memset(void* s, int c, size_t n);
 void* memcpy(void* dest, const void* src, size_t n);
@@ -41,3 +43,5 @@ char* strerror(int errnum);
 char* strsignal(int sig);
 const char *sigdescr_np(int sig);
 const char* sigabbrev_np(int sig);
+
+__END_DECLS
