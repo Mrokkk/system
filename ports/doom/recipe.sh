@@ -4,9 +4,9 @@ REPO="https://github.com/Mrokkk/fbDOOM.git"
 
 function build()
 {
-    if [[ ! -f "Makefile" ]]
+    if [[ ! -f "Makefile" ]] || [[ ! -f CMakeCache.txt ]]
     then
-        cmake -DCMAKE_INSTALL_PREFIX="${SYSROOT}" "${SRC_DIR}" || exit 1
+        cmake -DCMAKE_INSTALL_PREFIX="${SYSROOT}" -DCMAKE_INSTALL_DATADIR="${SYSROOT}/usr/share/doom" -DDOOM_DATA_DIR="/usr/share/doom" "${SRC_DIR}" || exit 1
     fi
     make -j${NPROC} || exit 1
 }
