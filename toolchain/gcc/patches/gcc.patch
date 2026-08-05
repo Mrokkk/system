@@ -1,6 +1,6 @@
-commit 6f33300faf880a4817f05740fbafd1d30435d7fe
+commit 670c2cdb1710a63e687cc5dc2093b57a96f2b36c
 Author: Mrokkk <mrokk@protonmail.com>
-Date:   Tue Jun 25 21:42:02 2024 +0200
+Date:   Thu Aug 6 00:35:42 2026 +0200
 
     Support for Phoenix
     
@@ -8,6 +8,7 @@ Date:   Tue Jun 25 21:42:02 2024 +0200
     * add support for shared libs and dynamic executables
     * don't link shared libgcc with libc (for the future)
     * add support for x86_64
+    * libstdc++ support
 
 diff --git a/fixincludes/mkfixinc.sh b/fixincludes/mkfixinc.sh
 index df90720b7..2f5541721 100755
@@ -179,3 +180,77 @@ index 29765bce8..3f18082dd 100644
  SHLIB_MAKE_SOLINK = $(LN_S) $(SHLIB_SONAME) $(SHLIB_DIR)/$(SHLIB_SOLINK)
  SHLIB_INSTALL_SOLINK = $(LN_S) $(SHLIB_SONAME) \
  	$(DESTDIR)$(slibdir)$(SHLIB_SLIBDIR_QUAL)/$(SHLIB_SOLINK)
+diff --git a/libstdc++-v3/acinclude.m4 b/libstdc++-v3/acinclude.m4
+index 49cb0623e..0b3a6d9c1 100644
+--- a/libstdc++-v3/acinclude.m4
++++ b/libstdc++-v3/acinclude.m4
+@@ -1397,7 +1397,7 @@ AC_DEFUN([GLIBCXX_ENABLE_LIBSTDCXX_TIME], [
+         ac_has_nanosleep=yes
+         ac_has_sched_yield=yes
+         ;;
+-      freebsd*|netbsd*|dragonfly*|rtems*)
++      freebsd*|netbsd*|dragonfly*|rtems*|phoenix*)
+         ac_has_clock_monotonic=yes
+         ac_has_clock_realtime=yes
+         ac_has_nanosleep=yes
+@@ -2434,7 +2434,7 @@ AC_DEFUN([GLIBCXX_ENABLE_CLOCALE], [
+       dragonfly* | freebsd*)
+ 	enable_clocale_flag=dragonfly
+ 	;;
+-      openbsd*)
++      openbsd* | phoenix*)
+ 	enable_clocale_flag=newlib
+ 	;;
+       *)
+diff --git a/libstdc++-v3/configure b/libstdc++-v3/configure
+index 9b6027775..e6e58e880 100755
+--- a/libstdc++-v3/configure
++++ b/libstdc++-v3/configure
+@@ -11905,6 +11905,11 @@ else
+     lt_cv_dlopen_libs=
+     ;;
+ 
++  phoenix*)
++    lt_cv_dlopen="dlopen"
++    lt_cv_dlopen_libs=
++    ;;
++
+   cygwin*)
+     lt_cv_dlopen="dlopen"
+     lt_cv_dlopen_libs=
+@@ -29361,7 +29366,7 @@ case "${host}" in
+     # This is a freestanding configuration; there is nothing to do here.
+     ;;
+ 
+-  avr*-*-*)
++  avr*-*-* | *phoenix*)
+     $as_echo "#define HAVE_ACOSF 1" >>confdefs.h
+ 
+     $as_echo "#define HAVE_ASINF 1" >>confdefs.h
+diff --git a/libstdc++-v3/configure.host b/libstdc++-v3/configure.host
+index 9e7c7f02d..5fc8c43f7 100644
+--- a/libstdc++-v3/configure.host
++++ b/libstdc++-v3/configure.host
+@@ -300,6 +300,9 @@ case "${host_os}" in
+   solaris2*)
+     os_include_dir="os/solaris"
+     ;;
++  phoenix*)
++    os_include_dir="os/newlib"
++    ;;
+   tpf)
+     os_include_dir="os/tpf"
+     ;;
+diff --git a/libstdc++-v3/crossconfig.m4 b/libstdc++-v3/crossconfig.m4
+index b3269cb88..d0e4becf9 100644
+--- a/libstdc++-v3/crossconfig.m4
++++ b/libstdc++-v3/crossconfig.m4
+@@ -9,7 +9,7 @@ case "${host}" in
+     # This is a freestanding configuration; there is nothing to do here.
+     ;;
+ 
+-  avr*-*-*)
++  avr*-*-* | *phoenix*)
+     AC_DEFINE(HAVE_ACOSF)
+     AC_DEFINE(HAVE_ASINF)
+     AC_DEFINE(HAVE_ATAN2F)

@@ -5,8 +5,8 @@ REVISION="c891d8dc23e1a46ad9f3e757d09e57b500d40044"
 
 function build()
 {
-    export CFLAGS="-g -O2"
-    export CXXFLAGS="-g -O2"
+    export CFLAGS="-g -O2 -fdiagnostics-color=always"
+    export CXXFLAGS="-g -O2 -fdiagnostics-color=always -std=gnu++11"
 
     if [[ ! -f "Makefile" ]]
     then
@@ -15,7 +15,8 @@ function build()
             --target="${TARGET}" \
             --with-sysroot="${SYSROOT}" \
             --disable-nls \
-            --enable-languages=c \
+            --enable-languages=c,c++ \
+            --disable-libstdcxx-pch \
             --disable-gcov \
             --disable-bootstrap \
             --enable-checking=release \
@@ -27,6 +28,7 @@ function build()
 
     make -O all-gcc -j${NPROC} || exit 1
     make -O all-target-libgcc -j${NPROC} || exit 1
+    #make -O all-target-libstdc++-v3 -j${NPROC} || exit 1
 }
 
 function install()
