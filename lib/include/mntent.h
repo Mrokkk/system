@@ -5,23 +5,23 @@
 
 __BEGIN_DECLS
 
-// File listing canonical interesting mount points
+/* File listing canonical interesting mount points */
 #define MNTTAB      "/etc/fstab"
-// File listing currently active mount points
+/* File listing currently active mount points */
 #define MOUNTED     "/etc/mtab"
 
-// General filesystem types
-#define MNTTYPE_IGNORE      "ignore"    // Ignore this entry
-#define MNTTYPE_NFS         "nfs"       // Network file system
-#define MNTTYPE_SWAP        "swap"      // Swap device
+/* General filesystem types */
+#define MNTTYPE_IGNORE      "ignore"    /* Ignore this entry */
+#define MNTTYPE_NFS         "nfs"       /* Network file system */
+#define MNTTYPE_SWAP        "swap"      /* Swap device */
 
-// Generic mount options
-#define MNTOPT_DEFAULTS     "defaults"  // Use all default options
-#define MNTOPT_RO           "ro"        // Read only
-#define MNTOPT_RW           "rw"        // Read/write
-#define MNTOPT_SUID         "suid"      // Set uid allowed
-#define MNTOPT_NOSUID       "nosuid"    // No set uid allowed
-#define MNTOPT_NOAUTO       "noauto"    // Do not auto mount
+/* Generic mount options */
+#define MNTOPT_DEFAULTS     "defaults"  /* Use all default options */
+#define MNTOPT_RO           "ro"        /* Read only */
+#define MNTOPT_RW           "rw"        /* Read/write */
+#define MNTOPT_SUID         "suid"      /* Set uid allowed */
+#define MNTOPT_NOSUID       "nosuid"    /* No set uid allowed */
+#define MNTOPT_NOAUTO       "noauto"    /* Do not auto mount */
 
 struct mntent
 {

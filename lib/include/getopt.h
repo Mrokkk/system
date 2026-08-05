@@ -1,10 +1,9 @@
 #pragma once
 
 #include <common/bits.h>
+#include <bits/getopt.h>
 
 __BEGIN_DECLS
-
-#include <bits/getopt.h>
 
 #define no_argument         0
 #define required_argument   1

@@ -7,11 +7,11 @@ __BEGIN_DECLS
 
 typedef int sig_atomic_t;
 
-#define SIG_BLOCK       0   // Block signals
-#define SIG_UNBLOCK     1   // Unblock signals
-#define SIG_SETMASK     2   // Set the set of blocked signals
+#define SIG_BLOCK       0   /* Block signals */
+#define SIG_UNBLOCK     1   /* Unblock signals */
+#define SIG_SETMASK     2   /* Set the set of blocked signals */
 
-int sigprocmask(int how, const sigset_t* restrict set, sigset_t* restrict oset);
+int sigprocmask(int how, const sigset_t* __RESTRICT set, sigset_t* __RESTRICT oset);
 int sigsuspend(const sigset_t* sigmask);
 
 int sigemptyset(sigset_t* set);

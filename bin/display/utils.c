@@ -22,7 +22,7 @@ void* file_map(const char* path)
 
     res = mmap(NULL, s.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 
-    if ((int)res == -1)
+    if (res == MAP_FAILED)
     {
         perror(path);
         return NULL;

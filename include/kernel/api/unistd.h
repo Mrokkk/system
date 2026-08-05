@@ -58,7 +58,7 @@ int rmdir(const char* pathname);
 
 ssize_t readlink(const char* pathname, char* buf, size_t bufsiz);
 
-// FIXME: replace later with ptrace
+/* FIXME: replace later with ptrace */
 #define DTRACE_FOLLOW_FORK (1 << 1)
 #define DTRACE_BACKTRACE   (1 << 2)
 int dtrace(int flag);

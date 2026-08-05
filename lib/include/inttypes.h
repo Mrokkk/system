@@ -184,7 +184,15 @@
 
 __BEGIN_DECLS
 
-intmax_t strtoimax(const char* restrict nptr, char** restrict endptr, int base);
-uintmax_t strtoumax(const char* restrict nptr, char** restrict endptr, int base);
+intmax_t strtoimax(const char* __RESTRICT nptr, char** __RESTRICT endptr, int base);
+uintmax_t strtoumax(const char* __RESTRICT nptr, char** __RESTRICT endptr, int base);
+
+typedef struct
+{
+    intmax_t quot; /* Quotient */
+    intmax_t rem;  /* Remainder */
+} imaxdiv_t;
+
+imaxdiv_t imaxdiv(intmax_t numerator, intmax_t denominator);
 
 __END_DECLS

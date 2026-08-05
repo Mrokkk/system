@@ -178,7 +178,7 @@ static void graphic_mode_initialize()
 
     buffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    if ((int)buffer == -1)
+    if (buffer == MAP_FAILED)
     {
         die_perror("mmap buffer");
     }

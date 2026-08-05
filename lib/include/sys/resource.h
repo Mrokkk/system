@@ -4,7 +4,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-// https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_resource.h.html
+/* https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_resource.h.html */
 
 __BEGIN_DECLS
 
@@ -31,14 +31,14 @@ typedef unsigned long rlim_t;
 
 struct rlimit
 {
-    rlim_t rlim_cur;    // the current (soft) limit
-    rlim_t rlim_max;    // the hard limit
+    rlim_t rlim_cur;    /* the current (soft) limit */
+    rlim_t rlim_max;    /* the hard limit */
 };
 
 struct rusage
 {
-    struct timeval ru_utime; // user time used
-    struct timeval ru_stime; // system time used
+    struct timeval ru_utime; /* user time used */
+    struct timeval ru_stime; /* system time used */
 };
 
 int getpriority(int which, id_t who);

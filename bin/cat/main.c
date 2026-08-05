@@ -9,10 +9,11 @@
 
 int main(int argc, char* argv[])
 {
+    void* addr = NULL;
     const char* filename = NULL;
-    int fd, use_mmap = 0;
+    int i, fd = -1, use_mmap = 0;
 
-    for (int i = 1; i < argc; ++i)
+    for (i = 1; i < argc; ++i)
     {
         if (argv[i][0] != '-')
         {
@@ -49,8 +50,8 @@ int main(int argc, char* argv[])
             return EXIT_FAILURE;
         }
 
-        void* addr = mmap(NULL, s.st_size, PROT_READ, 0, fd, 0);
-        if ((int)addr == -1)
+        addr = mmap(NULL, s.st_size, PROT_READ, 0, fd, 0);
+        if (addr == MAP_FAILED)
         {
             perror(filename);
             return EXIT_FAILURE;

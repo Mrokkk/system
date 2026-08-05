@@ -29,27 +29,27 @@ long atol(const char* nptr);
 double atof(const char* nptr);
 
 long strtol(
-    const char* restrict nptr,
-    char** restrict endptr,
+    const char* __RESTRICT nptr,
+    char** __RESTRICT endptr,
     int base);
 
 long long strtoll(
-    const char* restrict nptr,
-    char** restrict endptr,
+    const char* __RESTRICT nptr,
+    char** __RESTRICT endptr,
     int base);
 
 unsigned long strtoul(
-    const char* restrict nptr,
-    char** restrict endptr,
+    const char* __RESTRICT nptr,
+    char** __RESTRICT endptr,
     int base);
 
 unsigned long long strtoull(
-    const char* restrict nptr,
-    char** restrict endptr,
+    const char* __RESTRICT nptr,
+    char** __RESTRICT endptr,
     int base);
 
-double strtod(const char* restrict nptr, char** restrict endptr);
-float strtof(const char* restrict nptr, char** restrict endptr);
+double strtod(const char* __RESTRICT nptr, char** __RESTRICT endptr);
+float strtof(const char* __RESTRICT nptr, char** __RESTRICT endptr);
 long double strtold(const char* nptr, char** endptr);
 
 void qsort(
@@ -75,12 +75,12 @@ void* bsearch(
 int rand(void);
 void srand(unsigned int seed);
 
-static inline int abs(int j)
+static __INLINE int abs(int j)
 {
     return __builtin_abs(j);
 }
 
-static inline long labs(long j)
+static __INLINE long labs(long j)
 {
     return __builtin_abs(j);
 }
@@ -91,5 +91,27 @@ static inline long labs(long j)
 #define MB_CUR_MAX      1
 
 #define ATEXIT_MAX      32
+
+typedef struct
+{
+    int quot; /* Quotient */
+    int rem;  /* Remainder */
+} div_t;
+
+typedef struct
+{
+    long quot; /* Quotient */
+    long rem;  /* Remainder */
+} ldiv_t;
+
+typedef struct
+{
+    long long quot; /* Quotient */
+    long long rem;  /* Remainder */
+} lldiv_t;
+
+div_t div(int numerator, int denominator);
+ldiv_t ldiv(long numerator, long denominator);
+lldiv_t lldiv(long long numerator, long long denominator);
 
 __END_DECLS

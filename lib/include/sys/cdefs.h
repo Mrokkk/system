@@ -1,3 +1,3 @@
 #pragma once
 
-#include <common/bits.h> // IWYU pragma: export
+#include <common/bits.h> /* IWYU pragma: export */

@@ -5,7 +5,7 @@
 #include <sys/types.h>
 #include <kernel/api/time.h>
 
-// https://pubs.opengroup.org/onlinepubs/007904975/basedefs/sys/time.h.html
+/* https://pubs.opengroup.org/onlinepubs/007904975/basedefs/sys/time.h.html */
 
 __BEGIN_DECLS
 
@@ -15,15 +15,15 @@ __BEGIN_DECLS
 
 struct itimerval
 {
-    struct timeval it_interval; // Timer interval
-    struct timeval it_value;    // Current value
+    struct timeval it_interval; /* Timer interval */
+    struct timeval it_value;    /* Current value */
 };
 
 int getitimer(int which, struct itimerval* value);
 
 int setitimer(
     int which,
-    const struct itimerval* restrict value,
-    struct itimerval* restrict ovalue);
+    const struct itimerval* __RESTRICT value,
+    struct itimerval* __RESTRICT ovalue);
 
 __END_DECLS

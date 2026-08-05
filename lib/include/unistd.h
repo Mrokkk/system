@@ -5,17 +5,17 @@
 #include <bits/getopt.h>
 #include <kernel/api/unistd.h>
 
-// https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/basedefs/unistd.h.html
+/* https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/basedefs/unistd.h.html */
 
 __BEGIN_DECLS
 
 #define _POSIX_VERSION 200809L
 
-// Flags for sysconf
+/* Flags for sysconf */
 #define _SC_ARG_MAX         1
 #define _SC_OPEN_MAX        2
 
-// Flags for confstr
+/* Flags for confstr */
 #define _CS_PATH            1
 
 #ifndef __ASSEMBLER__
@@ -47,6 +47,6 @@ int symlink(const char* target, const char* linkpath);
 
 extern char** environ;
 
-#endif // __ASSEMBLER__
+#endif /* __ASSEMBLER__ */
 
 __END_DECLS

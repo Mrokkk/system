@@ -2,7 +2,7 @@
 
 #include <sys/cdefs.h>
 
-// https://pubs.opengroup.org/onlinepubs/9699919799.orig/basedefs/locale.h.html
+/* https://pubs.opengroup.org/onlinepubs/9699919799.orig/basedefs/locale.h.html */
 
 __BEGIN_DECLS
 

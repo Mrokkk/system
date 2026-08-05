@@ -3,7 +3,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-// https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_socket.h.html
+/* https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_socket.h.html */
 
 __BEGIN_DECLS
 
@@ -24,8 +24,8 @@ typedef size_t          socklen_t;
 
 struct sockaddr
 {
-    sa_family_t sa_family;  // Address family
-    char        sa_data[];  // Socket address (variable-length data)
+    sa_family_t sa_family;  /* Address family */
+    char        sa_data[];  /* Socket address (variable-length data) */
 };
 
 struct sockaddr_storage

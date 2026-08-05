@@ -9,10 +9,10 @@ __BEGIN_DECLS
 #define SEEK_CUR    2
 #define SEEK_END    3
 
-#define R_OK        4   // Test for read permission
-#define W_OK        2   // Test for write permission
-#define X_OK        1   // Test for execute permission
-#define F_OK        0   // Test for existence
+#define R_OK        4   /* Test for read permission */
+#define W_OK        2   /* Test for write permission */
+#define X_OK        1   /* Test for execute permission */
+#define F_OK        0   /* Test for existence */
 
 #define O_ACCMODE           3
 #define O_RDONLY            0
@@ -28,11 +28,11 @@ __BEGIN_DECLS
 #define O_CLOEXEC      0x2000
 #define O_DIRECTORY   0x10000
 
-#define F_DUPFD             0 // Duplicate file descriptor.
-#define F_GETFD             1 // Get file descriptor flags.
-#define F_SETFD             2 // Set file descriptor flags.
-#define F_GETFL             3 // Get file status flags
-#define F_SETFL             4 // Set file status flags
+#define F_DUPFD             0 /* Duplicate file descriptor. */
+#define F_GETFD             1 /* Get file descriptor flags. */
+#define F_SETFD             2 /* Set file descriptor flags. */
+#define F_GETFL             3 /* Get file status flags */
+#define F_SETFL             4 /* Set file status flags */
 
 #define FD_CLOEXEC 1
 

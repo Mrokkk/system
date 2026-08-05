@@ -59,8 +59,8 @@ typedef unsigned long sigset_t;
 
 union sigval
 {
-    int    sival_int;   // integer signal value
-    void*  sival_ptr;   // pointer signal value
+    int    sival_int;   /* integer signal value */
+    void*  sival_ptr;   /* pointer signal value */
 };
 
 typedef union sigval sigval_t;
@@ -98,40 +98,40 @@ typedef union sigval sigval_t;
 
 typedef struct
 {
-    int          si_signo;  // Signal number
-    int          si_code;   // Signal code
-    int          si_errno;  // If non-zero, an errno value associated with
-                            // this signal, as defined in <errno.h>
+    int          si_signo;  /* Signal number */
+    int          si_code;   /* Signal code */
+    int          si_errno;  /* If non-zero, an errno value associated with */
+                            /* this signal, as defined in <errno.h> */
 
     union
     {
-        // kill
+        /* kill */
         struct
         {
-            pid_t       _si_pid;     // Sending process ID
-            uid_t       _si_uid;     // Real user ID of sending process
+            pid_t       _si_pid;     /* Sending process ID */
+            uid_t       _si_uid;     /* Real user ID of sending process */
         } _kill;
 
-        // POSIX.1b timers
+        /* POSIX.1b timers */
         struct
         {
-            int         _si_tid;     // Timer ID
-            int         _si_overrun; // Overrun count
-            sigval_t    _si_sigval;  // Signal value
+            int         _si_tid;     /* Timer ID */
+            int         _si_overrun; /* Overrun count */
+            sigval_t    _si_sigval;  /* Signal value */
         } _timer;
 
-        // SIGILL, SIGFPE, SIGSEGV, SIGBUS
+        /* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
         struct
         {
-            void*       _si_addr;    // Memory location which caused fault
+            void*       _si_addr;    /* Memory location which caused fault */
         } _sigfault;
 
-        // SIGCHLD
+        /* SIGCHLD */
         struct
         {
-            pid_t       _si_pid;     // Sending process ID
-            uid_t       _si_uid;     // Real user ID of sending process
-            int         _si_status;  // Exit value or signal
+            pid_t       _si_pid;     /* Sending process ID */
+            uid_t       _si_uid;     /* Real user ID of sending process */
+            int         _si_status;  /* Exit value or signal */
         } _sigchld;
     };
 } siginfo_t;
@@ -162,11 +162,11 @@ struct sigaction
 
 struct sigevent
 {
-    int          sigev_notify;                   // notification type
-    int          sigev_signo;                    // signal number
-    union sigval sigev_value;                    // signal value
-    void         (*sigev_notify_function)(union sigval); // notification function
-    void*        sigev_notify_attributes;        // notification attributes
+    int          sigev_notify;                   /* notification type */
+    int          sigev_signo;                    /* signal number */
+    union sigval sigev_value;                    /* signal value */
+    void         (*sigev_notify_function)(union sigval); /* notification function */
+    void*        sigev_notify_attributes;        /* notification attributes */
 };
 
 int signal(int signum, sighandler_t handler);

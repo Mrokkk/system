@@ -47,20 +47,20 @@ __BEGIN_DECLS
 
 struct stat
 {
-    mode_t  st_mode;    // File mode
-    ino_t   st_ino;     // File serial number
-    dev_t   st_dev;     // Device containing the file
-    nlink_t st_nlink;   // Number of hard links to the file
-    dev_t   st_rdev;    // Device ID (if file is character or block special)
-    uid_t   st_uid;     // User ID of the file's owner
-    gid_t   st_gid;     // Group ID of the file's group
-    size_t  st_size;    // Size of file, in bytes
-    time_t  st_atime;   // Time of last access
-    time_t  st_mtime;   // Time of last modification
-    time_t  st_ctime;   // Time of last status change
+    mode_t  st_mode;    /* File mode */
+    ino_t   st_ino;     /* File serial number */
+    dev_t   st_dev;     /* Device containing the file */
+    nlink_t st_nlink;   /* Number of hard links to the file */
+    dev_t   st_rdev;    /* Device ID (if file is character or block special) */
+    uid_t   st_uid;     /* User ID of the file's owner */
+    gid_t   st_gid;     /* Group ID of the file's group */
+    size_t  st_size;    /* Size of file, in bytes */
+    time_t  st_atime;   /* Time of last access */
+    time_t  st_mtime;   /* Time of last modification */
+    time_t  st_ctime;   /* Time of last status change */
 };
 
-int stat(const char* restrict pathname, struct stat* restrict statbuf);
+int stat(const char* __RESTRICT pathname, struct stat* __RESTRICT statbuf);
 int fstat(int fd, struct stat* statbuf);
 int chmod(const char* pathname, mode_t mode);
 int fchmod(int fd, mode_t mode);

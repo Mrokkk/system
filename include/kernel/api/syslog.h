@@ -4,10 +4,10 @@
 
 __BEGIN_DECLS
 
-// Facilities
+/* Facilities */
 #define LOG_USER    (1 << 8)
 
-// Options
+/* Options */
 #define LOG_CONS    (1 << 9)
 #define LOG_PID     (1 << 10)
 

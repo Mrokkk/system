@@ -161,7 +161,7 @@ int initialize(void)
 
     framebuffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE, fb_fd, 0);
 
-    if ((int)framebuffer == -1)
+    if (framebuffer == MAP_FAILED)
     {
         perror("mmap");
         return EXIT_FAILURE;
@@ -169,7 +169,7 @@ int initialize(void)
 
     buffer = mmap(NULL, vinfo.yres * pitch, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    if ((int)buffer == -1)
+    if (buffer == MAP_FAILED)
     {
         perror("mmap buffer");
         return EXIT_FAILURE;

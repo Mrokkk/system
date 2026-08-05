@@ -9,53 +9,53 @@ __BEGIN_DECLS
 
 enum e_type
 {
-    ET_NONE     = 0, // Unkown Type
-    ET_REL      = 1, // Relocatable File
-    ET_EXEC     = 2, // Executable File
-    ET_DYN      = 3, // Shared object file
+    ET_NONE     = 0, /* Unkown Type */
+    ET_REL      = 1, /* Relocatable File */
+    ET_EXEC     = 2, /* Executable File */
+    ET_DYN      = 3, /* Shared object file */
 };
 
 enum e_ident
 {
-    EI_MAG0     = 0, // 0x7F
-    EI_MAG1     = 1, // 'E'
-    EI_MAG2     = 2, // 'L'
-    EI_MAG3     = 3, // 'F'
-    EI_CLASS    = 4, // Architecture (32/64)
-    EI_DATA     = 5, // Byte Order
-    EI_VERSION  = 6, // ELF Version
-    EI_OSABI    = 7, // OS Specific
-    EI_ABIVERSION = 8, // OS Specific
+    EI_MAG0     = 0, /* 0x7F */
+    EI_MAG1     = 1, /* 'E' */
+    EI_MAG2     = 2, /* 'L' */
+    EI_MAG3     = 3, /* 'F' */
+    EI_CLASS    = 4, /* Architecture (32/64) */
+    EI_DATA     = 5, /* Byte Order */
+    EI_VERSION  = 6, /* ELF Version */
+    EI_OSABI    = 7, /* OS Specific */
+    EI_ABIVERSION = 8, /* OS Specific */
 };
 
 enum e_ident_mag
 {
-    ELFMAG0     = 0x7F, // e_ident[EI_MAG0]
-    ELFMAG1     = 'E', // e_ident[EI_MAG1]
-    ELFMAG2     = 'L', // e_ident[EI_MAG2]
-    ELFMAG3     = 'F', // e_ident[EI_MAG3]
+    ELFMAG0     = 0x7F, /* e_ident[EI_MAG0] */
+    ELFMAG1     = 'E', /* e_ident[EI_MAG1] */
+    ELFMAG2     = 'L', /* e_ident[EI_MAG2] */
+    ELFMAG3     = 'F', /* e_ident[EI_MAG3] */
 };
 
 enum e_ident_class
 {
-    ELFCLASS32  = 1, // 32-bit Architecture
-    ELFCLASS64  = 2, // 64-bit Architecture
+    ELFCLASS32  = 1, /* 32-bit Architecture */
+    ELFCLASS64  = 2, /* 64-bit Architecture */
 };
 
 enum e_ident_data
 {
-    ELFDATA2LSB = 1, // Little Endian
-    ELFDATA2MSB = 2, // Big Endian
+    ELFDATA2LSB = 1, /* Little Endian */
+    ELFDATA2MSB = 2, /* Big Endian */
 };
 
 enum e_machine
 {
-    EM_386      = 3, // x86 Machine Type
+    EM_386      = 3, /* x86 Machine Type */
 };
 
 enum e_version
 {
-    EV_CURRENT  = 1, // ELF Current Version
+    EV_CURRENT  = 1, /* ELF Current Version */
 };
 
 typedef struct elf32_header
@@ -106,27 +106,27 @@ typedef struct elf32_segment_header
     uint32_t sh_name;
 
     uint32_t sh_type;
-#define SHT_NULL        0 // Null section
-#define SHT_PROGBITS    1 // Program information
-#define SHT_SYMTAB      2 // Symbol table
-#define SHT_STRTAB      3 // String table
-#define SHT_RELA        4 // Relocation (w/ addend)
-#define SHT_NOBITS      8 // Not present in file
-#define SHT_REL         9 // Relocation (no addend)
-#define SHT_DYNSYM     11 // Dynamic linker symbol table
+#define SHT_NULL        0 /* Null section */
+#define SHT_PROGBITS    1 /* Program information */
+#define SHT_SYMTAB      2 /* Symbol table */
+#define SHT_STRTAB      3 /* String table */
+#define SHT_RELA        4 /* Relocation (w/ addend) */
+#define SHT_NOBITS      8 /* Not present in file */
+#define SHT_REL         9 /* Relocation (no addend) */
+#define SHT_DYNSYM     11 /* Dynamic linker symbol table */
 
     uint32_t sh_flags;
-#define SHF_WRITE               0x01 // Writable section
-#define SHF_ALLOC               0x02 // Exists in memory
-#define SHF_EXECINSTR           0x04 // Executable machine instructions
-#define SHF_MERGE               0x10 // Data may be merged
-#define SHF_STRINGS             0x20 // Strings
-#define SHF_INFO_LINK           0x40 // Section header table index
-#define SHF_OS_NONCONFORMING    0x100 // OS-specific
-#define SHF_GROUP               0x200 // Member of a group
-#define SHF_TLS                 0x400 // Thread-Local Storage
-#define SHF_MASKOS              0x0ff00000 // OS-specific
-#define SHF_MASKPROC            0xf0000000 // Processor-specific
+#define SHF_WRITE               0x01 /* Writable section */
+#define SHF_ALLOC               0x02 /* Exists in memory */
+#define SHF_EXECINSTR           0x04 /* Executable machine instructions */
+#define SHF_MERGE               0x10 /* Data may be merged */
+#define SHF_STRINGS             0x20 /* Strings */
+#define SHF_INFO_LINK           0x40 /* Section header table index */
+#define SHF_OS_NONCONFORMING    0x100 /* OS-specific */
+#define SHF_GROUP               0x200 /* Member of a group */
+#define SHF_TLS                 0x400 /* Thread-Local Storage */
+#define SHF_MASKOS              0x0ff00000 /* OS-specific */
+#define SHF_MASKPROC            0xf0000000 /* Processor-specific */
 
     uint32_t sh_addr;
     uint32_t sh_offset;

@@ -18,6 +18,14 @@
 #define __END_DECLS
 #endif
 
-#if __STDC_VERSION__ < 199901L
-#define restrict
+#if defined(__cplusplus) || (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L)
+#define __INLINE inline
+#else
+#define __INLINE
+#endif
+
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define __RESTRICT restrict
+#else
+#define __RESTRICT
 #endif

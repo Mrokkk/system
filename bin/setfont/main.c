@@ -39,7 +39,7 @@ int main(int argc, char** argv)
     }
 
     void* addr = mmap(NULL, s.st_size, PROT_READ, 0, font_fd, 0);
-    if ((int)addr == -1)
+    if (addr == MAP_FAILED)
     {
         perror(font_path);
         exit(EXIT_FAILURE);

@@ -37,11 +37,11 @@ struct pollfd
 
 int pselect(
     int nfds,
-    fd_set* restrict readfds,
-    fd_set* restrict writefds,
-    fd_set* restrict errorfds,
-    const struct timespec* restrict timeout,
-    const sigset_t* restrict sigmask);
+    fd_set* __RESTRICT readfds,
+    fd_set* __RESTRICT writefds,
+    fd_set* __RESTRICT errorfds,
+    const struct timespec* __RESTRICT timeout,
+    const sigset_t* __RESTRICT sigmask);
 
 int select(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout);
 int poll(struct pollfd* fds, unsigned long nfds, int timeout);

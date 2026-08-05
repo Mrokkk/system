@@ -31,6 +31,7 @@ set(LIBC_SRC
     confstr.c
     ctype.c
     dirent.c
+    div.c
     dlfcn.c
     env.c
     errno.c

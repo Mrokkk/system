@@ -7,12 +7,12 @@ __BEGIN_DECLS
 
 struct __jmp_buf
 {
-    uint32_t ebx;       // 0
-    uint32_t esi;       // 4
-    uint32_t edi;       // 8
-    uint32_t eip;       // 12
-    uint32_t ebp;       // 16
-    uint32_t esp;       // 20
+    uint32_t ebx;       /* 0 */
+    uint32_t esi;       /* 4 */
+    uint32_t edi;       /* 8 */
+    uint32_t eip;       /* 12 */
+    uint32_t ebp;       /* 16 */
+    uint32_t esp;       /* 20 */
 };
 
 typedef struct __jmp_buf jmp_buf[1];

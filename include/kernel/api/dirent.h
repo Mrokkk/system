@@ -19,7 +19,7 @@ __BEGIN_DECLS
 struct dirent
 {
     ino_t       d_ino;
-    off_t       d_off; // TODO: add support for this
+    off_t       d_off; /* TODO: add support for this */
     uint16_t    d_reclen;
     uint8_t     d_type;
     char        d_name[1];

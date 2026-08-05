@@ -12,15 +12,15 @@ typedef unsigned int    tcflag_t;
 
 struct termios
 {
-    tcflag_t c_iflag;   // input mode flags
-    tcflag_t c_oflag;   // output mode flags
-    tcflag_t c_cflag;   // control mode flags
-    tcflag_t c_lflag;   // local mode flags
-    cc_t c_line;        // line discipline
-    cc_t c_cc[NCCS];    // control characters
+    tcflag_t c_iflag;   /* input mode flags */
+    tcflag_t c_oflag;   /* output mode flags */
+    tcflag_t c_cflag;   /* control mode flags */
+    tcflag_t c_lflag;   /* local mode flags */
+    cc_t c_line;        /* line discipline */
+    cc_t c_cc[NCCS];    /* control characters */
 };
 
-// c_cc characters
+/* c_cc characters */
 #define VINTR       0
 #define VQUIT       1
 #define VERASE      2
@@ -39,7 +39,7 @@ struct termios
 #define VLNEXT      15
 #define VEOL2       16
 
-// c_iflag bits
+/* c_iflag bits */
 #define IGNBRK  0000001
 #define BRKINT  0000002
 #define IGNPAR  0000004
@@ -55,7 +55,7 @@ struct termios
 #define IXOFF   0010000
 #define IMAXBEL 0020000
 
-// c_oflag bits
+/* c_oflag bits */
 #define OPOST   0000001
 #define OLCUC   0000002
 #define ONLCR   0000004
@@ -88,9 +88,9 @@ struct termios
 #define   FF0   0000000
 #define   FF1   0100000
 
-// c_cflag bit meaning
+/* c_cflag bit meaning */
 #define CBAUD   0010017
-#define  B0     0000000 // hang up
+#define  B0     0000000 /* hang up */
 #define  B50    0000001
 #define  B75    0000002
 #define  B110   0000003
@@ -124,10 +124,10 @@ struct termios
 #define  B115200 0010002
 #define  B230400 0010003
 #define  B460800 0010004
-#define CIBAUD    002003600000  // input baud rate (not used)
-#define CRTSCTS   020000000000  // flow control
+#define CIBAUD    002003600000  /* input baud rate (not used) */
+#define CRTSCTS   020000000000  /* flow control */
 
-// c_lflag bits
+/* c_lflag bits */
 #define ISIG    0000001
 #define ICANON  0000002
 #define XCASE   0000004
@@ -144,18 +144,18 @@ struct termios
 #define PENDIN  0040000
 #define IEXTEN  0100000
 
-// tcflow() and TCXONC use these
+/* tcflow() and TCXONC use these */
 #define TCOOFF      0
 #define TCOON       1
 #define TCIOFF      2
 #define TCION       3
 
-// tcflush() and TCFLSH use these
+/* tcflush() and TCFLSH use these */
 #define TCIFLUSH    0
 #define TCOFLUSH    1
 #define TCIOFLUSH   2
 
-// tcsetattr uses these
+/* tcsetattr uses these */
 #define TCSANOW     0
 #define TCSADRAIN   1
 #define TCSAFLUSH   2
